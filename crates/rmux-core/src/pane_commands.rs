@@ -26,6 +26,20 @@ impl<T: Clone + PartialEq, Z> State<T, Z> {
         self.zoomed = None;
         Some(ordinal)
     }
+    pub fn swap_target(&self, focused: &T, direction: Option<Direction>) -> Option<T> {
+        swap_target(self.layout.as_ref()?, focused, direction, self.zoomed.is_some())
+    }
+    /// Commit only the layout change; hosts keep focus/session ownership attached
+    /// to identity and update any traversal-order view list afterward.
+    pub fn swap(&mut self, first: &T, second: &T) -> bool {
+        if !self.layout.as_mut().is_some_and(|tree| tree.swap(first, second)) { return false; }
+        self.zoomed = None;
+        true
+    }
+    pub fn swap_direction(&mut self, focused: &T, direction: Option<Direction>) -> bool {
+        let Some(target) = self.swap_target(focused, direction) else { return false; };
+        self.swap(focused, &target)
+    }
     pub fn resize(&mut self, focused: &T, direction: Direction) -> bool {
         resize(&mut self.layout, focused, direction, self.zoomed.is_some())
     }
@@ -145,6 +159,24 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn swap_commit_preserves_zoom_on_rejection_and_reveals_on_success() {
+        let mut state = State::<i32, i32>::default();
+        state.insert(None, 1, Axis::Columns, false);
+        state.insert(Some(&1), 2, Axis::Columns, false);
+        state.toggle_zoom(Some(1));
+        assert!(!state.swap_direction(&1, Some(Direction::Right)));
+        assert!(!state.swap(&1, &99));
+        assert_eq!(state.zoomed, Some(1));
+        assert_eq!(state.layout.as_ref().unwrap().pane_at(0), Some(&1));
+        assert!(state.swap_direction(&1, None));
+        assert_eq!(state.zoomed, None);
+        assert_eq!(state.layout.as_ref().unwrap().pane_at(1), Some(&1));
+        assert!(state.swap_direction(&1, Some(Direction::Left)));
+        assert_eq!(state.layout.as_ref().unwrap().pane_at(0), Some(&1));
+        assert!(!state.swap_direction(&1, Some(Direction::Left)));
+    }
 
     #[test]
     fn pane_ownership_rejects_stale_requests_without_disturbing_zoom() {

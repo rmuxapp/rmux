@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Pane swap target resolution and commit now belong to shared layout State. Native
+commands/automation use the shared commit while retaining traversal-order view
+updates; browser uses the shared directional transition. Rejected/stale swaps
+preserve zoom, directional swaps are unavailable while zoomed, and next-pane
+swaps reveal the layout without replacing session identity. Ten focused pane
+tests and native/WASM checks pass. No UI runtime check or deployment this cycle.
+A code audit found existing weak search task references, blur cancellation of
+selection timers and TerminalEngine Drop cleanup; this is not runtime evidence
+of leak freedom. Whole-app lifecycle memory remains unverified.
+
 Extended the browser engine memory harness to five output and search/copy
 create/write/close cycles at 1/4/16 panes, including destruction with live search
 handles and explicit search closure. Recorded source and WASM hash with raw data

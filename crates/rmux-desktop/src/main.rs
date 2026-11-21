@@ -2758,19 +2758,15 @@ impl Workspace {
         }
     }
     fn swap_target_index(&self, current: usize, direction: Option<layout::Direction>) -> Option<usize> {
-        let next = rmux_core::pane_commands::swap_target(self.pane_state.layout.as_ref()?, self.panes.get(current)?, direction, self.pane_state.zoomed.is_some())?;
+        let next = self.pane_state.swap_target(self.panes.get(current)?, direction)?;
         self.panes.iter().position(|pane| *pane == next)
     }
     fn swap_panes(&mut self, current: usize, next: usize, cx: &mut Context<Self>) -> bool {
-        let Some(tree) = &mut self.pane_state.layout else {
-            return false;
-        };
-        if tree.swap(&self.panes[current], &self.panes[next]) {
+        if self.pane_state.swap(&self.panes[current], &self.panes[next]) {
             // Keep the pane vector in tree traversal order for save/restore and
             // keyboard cycling. The focused entity and its sessions stay alive.
             self.panes.swap(current, next);
             self.split_drag = None;
-            self.pane_state.zoomed = None;
             cx.notify();
             return true;
         }

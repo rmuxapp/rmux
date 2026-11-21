@@ -366,11 +366,7 @@ impl InputProbe {
                     CommandId::SwapPaneDown => Some(Direction::Down),
                     _ => None,
                 };
-                if let Some(tree) = &mut self.pane_state.layout {
-                    if let Some(next) = rmux_core::pane_commands::swap_target(tree, &self.focused, direction, self.pane_state.zoomed.is_some()) {
-                        if tree.swap(&self.focused, &next) { self.pane_state.zoomed = None; }
-                    }
-                }
+                self.pane_state.swap_direction(&self.focused, direction);
             }
             CommandId::EqualizePanes => {
                 self.pane_state.equalize();
