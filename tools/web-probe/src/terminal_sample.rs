@@ -15,6 +15,7 @@ pub(crate) struct TerminalSample {
     last_find_query: String,
     frame: Frame,
     font_revision: u64,
+    measured_cells: Option<CellMetrics>,
     pub(crate) font_size: f32,
     rows: row_cache::RowCache,
     cursor_cache: row_cache::CursorCache,
@@ -121,7 +122,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, measured_cells: None, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -292,9 +293,14 @@ impl Render for TerminalSample {
                 if this.font_revision != revision {
                     this.rows.release(); this.cursor_cache = Default::default();
                     this.font_revision = revision;
+                    this.measured_cells = None;
                 }
                 let family: SharedString = "Fira Mono".into();
-                let cells = CellMetrics::measured(this.font_size, family.clone(), window);
+                // Font metrics are logical pixels, independent of pane bounds.
+                // Keep this small value across hidden-pane cache reclamation;
+                // only font changes require another text-system measurement.
+                let cells = *this.measured_cells.get_or_insert_with(||
+                    CellMetrics::measured(this.font_size, family.clone(), window));
                 let content = crate::cell_metrics::content_bounds(bounds, 8);
                 this.selection_geometry = Some((content,cells));
                 let (columns, height) = cells.grid_size(content.size);
@@ -416,6 +422,7 @@ impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
         let next = CellMetrics::new(delta.map_or(14., |delta| self.font_size + delta)).font_size;
         if next == self.font_size { return; }
         self.font_size = next;
+        self.measured_cells = None;
         self.rows.release();
         self.cursor_cache = Default::default();
         self.selection_geometry = None;

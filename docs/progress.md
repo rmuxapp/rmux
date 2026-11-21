@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser terminal rendering now reuses measured cell metrics across ordinary
+redraws, pane resizing and workspace switches. The small cached value invalidates
+on terminal font-size changes or optional-font registration; glyph/row caches
+still release when a terminal is hidden. This removes repeated font resolution,
+advance, ascent and descent queries from unchanged redraws. WASM build passes;
+reviewed both invalidation paths against font loading and zoom. No runtime speed
+or memory improvement is claimed without measurement. Not deployed.
+
 Published GitHub Shared WASM demo run 44950500137 (a4740dc) to rmux.app via
 Cloudflare deployment b179207d. The artifact includes workspace/group rename and
 workspace pinning. Production embedded-demo smoke verified Cmd+Shift+R rename,
