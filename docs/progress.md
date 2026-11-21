@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Published shared WASM source 246240b to rmux.app from successful GitHub run
+44944665222. Cloudflare deployment c3c998c4; the local site imported the exact CI
+artifact and verified WASM hashes before uploading static output. Website source
+stays off GitHub. Production smoke passed sidebar multi-selection, Cmd+P, the
+correct grouping hint, palette grouping and Cmd+F search/match selection.
+Screenshot: target/live-demo-246240b.jpg. Native downloads remain v0.1.4. This
+updates the published demo through the recent shared workspace/search/copy work;
+it does not establish full application parity or performance acceptance.
+
 Resolved the missing grouping hint: this was a real keybinding conflict, not a
 lost focus handle. Cmd+Shift+G for grouping was shadowed by terminal Find Previous.
 Grouping now uses Ctrl+Cmd+Shift+G on macOS; Ctrl+Alt+Shift+G elsewhere is unchanged.

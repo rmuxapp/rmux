@@ -7,10 +7,13 @@ the architectural target.
 
 ## Published versus shared build
 
-The Cloudflare site now embeds the optimized shared Rust/GPUI demo from GitHub
-run 44939199824, source a18ec98 (Cloudflare deployment b6c3a2a9). Production splitting, numbered-pane selection, input, zoom and click-to-restore were verified at rmux.app.
-The old JavaScript/ghostty-web layout imitation is no longer published. The marketing
-site remains local and off GitHub. Newer changes on main are not yet deployed.
+The Cloudflare site embeds the optimized shared Rust/GPUI demo from GitHub
+run 44944665222, source 246240b (Cloudflare deployment c3c998c4). Production
+multi-selection, Cmd+P from sidebar focus, the corrected grouping shortcut hint,
+palette grouping and terminal search were verified at rmux.app. This includes
+the recent shared ownership, search, copy handling and workspace improvements.
+The old JavaScript/ghostty-web layout imitation is no longer published. The
+marketing site remains local and off GitHub; native downloads remain v0.1.4.
 
 `tools/web-probe` contains the shared browser application under development. It uses GPUI CE
 0.3.0 for browser rendering while desktop remains on GPUI 0.2.2. The browser
