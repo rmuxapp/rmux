@@ -6,7 +6,7 @@ rust = { version = "1.99.1", targets = ["wasm32-unknown-unknown"] }
 
 [tasks.build]
 depends = ["build-native-vt"]
-run = ["npm ci --ignore-scripts", "cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html engine.js legacy-engine.js native-vt.js native-vt-render.js native-vt-selection.js dist/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist/libghostty-vt-LICENSE", "cp node_modules/ghostty-web/dist/ghostty-web.js node_modules/ghostty-web/dist/ghostty-vt.wasm node_modules/ghostty-web/LICENSE dist/"]
+run = ["cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html engine.js native-vt.js native-vt-render.js native-vt-selection.js dist/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist/libghostty-vt-LICENSE"]
 
 [tasks.serve]
 run = "python -m http.server 4319 --bind 127.0.0.1 --directory dist"
@@ -28,5 +28,15 @@ description = "Measure the current direct engine adapter across 1/4/16 panes"
 run = "node scripts/bench-native-vt.mjs"
 
 [tasks.bench-browser-engine]
+depends = ["prepare-legacy-benchmark"]
 description = "Measure the Ghostty WASM/JSON boundary at 1, 4 and 16 panes (build first)"
 run = "node scripts/bench-browser-engine.mjs"
+
+[tasks.build-release]
+description = "Build the optimized shared UI artifact for static hosting"
+depends = ["build-native-vt"]
+run = ["cargo build --locked --release --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist-release target/wasm32-unknown-unknown/release/rmux_web_probe.wasm", "cp index.html engine.js native-vt.js native-vt-render.js native-vt-selection.js dist-release/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist-release/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist-release/libghostty-vt-LICENSE", "cp ../../LICENSE dist-release/rmux-LICENSE", "node scripts/report-release.mjs"]
+
+[tasks.prepare-legacy-benchmark]
+description = "Prepare historical ghostty-web benchmark dependencies only"
+run = ["npm ci --ignore-scripts", "mkdir -p dist", "cp legacy-engine.js dist/", "cp node_modules/ghostty-web/dist/ghostty-web.js node_modules/ghostty-web/dist/ghostty-vt.wasm node_modules/ghostty-web/LICENSE dist/"]

@@ -24,3 +24,7 @@ unicode-segmentation = "1.13.3"
 
 [profile.dev]
 debug = 0
+
+[profile.release]
+lto = "thin"
+strip = "debuginfo"

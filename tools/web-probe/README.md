@@ -1,5 +1,15 @@
 # Shared rmux web compatibility probe
 
+`mise run build` keeps the fast development build in `dist`. It no longer
+installs or copies the retired ghostty-web runtime. Historical benchmarks install
+their own dependencies through `prepare-legacy-benchmark`.
+
+The **Shared WASM demo** GitHub workflow runs `mise run build-release` and uploads
+`rmux-shared-demo`, an optimized static bundle in `dist-release`. It includes
+raw/gzip/Brotli WASM byte counts and SHA-256 hashes in `build-sizes.json`. These
+are payload measurements, not browser memory or latency measurements. The
+workflow builds artifacts only; publishing the local Cloudflare site is separate.
+
 Shift+PageUp/Down and Shift+Home/End use the same scroll command type and
 navigation calculation as desktop. The palette also offers Scroll to Top and
 Scroll to Bottom. Browser checks cover top, page overlap and the bottom command.

@@ -1,0 +1,62 @@
+name: Shared WASM demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - tools/web-probe/**
+      - crates/rmux-core/**
+      - crates/rmux-desktop/src/**
+      - scripts/build-ghostty-source.sh
+      - mise.toml
+      - .github/workflows/shared-demo.yml
+permissions:
+  contents: read
+concurrency:
+  group: shared-demo-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: macos-15
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: tools/web-probe
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db
+        with:
+          version: 2026.11.8
+      - name: Prepare pinned browser tools
+        run: mise install
+      - id: cache
+        uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/web-probe/target/release
+            tools/web-probe/target/wasm32-unknown-unknown/release
+            .deps
+          key: shared-demo-${{ runner.os }}-${{ hashFiles('tools/web-probe/Cargo.lock', 'tools/web-probe/Cargo.toml', 'tools/web-probe/mise.toml', 'mise.toml') }}-${{ github.sha }}
+          restore-keys: shared-demo-${{ runner.os }}-
+      - name: Build optimized shared UI
+        run: mise run build-release
+      - name: Check native engine adapter
+        run: mise run check-native-vt
+      - name: Cache compiled dependencies
+        if: success() && steps.cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            tools/web-probe/target/release
+            tools/web-probe/target/wasm32-unknown-unknown/release
+            .deps
+          key: shared-demo-${{ runner.os }}-${{ hashFiles('tools/web-probe/Cargo.lock', 'tools/web-probe/Cargo.toml', 'tools/web-probe/mise.toml', 'mise.toml') }}-${{ github.sha }}
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rmux-shared-demo
+          path: tools/web-probe/dist-release/
+          if-no-files-found: error
