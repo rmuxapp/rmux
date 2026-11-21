@@ -1695,15 +1695,15 @@ impl TerminalView {
     fn copy_selection(&mut self, unwrap: bool, cx: &mut Context<Self>) {
         // Latest user intent wins, including changing copy modes while an older
         // export waits on output. Invalidate it before canceling its UI task.
-        let ticket = clipboard::begin();
+        let request = clipboard::PendingCopy::new();
         self.clipboard_task = None;
-        let export = self.session.clipboard_export(unwrap, move || clipboard::current(ticket));
+        let export = self.session.clipboard_export(unwrap, request.checker());
         let executor = cx.background_executor().clone();
         self.clipboard_task = Some(cx.spawn(async move |entity, cx| {
             let result = executor.spawn(async move { export() }).await;
             let _ = entity.update(cx, |this, cx| {
                 this.clipboard_task = None;
-                if !clipboard::current(ticket) { return; }
+                if !request.current() { return; }
                 match result {
                     Ok(Some(text)) => clipboard::write(ClipboardItem::new_string(text), cx),
                     Ok(None) => {},

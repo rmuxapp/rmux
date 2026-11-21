@@ -1,5 +1,16 @@
 # rmux performance acceptance plan
 
+## Cancel abandoned clipboard exports
+
+Native copies carry a per-request cancellation guard owned by the UI task.
+Dropping that task now stops the background worker's parser-lock retries, even
+if no later clipboard write changes the global generation. This avoids retaining
+an engine or polling indefinitely after abandoning a copy. Cancellation of an
+older request cannot invalidate a newer request in another pane. Focused tests
+exercise unpolled-task destruction and cancellation under a held parser lock;
+this is a lifecycle fix, not a measured latency improvement. An export already
+formatting under the lock still finishes its bounded (16 MiB) operation.
+
 ## Explicit process shutdown on close
 
 Current debug source reproduced the lingering-child observation at eight panes.

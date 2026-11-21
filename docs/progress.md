@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Native clipboard exports now stop waiting for the parser when their owning UI
+task is canceled (selection changes, history clear, or pane destruction). A
+per-request drop guard complements global clipboard ordering without canceling
+a newer copy in another pane. Focused tests cover dropping an unpolled task,
+cross-request isolation, and cancellation while the parser remains locked.
+Formatting already in progress remains bounded to 16 MiB and is not preempted.
+
 Native Clear Scrollback now uses the bounded input worker queue rather than
 acquiring the parser lock on the UI thread. Completion wakes the UI even when
 no PTY bytes are produced; full/closed queues report an error. The worker keeps
