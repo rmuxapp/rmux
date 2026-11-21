@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Added the Shared WASM demo GitHub workflow and optimized `build-release` artifact
+path. Development stays on the quick unoptimized build; normal builds no longer
+install/copy the retired ghostty-web benchmark dependency. Release packaging
+includes dependency/font notices, source licenses and raw/gzip/Brotli WASM size
+reports. The development UI module measured 86,695,622 bytes raw / 12,455,794 gzip.
+First optimized CI run: 44929617746; packaging follow-up: 44929803785. At this
+checkpoint the first is compiling and the follow-up is pending, so optimized
+sizes and successful artifact production are not yet verified. Native/browser
+parity documentation was consolidated to remove superseded migration claims.
+
 Aligned browser terminal initialization with desktop: shared Rust foreground
 (220,223,230), background (18,20,26), and 4 MiB scrollback limit are passed through
 the WASM adapter. Native initialization now also reads the existing shared color
