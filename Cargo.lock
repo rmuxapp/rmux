@@ -5400,6 +5400,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmux-core"
+version = "0.1.4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "rmux-desktop"
 version = "0.1.4"
 dependencies = [
@@ -5421,6 +5428,7 @@ dependencies = [
  "objc2-web-kit",
  "pulldown-cmark",
  "raw-window-handle",
+ "rmux-core",
  "rmux-terminal",
  "serde",
  "serde_json",

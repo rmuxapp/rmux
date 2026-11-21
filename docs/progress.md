@@ -2,6 +2,20 @@
 
 ## Current implementation focus
 
+Started the shared-browser architecture work after confirming Rustable hosts its
+actual application UI while rmux's current site is a separate JavaScript showcase.
+Moved the existing pane tree, directional navigation and focus history unchanged
+into `rmux-core`, consumed by desktop. This is shared behavior groundwork, not a
+shared browser UI yet. All 15 core tests and the desktop compile pass.
+`docs/browser-ui.md` records the migration path and browser
+backend candidates; no renderer dependency has changed.
+
+Prepared v0.1.4 and dispatched GitHub Release run 44915722957. Publication is
+pending. Fixed the deployed WASM showcase's stale terminal cells with an explicit
+initial reset/clear, reproduced and checked across repeated WASM reuse; hid the
+contenteditable browser caret and verified clean workspace switching on rmux.app.
+The site remains local-only; it is not the actual Rust UI compiled for the web.
+
 Added `rmuxctl focus-back --window ID` and `focus-forward --window ID` with
 optional `--activate`, command help and offline shell completion. They map to
 the existing focus-history RPC and require explicit window ownership. A focused

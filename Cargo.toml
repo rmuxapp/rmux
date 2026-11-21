@@ -1,5 +1,5 @@
 [workspace]
-members = ["crates/rmux-terminal", "crates/rmux-desktop", "crates/rmux-cli"]
+members = ["crates/rmux-core", "crates/rmux-terminal", "crates/rmux-desktop", "crates/rmux-cli"]
 resolver = "3"
 exclude = ["vendor/mac-usernotifications"]
 
