@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser host now handles CommandPalette when sidebar clicks move focus outside
+the active workspace's action path. It restores the active terminal context and
+opens that workspace's palette without clearing multi-selection. WASM build
+passed. Browser smoke verified Cmd-click selection → Cmd+P → query, then Escape
+and sample `echo focus-restored` input, with both selected rows retained.
+Screenshot: target/sidebar-palette-focus.jpg. Shortcut hint was missing in this
+opening path; hint/context parity remains open. Not deployed. Native code was
+unchanged; full shared application entry point remains open.
+
 Group Selected Workspaces now uses shared workspace ownership transitions in
 native UI and browser, with native automation also using the same multi-member
 creation operation. Source anchors retain their slots, selection follows identity,

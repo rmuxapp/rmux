@@ -217,9 +217,12 @@ impl InputProbe {
     }
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
+        self.focus_terminal(window, cx);
+        cx.notify();
+    }
+    fn focus_terminal(&self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         else { self.empty_focus.focus(window,cx); }
-        cx.notify();
     }
     fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, cx: &mut Context<Self>) {
         self.workspace_results = workspaces;

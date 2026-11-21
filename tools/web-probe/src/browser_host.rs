@@ -185,6 +185,17 @@ impl Render for BrowserHost {
         div().size_full().relative().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
             .child(crate::sidebar_interaction::drag_capture(cx))
             .map(|root| crate::workspace_actions::bind(root, cx))
+            // Sidebar clicks focus this host, outside the workspace action path.
+            // Resolve palette commands here too, restoring the active terminal
+            // context without changing sidebar selection.
+            .on_action(cx.listener(|this, _: &crate::CommandPalette, window, cx| {
+                if let Some((_, workspace)) = this.workspace_state.entries.get(this.workspace_state.active) {
+                    workspace.update(cx, |workspace, cx| {
+                        workspace.focus_terminal(window, cx);
+                        workspace.open_palette(window, cx);
+                    });
+                }
+            }))
             .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(width)
                 .child(sidebar_presentation::header()
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
