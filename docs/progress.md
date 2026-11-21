@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Browser split-tab and join-pane commands now use the same transfer cleanup as
+dragging a tab: session/output ownership is preserved while source render caches,
+selection gestures and held input are released. Splitting reuses `take_tab`;
+joining releases every transferred tab, including inactive tabs, and drops the
+source tab menu subscriptions. WASM cargo check passed. This follow-up still
+needs a GitHub artifact and live split/join interaction check before deployment.
+
 Native clipboard exports now stop waiting for the parser when their owning UI
 task is canceled (selection changes, history clear, or pane destruction). A
 per-request drop guard complements global clipboard ordering without canceling

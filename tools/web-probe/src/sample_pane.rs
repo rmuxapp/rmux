@@ -51,13 +51,8 @@ impl SamplePane {
     pub fn take_active_for_split(&mut self, cx: &mut Context<Self>) -> Option<TabTransfer> {
         if self.terminals.len() < 2 { return None; }
         self.rename = None;
-        let terminal = self.terminals.remove(self.terminals.active_index());
-        let id = terminal.entity_id();
-        let label = self.labels.remove(&id).expect("tab label follows terminal ownership");
-        self.tab_scroll.scroll_to_item(self.terminals.active_index());
-        cx.notify();
-        Some(TabTransfer { terminals: vec![terminal], labels: [(id, label)].into_iter().collect(),
-            active: 0, next_number: self.next_number })
+        let id = self.terminals.active()?.entity_id();
+        self.take_tab(id, cx)
     }
     pub fn from_transfer(transfer: TabTransfer) -> Self {
         Self { scope: None, menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
@@ -95,6 +90,11 @@ impl SamplePane {
 
     pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> TabTransfer {
         self.rename = None;
+        self.menu = None;
+        self.menu_blur = None;
+        // Joining panes changes the layout owner just like dragging one tab.
+        // Include inactive tabs: their cached geometry belongs to this pane too.
+        self.release_render_caches(cx);
         let active = self.terminals.active_index();
         let transfer = TabTransfer { terminals: self.terminals.take_all(),
             labels: std::mem::take(&mut self.labels), active, next_number: self.next_number };
