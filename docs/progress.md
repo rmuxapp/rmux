@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Cross-pane pointer transfer now releases the moved terminal's rendering caches
+and transient input gestures before changing owners. This preserves the engine
+and session while rebuilding cursor/selection geometry at the destination.
+Browser build and native-VT adapter checks pass; local transfer retained output,
+removed the empty source pane and accepted subsequent input. Screenshot:
+`target/browser-transfer-cache-reset.jpg`. The earlier possible source-pane
+text artifact is not yet conclusively reproduced or attributed to this change.
+
 Browser tab dragging now transfers existing terminal entities between panes in
 the same workspace, inserting before a target tab or appending in empty strip
 space. The workspace validates source/destination identities, rename state and

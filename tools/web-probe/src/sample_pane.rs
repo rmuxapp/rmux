@@ -72,6 +72,10 @@ impl SamplePane {
         if self.rename.is_some() { return None; }
         let index = self.terminals.iter().position(|terminal| terminal.entity_id() == id)?;
         let terminal = self.terminals.remove(index);
+        // The terminal is changing layout/focus owners. Retain its engine and
+        // session, but end transient input gestures and rebuild geometry at the
+        // destination instead of carrying source-pane selection/cursor bounds.
+        terminal.update(cx, |terminal, cx| terminal.release_render_cache(cx));
         let label = self.labels.remove(&id).expect("tab label follows terminal ownership");
         self.menu = None;
         self.menu_blur = None;
