@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Shared IME layout now covers platform range bounds and pointer-to-UTF-16 hit
+testing as well as painting. Browser no longer returns a fixed cursor rectangle
+for every range or zero for every point. The terminal origin stays separate from
+the composition caret, avoiding applying selection offsets twice. Native and
+WASM checks pass; actual IME interaction remains unverified.
+
 Extracted native terminal IME overlay into shared preedit_view: underlined text,
 selected-range background and composition caret placement now serve both hosts.
 Platform shaping stays in text_layout adapters, including native input bounds.

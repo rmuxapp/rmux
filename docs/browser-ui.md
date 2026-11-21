@@ -24,7 +24,8 @@ platform services are still separate. Do not describe it as full parity yet.
   command identities, palette matching, terminal frames and style runs.
 - **Views:** native palette and text field, sidebar/tab/pane presentation,
   recursive split layout and interaction, icons, row cache/painter, cell metrics,
-  cursor geometry, IME preedit overlay and draggable scrollback indicator.
+  cursor geometry, IME preedit overlay/range bounds/hit testing and draggable
+  scrollback indicator.
 - **Input:** shared composition model, workspace/pane/tab shortcut definitions,
   tab action dispatch, fractional wheel accumulation and Shift+PageUp/Down/Home/End.
   Delivered-key tracking is shared too: shifted aliases pair with their original

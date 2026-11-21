@@ -2237,28 +2237,8 @@ impl EntityInputHandler for TerminalView {
         _: &mut Context<Self>,
     ) -> Option<Bounds<Pixels>> {
         let (x, y) = self.frame.cursor.unwrap_or_default();
-        let (offset, width) = if self.composition.text.is_empty() {
-            (px(0.), px(self.cells.width))
-        } else {
-            let line = shape_preedit(
-                &self.composition.text,
-                self.cells,
-                &self.font_family,
-                window,
-            );
-            let range = self.composition.byte_range(range);
-            let start = line.x_for_index(range.start);
-            let end = line.x_for_index(range.end);
-            (start.min(end), (end - start).abs().max(px(2.)))
-        };
-        Some(Bounds::new(
-            self.last_bounds.origin
-                + point(
-                    px(x as f32 * self.cells.width) + offset,
-                    px(y as f32 * self.cells.height),
-                ),
-            size(width, px(self.cells.height)),
-        ))
+        let origin = self.last_bounds.origin + point(px(x as f32 * self.cells.width), px(y as f32 * self.cells.height));
+        Some(preedit_view::bounds_for_range(&self.composition, range, origin, self.cells, &self.font_family, window))
     }
     fn character_index_for_point(
         &mut self,
@@ -2266,33 +2246,11 @@ impl EntityInputHandler for TerminalView {
         window: &mut Window,
         _: &mut Context<Self>,
     ) -> Option<usize> {
-        if self.composition.text.is_empty() {
-            return Some(0);
-        }
+        if self.composition.text.is_empty() { return Some(0); }
         let (x, y) = self.frame.cursor?;
-        let origin = self.last_bounds.origin
-            + point(
-                px(x as f32 * self.cells.width),
-                px(y as f32 * self.cells.height),
-            );
-        if position.y < origin.y || position.y > origin.y + px(self.cells.height) {
-            return None;
-        }
-        let line = shape_preedit(
-            &self.composition.text,
-            self.cells,
-            &self.font_family,
-            window,
-        );
-        Some(
-            self.composition
-                .utf16_offset(line.closest_index_for_x(position.x - origin.x)),
-        )
+        let origin = self.last_bounds.origin + point(px(x as f32 * self.cells.width), px(y as f32 * self.cells.height));
+        preedit_view::character_index_for_point(&self.composition, position, origin, self.cells, &self.font_family, window)
     }
-}
-
-fn shape_preedit(text: &str, cells: CellMetrics, family: &SharedString, window: &Window) -> text_layout::Line {
-    text_layout::preedit(window, text.to_owned().into(), family, cells.font_size)
 }
 
 struct TerminalElement {

@@ -269,7 +269,6 @@ impl Render for TerminalSample {
                         let overlay = crate::preedit_view::Preedit::new(&this.composition, origin, cells,
                             &family, row_host::color(this.frame.background), window);
                         origin = overlay.cursor;
-                        this.cursor_bounds.origin = origin;
                         preedit = Some(overlay);
                     }
                     let quads = crate::cursor_view::quads(shape, origin, f32::from(cell.width.max(1))*cells.width, cells.height, row_host::color(this.frame.cursor_color));
@@ -324,6 +323,14 @@ impl EntityInputHandler for TerminalSample {
         self.composition.update(range, text, selected);
         cx.notify();
     }
-    fn bounds_for_range(&mut self, _: Range<usize>, _: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> { Some(self.cursor_bounds) }
-    fn character_index_for_point(&mut self, _: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> { Some(0) }
+    fn bounds_for_range(&mut self, range: Range<usize>, _: Bounds<Pixels>, window: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> {
+        let (_, cells) = self.selection_geometry?;
+        Some(crate::preedit_view::bounds_for_range(&self.composition, range, self.cursor_bounds.origin,
+            cells, &"Fira Mono".into(), window))
+    }
+    fn character_index_for_point(&mut self, position: Point<Pixels>, window: &mut Window, _: &mut Context<Self>) -> Option<usize> {
+        let (_, cells) = self.selection_geometry?;
+        crate::preedit_view::character_index_for_point(&self.composition, position, self.cursor_bounds.origin,
+            cells, &"Fira Mono".into(), window)
+    }
 }
