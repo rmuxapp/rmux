@@ -63,6 +63,7 @@ impl Drop for PastePermit {
 
 enum InputPayload {
     Bytes(Vec<u8>),
+    KeyPress { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers, repeat: bool },
     KeyRelease { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers },
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
     Paste { text: String, bracketed: bool },
@@ -79,6 +80,11 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
+            Self::KeyPress { terminal, key, mods, repeat } => {
+                let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
+                let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
+                Ok(terminal.encode_key(&key, mods, repeat)?.unwrap_or_default())
+            }
             Self::KeyRelease { terminal, key, mods } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
@@ -654,6 +660,20 @@ impl Session {
         repeat: bool,
         text: Option<&str>,
     ) -> Result<bool> {
+        if crate::keyboard::key_identity(key).is_none() { return Ok(false); }
+        let native_text_key = (key.chars().count() == 1 || key == "space") && !mods.control && !mods.alt;
+        if !native_text_key {
+            anyhow::ensure!(self.exit_status().is_none(), "process has exited");
+            anyhow::ensure!(key.len() <= 128, "oversized key name");
+            self.writer.try_send(InputMessage {
+                payload: InputPayload::KeyPress { terminal: Arc::downgrade(&self.terminal), key: key.into(), mods, repeat },
+                _paste: None,
+            }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))?;
+            self.follow_output()?;
+            return Ok(true);
+        }
+        // Plain text still needs the negotiated report-all decision so native
+        // composition is neither swallowed nor delivered twice.
         let bytes = self
             .terminal
             .lock()
@@ -1276,6 +1296,8 @@ mod tests {
         let paste_error = session.paste("must-not-be-queued").unwrap_err();
         assert!(paste_error.to_string().contains("No paste input was queued"));
         assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
+        // Ctrl+U clears the canonical fixture input before the payload below.
+        assert!(session.key("u", crate::keyboard::Modifiers { control: true, ..Default::default() }, false)?);
         session.queue_key_release("up", Default::default())?;
         session.queue_focus_with_releases(false, vec!["a".into(), "enter".into()])?;
         session.queue_focus(true)?;
@@ -1353,6 +1375,26 @@ mod tests {
         drop(engine);
         worker.join().unwrap();
         assert!(result??.is_none(), "obsolete directory lookup waited for parser access");
+        Ok(())
+    }
+    #[test]
+    fn queued_navigation_press_repeat_and_release_preserve_protocol_order() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
+        terminal.lock().unwrap().write(b"\x1b[>3u");
+        let mods = crate::keyboard::Modifiers { shift: true, ..Default::default() };
+        let (sender, receiver) = mpsc::sync_channel(3);
+        for repeat in [false, true] {
+            sender.send(InputMessage { payload: InputPayload::KeyPress {
+                terminal: Arc::downgrade(&terminal), key: "up".into(), mods, repeat,
+            }, _paste: None })?;
+        }
+        sender.send(InputMessage { payload: InputPayload::KeyRelease {
+            terminal: Arc::downgrade(&terminal), key: "up".into(), mods,
+        }, _paste: None })?;
+        drop(sender);
+        let mut output = Vec::new();
+        write_messages(receiver, &mut output, |error| panic!("{error}"), || {});
+        assert_eq!(output, b"\x1b[1;2:1A\x1b[1;2:2A\x1b[1;2:3A");
         Ok(())
     }
     #[test]

@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Native non-text/navigation and Ctrl/Alt key presses now enqueue encoding on the
+PTY writer. Press/repeat/release order follows the bounded queue; unknown keys
+return unhandled without locking, exited processes remain rejected, and accepted
+input retains opportunistic follow-output behavior. Plain unmodified text keeps
+the existing negotiated report-all decision so native text/IME is not swallowed
+or doubled. Tests pass for exact Kitty press/repeat/release ordering and Ctrl+U
+admission during parser contention; desktop check passes. The first contention
+fixture used unsupported F35 and failed; replacing it with canonical Ctrl+U
+exercises a real accepted control key without contaminating the responder line.
+CI covers these queued-input regressions. Plain-text protocol decisions and mouse
+input remain separate latency work. Not released.
+
 Native ordinary key-up reporting now uses a bounded writer message instead of
 synchronously acquiring the parser. It preserves the original pressed-key name,
 modifiers and writer ordering, holds a weak terminal reference, and never follows
