@@ -762,11 +762,6 @@ impl WorkspaceWindow {
 
     fn sidebar_order(&self) -> Vec<usize> { self.workspace_order(false) }
 
-    fn reveal_workspace(&mut self, index: usize) {
-        let Some(entry) = self.entries.get(index) else { return; };
-        self.groups.reveal(entry.workspace.entity_id());
-    }
-
     fn scroll_to_workspace(&self, index: usize) {
         let Some(entry) = self.entries.get(index) else { return; };
         let visible = self.groups.visible_workspace(entry.workspace.entity_id());
@@ -1967,11 +1962,9 @@ impl WorkspaceWindow {
         };
         self.record_terminal_focus(window, cx);
         self.remember_focus(window, cx);
-        self.remember_workspace_switch(index);
-        self.active = index;
+        self.activate_workspace(index);
         self.rename = None;
         self.entries[index].last_pane = Some(pane.entity_id());
-        self.reveal_workspace(index);
         self.scroll_to_workspace(index);
         window.set_window_title(&format!("{} — rmux", self.entries[index].name));
         self.entries[index].workspace.update(cx, |workspace, cx| {
@@ -2339,10 +2332,10 @@ impl WorkspaceWindow {
             )
             .into_any_element()
     }
-    fn remember_workspace_switch(&mut self, index: usize) {
-        self.previous_workspace.record(
-            self.entries.get(self.active).map(|entry| entry.workspace.entity_id()),
-            self.entries.get(index).map(|entry| entry.workspace.entity_id()),
+    fn activate_workspace(&mut self, index: usize) {
+        rmux_core::workspace_lifecycle::select(
+            &self.entries, &mut self.active, &mut self.groups, &mut self.previous_workspace,
+            index, |entry| entry.workspace.entity_id(),
         );
     }
 
@@ -3098,10 +3091,8 @@ impl WorkspaceWindow {
                 if workspace.zoomed.is_some() { workspace.zoomed = Some(pane.entity_id()); }
                 cx.notify();
             });
-            destination.remember_workspace_switch(index);
-            destination.active = index;
+            destination.activate_workspace(index);
             destination.entries[index].last_pane = Some(pane.entity_id());
-            destination.reveal_workspace(index);
             destination.scroll_to_workspace(index);
             window.set_window_title(&format!("{} — rmux", destination.entries[index].name));
             pane.update(cx, |pane, cx| pane.append_tabs(vec![tab], 0, window, cx));
@@ -3219,10 +3210,8 @@ impl WorkspaceWindow {
         // Set the destination before selecting the transferred terminal, without
         // briefly focusing (and acknowledging) the destination's old active tab.
         self.rename = None;
-        self.remember_workspace_switch(destination);
-        self.active = destination;
+        self.activate_workspace(destination);
         self.entries[destination].last_pane = Some(target.entity_id());
-        self.reveal_workspace(destination);
         self.scroll_to_workspace(destination);
         window.set_window_title(&format!("{} — rmux", self.entries[destination].name));
         target.update(cx, |pane, cx| pane.append_tabs(vec![tab], 0, window, cx));
@@ -3660,9 +3649,7 @@ impl WorkspaceWindow {
         self.record_terminal_focus(window, cx);
         self.rename = None;
         self.remember_focus(window, cx);
-        self.remember_workspace_switch(index);
-        self.active = index;
-        self.reveal_workspace(index);
+        self.activate_workspace(index);
         self.scroll_to_workspace(index);
         let entry = &self.entries[index];
         window.set_window_title(&format!("{} — rmux", entry.name));
@@ -3847,8 +3834,7 @@ impl WorkspaceWindow {
             if let Some(group) = self.groups.get_mut(group) { group.collapsed = false; }
         }
         if focus {
-        self.remember_workspace_switch(index);
-        self.active = index;
+        self.activate_workspace(index);
         self.scroll_to_workspace(self.active);
         window.set_window_title(&format!("{} — rmux", self.entries[self.active].name));
         }

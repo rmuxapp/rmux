@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Workspace selection now commits active identity, previous-workspace history and
+collapsed-group reveal through one core lifecycle operation. Native regular
+selection, terminal targeting, same/cross-window tab transfer and focused creation
+use that operation alongside BrowserHost selection. It deliberately does not
+focus a terminal: transfer hosts retain their no-intermediate-focus behavior.
+Repeated selection preserves the last-workspace toggle, while invalid indices
+leave state unchanged. Four focused lifecycle tests and desktop/WASM compilation
+pass. Native transfer UI and browser runtime were not re-tested this cycle; not
+deployed. Workspace creation and unified application entry remain open.
+
 Ungrouping now uses the shared workspace lifecycle in both hosts. It materializes
 logical order including collapsed members, removes group ownership without
 recreating sessions, preserves individual pin flags and restores selection by

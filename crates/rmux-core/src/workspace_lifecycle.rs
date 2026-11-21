@@ -1,6 +1,20 @@
 //! Workspace ownership transitions, shared by native and browser applications.
 use crate::{focus_trail::PreviousSelection, workspace_groups::{self, Groups}};
 
+/// Commit selection without focusing a terminal. Hosts can restore a remembered
+/// pane or transfer a tab afterward without briefly activating the wrong session.
+/// Re-selecting preserves MRU history but still reveals a collapsed group.
+pub fn select<T, W: Copy + Eq>(
+    entries: &[T], active: &mut usize, groups: &mut Groups<W>,
+    previous: &mut PreviousSelection<W>, index: usize, key: impl Fn(&T) -> W,
+) -> bool {
+    let Some(destination) = entries.get(index).map(&key) else { return false; };
+    previous.record(entries.get(*active).map(&key), Some(destination));
+    *active = index;
+    groups.reveal(destination);
+    true
+}
+
 pub struct ClosedWorkspace<T> {
     /// Keep ownership alive until the host finishes its subscriptions/UI cleanup.
     pub removed: T,
@@ -71,6 +85,31 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn selection_reveals_groups_preserves_toggle_and_ignores_stale_indices() {
+        let entries = [1, 2, 3];
+        let mut active = 0;
+        let mut groups = Groups::default();
+        let group = groups.create("group".into(), vec![2, 3], false).unwrap();
+        groups.get_mut(group).unwrap().collapsed = true;
+        let mut previous = PreviousSelection::default();
+        assert!(!select(&entries, &mut active, &mut groups, &mut previous, 99, |id| *id));
+        assert_eq!(active, 0);
+        assert_eq!(previous.target(), None);
+        assert!(groups.entries()[0].collapsed);
+        assert!(select(&entries, &mut active, &mut groups, &mut previous, 2, |id| *id));
+        assert_eq!(previous.target(), Some(1));
+        assert!(!groups.entries()[0].collapsed);
+        groups.get_mut(group).unwrap().collapsed = true;
+        assert!(select(&entries, &mut active, &mut groups, &mut previous, 2, |id| *id));
+        assert_eq!(previous.target(), Some(1));
+        assert!(!groups.entries()[0].collapsed);
+        let back = entries.iter().position(|id| Some(*id) == previous.target()).unwrap();
+        select(&entries, &mut active, &mut groups, &mut previous, back, |id| *id);
+        assert_eq!(active, 0);
+        assert_eq!(previous.target(), Some(3));
+    }
 
     #[test]
     fn ungroup_preserves_hidden_member_order_selection_and_individual_pins() {

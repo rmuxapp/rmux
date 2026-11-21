@@ -80,13 +80,10 @@ impl BrowserHost {
                 pane.update(cx, |pane,cx| pane.release_render_caches(cx));
             }
         });
-        self.previous_workspace.record(
-            self.workspaces.get(self.active).map(|(_, entity)| entity.entity_id()),
-            Some(self.workspaces[index].1.entity_id()),
+        rmux_core::workspace_lifecycle::select(
+            &self.workspaces, &mut self.active, &mut self.groups, &mut self.previous_workspace,
+            index, |(_, entity)| entity.entity_id(),
         );
-        self.active=index;
-        let member = self.workspaces[index].1.entity_id();
-        self.groups.reveal(member);
         self.scroll_to_workspace();
         self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
