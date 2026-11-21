@@ -421,6 +421,14 @@ impl Render for InputProbe {
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);
                     }))))
+            .when(self.zoomed, |root| {
+                let shortcut = window.focused(cx).and_then(|focus|
+                    window.highest_precedence_binding_for_action_in(&TogglePaneZoom, &focus))
+                    .map(|binding| binding.keystrokes().iter().map(|key|
+                        shortcut_label::format_key_parts(key.key(), *key.modifiers(), terminal_engine::is_mac()))
+                        .collect::<Vec<_>>().join(" "));
+                root.child(split_presentation::restore_layout(self.samples.len().saturating_sub(1), shortcut, cx))
+            })
             .child(div().flex_1().min_h_0().relative().child(split_interaction::drag_capture(cx)).child(panes))
             .when_some(self.feedback.clone().filter(|_| !self.palette_open), |root, message|
                 root.child(div().flex_shrink_0().px_3().py_2().text_sm().text_color(rgb(0xf0b85b)).child(message)))

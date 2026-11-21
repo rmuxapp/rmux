@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Zoomed panes now show the desktop's shared 28px status/restore bar in the demo,
+including hidden-pane count, shortcut hint and restore action. Native's previous
+inline bar was replaced with the same presentation/control. Browser smoke exposed
+focus loss when using generic focused-action dispatch after clicking the bar;
+the control now calls the shared PaneCommandHost handler directly. Clicking
+restored both panes and subsequent typing reached the active terminal. Desktop
+check and WASM build pass. Screenshot: target/shared-zoom-status.jpg. Native
+runtime was not re-tested. Not deployed; full application migration remains open.
+
 Numbered-pane shortcuts now share bindings/action routing: Cmd+Option+1–9 on
 macOS, Ctrl+Alt+Shift+1–9 elsewhere. Browser resolves visual leaf positions and
 moves terminal focus, retaining zoom on the chosen pane as desktop does. Invalid

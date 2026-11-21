@@ -3229,33 +3229,7 @@ impl Render for Workspace {
                             .map(|terminal| terminal.read(cx).focus.clone())
                     });
                 let shortcut = focus.as_ref().and_then(|focus| shortcuts::hint(&TogglePaneZoom, focus, window));
-                let hidden = self.panes.len().saturating_sub(1);
-                let status = format!("Pane zoomed · {hidden} {} hidden", if hidden == 1 { "pane" } else { "panes" });
-                let hint: SharedString = match &shortcut {
-                    Some(shortcut) => format!("Restore split layout  {shortcut}"),
-                    None => "Restore split layout".into(),
-                }.into();
-                root.child(
-                    div()
-                        .id("restore-pane-layout")
-                        .h(px(28.)).min_w_0()
-                        .flex_shrink_0()
-                        .px_3()
-                        .flex().gap_2()
-                        .items_center()
-                        .text_xs()
-                        .bg(rgb(0x27344a))
-                        .cursor_pointer()
-                        .hover(|style| style.bg(rgb(0x354660)))
-                        .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
-                        .on_click(cx.listener(|view, event: &ClickEvent, window, cx| {
-                            if event.standard_click() { view.toggle_zoom(window, cx); }
-                        }))
-                        .child(icons::icon("split-right"))
-                        .child(div().flex_1().min_w_0().truncate().child(status))
-                        .child(div().flex_shrink_0().child("Restore layout"))
-                        .when_some(shortcut, |row, shortcut| row.child(div().max_w(relative(0.3)).truncate().text_color(rgb(0xa0b6d6)).child(shortcut))),
-                )
+                root.child(split_presentation::restore_layout(self.panes.len().saturating_sub(1), shortcut, cx))
             })
             .child(
                 div()
