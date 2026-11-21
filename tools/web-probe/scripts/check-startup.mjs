@@ -36,3 +36,15 @@ for (const failure of ['engine', 'ui']) {
     assert.equal(started, false);
   });
 }
+import {readTerminalClipboard} from '../engine.js';
+test('terminal clipboard reads only bounded text during user activation', async () => {
+  let called = false;
+  const clipboard = {read() { throw new Error('must not request images'); }, readText() { called = true; return Promise.resolve('界🙂'); }};
+  const read = readTerminalClipboard(7, clipboard);
+  assert.equal(called, true);
+  assert.equal(await read, '界🙂');
+  await assert.rejects(readTerminalClipboard(6, clipboard), error => String(error).includes('session limit'));
+  await assert.rejects(readTerminalClipboard(4, {readText: () => Promise.resolve('abcde')}));
+  await assert.rejects(readTerminalClipboard(4096, {}));
+  await assert.rejects(readTerminalClipboard(4096, {readText: () => Promise.reject(new Error('private browser detail'))}), error => !String(error).includes('private browser detail'));
+});

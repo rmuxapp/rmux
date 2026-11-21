@@ -23,15 +23,20 @@ impl TerminalSample {
     fn paste_from_clipboard(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.clipboard_read.is_some() { return; }
         // Begin synchronously while the click/keypress still grants activation.
-        let read = cx.read_from_clipboard_async();
+        let read = match crate::browser_clipboard::read() {
+            Ok(read) => read,
+            Err(_) => { self.input_error = Some("Clipboard access was unavailable. Use your keyboard paste shortcut.".into()); cx.notify(); return; }
+        };
         self.clipboard_read = Some(cx.spawn_in(window, async move |entity, cx| {
-            let result = read.await;
+            let result = wasm_bindgen_futures::JsFuture::from(read).await;
             let _ = entity.update_in(cx, |this, window, cx| {
                 this.clipboard_read = None;
                 match result {
-                    Ok(Some(item)) => EntityInputHandler::paste(this, item, window, cx),
-                    Ok(None) => this.input_error = Some("The clipboard has no text to paste.".into()),
-                    Err(_) => this.input_error = Some("Clipboard access was unavailable. Use your keyboard paste shortcut.".into()),
+                    Ok(value) => match value.as_string().filter(|text| !text.is_empty()) {
+                        Some(text) => EntityInputHandler::paste(this, ClipboardItem::new_string(text), window, cx),
+                        None => this.input_error = Some("The clipboard has no text to paste.".into()),
+                    },
+                    Err(error) => this.input_error = Some(error.as_string().unwrap_or_else(|| "Could not read clipboard text.".into())),
                 }
                 cx.notify();
             });

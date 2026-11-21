@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Menu paste now uses a text-only browser clipboard adapter. Inspection showed
+GPUI's general reader also fetches supported image payloads, which a sample text
+terminal does not need. The adapter starts readText under user activation and
+checks the session's 4 KiB UTF-8 budget before transferring text into WASM; JS
+still receives the browser's initial text string. Byte-length measurement is
+bounded by the preliminary string-length check. Focused tests cover immediate
+invocation, Unicode limits, no image reads, missing API and rejected permission.
+WASM build passes; browser menu paste succeeded and a 4097-byte clipboard showed
+the limit message without changing the terminal draft. Screenshot:
+target/browser-bounded-clipboard.jpg. Not deployed.
+
 Browser terminal menus now include Paste via GPUI's asynchronous clipboard API.
 The read begins during user activation, stays bound to the originating terminal,
 and permits one pending read per terminal. Results use the existing Ghostty

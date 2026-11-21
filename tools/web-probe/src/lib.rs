@@ -22,6 +22,7 @@ mod text_field;
 mod text_layout;
 mod fonts;
 mod browser_find;
+mod browser_clipboard;
 #[path = "../../../crates/rmux-desktop/src/find_presentation.rs"]
 mod find_presentation;
 #[path = "../../../crates/rmux-desktop/src/pane_actions.rs"]
