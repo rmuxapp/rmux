@@ -24,6 +24,6 @@ repo = Path(__file__).resolve().parent.parent
 parts.append('\nGhostty notices\n' + (repo / 'release/ghostty-notices.txt').read_text(encoding='utf-8'))
 if os.environ.get('RMUX_RELEASE_TARGET') == 'wasm32-unknown-unknown':
     fonts = repo / 'tools/web-probe/assets'
-    for name in ['FiraMono-LICENSE', 'Inter-OFL.txt', 'NotoSansCJK-OFL.txt', 'NotoSansCJK-README.md']:
+    for name in ['FiraMono-LICENSE', 'Inter-OFL.txt', 'NotoSansCJK-OFL.txt', 'NotoSansCJK-README.md', 'NotoEmoji-OFL.txt', 'NotoEmoji-README.md']:
         parts.append('\nBrowser font notices: ' + name + '\n' + (fonts / name).read_text(encoding='utf-8'))
 Path(sys.argv[1]).write_text(''.join(parts), encoding='utf-8')

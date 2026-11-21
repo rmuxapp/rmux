@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Optional font loading now supports independent CJK and emoji requests. Reused
+Rustable's licensed, unmodified 1,982,596-byte Noto Emoji outline font, outside
+WASM and only fetched on emoji input/preedit. The shared loader rejects unknown
+asset kinds and bounds/verifies each asset; both fonts' success and failure-path
+tests pass, along with the WASM build. Browser smoke rendered common emoji,
+then CJK in the same session while retaining prior output. Screenshot:
+target/shared-emoji-cjk.jpg. Emoji are monochrome, and exhaustive sequence/color
+coverage and actual IME behavior remain unverified. No new deployment yet.
+
 Added on-demand, same-origin CJK fallback using Rustable's existing unmodified
 SIL OFL Noto Sans CJK JP asset. CJK input/preedit requests it once; ASCII-only
 sessions do not. The 16,467,736-byte font stays outside WASM, is bounded and

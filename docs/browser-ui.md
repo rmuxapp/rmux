@@ -78,8 +78,11 @@ CJK input/preedit triggers an optional same-origin Noto Sans CJK JP download
 (16,467,736 bytes, not embedded in WASM). It is size/hash checked, shared by all
 panes, and retained until page close. Font registration invalidates shaped-row
 caches. Chinese/Japanese/Korean rendering passed a browser smoke; Japanese
-regional glyph forms are used. ASCII sessions do not request this font. Emoji
-fallback and full font/rendering parity remain open.
+regional glyph forms are used. ASCII sessions do not request this font. Emoji input/preedit independently loads
+Noto Emoji (1,982,596 bytes), using the same bounded, verified loader and cache
+invalidation. Common emoji and CJK together passed a browser smoke. Emoji are
+monochrome outlines; color, exhaustive sequence coverage and full rendering
+parity remain open.
 GPUI CE lacks the native fixed-cell-width shaping argument, so the adapter uses
 batched ASCII runs only when every caret boundary matches the terminal grid;
 otherwise it falls back to explicit placement. Do not infer native performance
