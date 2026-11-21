@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser workspace pinning now uses the native shared action route and core
+ordering/navigation rules. Each browser workspace owns its pin state; sidebar
+badges match desktop group/workspace semantics. Palette pin/unpin preserves the
+active terminal, and numbered navigation follows the pinned order. Native check
+and WASM build pass. Browser smoke verified pin, unpin, Cmd+2/Cmd+1 navigation
+and retained output. Screenshot: target/browser-workspace-pin.jpg. Not deployed;
+pin state, like other browser workspace state, resets on reload.
+
 Browser workspace groups can now be renamed through Rename Workspace Group in
 the palette or by double-clicking the group header. Native/browser group rename
 actions share routing and the existing inline editor captures the group identity.
