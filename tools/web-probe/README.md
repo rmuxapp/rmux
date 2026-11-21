@@ -71,3 +71,9 @@ Cursor rendering follows engine block/bar/underline shape when focused, and uses
 a hollow cursor when unfocused. Browser checks cover block placement after input
 and an unfocused hollow cursor. Native blink scheduling and cursor preference
 policy are not connected yet.
+
+Cmd+P opens the palette in the tested in-app browser. Executing a command or
+pressing Escape returns keyboard focus to the selected terminal. Splitting
+focuses the new terminal; clicking a pane header focuses its terminal. Verified
+split → type ls and Cmd+P → Escape → type help without a terminal click.
+Other browsers may reserve this shortcut; the Commands button remains available.

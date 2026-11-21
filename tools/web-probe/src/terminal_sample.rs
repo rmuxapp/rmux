@@ -11,6 +11,7 @@ pub(crate) struct TerminalSample {
     command: String,
 }
 impl TerminalSample {
+    pub fn focus(&self, window: &mut Window, cx: &mut App) { self.focus.focus(window, cx); }
     pub fn new(cx: &mut Context<Self>) -> Self {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");

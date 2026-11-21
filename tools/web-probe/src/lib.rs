@@ -22,7 +22,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette]);
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -41,7 +41,18 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<terminal_sample::TerminalSample>>,
 }
 impl InputProbe {
-    fn choose(&mut self, cx: &mut Context<Self>) {
+    fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = false;
+        self.samples[&self.focused].update(cx, |sample, cx| sample.focus(window, cx));
+        cx.notify();
+    }
+    fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_open = true;
+        self.input.update(cx, |input, cx| { input.replace_draft("", cx); input.focus.focus(window, cx); });
+        cx.notify();
+    }
+
+    fn choose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
         match COMMANDS[index] {
             CommandId::Split | CommandId::SplitBelow => {
@@ -55,8 +66,7 @@ impl InputProbe {
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
             _ => return,
         }
-        self.palette_open = false;
-        cx.notify();
+        self.close_palette(window, cx);
     }
     fn panes(&self, tree: &PaneTree<usize>, path: String, cx: &mut Context<Self>) -> AnyElement {
         match tree {
@@ -64,7 +74,7 @@ impl InputProbe {
                 let id = *id;
                 split_presentation::leaf(("pane", id)).flex().flex_col().bg(rgb(0x111216))
                     .border_t_2().border_color(rgb(if self.focused == id { 0x9790d7 } else { 0x383838 }))
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| { this.focused = id; cx.notify(); }))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| { this.focused = id; this.samples[&id].update(cx, |sample, cx| sample.focus(window, cx)); cx.notify(); }))
                     .child(div().p_3().flex_shrink_0().text_sm().child(format!("Pane {} · live Ghostty · sample session", id + 1)))
                     .child(div().flex_1().min_h_0().child(self.samples[&id].clone()))
                     .into_any_element()
@@ -86,13 +96,12 @@ impl Render for InputProbe {
         let height = f32::from(window.viewport_size().height);
         let panes = if self.zoomed { self.panes(&PaneTree::Pane(self.focused), "root".into(), cx) } else { self.panes(&self.tree, "root".into(), cx) };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
+            .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(div().h(px(44.)).flex_shrink_0().px_3().flex().items_center().justify_between()
                 .child("Shared rmux layout · development probe")
                 .child(div().id("open-commands").px_3().py_1().cursor_pointer().child("Commands")
                     .on_click(cx.listener(|this, _, window, cx| {
-                        this.palette_open = true;
-                        this.input.update(cx, |input, cx| { input.replace_draft("", cx); input.focus.focus(window, cx); });
-                        cx.notify();
+                        this.open_palette(window, cx);
                     }))))
             .child(div().flex_1().min_h_0().child(panes))
             .when(self.palette_open, |root| root.child(div().absolute().inset_0().bg(rgba(0x00000066))
@@ -109,8 +118,8 @@ impl Render for InputProbe {
                 .children(self.search.matches.iter().enumerate().map(|(row, &index)| {
                     palette_view::result(index, 36., row == self.selected)
                         .child(div().flex_1().min_w_0().truncate().child(COMMANDS[index].title()))
-                        .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
-                            if event.standard_click() { this.selected = row; this.choose(cx); }
+                        .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                            if event.standard_click() { this.selected = row; this.choose(window, cx); }
                         }))
                 }))
                 .when(self.search.matches.is_empty(), |panel| panel.child(div().p_3().text_sm().child("No matching commands")))
@@ -127,6 +136,7 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
         cx.bind_keys([
+            KeyBinding::new("cmd-p", CommandPalette, None),
             KeyBinding::new("cmd-a", EditorSelectAll, Some("TextInput")),
             KeyBinding::new("cmd-z", EditorUndo, Some("TextInput")),
             KeyBinding::new("cmd-shift-z", EditorRedo, Some("TextInput")),
@@ -140,11 +150,11 @@ pub fn start() {
                 input.placeholder = Some("Type a command or workspace name…");
                 input.focus.focus(window, cx);
             });
-            cx.subscribe(&input, |this: &mut InputProbe, _, event: &text_field::EditEvent, cx| {
+            cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
                 match event {
                     text_field::EditEvent::Changed(query) => { this.search.update(query); this.selected = 0; this.feedback = None; },
-                    text_field::EditEvent::Submitted { .. } => this.choose(cx),
-                    text_field::EditEvent::Cancelled => this.palette_open = false,
+                    text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
+                    text_field::EditEvent::Cancelled => this.close_palette(window, cx),
                 }
                 cx.notify();
             }).detach();

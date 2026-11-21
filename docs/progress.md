@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Fixed browser focus routing after palette actions and dismissal. Executing a
+split focuses the new terminal; Escape returns focus to the selected terminal;
+pane headers focus their terminal as well. Cmd+P opens the shared palette.
+WASM build passes. Browser verified split → immediate ls, Cmd+P → Escape →
+immediate help without clicking the terminal. Broader native input/IME sharing,
+workspace/tab state and browser shortcut coverage remain pending.
+
 Extracted native block/bar/underline/hollow cursor quads into cursor_view and
 compiled the same drawing code into the browser. The browser uses the existing
 shared CursorCache for block-cursor glyph inversion, honors hidden cells and
