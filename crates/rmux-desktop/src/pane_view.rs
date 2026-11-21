@@ -991,10 +991,8 @@ impl PaneView {
 
     fn close_tabs(&mut self, scope: TabCloseScope, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_busy(cx) || cx.global::<Shutdowns>().quitting { return; }
-        let Some(keep) = self.active_terminal_id() else { return; };
-        let targets: Vec<_> = self.terminals.iter().enumerate()
-            .filter(|(index, terminal)| scope.includes(*index, self.terminals.active_index(), terminal.read(cx).process_exit.is_some()))
-            .map(|(_, terminal)| terminal.entity_id()).collect();
+        let Some((keep, targets)) = self.terminals.close_targets(scope, Entity::entity_id,
+            |terminal| terminal.read(cx).process_exit.is_some()) else { return; };
         if targets.is_empty() { return; }
         let confirms = cx.global::<ClosePolicy>().confirms(true, || {
             self.terminals.iter().filter(|terminal| targets.contains(&terminal.entity_id()))

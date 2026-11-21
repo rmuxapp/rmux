@@ -36,6 +36,17 @@ impl<T> Tabs<T> {
     /// Zero for an empty pane; use `get` when resolving the active item.
     pub fn active_index(&self) -> usize { self.active }
     pub fn active(&self) -> Option<&T> { self.items.get(self.active) }
+    /// Capture identities before any asynchronous host confirmation. Hosts supply
+    /// session identity and completion status; selection policy stays shared.
+    pub fn close_targets<I>(&self, scope: CloseScope, mut identity: impl FnMut(&T) -> I,
+        mut finished: impl FnMut(&T) -> bool) -> Option<(I, Vec<I>)> {
+        let keep = identity(self.active()?);
+        let targets = self.items.iter().enumerate()
+            .filter(|(index, item)| scope.includes(*index, self.active,
+                matches!(scope, CloseScope::Finished) && finished(item)))
+            .map(|(_, item)| identity(item)).collect();
+        Some((keep, targets))
+    }
     pub fn select(&mut self, index: usize) -> bool {
         if index >= self.items.len() { return false; }
         self.active = index;
@@ -104,6 +115,21 @@ impl<T> IntoIterator for Tabs<T> {
 #[cfg(test)]
 mod tests {
     use super::Tabs;
+    #[test]
+    fn captured_close_targets_survive_selection_changes_and_new_tabs() {
+        let mut tabs = Tabs::new(vec![10, 20, 30, 40], 1);
+        let (keep, targets) = tabs.close_targets(super::CloseScope::Right, |id| *id,
+            |_| panic!("right scope does not inspect process status")).unwrap();
+        tabs.swap(0, 3);
+        tabs.push(50);
+        tabs.select(4);
+        for index in super::close_indices(&tabs, keep, &targets) { tabs.remove(index); }
+        assert_eq!(&*tabs, &[20, 10, 50]);
+        assert_eq!(tabs.active(), Some(&50));
+        let (_, targets) = tabs.close_targets(super::CloseScope::Finished, |id| *id, |id| *id != 10).unwrap();
+        assert_eq!(targets, vec![20]);
+        assert!(Tabs::<u32>::new(vec![], 0).close_targets(super::CloseScope::Others, |id| *id, |_| false).is_none());
+    }
     #[test]
     fn joining_tabs_preserves_order_and_incoming_selection() {
         let mut source = Tabs::new(vec!["source-a", "source-b"], 1);

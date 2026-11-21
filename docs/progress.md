@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Bulk tab-close target capture now belongs to the shared Tabs model. Both hosts
+provide session identities and completion status; the model applies the same
+scope and active-tab exclusion before any native confirmation delay. Native
+process guards and confirmation remain in place. Five focused tab tests pass,
+including captured identities surviving reorder, new tabs and selection changes;
+native and WASM compile checks pass. No presentation change or deployment.
+
 Measured startup readiness of the installed GitHub-built v0.1.4 release with its
 bundled CLI and the isolated fixture shell. Three fresh processes exited normally;
 median socket / terminal registration / readable shell output were

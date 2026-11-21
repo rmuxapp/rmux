@@ -85,11 +85,8 @@ impl SamplePane {
         }
     }
     fn close_tabs(&mut self, scope: rmux_core::tabs::CloseScope, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(keep) = self.terminals.active().map(Entity::entity_id) else { return; };
+        let Some((keep, targets)) = self.terminals.close_targets(scope, Entity::entity_id, |_| false) else { return; };
         let current: Vec<_> = self.terminals.iter().map(Entity::entity_id).collect();
-        let targets: Vec<_> = current.iter().enumerate()
-            .filter(|(index, _)| scope.includes(*index, self.terminals.active_index(), false))
-            .map(|(_, id)| *id).collect();
         for index in rmux_core::tabs::close_indices(&current, keep, &targets) { self.close(index, window, cx); }
     }
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
