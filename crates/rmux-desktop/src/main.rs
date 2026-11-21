@@ -1160,21 +1160,11 @@ impl TerminalView {
             self.selection_scroll = None;
             self.selection_pointer = None;
         }
-        if let Err(error) = self.session.focus(focused) {
+        if let Err(error) = self.session.queue_focus(focused) {
             self.error = Some(error.to_string());
         }
-        if focused
-            && let Some((revision, status)) = self
-                .session
-                .program_status_since(self.program_status_revision)
-        {
-            self.program_status_revision = revision;
-            self.program_status = status;
-            if self.status_details.is_some() {
-                self.status_details = Some(self.session.program_status_records());
-            }
-            cx.emit(TabMetadataChanged);
-        }
+        // The writer wakes the existing nonblocking metadata observer after
+        // acknowledging status; avoid a synchronous parser read during focus.
         cx.notify();
     }
     fn toggle_status_details(&mut self, window: &mut Window, cx: &mut Context<Self>) {

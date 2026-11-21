@@ -63,6 +63,7 @@ impl Drop for PastePermit {
 
 enum InputPayload {
     Bytes(Vec<u8>),
+    Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool },
     Paste { text: String, bracketed: bool },
 }
 impl InputPayload {
@@ -77,6 +78,12 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
+            Self::Focus { terminal, focused } => {
+                let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
+                let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
+                if focused { terminal.acknowledge_program_status(); }
+                Ok(terminal.encode_focus(focused)?.map_or_else(Vec::new, |bytes| bytes.to_vec()))
+            }
             Self::Paste { text, bracketed } => crate::keyboard::encode_paste(&text, bracketed),
         }
     }
@@ -94,10 +101,10 @@ impl From<Vec<u8>> for InputMessage {
 
 fn write_messages(writes: mpsc::Receiver<InputMessage>, mut writer: impl Write, mut report: impl FnMut(String), mut finished: impl FnMut()) {
     while let Ok(message) = writes.recv() {
-        let paste = message._paste.is_some();
+        let notify = message._paste.is_some() || matches!(&message.payload, InputPayload::Focus { .. });
         let keep_writing = write_message(message, &mut writer, &mut report);
         // The permit must be released before waking a quiet terminal's UI.
-        if paste { finished(); }
+        if notify { finished(); }
         if !keep_writing {
             drop(writes); // Release any paste queued behind the failed write.
             finished();
@@ -110,7 +117,7 @@ fn write_message(message: InputMessage, writer: &mut impl Write, report: &mut im
     let bytes = match message.payload.encode_pending(message._paste.as_ref()) {
         Ok(Some(bytes)) => bytes,
         Ok(None) => return true,
-        Err(error) => { report(format!("Paste encoding failed: {error}")); return true; }
+        Err(error) => { report(format!("Terminal input encoding failed: {error}")); return true; }
     };
     if let Err(error) = writer.write_all(&bytes) {
         report(format!("Terminal input failed: {error}"));
@@ -596,6 +603,15 @@ impl Session {
         // Explicit navigation after input supersedes a deferred follow request.
         self.follow_output_pending.store(false, Ordering::Release);
         terminal.scroll(scroll)
+    }
+    /// Queue focus reporting/acknowledgement without waiting for the parser.
+    /// The writer wakes metadata observers after processing even if focus
+    /// reporting is disabled and therefore produces no PTY bytes.
+    pub fn queue_focus(&self, focused: bool) -> Result<()> {
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::Focus { terminal: Arc::downgrade(&self.terminal), focused },
+            _paste: None,
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))
     }
     pub fn focus(&self, focused: bool) -> Result<()> {
         let bytes = {
@@ -1234,6 +1250,8 @@ mod tests {
         let paste_error = session.paste("must-not-be-queued").unwrap_err();
         assert!(paste_error.to_string().contains("No paste input was queued"));
         assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
+        session.queue_focus(false)?;
+        session.queue_focus(true)?;
         session.input_without_scroll("state-世界\n".as_bytes())?;
         let elapsed = started_at.elapsed();
         let _ = release.send(());
@@ -1308,6 +1326,30 @@ mod tests {
         drop(engine);
         worker.join().unwrap();
         assert!(result??.is_none(), "obsolete directory lookup waited for parser access");
+        Ok(())
+    }
+    #[test]
+    fn queued_focus_preserves_order_and_wakes_without_reporting() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
+        for reporting in [false, true] {
+            if reporting { terminal.lock().unwrap().write(b"\x1b[?1004h"); }
+            let (sender, receiver) = mpsc::sync_channel(4);
+            for focused in [false, true] {
+                sender.send(InputMessage { payload: InputPayload::Focus {
+                    terminal: Arc::downgrade(&terminal), focused,
+                }, _paste: None })?;
+            }
+            sender.send(b"after-focus".to_vec().into())?;
+            drop(sender);
+            let mut output = Vec::new();
+            let mut wakes = 0;
+            write_messages(receiver, &mut output, |error| panic!("{error}"), || wakes += 1);
+            assert_eq!(wakes, 2, "focus acknowledgement wakes quiet metadata observers");
+            assert_eq!(output, if reporting { b"\x1b[O\x1b[Iafter-focus".as_slice() } else { b"after-focus".as_slice() });
+        }
+        let pending = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused: true };
+        drop(terminal);
+        assert!(pending.encode()?.is_empty(), "queued focus must not retain a closed terminal");
         Ok(())
     }
     #[test]

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Native TerminalView focus reporting and program-status acknowledgement now enqueue
+on the existing bounded PTY writer instead of locking the parser on the UI thread.
+Focus messages preserve writer order and hold weak engine references. Completion
+wakes the existing nonblocking metadata observer even when focus reporting emits
+no bytes; the redundant synchronous status read was removed from set_input_focus.
+Queue admission failure remains visible through the terminal error path. Focused
+macOS tests pass for busy-parser admission, report ordering, disabled-report
+wakeups and closed-engine cleanup; desktop check passes. No full focus-latency
+claim: held-key release and other focus-handler work still need separate review.
+Not released.
+
 Published GitHub demo run 44951200648 (05673c6) to rmux.app, Cloudflare deployment
 5a84225c. Includes group closure, terminal font controls/inheritance and measured
 cell-metric reuse. Production embedded smoke verified zoomed text inherited by a
