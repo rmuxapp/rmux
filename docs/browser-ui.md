@@ -8,7 +8,7 @@ the architectural target.
 ## Published versus shared build
 
 The Cloudflare site now embeds the optimized shared Rust/GPUI demo from GitHub
-run 44934228048, source e52115e (Cloudflare deployment 3783d1ac). Production terminal input and splitting were verified at rmux.app.
+run 44937216212, source 33a210d (Cloudflare deployment 44619191). Production Unicode sample input, splitting and workspace switching were verified at rmux.app.
 The old JavaScript/ghostty-web layout imitation is no longer published. The marketing
 site remains local and off GitHub. Newer changes on main are not yet deployed.
 

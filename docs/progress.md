@@ -2,6 +2,24 @@
 
 ## Current implementation focus
 
+Published GitHub shared-demo run 44937216212 (source 33a210d) to Cloudflare
+44619191 and rmux.app. This brings Unicode sample editing, optional CJK/monochrome
+emoji fonts, shared pane command routing, pane joining and tab-to-split actions
+to production. Browser smoke entered Japanese/emoji sample output, split the
+terminal, switched to the clean website workspace, then returned with the first
+workspace's output/layout retained. Screenshot: target/live-demo-33a210d.jpg.
+Website source stays local/off GitHub. The later shared join guard and workspace
+close lifecycle commits are not included in this deployment.
+
+Warm shared-demo CI run 44937216212 restored the preceding commit's 763 MB cache.
+Its build task took 97.01 s: Ghostty step about 33.11 s, release Cargo 59.92 s,
+and size-report step about 1.40 s. Earlier baseline run 44933212995 took 209.66 s
+with roughly 104 s Ghostty and 51 s reporting. This is an observed pair of runs,
+not a controlled benchmark or a guaranteed speedup; source and runner state
+changed. The tracked Zig global cache and Brotli quality-6 report are working.
+Brotli figures use a different quality from older reports; hosted compression
+and release optimization settings were not changed.
+
 Workspace close now has one ownership/lifecycle operation in rmux-core, called
 by native WindowView and BrowserHost. It removes the entry and group membership,
 forgets closed previous-workspace destinations, promotes anchors in the original
