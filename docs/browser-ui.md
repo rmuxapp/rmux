@@ -27,6 +27,7 @@ views and core policies are useful migration steps, not completion evidence.
    shared application layer. Both hosts must dispatch the same commands; native
    process creation and browser sample sessions should return through the same
    session interface. Pane insertion, zoom/resize/equalize, swap/join targeting, join layout guards, cycling and focus-after-close now share command transitions.
+   Workspace removal, group-anchor promotion, successor selection and previous-workspace cleanup now run through one shared lifecycle operation.
 2. Resolve the GPUI 0.2.2 / CE 0.3.0 boundary so the application view hierarchy
    and event orchestration compile for both hosts. Keep rendering/font adapters
    explicit; do not silently replace the shipped desktop backend without checks.

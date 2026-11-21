@@ -54,23 +54,11 @@ impl BrowserHost {
         entity
     }
     fn close_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        use rmux_core::workspace_groups::{neighbor_after_removal, preserve_anchor_slot};
-        let Some((_, current)) = self.workspaces.get(self.active) else { return; };
-        let removed = current.entity_id();
-        let order: Vec<_> = self.workspace_order(true).into_iter()
-            .map(|index| self.workspaces[index].1.entity_id()).collect();
-        let next = neighbor_after_removal(&order, removed);
-        let anchor_group = self.groups.containing(removed)
-            .filter(|group| group.members.first() == Some(&removed)).map(|group| group.id);
-        let previous_index = self.active;
-        self.groups.remove(removed);
-        self.previous_workspace.remove(removed);
-        self.workspaces.remove(previous_index);
-        if let Some(anchor) = anchor_group.and_then(|id| self.groups.entries().iter().find(|group| group.id == id))
-            .and_then(|group| group.members.first()).copied() {
-            preserve_anchor_slot(&mut self.workspaces, |(_, entity)| entity.entity_id(), removed, previous_index, anchor);
-        }
-        self.active = next.and_then(|id| self.workspaces.iter().position(|(_, entity)| entity.entity_id() == id)).unwrap_or(0);
+        let index = self.active;
+        let Some(_closed) = rmux_core::workspace_lifecycle::close(
+            &mut self.workspaces, &mut self.active, &mut self.groups, &mut self.previous_workspace,
+            index, |(_, entity)| (entity.entity_id(), false),
+        ) else { return; };
         if self.workspaces.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
         else { self.select(self.active, window, cx); }
     }

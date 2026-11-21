@@ -2426,37 +2426,19 @@ impl WorkspaceWindow {
         .detach();
     }
     fn close_workspace(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.entries.len() {
-            return;
-        }
+        let Some(closed) = rmux_core::workspace_lifecycle::close(
+            &mut self.entries, &mut self.active, &mut self.groups, &mut self.previous_workspace,
+            index, |entry| (entry.workspace.entity_id(), entry.pinned),
+        ) else { return; };
         self.rename = None;
-        let selected = self.entries.get(self.active).map(|entry| entry.workspace.entity_id());
-        let successor = (self.active == index)
-            .then(|| workspace_groups::neighbor_after_removal(&self.workspace_order(true), index))
-            .flatten()
-            .map(|next| self.entries[next].workspace.entity_id());
-        let slot = self.group_anchor_slot(self.entries[index].workspace.entity_id());
-        let removed = self.entries.remove(index);
-        let removed_active = selected == Some(removed.workspace.entity_id());
+        let removed = closed.removed;
         self.sidebar_selection.retain(|id| *id != removed.workspace.entity_id());
         if self.sidebar_selection_anchor == Some(removed.workspace.entity_id()) { self.sidebar_selection_anchor = None; }
-        self.groups.remove(removed.workspace.entity_id());
-        self.previous_workspace.remove(removed.workspace.entity_id());
         if self.entries.is_empty() {
             window.remove_window();
             return;
         }
-        if self.active > index {
-            self.active -= 1;
-        }
-        self.active = self.active.min(self.entries.len() - 1);
-        let selected = if selected == Some(removed.workspace.entity_id()) {
-            slot.filter(|(_, anchor, _)| *anchor == removed.workspace.entity_id())
-                .and_then(|(id, _, _)| self.groups.entries().iter().find(|group| group.id == id))
-                .and_then(|group| group.members.first()).copied().or(successor)
-        } else { selected };
-        self.preserve_group_slot(slot, selected);
-        if removed_active {
+        if closed.was_active {
             self.select(self.active, window, cx);
         } else {
             cx.notify();

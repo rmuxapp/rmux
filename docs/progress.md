@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Workspace close now has one ownership/lifecycle operation in rmux-core, called
+by native WindowView and BrowserHost. It removes the entry and group membership,
+forgets closed previous-workspace destinations, promotes anchors in the original
+sidebar slot, and selects the successor in logical pinned/grouped order while
+preserving other active workspaces by identity. The removed entity remains owned
+until host cleanup finishes. Native process confirmation/sidebar cleanup/window
+closure and browser empty-state focus stay in host adapters. Two focused tests
+cover anchor promotion with separated storage, active/inactive removal, pinned
+order, invalid indices and closing the final entry; desktop and WASM checks pass.
+Runtime UI was not re-tested this cycle. Not deployed; shared application
+entry-point and renderer-version convergence remain unfinished.
+
 Pane join targeting and layout guards now run through one core transition in
 both desktop and browser hosts. Join Next follows the layout's visual leaf order;
 directional joins use the same neighbor resolution. Missing/single panes are
