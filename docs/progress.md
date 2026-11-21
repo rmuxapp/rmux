@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+The Shared WASM workflow excludes native `main.rs`, `window_view.rs`, and
+`clipboard.rs` from its desktop source trigger. The browser supplies its own
+versions of those hosts, so native-only edits no longer queue an unchanged demo
+build behind useful work. All other desktop source remains conservatively
+watched, and manual dispatch remains available. This reduces unnecessary runs;
+it does not claim faster compilation of a changed browser artifact.
+
 Browser split-tab and join-pane commands now use the same transfer cleanup as
 dragging a tab: session/output ownership is preserved while source render caches,
 selection gestures and held input are released. Splitting reuses `take_tab`;
