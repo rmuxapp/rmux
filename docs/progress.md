@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Added on-demand, same-origin CJK fallback using Rustable's existing unmodified
+SIL OFL Noto Sans CJK JP asset. CJK input/preedit requests it once; ASCII-only
+sessions do not. The 16,467,736-byte font stays outside WASM, is bounded and
+SHA-256 verified before registration, and remains shared across panes until page
+close. Terminal row/cursor caches invalidate when it arrives. A visible error
+reports download/registration failure without replacing existing fonts. Loader
+success/HTTP/truncation/oversize/hash-failure tests and native check/WASM build
+pass. Browser screenshot target/shared-cjk-font.jpg confirms Japanese, Chinese
+and Korean output. Licensing/source notices ship with the asset and release
+notices. Not yet deployed. Emoji fallback, full script coverage and actual IME
+validation remain open; no startup or memory improvement is claimed.
+
 Sample session input now uses Ghostty grapheme segmentation (mode 2027 enabled),
 accepts a bounded 4 KiB Unicode draft, and backspaces entire clusters including
 combining/ZWJ sequences split across input events. A horizontal draft viewport

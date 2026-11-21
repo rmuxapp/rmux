@@ -74,8 +74,12 @@ history. `echo <text>` is a bundled sample operation, not a real shell command.
 Actual IME event verification and multiline paste remain open.
 
 The browser font adapter uses bundled Fira Mono. Desktop uses platform fonts.
-The browser currently shows missing-glyph boxes for CJK in the tested fixture;
-Unicode input support does not establish font/rendering parity.
+CJK input/preedit triggers an optional same-origin Noto Sans CJK JP download
+(16,467,736 bytes, not embedded in WASM). It is size/hash checked, shared by all
+panes, and retained until page close. Font registration invalidates shaped-row
+caches. Chinese/Japanese/Korean rendering passed a browser smoke; Japanese
+regional glyph forms are used. ASCII sessions do not request this font. Emoji
+fallback and full font/rendering parity remain open.
 GPUI CE lacks the native fixed-cell-width shaping argument, so the adapter uses
 batched ASCII runs only when every caret boundary matches the terminal grid;
 otherwise it falls back to explicit placement. Do not infer native performance

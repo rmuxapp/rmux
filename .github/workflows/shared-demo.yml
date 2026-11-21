@@ -48,6 +48,8 @@ jobs:
           restore-keys: shared-demo-${{ runner.os }}-
       - name: Build optimized shared UI
         run: mise run build-release
+      - name: Check optional font loader
+        run: mise run check-fonts
       - name: Check startup ordering
         run: mise run check-startup
       - name: Check native engine adapter

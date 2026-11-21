@@ -18,6 +18,7 @@ mod edit_history;
 #[path = "../../../crates/rmux-desktop/src/text_field.rs"]
 mod text_field;
 mod text_layout;
+mod fonts;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
@@ -382,6 +383,7 @@ pub fn start() {
     #[cfg(target_family = "wasm")]
     gpui_platform::web_init();
     gpui_platform::application().with_assets(icons::Assets).run(|cx| {
+        cx.set_global(fonts::Fonts::default());
         cx.text_system().add_fonts(vec![
             std::borrow::Cow::Borrowed(include_bytes!("../assets/Inter-Regular.ttf").as_slice()),
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),

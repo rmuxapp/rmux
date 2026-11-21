@@ -16,14 +16,14 @@ impl Line {
     }
 }
 pub fn shape(window: &Window, text: SharedString, font: Font, color: u32) -> Line {
-    let run = TextRun { len: text.len(), font, color: rgb_to_hsla(rgb(color)), ..Default::default() };
+    let run = TextRun { len: text.len(), font: crate::fonts::fallback(font), color: rgb_to_hsla(rgb(color)), ..Default::default() };
     Line(window.text_system().shape_line(text, px(14.), &[run]))
 }
 pub fn focus(handle: &FocusHandle, window: &mut Window, cx: &mut App) { handle.focus(window, cx); }
 pub fn mask(bounds: Bounds<Pixels>) -> ContentMask<Pixels> { ContentMask { bounds, ..Default::default() } }
 
 pub fn preedit(window: &Window, text: SharedString, family: &SharedString, font_size: f32) -> Line {
-    let run = TextRun { len: text.len(), font: font(family.clone()),
+    let run = TextRun { len: text.len(), font: crate::fonts::fallback(font(family.clone())),
         color: rgb_to_hsla(rgb(0xffffff)),
         background_color: None,
         underline: Some(UnderlineStyle { thickness: px(1.), color: None, wavy: false }),

@@ -18,6 +18,8 @@ smol_str = { version = "0.2.2", features = ["serde"] }
 serde_json = "1"
 rmux-core = { path = "../../crates/rmux-core" }
 wasm-bindgen = "=0.2.130"
+wasm-bindgen-futures = "=0.4.80"
+js-sys = "=0.3.107"
 gpui = { package = "gpui-ce", version = "=0.3.0", default-features = false }
 gpui_platform = { package = "gpui_ce_platform", version = "=0.3.0", default-features = false }
 unicode-segmentation = "1.13.3"

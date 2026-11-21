@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';
+import {readFile} from 'node:fs/promises';
+import {readCjk, CJK_SIZE} from '../fonts.js';
+const bytes = await readFile(new URL('../assets/NotoSansCJKjp-Regular.otf', import.meta.url));
+assert.equal((await readCjk(new Response(bytes))).length, CJK_SIZE);
+await assert.rejects(readCjk(new Response('', {status:404})), /unavailable/);
+await assert.rejects(readCjk(new Response(new Uint8Array(3))), /Incomplete/);
+await assert.rejects(readCjk(new Response(new Uint8Array(CJK_SIZE + 1))), /too large/);
+await assert.rejects(readCjk(new Response(new Uint8Array(CJK_SIZE))), /checksum/);
+console.log('Optional CJK font: pinned asset and bounded failure paths passed.');

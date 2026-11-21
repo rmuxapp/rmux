@@ -28,7 +28,7 @@ pub(crate) fn color(value: Color) -> Hsla {
     rgb_to_hsla(rgb((u32::from(value.0) << 16) | (u32::from(value.1) << 8) | u32::from(value.2)))
 }
 pub(crate) fn run(len: usize, font: Font, color: Hsla, underline: Option<UnderlineStyle>, strikethrough: Option<StrikethroughStyle>) -> TextRun {
-    TextRun { len, font, color, underline, strikethrough, ..Default::default() }
+    TextRun { len, font: crate::fonts::fallback(font), color, underline, strikethrough, ..Default::default() }
 }
 pub(crate) fn shape(window: &Window, text: SharedString, cells: CellMetrics, run: TextRun) -> ShapedLine {
     // CE has no fixed-cell-width shaping parameter. Use a single shaped run only

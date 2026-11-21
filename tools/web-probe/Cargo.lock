@@ -4827,12 +4827,14 @@ dependencies = [
  "anyhow",
  "gpui-ce",
  "gpui_ce_platform",
+ "js-sys",
  "rmux-core",
  "serde",
  "serde_json",
  "smol_str 0.2.2",
  "unicode-segmentation",
  "wasm-bindgen",
+ "wasm-bindgen-futures",
 ]
 
 [[package]]

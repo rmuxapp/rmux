@@ -6,6 +6,7 @@ use crate::{cell_metrics::CellMetrics, row_cache, row_host, terminal_engine::Ter
 pub(crate) struct TerminalSample {
     engine: TerminalEngine,
     frame: Frame,
+    font_revision: u64,
     rows: row_cache::RowCache,
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
@@ -66,7 +67,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -190,6 +191,7 @@ impl TerminalSample {
                     cx.notify();
                     return;
                 }
+                crate::fonts::ensure(text, cx);
                 self.engine.write(&self.command.display(self.frame.columns));
             }
         }
@@ -258,7 +260,12 @@ impl Render for TerminalSample {
                     cx.stop_propagation();
                 }
             }))
-            .child(canvas(move |bounds, window, cx| entity.update(cx, |this, _| {
+            .child(canvas(move |bounds, window, cx| entity.update(cx, |this, cx| {
+                let revision = cx.global::<crate::fonts::Fonts>().revision;
+                if this.font_revision != revision {
+                    this.rows.release(); this.cursor_cache = Default::default();
+                    this.font_revision = revision;
+                }
                 let family: SharedString = "Fira Mono".into();
                 let cells = CellMetrics::measured(14., family.clone(), window);
                 let content = crate::cell_metrics::content_bounds(bounds, 8);
@@ -313,7 +320,7 @@ impl Render for TerminalSample {
                     if let Some(scrollbar) = scrollbar { window.paint_quad(scrollbar); }
                 });
             }).flex_1().min_h_0().w_full())
-            .when_some(self.input_error.clone(), |root, message| root.child(div().px_2().py_1().text_xs().text_color(rgb(0xf0b85b)).child(message)))
+            .when_some(self.input_error.clone().or_else(|| cx.global::<crate::fonts::Fonts>().error.clone()), |root, message| root.child(div().px_2().py_1().text_xs().text_color(rgb(0xf0b85b)).child(message)))
     }
 }
 
@@ -348,6 +355,7 @@ impl EntityInputHandler for TerminalSample {
         cx.notify();
     }
     fn replace_and_mark_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, selected: Option<Range<usize>>, _: &mut Window, cx: &mut Context<Self>) {
+        crate::fonts::ensure(text, cx);
         self.composition.update(range, text, selected);
         cx.notify();
     }
