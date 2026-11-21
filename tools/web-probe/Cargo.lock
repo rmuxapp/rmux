@@ -4814,8 +4814,10 @@ dependencies = [
 name = "rmux-core"
 version = "0.1.4"
 dependencies = [
+ "anyhow",
  "serde",
  "smol_str 0.2.2",
+ "unicode-segmentation",
 ]
 
 [[package]]

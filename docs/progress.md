@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Moved the existing native workspace group model into rmux-core, including pin/
+member ordering, anchor promotion, insertion/removal rules, restore validation
+and its tests. Desktop re-exports the shared model; browser owns the same Groups
+model and uses its logical order. Both hosts now use shared numbered-target and
+cycle-target rules (9 selects last; cycling wraps in logical order). Workspace
+icon validation is shared too. All 14 focused group/navigation tests pass, along
+with native and WASM checks. This is a behavior-preserving extraction; browser
+group creation/editing controls and full application-state integration remain.
+
+
 Browser workspaces now retain independent pane trees, tab selection and live
 sample terminal engines. Sidebar/header/row presentation and workspace shortcut
 definitions are actual native sources consumed by both hosts. Hidden workspaces

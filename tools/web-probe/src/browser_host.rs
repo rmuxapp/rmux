@@ -4,12 +4,13 @@ use crate::{InputProbe, sidebar_presentation, NewWorkspace, NextWorkspace, Previ
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
+    groups: rmux_core::workspace_groups::Groups<EntityId>,
 }
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), cx.new(|cx| InputProbe::new(window, cx)))).collect();
-        let mut host = Self { workspaces, active: 0 };
+        let mut host = Self { workspaces, active: 0, groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -24,8 +25,12 @@ impl BrowserHost {
         self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
     }
+    fn workspace_order(&self) -> Vec<usize> {
+        let entries: Vec<_> = self.workspaces.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
+        self.groups.ordered_indices(&entries, true)
+    }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = rmux_core::layout::cycle_index(self.active, self.workspaces.len(), direction) {
+        if let Some(index) = rmux_core::workspace_groups::cycle_target(&self.workspace_order(), self.active, direction) {
             self.select(index, window, cx);
         }
     }
@@ -43,12 +48,9 @@ impl Render for BrowserHost {
             .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousWorkspace, window, cx| this.cycle(-1, window, cx)))
             .on_action(cx.listener(|this, action: &SelectWorkspaceNumber, window, cx| {
-                let index = match action.number {
-                    1..=8 => action.number - 1,
-                    9 => this.workspaces.len().saturating_sub(1),
-                    _ => return,
-                };
-                this.select(index, window, cx);
+                if let Some(index) = rmux_core::workspace_groups::numbered_target(&this.workspace_order(), action.number) {
+                    this.select(index, window, cx);
+                }
             }))
             .child(sidebar_presentation::sidebar(220.)
                 .child(sidebar_presentation::header()

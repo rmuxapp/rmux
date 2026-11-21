@@ -61,3 +61,8 @@ terminal engines. Browser checks cover restoring split layouts/tabs/output and
 keyboard workspace creation, numbered selection and wraparound. The host still
 owns a separate workspace service model; this is progress toward shared UI, not
 completion of the Rustable-style single application model.
+
+Workspace group ownership and ordering now live in rmux-core, extracted from the
+native model with its existing tests and restore validation. Both hosts consume
+that model and shared numbered/cyclic selection rules. Browser group controls
+are not connected yet; having the model does not establish group UI parity.

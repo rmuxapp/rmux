@@ -4014,9 +4014,9 @@ impl WorkspaceWindow {
             return;
         }
         let order = self.workspace_order(true);
-        let position = order.iter().position(|index| *index == self.active).unwrap_or(0);
-        let next = (position as isize + delta).rem_euclid(order.len() as isize) as usize;
-        self.select(order[next], window, cx);
+        if let Some(next) = workspace_groups::cycle_target(&order, self.active, delta) {
+            self.select(next, window, cx);
+        }
     }
 
     fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
@@ -4439,12 +4439,9 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &SetGroupAnchor, _, cx| this.set_group_anchor(cx)))
             .on_action(cx.listener(|this, action: &SelectWorkspaceNumber, window, cx| {
                 let order = this.workspace_order(true);
-                let position = match action.number {
-                    1..=8 => action.number - 1,
-                    9 => order.len().saturating_sub(1),
-                    _ => return,
-                };
-                if let Some(index) = order.get(position) { this.select(*index, window, cx); }
+                if let Some(index) = workspace_groups::numbered_target(&order, action.number) {
+                    this.select(index, window, cx);
+                }
             }))
             .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
             .on_action(cx.listener(|this, _: &LastWorkspace, window, cx| this.last_workspace(window, cx)))

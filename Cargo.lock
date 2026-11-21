@@ -5403,8 +5403,11 @@ dependencies = [
 name = "rmux-core"
 version = "0.1.4"
 dependencies = [
+ "anyhow",
  "serde",
+ "serde_json",
  "smol_str",
+ "unicode-segmentation",
 ]
 
 [[package]]

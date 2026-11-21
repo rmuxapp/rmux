@@ -658,10 +658,4 @@ mod tests {
 }
 
 /// One display grapheme, bounded independently of the layout file size.
-pub fn valid_workspace_icon(icon: &str) -> bool {
-    use unicode_segmentation::UnicodeSegmentation;
-    !icon.trim().is_empty()
-        && icon.len() <= 64
-        && !icon.chars().any(char::is_control)
-        && icon.graphemes(true).count() == 1
-}
+pub use rmux_core::workspace_groups::valid_workspace_icon;

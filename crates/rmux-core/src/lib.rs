@@ -7,3 +7,4 @@ pub mod palette_match;
 pub mod terminal_frame;
 pub mod terminal_runs;
 pub mod keyboard;
+pub mod workspace_groups;
