@@ -13,6 +13,15 @@ run = "python -m http.server 4319 --bind 127.0.0.1 --directory dist"
 [tasks.check]
 run = "cargo check --target wasm32-unknown-unknown"
 
+[tasks.build-native-vt]
+description = "Build the desktop libghostty-vt version for browser integration"
+dir = "../.."
+run = "RMUX_GHOSTTY_TARGET=wasm32-freestanding mise exec -- sh scripts/build-ghostty-source.sh"
+
+[tasks.check-native-vt]
+description = "Check the direct desktop-engine WASM adapter (build-native-vt first)"
+run = "node scripts/check-native-vt.mjs"
+
 [tasks.bench-browser-engine]
 description = "Measure the Ghostty WASM/JSON boundary at 1, 4 and 16 panes (build first)"
 run = "node scripts/bench-browser-engine.mjs"

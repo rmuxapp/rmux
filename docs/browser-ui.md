@@ -39,6 +39,18 @@ The browser must use the same workspace/tab/pane state, command definitions, pal
 
 ## Terminal rendering adapter
 
+### Converging on the desktop engine version
+
+The pinned libghostty-vt 1.0.1 distribution supports wasm32-freestanding, including
+the C selection APIs used by native rmux. `mise run build-native-vt` in
+tools/web-probe builds it to the isolated .deps/ghostty-vt-wasm32-freestanding
+prefix; `mise run check-native-vt` tests a direct adapter. Its ABI manifest drives
+enum values and selection sizes, with version/pointer-width checks. Selection,
+Unicode copy, soft wraps, bounded output and session isolation pass in Node's
+WASM runtime. This is migration groundwork, not browser selection completion:
+the UI still uses ghostty-web until render snapshots, keyboard and selection
+gestures are connected to the direct engine adapter.
+
 The owned frame contract and style-run grouping now live in rmux-core and are
 used by the native renderer. Keep row Arc identity and style-run batching when
 connecting the web host. GPUI 0.2.2 shapes with an explicit cell-width argument;

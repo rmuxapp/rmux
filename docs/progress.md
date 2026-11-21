@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+The pinned desktop libghostty-vt 1.0.1 source now has an isolated WASM build
+target via mise (892 KiB ReleaseSmall, all engine features retained). The older
+ghostty-web wrapper does not expose desktop's native selection gesture API.
+Rather than duplicate those semantics, native-vt.js starts a direct adapter to
+the same C API, reading enum values/struct sizes from the engine ABI manifest.
+Focused WASM runtime tests pass for select-all, Unicode copy, soft-wrap policy,
+bounded copy, clear-selection, session isolation and disposal. This adapter is
+not wired into the browser UI yet; snapshot decoding, keyboard encoding and
+gesture input must move across before replacing ghostty-web. No public deploy.
+
 Browser terminal now registers ElementInputHandler during paint, matching the
 desktop committed-text boundary and reusing its Composition model. Printable
 text goes through platform text commits; symbolic/control keys remain Ghostty

@@ -23,6 +23,10 @@ cd ".deps/libghostty-vt-$version"
 # a cross-compiled archive from silently replacing the host library.
 if [ -n "${RMUX_GHOSTTY_TARGET:-}" ]; then
     case "$RMUX_GHOSTTY_TARGET" in
+        wasm32-freestanding)
+            zig build -Demit-lib-vt -Dtarget=wasm32-freestanding -Doptimize=ReleaseSmall --prefix "$root/.deps/ghostty-vt-wasm32-freestanding"
+            exit 0
+            ;;
         x86_64-linux-gnu|aarch64-linux-gnu|x86_64-windows-gnu|aarch64-windows-gnu) ;;
         *) echo 'Unsupported cross-build target' >&2; exit 1 ;;
     esac
