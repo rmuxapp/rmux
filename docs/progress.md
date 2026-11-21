@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Long browser tab names now use desktop's shared title view: 48–220 px width,
+truncation and full-title tooltip. Native keeps its existing richer tooltip text;
+browser uses the full custom/automatic title. Rename completion requests active
+tab visibility. Native check and WASM build pass. Browser smoke verified a long
+custom title truncates while its close button and neighboring tab remain visible.
+Screenshot: target/shared-tab-title-width.jpg. Tooltip hover and overflowed-strip
+scroll positioning were not separately exercised. Not deployed.
+
 Close Other Tabs and Close Tabs to the Right are now available in the browser
 palette through shared action routing. Both hosts share close-scope selection and
 identity-based target revalidation; native process confirmation and prompt guards

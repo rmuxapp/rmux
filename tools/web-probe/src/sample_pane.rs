@@ -34,6 +34,7 @@ impl SamplePane {
                 crate::text_field::EditEvent::Changed(_) => return,
             }
             this.rename = None;
+            this.tab_scroll.scroll_to_item(this.terminals.active_index());
             this.focus(window, cx);
             cx.notify();
         }).detach();
@@ -174,7 +175,11 @@ impl Render for SamplePane {
                 .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
                     .children(self.terminals.iter().enumerate().map(|(index, terminal)|
                         tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused)
-                            .child(terminal.read(cx).custom_title.clone().unwrap_or_else(|| self.labels[&terminal.entity_id()].clone()))
+                            .child({
+                                let title: SharedString = terminal.read(cx).custom_title.clone()
+                                    .unwrap_or_else(|| self.labels[&terminal.entity_id()].clone()).into();
+                                tab_presentation::title(("tab-title", terminal.entity_id()), title.clone(), title)
+                            })
                             .child(div().id(("close-sample-tab",terminal.entity_id())).px_1().child("×")
                                 .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))

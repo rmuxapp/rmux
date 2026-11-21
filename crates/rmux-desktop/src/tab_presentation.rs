@@ -18,3 +18,9 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div 
         .child(div().text_xs().text_color(rgb(0xaaaaaa)).child("Tab name · empty restores automatic title · Enter to save · Esc to cancel"))
         .child(input)
 }
+
+pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {
+    div().id(id).min_w(px(48.)).max_w(px(220.)).truncate()
+        .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
+        .child(title)
+}

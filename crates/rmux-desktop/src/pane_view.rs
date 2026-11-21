@@ -1257,10 +1257,7 @@ impl Render for PaneView {
                                                 tab.child(div().text_xs().flex_shrink_0().text_color(rgb(0xa0a0a0)).child("Finished"))
                                             })
                                             .child({
-                                                div().id(("tab-title", target)).min_w(px(48.)).max_w(px(220.)).truncate()
-                                                    .tooltip(move |_, cx| cx.new(|_| ControlHint(title_hint.clone())).into()).child(
-                                                    display_title,
-                                                )
+                                                crate::tab_presentation::title(("tab-title", target), display_title, title_hint)
                                             })
                                             .child(
                                                 div()
