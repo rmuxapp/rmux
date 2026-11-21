@@ -1,9 +1,10 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
-use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
+use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, LastWorkspace, SelectWorkspaceNumber};
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
+    previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     empty_focus: FocusHandle,
     workspace_scroll: ScrollHandle,
     groups: rmux_core::workspace_groups::Groups<EntityId>,
@@ -12,7 +13,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
+        let mut host = Self { workspaces, active: 0, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -23,6 +24,7 @@ impl BrowserHost {
                 CommandId::CloseWorkspace => this.close_workspace(window, cx),
                 CommandId::NewWorkspace => this.add(window, cx),
                 CommandId::NewWorkspaceGroup => this.new_group(window, cx),
+                CommandId::LastWorkspace => this.last_workspace(window, cx),
                 CommandId::NextWorkspace => this.cycle(1, window, cx),
                 CommandId::PreviousWorkspace => this.cycle(-1, window, cx),
                 CommandId::UngroupWorkspaces => this.ungroup(cx),
@@ -58,6 +60,7 @@ impl BrowserHost {
             .filter(|group| group.members.first() == Some(&removed)).map(|group| group.id);
         let previous_index = self.active;
         self.groups.remove(removed);
+        self.previous_workspace.remove(removed);
         self.workspaces.remove(previous_index);
         if let Some(anchor) = anchor_group.and_then(|id| self.groups.entries().iter().find(|group| group.id == id))
             .and_then(|group| group.members.first()).copied() {
@@ -86,12 +89,22 @@ impl BrowserHost {
                 pane.update(cx, |pane,cx| pane.release_render_caches(cx));
             }
         });
+        self.previous_workspace.record(
+            self.workspaces.get(self.active).map(|(_, entity)| entity.entity_id()),
+            Some(self.workspaces[index].1.entity_id()),
+        );
         self.active=index;
         let member = self.workspaces[index].1.entity_id();
         self.groups.reveal(member);
         self.scroll_to_workspace();
         self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
+    }
+    fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = self.workspaces.iter().position(|(_, entity)|
+            Some(entity.entity_id()) == self.previous_workspace.target()) {
+            self.select(index, window, cx);
+        }
     }
     fn scroll_to_workspace(&self) {
         let Some((_, entity)) = self.workspaces.get(self.active) else { return; };
@@ -149,6 +162,7 @@ impl Render for BrowserHost {
         div().size_full().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
             .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.new_group(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.add(window, cx)))
+            .on_action(cx.listener(|this, _: &LastWorkspace, window, cx| this.last_workspace(window, cx)))
             .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousWorkspace, window, cx| this.cycle(-1, window, cx)))
             .on_action(cx.listener(|this, action: &SelectWorkspaceNumber, window, cx| {

@@ -25,7 +25,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::NewWorkspace, CommandId::NewTab,
     CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
-    CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
+    CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
@@ -38,7 +38,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -164,6 +164,7 @@ impl InputProbe {
             if let Some(action) = tab_action(*command) { action } else { match command {
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
+                CommandId::LastWorkspace => Box::new(LastWorkspace),
                 CommandId::NextWorkspace => Box::new(NextWorkspace),
                 CommandId::PreviousWorkspace => Box::new(PreviousWorkspace),
                 CommandId::Split => Box::new(Split),
@@ -260,7 +261,7 @@ impl InputProbe {
             }
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
             command @ (CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
-                | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
+                | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);
                 cx.emit(WorkspaceCommand(command));
                 return;

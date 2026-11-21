@@ -150,7 +150,7 @@ pub(super) struct WorkspaceWindow {
     active: usize,
     rendered_workspace: Option<WeakEntity<Workspace>>,
     rendered_background: Option<WindowBackgroundAppearance>,
-    previous_workspace: Option<EntityId>,
+    previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     close_prompt: Option<EntityId>,
     window_close_prompt: bool,
     close_handler_installed: bool,
@@ -2346,18 +2346,17 @@ impl WorkspaceWindow {
             .into_any_element()
     }
     fn remember_workspace_switch(&mut self, index: usize) {
-        if index != self.active {
-            self.previous_workspace = self
-                .entries
-                .get(self.active)
-                .map(|entry| entry.workspace.entity_id());
-        }
+        self.previous_workspace.record(
+            self.entries.get(self.active).map(|entry| entry.workspace.entity_id()),
+            self.entries.get(index).map(|entry| entry.workspace.entity_id()),
+        );
     }
+
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(index) = self
             .entries
             .iter()
-            .position(|entry| Some(entry.workspace.entity_id()) == self.previous_workspace)
+            .position(|entry| Some(entry.workspace.entity_id()) == self.previous_workspace.target())
         {
             self.select(index, window, cx);
         }
@@ -2442,9 +2441,7 @@ impl WorkspaceWindow {
         self.sidebar_selection.retain(|id| *id != removed.workspace.entity_id());
         if self.sidebar_selection_anchor == Some(removed.workspace.entity_id()) { self.sidebar_selection_anchor = None; }
         self.groups.remove(removed.workspace.entity_id());
-        if self.previous_workspace == Some(removed.workspace.entity_id()) {
-            self.previous_workspace = None;
-        }
+        self.previous_workspace.remove(removed.workspace.entity_id());
         if self.entries.is_empty() {
             window.remove_window();
             return;
@@ -3319,7 +3316,7 @@ impl WorkspaceWindow {
             sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
-            previous_workspace: None,
+            previous_workspace: Default::default(),
             close_prompt: None,
             window_close_prompt: false,
             close_handler_installed: false,
@@ -3534,7 +3531,7 @@ impl WorkspaceWindow {
             sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
-            previous_workspace: None,
+            previous_workspace: Default::default(),
             close_prompt: None,
             window_close_prompt: false,
             close_handler_installed: false,

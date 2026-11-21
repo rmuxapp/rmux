@@ -1,3 +1,22 @@
+/// Identity-based toggle between the current and previously selected item.
+/// Re-selecting the current item must not overwrite the previous destination.
+#[derive(Clone, Copy, Debug)]
+pub struct PreviousSelection<T>(Option<T>);
+
+impl<T> Default for PreviousSelection<T> {
+    fn default() -> Self { Self(None) }
+}
+
+impl<T: Copy + Eq> PreviousSelection<T> {
+    pub fn target(&self) -> Option<T> { self.0 }
+    pub fn record(&mut self, current: Option<T>, destination: Option<T>) {
+        if current != destination { self.0 = current; }
+    }
+    pub fn remove(&mut self, removed: T) {
+        if self.0 == Some(removed) { self.0 = None; }
+    }
+}
+
 /// Bounded navigation history, separate from the last-terminal MRU toggle.
 pub struct FocusTrail<T> {
     entries: Vec<T>,
@@ -34,6 +53,21 @@ impl<T: Copy + Eq> FocusTrail<T> {
 #[cfg(test)]
 mod tests {
     use super::FocusTrail;
+    #[test]
+    fn previous_selection_toggles_and_forgets_closed_destinations() {
+        let mut previous = super::PreviousSelection::default();
+        previous.record(None, Some(1));
+        assert_eq!(previous.target(), None);
+        previous.record(Some(1), Some(2));
+        previous.record(Some(2), Some(2));
+        assert_eq!(previous.target(), Some(1));
+        previous.record(Some(2), previous.target());
+        assert_eq!(previous.target(), Some(2));
+        previous.remove(1);
+        assert_eq!(previous.target(), Some(2));
+        previous.remove(2);
+        assert_eq!(previous.target(), None);
+    }
     #[test]
     fn back_forward_and_new_visit_branch() {
         let mut trail = FocusTrail::default();

@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Last Workspace now uses shared PreviousSelection state in desktop and browser.
+The browser palette exposes the command; selecting the current workspace keeps
+the previous destination, switching back toggles it, and closing the remembered
+workspace clears it. Focused core test and native/WASM checks pass; browser
+palette interaction verification remains pending.
+
+CI update: packaging run 44929803785 succeeded. Runs 44930447459 and
+44930926951 were cancelled; current workspace-placement run 44931038517 is
+in progress. These statuses supersede the older queue notes below.
+
 Workspace creation now uses the same top-level insertion policy in desktop and
 browser: after-current placement resolves grouped origins through their anchor
 and keeps new unpinned rows out of the pinned tier. Browser previously appended
