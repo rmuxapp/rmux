@@ -183,8 +183,9 @@ impl Render for TerminalSample {
                         .then(|| this.cursor_cache.shape(cell, cell.background, cells, &family, window, None));
                     Some((quads, glyph, origin))
                 });
-                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor, this.frame.selections.clone())
-            }), move |_, (rows, cells, background, bounds, content, cursor, selections), window, cx| {
+                let scrollbar = crate::scrollbar_view::indicator(content, &this.frame);
+                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor, this.frame.selections.clone(), scrollbar)
+            }), move |_, (rows, cells, background, bounds, content, cursor, selections, scrollbar), window, cx| {
                 window.handle_input(&input.read(cx).focus, ElementInputHandler::new(bounds, input.clone()), cx);
                 input.read(cx).engine.focus(input.read(cx).focus.is_focused(window));
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
@@ -196,6 +197,7 @@ impl Render for TerminalSample {
                         for quad in quads { window.paint_quad(quad); }
                         if let Some(glyph) = glyph { glyph.paint(origin, px(cells.height), window, cx); }
                     }
+                    if let Some(scrollbar) = scrollbar { window.paint_quad(scrollbar); }
                 });
             }).size_full())
     }

@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Desktop and browser now render the same extracted scrollback position indicator:
+3px width, minimum 8px thumb, native color and hidden at the live bottom. Native
+check and WASM build pass. Browser verified top/middle placement and hiding after
+Shift+End; evidence: target/shared-scrollbar-wasm.png. This matches the current
+desktop indicator, which is not draggable. Drag interaction remains unfinished
+on both hosts, along with selection edge autoscroll.
+
 Desktop and browser now share the Scroll command type and Shift navigation
 mapping in rmux-core. Shift+PageUp/Down overlaps one row between pages;
 Shift+Home/End selects top/bottom. Browser palette exposes native Scroll to Top

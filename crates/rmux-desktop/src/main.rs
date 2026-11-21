@@ -33,6 +33,7 @@ mod command_palette;
 mod palette_view;
 mod composition;
 mod control_hint;
+mod scrollbar_view;
 mod diagnostics;
 mod memory_view;
 mod settings_view;
@@ -2469,23 +2470,7 @@ impl Element for TerminalElement {
         let state = TerminalPaint {
             content_bounds: bounds,
             selections: frame.selections.clone(),
-            scrollbar: (frame.scrollback_offset > 0 && frame.scrollback_lines > 0).then(|| {
-                let height = f32::from(bounds.size.height);
-                let total = frame.scrollback_lines as f32 + frame.rows.len() as f32;
-                let thumb = (height * frame.rows.len() as f32 / total)
-                    .max(8.)
-                    .min(height);
-                let offset = (frame.scrollback_lines - frame.scrollback_offset) as f32
-                    / frame.scrollback_lines as f32;
-                fill(
-                    Bounds::new(
-                        bounds.origin
-                            + point(bounds.size.width - px(3.), px((height - thumb) * offset)),
-                        size(px(3.), px(thumb)),
-                    ),
-                    rgb(0x667085),
-                )
-            }),
+            scrollbar: scrollbar_view::indicator(bounds, &frame),
             rows: shaped_rows,
             backgrounds,
             preedit_backgrounds,
