@@ -164,3 +164,9 @@ Selecting a workspace result targets its stable entity and restores terminal foc
 WASM build and browser search/switch/return checks pass with retained output.
 The combined list scrolls; keyboard-driven off-screen result visibility still
 needs completion.
+
+Command results now use the native ListState/list virtualization pattern and
+shared row-reveal helper. Page Up/Down uses the native viewport-based calculation;
+filtering resets list position. Six native navigation tests and WASM build pass.
+Browser checks with 10 workspaces cover wraparound to a previously off-screen
+result, Page Up and filtering after scrolling.

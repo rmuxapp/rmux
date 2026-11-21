@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser command results now use GPUI ListState/list virtualization, native
+list_navigation::reveal and shared viewport-based paged_result. Search/catalog
+updates reset selection and scrolling. Native palette uses the extracted paging
+function unchanged. Six native navigation tests pass and WASM build passes.
+Browser check with 10 workspaces verified Up wrapping to the last off-screen
+result, Page Up revealing the correct earlier result, and filtering resetting to
+a visible first match. Evidence: target/shared-palette-scroll-wasm.png. This closes
+the pending long-list keyboard visibility gap; other browser parity work remains.
+
+
 Browser palette now snapshots workspace names/identities in logical order when
 opened, combines them with shared command titles in RankedSearch, and dispatches
 workspace selection by stable entity identity. Result labels follow native

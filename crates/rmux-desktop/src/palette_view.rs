@@ -38,3 +38,21 @@ pub(crate) fn footer() -> Div {
     div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x363636))
         .flex().flex_wrap().items_center().gap_2().text_xs().text_color(rgb(0xa0a0a0))
 }
+
+// Keep the destination within one viewport of the starting row. Always advance
+// at least one result, including in a window shorter than a single row.
+pub(crate) fn paged_result(selected: usize, count: usize, backwards: bool, viewport: f32, row_height: impl Fn(usize) -> f32) -> Option<usize> {
+    if count == 0 { return None; }
+    let mut next = selected.min(count - 1);
+    let mut occupied = row_height(next);
+    loop {
+        let candidate = if backwards { next.checked_sub(1) } else { next.checked_add(1).filter(|index| *index < count) };
+        let Some(candidate) = candidate else { break; };
+        occupied += row_height(candidate);
+        if occupied > viewport && next != selected.min(count - 1) { break; }
+        next = candidate;
+        if occupied >= viewport { break; }
+    }
+    Some(next)
+}
+

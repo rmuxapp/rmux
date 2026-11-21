@@ -44,6 +44,7 @@ struct InputProbe {
     search: palette_match::RankedSearch,
     workspace_results: Vec<(EntityId, String)>,
     selected: usize,
+    scroll: ListState,
     feedback: Option<String>,
     tree: Option<PaneTree<usize>>,
     focused: usize,
@@ -61,14 +62,14 @@ impl InputProbe {
             });
             cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
                 match event {
-                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
                     text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
                     text_field::EditEvent::Cancelled => this.close_palette(window, cx),
                 }
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -123,6 +124,7 @@ impl InputProbe {
         self.search = palette_match::RankedSearch::new(COMMANDS.iter().map(|command| command.title().to_lowercase())
             .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase())).collect());
         self.selected = 0;
+        self.scroll.reset(self.search.matches.len());
         cx.notify();
     }
     fn result_title(&self, index: usize) -> &str {
@@ -217,19 +219,33 @@ impl Render for InputProbe {
                 .child(palette_view::panel(height)
                 .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                     if this.input.read(cx).is_composing() { return; }
-                    if let Some(next) = palette_view::navigated_result(this.selected, this.search.matches.len(), &event.keystroke.key) {
-                        this.selected = next; this.feedback = None; cx.notify(); cx.stop_propagation();
+                    let key = event.keystroke.key.as_str();
+                    let next = if matches!(key, "pageup" | "pagedown") {
+                        palette_view::paged_result(this.selected, this.search.matches.len(), key == "pageup",
+                            f32::from(this.scroll.viewport_bounds().size.height), |_| 36.)
+                    } else { palette_view::navigated_result(this.selected, this.search.matches.len(), key) };
+                    if let Some(next) = next {
+                        this.selected = next;
+                        list_navigation::reveal(&this.scroll, next);
+                        this.feedback = None; cx.notify(); cx.stop_propagation();
                     }
                 }))
                 .child(palette_view::heading("Shared rmux palette · development probe"))
                 .child(palette_view::search(self.input.clone()))
-                .child(div().id("palette-results").min_h_0().overflow_y_scroll().children(self.search.matches.iter().enumerate().map(|(row, &index)| {
-                    palette_view::result(index, 36., row == self.selected)
-                        .child(div().flex_1().min_w_0().truncate().child(self.result_title(index).to_owned()))
-                        .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
-                            if event.standard_click() { this.selected = row; this.choose(window, cx); }
-                        }))
-                })))
+                .child({
+                    let entity = cx.entity();
+                    list(self.scroll.clone(), move |row, _, cx| {
+                        entity.update(cx, |this, cx| {
+                            let index = this.search.matches[row];
+                            palette_view::result(index, 36., row == this.selected)
+                                .child(div().flex_1().min_w_0().truncate().child(this.result_title(index).to_owned()))
+                                .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                                    if event.standard_click() { this.selected = row; this.choose(window, cx); }
+                                })).into_any_element()
+                        })
+                    }).with_sizing_behavior(ListSizingBehavior::Auto).w_full().min_h_0()
+                        .h(px((self.search.matches.len() as f32 * 36.).min(320.)))
+                })
                 .when(self.search.matches.is_empty(), |panel| panel.child(div().p_3().text_sm().child("No matching commands")))
                 .child(palette_view::footer().child(self.feedback.clone().unwrap_or_else(|| "↑↓ Navigate     ↵ Run     Esc Close".into()))))))
     }
@@ -290,3 +306,6 @@ mod browser_host;
 
 #[path = "../../../crates/rmux-desktop/src/workspace_shortcuts.rs"]
 mod workspace_shortcuts;
+
+#[path = "../../../crates/rmux-desktop/src/list_navigation.rs"]
+mod list_navigation;

@@ -84,22 +84,7 @@ fn result_area_height(rows: impl IntoIterator<Item = bool>) -> f32 {
 
 pub(super) use crate::palette_view::navigated_result;
 
-// Keep the destination within one viewport of the starting row. Always advance
-// at least one result, including in a window shorter than a single row.
-pub(super) fn paged_result(selected: usize, count: usize, backwards: bool, viewport: f32, row_height: impl Fn(usize) -> f32) -> Option<usize> {
-    if count == 0 { return None; }
-    let mut next = selected.min(count - 1);
-    let mut occupied = row_height(next);
-    loop {
-        let candidate = if backwards { next.checked_sub(1) } else { next.checked_add(1).filter(|index| *index < count) };
-        let Some(candidate) = candidate else { break; };
-        occupied += row_height(candidate);
-        if occupied > viewport && next != selected.min(count - 1) { break; }
-        next = candidate;
-        if occupied >= viewport { break; }
-    }
-    Some(next)
-}
+pub(super) use crate::palette_view::paged_result;
 
 #[cfg(test)]
 mod navigation_tests {
