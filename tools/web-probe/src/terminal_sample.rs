@@ -5,6 +5,7 @@ use rmux_core::terminal_frame::Frame;
 use crate::{cell_metrics::CellMetrics, row_cache, row_host, terminal_engine::TerminalEngine};
 pub(crate) struct TerminalSample {
     pub(crate) engine: TerminalEngine,
+    pub(crate) custom_title: Option<String>,
     find: Option<Entity<crate::browser_find::FindBar>>,
     find_history: rmux_core::search_state::QueryHistory,
     last_find_query: String,
@@ -114,7 +115,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };

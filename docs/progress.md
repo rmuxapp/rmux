@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser tabs can be renamed through the palette or double-click, using shared
+RenameTab action routing, TextField/editor presentation and bounded title
+normalization. Empty input restores the sample automatic title; Escape cancels.
+Custom titles live on terminal entities and survive tab-to-pane transfer. Native
+check and WASM build pass. Browser smoke verified palette save, double-click
+cancel and moving the renamed terminal to a new split with its title intact.
+Screenshot: target/shared-tab-rename.jpg. Not deployed. The actual shared app
+entry point and session-service abstraction remain open.
+
 Pane swap target resolution and commit now belong to shared layout State. Native
 commands/automation use the shared commit while retaining traversal-order view
 updates; browser uses the shared directional transition. Rejected/stale swaps

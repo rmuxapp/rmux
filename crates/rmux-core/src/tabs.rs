@@ -1,4 +1,10 @@
 //! Ordered pane tabs and selection, independent of UI entities or sessions.
+/// User tab titles share the same bounded normalization on every host.
+/// None restores the terminal's automatic title.
+pub fn custom_title(text: &str) -> Option<String> {
+    let title: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
+    (!title.is_empty()).then_some(title)
+}
 #[derive(Clone, Debug)]
 pub struct Tabs<T> {
     items: Vec<T>,

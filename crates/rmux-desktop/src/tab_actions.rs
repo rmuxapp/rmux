@@ -1,7 +1,7 @@
 //! Tab action routing shared by native and sample-session panes.
 use gpui::{prelude::*, *};
 use rmux_core::commands::CommandId;
-use crate::{NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, SelectTabNumber};
+use crate::{NewTab, RenameTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, SelectTabNumber};
 
 pub(crate) trait TabCommandHost: Sized + 'static {
     fn select_tab_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>);
@@ -20,4 +20,4 @@ macro_rules! tab_commands {
         }
     };
 }
-tab_commands! { NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane }
+tab_commands! { NewTab, RenameTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane }

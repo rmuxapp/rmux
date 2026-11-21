@@ -549,14 +549,9 @@ impl PaneView {
                             .iter()
                             .find(|terminal| terminal.entity_id() == id)
                         {
-                            let title: String = text
-                                .trim()
-                                .chars()
-                                .filter(|c| !c.is_control())
-                                .take(128)
-                                .collect();
+                            let title = rmux_core::tabs::custom_title(text);
                             terminal.update(cx, |terminal, cx| {
-                                terminal.custom_title = (!title.is_empty()).then_some(title);
+                                terminal.custom_title = title;
                                 cx.emit(TabMetadataChanged);
                                 cx.notify();
                             });
@@ -1161,6 +1156,7 @@ impl crate::tab_actions::TabCommandHost for PaneView {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::NewTab => self.add(window, cx),
+            CommandId::RenameTab => self.rename_tab(window, cx),
             CommandId::NextTab => self.cycle(1, window, cx),
             CommandId::PreviousTab => self.cycle(-1, window, cx),
             CommandId::MoveTabLeft => self.reorder(-1, cx),
@@ -1188,7 +1184,6 @@ impl Render for PaneView {
             .on_action(cx.listener(|this, _: &CloseTabsToRight, window, cx| this.close_tabs(TabCloseScope::Right, window, cx)))
             .on_action(cx.listener(|this, _: &CloseFinishedTabs, window, cx| this.close_tabs(TabCloseScope::Finished, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewTab, _, cx| this.cancel_tab_launch(cx)))
-            .on_action(cx.listener(|this, _: &RenameTab, window, cx| this.rename_tab(window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabPicker, window, cx| this.show_tab_picker(window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabMenu, window, cx| this.show_active_tab_menu(window, cx)))
             .map(|root| crate::tab_actions::bind(root, cx))
@@ -1380,9 +1375,7 @@ impl Render for PaneView {
                     }),
             )
             .when_some(self.rename.as_ref(), |root, input| {
-                root.child(div().flex().flex_col().gap_1().px_3().py_2().bg(rgb(0x292929))
-                    .child(div().text_xs().text_color(rgb(0xaaaaaa)).child("Tab name · empty restores automatic title · Enter to save · Esc to cancel"))
-                    .child(input.clone()))
+                root.child(crate::tab_presentation::rename_editor(input.clone()))
             })
             .when_some(self.error.clone(), |root, error| {
                 root.child(div_error(error, cx.listener(|this, event: &ClickEvent, _, cx| {

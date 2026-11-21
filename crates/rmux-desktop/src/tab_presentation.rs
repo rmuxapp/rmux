@@ -12,3 +12,9 @@ pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stat
             .text_color(rgb(if focused {0xe5e5e5} else {0xb8bfcb}))
             .border_color(rgb(if focused {0x4599ef} else {0x4a5362})))
 }
+
+pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div {
+    div().flex().flex_col().gap_1().px_3().py_2().bg(rgb(0x292929))
+        .child(div().text_xs().text_color(rgb(0xaaaaaa)).child("Tab name · empty restores automatic title · Enter to save · Esc to cancel"))
+        .child(input)
+}
