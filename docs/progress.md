@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Built and ran the actual shared rmux text field in the browser through GPUI CE.
+The isolated host bundles licensed Inter, uses a mise-managed wasm-bindgen loader,
+and binds editing shortcuts. Browser interaction verified typing, select-all,
+replacement and undo restoration. This is a single real rmux view, not a full web
+application; IME, clipboard, workspace/palette/terminal rendering and browser
+performance acceptance remain pending. The public showcase is unchanged.
+
 The actual desktop text field now compiles under both native GPUI 0.2.2 and the
 isolated GPUI CE 0.3.0 WASM host. Added small host-specific text layout/focus/paint
 adapters while retaining one source for editing, selection, IME, undo and visuals.
