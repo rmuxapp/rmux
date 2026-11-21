@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Desktop terminal menus, desktop tab menus and browser tab menus now use the same
+keyboard navigation resolver. Up/Down wrap through enabled items, Home/End pick
+enabled endpoints, and stale selections are bounded before navigation. Empty or
+entirely disabled menus return no target. Two focused navigation/type-ahead tests
+pass with the native test build; WASM compile passes. This consolidates behavior
+without changing menu presentation. No deployment.
+
 Tab menus now open through shared ShowTabMenu action routing on both hosts.
 The browser exposes Show Tab Actions in its palette and Shift+F10 from terminal
 focus, anchored below the tab strip. Menu shortcut hints are resolved once at

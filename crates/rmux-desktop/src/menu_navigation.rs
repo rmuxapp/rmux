@@ -4,6 +4,24 @@ use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
+/// Resolve menu navigation against current availability, including a selection
+/// that became stale while the menu was open. No enabled item means no target.
+pub fn navigate(key: &str, current: usize, enabled: &[bool]) -> Option<usize> {
+    match key {
+        "home" => enabled.iter().position(|value| *value),
+        "end" => enabled.iter().rposition(|value| *value),
+        "up" | "down" if !enabled.is_empty() => {
+            let count = enabled.len();
+            let current = current.min(count - 1);
+            (1..=count).map(|step| {
+                if key == "up" { (current + count - step) % count }
+                else { (current + step) % count }
+            }).find(|index| enabled[*index])
+        }
+        _ => None,
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct Typeahead {
     query: String,
@@ -43,6 +61,20 @@ impl Typeahead {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn navigation_revalidates_availability_and_wraps_only_to_enabled_items() {
+        let enabled = [false, true, false, true, false];
+        assert_eq!(navigate("down", 1, &enabled), Some(3));
+        assert_eq!(navigate("down", 3, &enabled), Some(1));
+        assert_eq!(navigate("up", 1, &enabled), Some(3));
+        assert_eq!(navigate("home", 3, &enabled), Some(1));
+        assert_eq!(navigate("end", 1, &enabled), Some(3));
+        assert_eq!(navigate("down", usize::MAX, &enabled), Some(1));
+        assert_eq!(navigate("up", 0, &[false; 5]), None);
+        assert_eq!(navigate("down", 0, &[]), None);
+        assert_eq!(navigate("enter", 1, &enabled), None);
+    }
 
     #[test]
     fn menu_prefixes_cycle_skip_disabled_and_expire() {

@@ -282,15 +282,11 @@ impl PaneView {
                         menu.typeahead.select(&event.keystroke.key, TAB_MENU_LABELS, &enabled, menu.selected, std::time::Instant::now())
                     } else { None };
                     match event.keystroke.key.as_str() {
-                        "up" | "down" => {
-                            let backwards = event.keystroke.key == "up";
-                            for step in 1..=enabled.len() {
-                                let candidate = (menu.selected + if backwards { enabled.len() - step } else { step }) % enabled.len();
-                                if enabled[candidate] { menu.selected = candidate; break; }
+                        "up" | "down" | "home" | "end" => {
+                            if let Some(selected) = crate::menu_navigation::navigate(&event.keystroke.key, menu.selected, &enabled) {
+                                menu.selected = selected;
                             }
                         }
-                        "home" => menu.selected = enabled.iter().position(|enabled| *enabled).unwrap_or(0),
-                        "end" => menu.selected = enabled.iter().rposition(|enabled| *enabled).unwrap_or(0),
                         "enter" | "space" => { let selected = menu.selected; this.activate_tab_menu(selected, window, cx); },
                         "escape" => this.dismiss_tab_menu(window, cx),
                         _ => { if let Some(selected) = typed { menu.selected = selected; } },

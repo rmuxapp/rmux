@@ -77,14 +77,11 @@ impl SamplePane {
                         menu.typeahead.select(&event.keystroke.key, MENU_LABELS, &enabled, menu.selected, web_time::Instant::now())
                     } else { None };
                     match event.keystroke.key.as_str() {
-                        "up" | "down" => {
-                            for step in 1..=enabled.len() {
-                                let candidate = (menu.selected + if event.keystroke.key == "up" { enabled.len() - step } else { step }) % enabled.len();
-                                if enabled[candidate] { menu.selected = candidate; break; }
+                        "up" | "down" | "home" | "end" => {
+                            if let Some(selected) = crate::menu_navigation::navigate(&event.keystroke.key, menu.selected, &enabled) {
+                                menu.selected = selected;
                             }
                         }
-                        "home" => menu.selected = enabled.iter().position(|value| *value).unwrap_or(0),
-                        "end" => menu.selected = enabled.iter().rposition(|value| *value).unwrap_or(0),
                         "enter" | "space" => { let selected = menu.selected; this.activate_menu(selected, window, cx); }
                         "escape" => this.dismiss_menu(window, cx),
                         _ => if let Some(selected) = typed { menu.selected = selected; },
