@@ -466,15 +466,12 @@ impl WorkspaceWindow {
         cx.notify();
     }
 
-    fn group_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let members: Vec<_> = self.workspace_order(true).into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id())
-            .filter(|id| self.workspace_state.sidebar_selection.contains(id)).map(|id| id.to_string()).collect();
-        if members.len() < 2 { cx.propagate(); return; }
-        let name = self.workspace_state.next_group_name();
-        let create = automation::GroupCreate { cwd: None, window_id: cx.entity_id().to_string(), name, workspace_ids: Some(members), external_id: None };
-        match self.automation_group_create(&create, window, cx) {
-            Ok(_) => { self.workspace_state.sidebar_selection.clear(); self.workspace_state.sidebar_selection_anchor = None; }
-            Err(error) => self.notice = Some(error.message.into()),
+    fn group_selected(&mut self, _window: &mut Window, cx: &mut Context<Self>) {
+        if self.automation_available(cx).is_err() { return; }
+        match self.workspace_state.group_sidebar_selection(|entry| (entry.workspace.entity_id(), entry.pinned)) {
+            Ok(Some(_)) => { self.sidebar = true; self.scroll_to_workspace(self.workspace_state.active); }
+            Ok(None) => { cx.propagate(); return; }
+            Err(error) => self.notice = Some(error.to_string().into()),
         }
         cx.notify();
     }
@@ -503,7 +500,6 @@ impl WorkspaceWindow {
             return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" });
         }
         let selected = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id());
-        let slots: Vec<_> = members.iter().filter_map(|member| self.group_anchor_slot(*member)).collect();
         if generated {
             let previous = self.workspace_state.previous;
             let next_number = self.next_number;
@@ -524,7 +520,7 @@ impl WorkspaceWindow {
             }
             members.push(self.workspace_state.entries[index].workspace.entity_id());
         }
-        let id = match self.workspace_state.groups.create(create.name.clone(), members, generated) {
+        let id = match self.workspace_state.create_group_members(create.name.clone(), members, generated, |entry| entry.workspace.entity_id()) {
             Ok(id) => id,
             Err(_) => {
                 if generated { self.close_workspace(self.workspace_state.entries.len() - 1, window, cx); }
@@ -533,14 +529,6 @@ impl WorkspaceWindow {
         };
         self.workspace_state.groups.get_mut(id).unwrap().external_id = create.external_id.clone();
         self.workspace_state.groups.get_mut(id).unwrap().cwd = create.cwd.clone();
-        // A source group may contribute several members; preserve its slot once.
-        let mut preserved = Vec::new();
-        for slot in slots {
-            if !preserved.contains(&slot.0) {
-                preserved.push(slot.0);
-                self.preserve_group_slot(Some(slot), selected);
-            }
-        }
         self.sidebar = true;
         self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
@@ -3990,6 +3978,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
+            CommandId::GroupSelectedWorkspaces => self.group_selected(window, cx),
             CommandId::ToggleGroupPin => self.toggle_group_pin(cx),
             CommandId::RemoveWorkspaceFromGroup => self.remove_workspace_from_group(cx),
             CommandId::SetGroupAnchor => self.set_group_anchor(cx),
@@ -4284,7 +4273,6 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &GroupSelectedWorkspaces, window, cx| this.group_selected(window, cx)))
             .on_action(cx.listener(|this, _: &RenameWorkspaceGroup, window, cx| this.edit_metadata(MetadataField::GroupName, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))

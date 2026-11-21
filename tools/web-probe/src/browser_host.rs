@@ -139,6 +139,13 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
             CommandId::NewWorkspace => self.add(window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
+            CommandId::GroupSelectedWorkspaces => {
+                match self.workspace_state.group_sidebar_selection(|(_, entity)| (entity.entity_id(), false)) {
+                    Ok(Some(_)) => { self.sidebar = true; self.scroll_to_workspace(); cx.notify(); }
+                    Ok(None) => cx.propagate(),
+                    Err(error) => eprintln!("Could not group workspaces: {error}"),
+                }
+            }
             CommandId::ToggleSidebar => self.toggle_sidebar(window, cx),
             CommandId::LastWorkspace => self.last_workspace(window, cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),

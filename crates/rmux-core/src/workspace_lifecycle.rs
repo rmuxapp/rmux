@@ -138,11 +138,32 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
     /// promoted anchor in the sidebar or changing the selected workspace identity.
     pub fn create_group(&mut self, index: usize, generated: bool, key: impl Fn(&T) -> W) -> anyhow::Result<u64> {
         let member = self.entries.get(index).map(&key).ok_or_else(|| anyhow::anyhow!("workspace no longer exists"))?;
+        self.create_group_members(self.next_group_name(), vec![member], generated, key)
+    }
+    /// Create a group from owned views without recreating sessions. Source groups
+    /// keep their sidebar slots when an anchor moves, and focus follows identity.
+    pub fn create_group_members(&mut self, name: String, members: Vec<W>, generated: bool, key: impl Fn(&T) -> W) -> anyhow::Result<u64> {
+        anyhow::ensure!(members.iter().all(|member| self.entries.iter().any(|entry| key(entry) == *member)), "workspace no longer exists");
         let selected = self.entries.get(self.active).map(&key);
-        let slot = self.group_anchor_slot(member, &key);
-        let id = self.groups.create(self.next_group_name(), vec![member], generated)?;
-        self.preserve_group_slot(slot, selected, key);
+        let mut slots = Vec::new();
+        for member in &members {
+            if let Some(slot) = self.group_anchor_slot(*member, &key) {
+                if !slots.iter().any(|existing: &(u64, W, usize)| existing.0 == slot.0) { slots.push(slot); }
+            }
+        }
+        let id = self.groups.create(name, members, generated)?;
+        for slot in slots { self.preserve_group_slot(Some(slot), selected, &key); }
         Ok(id)
+    }
+    pub fn group_sidebar_selection(&mut self, metadata: impl Fn(&T) -> (W, bool)) -> anyhow::Result<Option<u64>> {
+        let members: Vec<_> = self.order(true, &metadata).into_iter()
+            .map(|index| metadata(&self.entries[index]).0)
+            .filter(|id| self.sidebar_selection.contains(id)).collect();
+        if members.len() < 2 { return Ok(None); }
+        let id = self.create_group_members(self.next_group_name(), members, false, |entry| metadata(entry).0)?;
+        self.sidebar_selection.clear();
+        self.sidebar_selection_anchor = None;
+        Ok(Some(id))
     }
     pub fn select(&mut self, index: usize, key: impl Fn(&T) -> W) -> bool {
         select(&self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, key)
@@ -281,6 +302,29 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn grouping_selection_preserves_source_slots_focus_and_member_order() {
+        let mut state = State { entries: vec![(1, false), (2, false), (3, false), (4, false), (5, false)], active: 4, ..Default::default() };
+        let old = state.groups.create("original".into(), vec![1, 4, 5], false).unwrap();
+        state.sidebar_selection = vec![2, 4, 1]; // Click order differs from sidebar order.
+        let id = state.group_sidebar_selection(|entry| *entry).unwrap().unwrap();
+        assert_eq!(state.groups.get_mut(id).unwrap().members, vec![1, 4, 2]);
+        assert_eq!(state.groups.get_mut(old).unwrap().members, vec![5]);
+        assert_eq!(state.entries[0].0, 5); // Surviving source anchor retains its slot.
+        assert_eq!(state.entries[state.active].0, 5);
+        assert!(state.sidebar_selection.is_empty());
+        assert_eq!(state.sidebar_selection_anchor, None);
+        assert!(!state.groups.get_mut(id).unwrap().generated_anchor);
+        state.sidebar_selection = vec![2];
+        assert_eq!(state.group_sidebar_selection(|entry| *entry).unwrap(), None);
+        assert_eq!(state.sidebar_selection, vec![2]);
+        let before = state.groups.entries().to_vec();
+        assert!(state.create_group_members("invalid".into(), vec![1, 99], false, |entry| entry.0).is_err());
+        assert_eq!(state.groups.entries(), before);
+        assert!(state.create_group_members("invalid".into(), vec![1, 1], false, |entry| entry.0).is_err());
+        assert_eq!(state.groups.entries(), before);
+    }
 
     #[test]
     fn sidebar_selection_follows_visible_order_and_survives_ownership_changes() {

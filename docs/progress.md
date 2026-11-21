@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Group Selected Workspaces now uses shared workspace ownership transitions in
+native UI and browser, with native automation also using the same multi-member
+creation operation. Source anchors retain their slots, selection follows identity,
+and sessions are not recreated. Both hosts share the action/palette factory and
+Cmd+Shift+G / Ctrl+Alt+Shift+G binding. Twelve lifecycle tests pass, including
+multi-member extraction, source anchor promotion, sidebar member order and invalid
+request atomicity. Native check and WASM build pass; browser keyboard grouping and
+palette regrouping passed. Screenshot: target/shared-group-selection.jpg.
+Browser Cmd+P did not open after modified sidebar selection (Commands toolbar did);
+that focus-routing issue remains to fix. Native runtime and non-mac shortcuts were
+not exercised. Not deployed; full shared application migration remains open.
+
 Sidebar multi-selection now belongs to shared workspace State, including its
 range anchor and cleanup when a workspace closes or transfers out. Native uses
 that model; the browser now supports Cmd/Ctrl-click toggles, Shift-click visible
