@@ -23,6 +23,8 @@ const COMMANDS: &[CommandId] = &[
     CommandId::NewWorkspace, CommandId::NewWorkspaceGroup,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
+    CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
+    CommandId::ResizePaneUp, CommandId::ResizePaneDown,
 ];
 struct WorkspaceCommand(CommandId);
 impl EventEmitter<WorkspaceCommand> for InputProbe {}
@@ -159,6 +161,17 @@ impl InputProbe {
                     self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
+            }
+            CommandId::EqualizePanes => { if let Some(tree) = &mut self.tree { tree.equalize(); } }
+            command @ (CommandId::ResizePaneLeft | CommandId::ResizePaneRight | CommandId::ResizePaneUp | CommandId::ResizePaneDown) => {
+                use rmux_core::layout::Direction;
+                let direction = match command {
+                    CommandId::ResizePaneLeft => Direction::Left,
+                    CommandId::ResizePaneRight => Direction::Right,
+                    CommandId::ResizePaneUp => Direction::Up,
+                    _ => Direction::Down,
+                };
+                if let Some(tree) = &mut self.tree { tree.resize_direction(&self.focused, direction); }
             }
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
             command @ (CommandId::NewWorkspace | CommandId::NewWorkspaceGroup

@@ -187,3 +187,9 @@ The shared drag-release handler now notifies its host after clearing drag state,
 committing a final non-dragging scene. Browser regression confirms the previously
 missing upper text is visible immediately after nested vertical dragging. Native
 check and WASM build pass. Nested double-click equalization remains unresolved.
+
+Nested double-click equalization is now verified: event tracing confirmed correct
+path/count delivery and the resulting frame restored equal heights. Diagnostics
+were removed. The palette also offers four Resize Pane directions and Equalize
+Pane Sizes through native core operations. Clean WASM build and browser Up/Equalize
+interaction checks pass.

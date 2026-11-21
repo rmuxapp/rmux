@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Resolved the nested equalization investigation: temporary event tracing confirmed
+correct nested path and click counts 1/2; the subsequent frame restored equal
+heights. Prior captures were premature, not evidence of a hit-test defect. Trace
+code was removed. Added all four Resize Pane directions and Equalize Pane Sizes
+to the browser palette using shared command identities and core tree operations.
+Clean WASM build passes; browser verified Resize Pane Up moves the divider and
+Equalize restores equal sizes with sessions retained. Evidence:
+target/shared-resize-commands-wasm.png. Broader browser/platform parity remains.
+
+
 Fixed the observed post-drag missing-text frame by notifying the shared split
 host when mouse release clears its drag state. The final non-dragging scene now
 renders without needing another pointer action. A prepaint invalidation attempt
