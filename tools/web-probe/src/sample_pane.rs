@@ -83,6 +83,14 @@ impl SamplePane {
             terminal.update(cx, |terminal,cx| terminal.release_render_cache(cx));
         }
     }
+    fn close_tabs(&mut self, scope: rmux_core::tabs::CloseScope, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(keep) = self.terminals.active().map(Entity::entity_id) else { return; };
+        let current: Vec<_> = self.terminals.iter().map(Entity::entity_id).collect();
+        let targets: Vec<_> = current.iter().enumerate()
+            .filter(|(index, _)| scope.includes(*index, self.terminals.active_index(), false))
+            .map(|(_, id)| *id).collect();
+        for index in rmux_core::tabs::close_indices(&current, keep, &targets) { self.close(index, window, cx); }
+    }
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() { return; }
         let replace_focus = self.terminals[index].read(cx).is_focused(window) || self.rename.is_some();
@@ -146,6 +154,8 @@ impl crate::tab_actions::TabCommandHost for SamplePane {
         match command {
             CommandId::NewTab => self.add(window, cx),
             CommandId::RenameTab => self.rename_tab(window, cx),
+            CommandId::CloseOtherTabs => self.close_tabs(rmux_core::tabs::CloseScope::Others, window, cx),
+            CommandId::CloseTabsToRight => self.close_tabs(rmux_core::tabs::CloseScope::Right, window, cx),
             CommandId::NextTab => self.cycle(1, window, cx),
             CommandId::PreviousTab => self.cycle(-1, window, cx),
             CommandId::MoveTabLeft => self.reorder(-1, cx),

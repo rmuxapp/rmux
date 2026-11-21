@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Close Other Tabs and Close Tabs to the Right are now available in the browser
+palette through shared action routing. Both hosts share close-scope selection and
+identity-based target revalidation; native process confirmation and prompt guards
+remain in the native host. Existing focused tests passed for reordered/right-side
+targets, newly opened tabs surviving a pending request, and finished-tab scope.
+Native test build and WASM build pass. Browser smoke verified four tabs reduced
+to the selected tab and its left neighbor, then to the selected tab alone, with
+its sample output retained. Screenshot: target/shared-bulk-tab-close.jpg. Native
+prompt UI was not exercised. Not deployed; full app/session parity remains open.
+
 Browser tabs can be renamed through the palette or double-click, using shared
 RenameTab action routing, TextField/editor presentation and bounded title
 normalization. Empty input restores the sample automatic title; Escape cancels.

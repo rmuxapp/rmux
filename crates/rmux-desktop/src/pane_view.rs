@@ -29,23 +29,7 @@ fn reveal_reordered_tab(scroll: &ListState, previous: &mut usize, row: usize) {
     *previous = row;
 }
 
-#[derive(Clone, Copy)]
-enum TabCloseScope { Others, Right, Finished }
-impl TabCloseScope {
-    fn includes(self, index: usize, active: usize, finished: bool) -> bool {
-        match self {
-            Self::Others => index != active,
-            Self::Right => index > active,
-            Self::Finished => index != active && finished,
-        }
-    }
-}
-
-fn other_tab_close_indices<T: Copy + Eq>(current: &[T], keep: T, targets: &[T]) -> Vec<usize> {
-    if !current.contains(&keep) { return Vec::new(); }
-    current.iter().enumerate().rev()
-        .filter_map(|(index, id)| (*id != keep && targets.contains(id)).then_some(index)).collect()
-}
+use rmux_core::tabs::{CloseScope as TabCloseScope, close_indices as other_tab_close_indices};
 
 fn tab_drop_index(from: usize, target: usize) -> usize {
     target.saturating_sub(usize::from(from < target))
@@ -1157,6 +1141,8 @@ impl crate::tab_actions::TabCommandHost for PaneView {
         match command {
             CommandId::NewTab => self.add(window, cx),
             CommandId::RenameTab => self.rename_tab(window, cx),
+            CommandId::CloseOtherTabs => self.close_tabs(TabCloseScope::Others, window, cx),
+            CommandId::CloseTabsToRight => self.close_tabs(TabCloseScope::Right, window, cx),
             CommandId::NextTab => self.cycle(1, window, cx),
             CommandId::PreviousTab => self.cycle(-1, window, cx),
             CommandId::MoveTabLeft => self.reorder(-1, cx),
@@ -1180,8 +1166,6 @@ impl Render for PaneView {
         let attention = self.needs_attention(cx);
         crate::pane_presentation::frame(self.benchmark, attention)
             .on_action(cx.listener(|this, _: &NewLocalTab, window, cx| this.add_terminal(false, window, cx)))
-            .on_action(cx.listener(|this, _: &CloseOtherTabs, window, cx| this.close_tabs(TabCloseScope::Others, window, cx)))
-            .on_action(cx.listener(|this, _: &CloseTabsToRight, window, cx| this.close_tabs(TabCloseScope::Right, window, cx)))
             .on_action(cx.listener(|this, _: &CloseFinishedTabs, window, cx| this.close_tabs(TabCloseScope::Finished, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewTab, _, cx| this.cancel_tab_launch(cx)))
             .on_action(cx.listener(|this, _: &ShowTabPicker, window, cx| this.show_tab_picker(window, cx)))

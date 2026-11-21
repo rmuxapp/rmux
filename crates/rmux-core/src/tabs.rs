@@ -5,6 +5,24 @@ pub fn custom_title(text: &str) -> Option<String> {
     let title: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
     (!title.is_empty()).then_some(title)
 }
+#[derive(Clone, Copy)]
+pub enum CloseScope { Others, Right, Finished }
+impl CloseScope {
+    pub fn includes(self, index: usize, active: usize, finished: bool) -> bool {
+        match self {
+            Self::Others => index != active,
+            Self::Right => index > active,
+            Self::Finished => index != active && finished,
+        }
+    }
+}
+/// Revalidate captured identities after a possible confirmation delay. New tabs
+/// and the kept tab survive; descending indices avoid shifting later removals.
+pub fn close_indices<T: Copy + Eq>(current: &[T], keep: T, targets: &[T]) -> Vec<usize> {
+    if !current.contains(&keep) { return Vec::new(); }
+    current.iter().enumerate().rev()
+        .filter_map(|(index, id)| (*id != keep && targets.contains(id)).then_some(index)).collect()
+}
 #[derive(Clone, Debug)]
 pub struct Tabs<T> {
     items: Vec<T>,
