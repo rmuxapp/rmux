@@ -9,6 +9,7 @@ pub(crate) struct BrowserHost {
     rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
     workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, WorkspaceMetadata), EntityId>,
     editor_hint: String,
+    editor_presets: Option<bool>,
     sidebar: bool,
     sidebar_width: f32,
     sidebar_drag: Option<(Pixels, f32)>,
@@ -19,7 +20,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, WorkspaceMetadata::default())).collect();
-        let mut host = Self { rename: None, editor_hint: String::new(), workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
+        let mut host = Self { rename: None, editor_hint: String::new(), editor_presets: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
     }
@@ -107,7 +108,7 @@ impl BrowserHost {
                     }
                 }
                 crate::text_field::EditEvent::Cancelled => {},
-                crate::text_field::EditEvent::Changed(text) => { crate::fonts::ensure(text, cx); return; },
+                crate::text_field::EditEvent::Changed(text) => { crate::fonts::ensure(text, cx); cx.notify(); return; },
             }
             this.rename = None;
             this.select(this.workspace_state.active, window, cx);
@@ -121,6 +122,16 @@ impl BrowserHost {
             WorkspaceField::Color | WorkspaceField::GroupColor => "Color: #RRGGBB; empty clears",
             _ => "Enter to save · Esc to cancel",
         }.into();
+        self.editor_presets = match field {
+            WorkspaceField::Color | WorkspaceField::GroupColor => Some(false),
+            WorkspaceField::Icon | WorkspaceField::GroupIcon => Some(true),
+            _ => None,
+        };
+        if self.editor_presets == Some(true) {
+            for (_, icon) in crate::metadata_presets::WORKSPACE_ICONS {
+                if let Some(icon) = icon { crate::fonts::ensure(icon, cx); }
+            }
+        }
         self.rename = Some((target, input));
         cx.notify();
     }
@@ -345,6 +356,7 @@ impl Render for BrowserHost {
                             .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 div().flex().flex_col().gap_1().child(input.clone())
+                                    .when_some(self.editor_presets, |editor, icons| editor.child(crate::metadata_presets::render(input, icons, cx)))
                                     .child(div().text_xs().child(self.editor_hint.clone()))))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }

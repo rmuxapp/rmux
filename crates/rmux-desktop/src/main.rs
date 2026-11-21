@@ -71,6 +71,7 @@ mod terminal_actions;
 mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;
+mod metadata_presets;
 mod sidebar_interaction;
 mod workspace_presentation;
 mod list_navigation;
@@ -258,23 +259,7 @@ struct SetWorkspaceColor {
 struct SetWorkspaceIcon {
     icon: Option<String>,
 }
-const WORKSPACE_ICONS: &[(&str, Option<&str>)] = &[
-    ("None", None),
-    ("Terminal", Some("⌘")),
-    ("Code", Some("⌨")),
-    ("Build", Some("⚙")),
-    ("Cloud", Some("☁")),
-    ("Notes", Some("✎")),
-];
-const WORKSPACE_COLORS: &[(&str, Option<u32>)] = &[
-    ("None", None),
-    ("Blue", Some(0x7aa2f7)),
-    ("Green", Some(0x9ece6a)),
-    ("Amber", Some(0xe0af68)),
-    ("Red", Some(0xf7768e)),
-    ("Purple", Some(0xbb9af7)),
-    ("Cyan", Some(0x7dcfff)),
-];
+use metadata_presets::{WORKSPACE_ICONS, WORKSPACE_COLORS};
 impl Global for Shutdowns {}
 fn checkpoint_before_quit(cx: &mut App) -> Option<Task<anyhow::Result<()>>> {
     if cx.global::<Shutdowns>().quitting { return None; }

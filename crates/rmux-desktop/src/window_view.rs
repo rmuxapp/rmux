@@ -812,36 +812,6 @@ impl WorkspaceWindow {
         }
         cx.notify();
     }
-    fn metadata_presets(input: &Entity<text_field::TextField>, field: MetadataField, cx: &App) -> AnyElement {
-        let choices: Vec<(&str, String, Option<u32>)> = match field {
-            MetadataField::Color | MetadataField::GroupColor => WORKSPACE_COLORS.iter().map(|(name, color)| (*name, color.map(|color| format!("#{color:06X}")).unwrap_or_default(), *color)).collect(),
-            MetadataField::Icon | MetadataField::GroupIcon => WORKSPACE_ICONS.iter().map(|(name, icon)| (*name, icon.unwrap_or_default().to_owned(), None)).collect(),
-            _ => return gpui::div().into_any_element(),
-        };
-        let draft = input.read(cx).value().trim();
-        gpui::div().flex().flex_wrap().gap_1().py_1()
-            .children(choices.into_iter().enumerate().map(|(index, (name, value, color))| {
-                let selected = if matches!(field, MetadataField::Color | MetadataField::GroupColor) {
-                    parse_workspace_color(draft).is_ok_and(|current| current == color)
-                } else { draft == value };
-                let input = input.clone();
-                let label = if matches!(field, MetadataField::Icon | MetadataField::GroupIcon) && !value.is_empty() { value.clone() } else if value.is_empty() { "×".into() } else { String::new() };
-                gpui::div().id(("metadata-preset", index)).w(px(28.)).h(px(28.))
-                    .flex().items_center().justify_center().rounded_md().border_1()
-                    .border_color(rgb(if selected { 0xa7c7ff } else { 0x465063 }))
-                    .bg(rgb(0x252d3b)).cursor_pointer()
-                    .hover(|button| button.bg(rgb(0x3a465c)))
-                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(name.into())).into())
-                    .child(gpui::div().w(px(16.)).h(px(16.)).rounded_sm().text_center().line_height(px(16.))
-                        .when_some(color, |swatch, color| swatch.bg(rgb(color))).child(label))
-                    .on_click(move |event, window, cx| {
-                        if !event.standard_click() { return; }
-                        cx.stop_propagation();
-                        input.update(cx, |input, cx| input.replace_draft(&value, cx));
-                        input.read(cx).focus.focus(window);
-                    })
-            })).into_any_element()
-    }
     pub(super) fn automation_text_export(&self, target: EntityId, max_bytes: usize, selected: bool, preserve_wraps: bool, lines: Option<usize>, cx: &App) -> Option<rmux_terminal::session::HistoryExport> {
         self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target)
@@ -4390,7 +4360,7 @@ impl Render for WorkspaceWindow {
                                                     .min_w_0()
                                                     .child(gpui::div().text_xs().child(field.label()))
                                                     .child(input.clone())
-                                                    .when(matches!(field, MetadataField::Color | MetadataField::Icon | MetadataField::GroupColor | MetadataField::GroupIcon), |editor| editor.child(Self::metadata_presets(input, *field, cx)))
+                                                    .when(matches!(field, MetadataField::Color | MetadataField::Icon | MetadataField::GroupColor | MetadataField::GroupIcon), |editor| editor.child(crate::metadata_presets::render(input, matches!(field, MetadataField::Icon | MetadataField::GroupIcon), cx)))
                                                     .child(
                                                         gpui::div()
                                                             .text_xs()

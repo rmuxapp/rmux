@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Color/icon preset pickers now use one shared desktop/browser module, including
+choices, selection outlines, tooltips, sizing and draft-only click behavior.
+Browser metadata edits notify their host so selection outlines follow typing
+and preset clicks. Icon picker fonts load on demand; the Notes preset uses the
+bundled-font-supported pencil (✏) instead of the missing lower-right pencil
+glyph (✎). Existing custom icon values are preserved. Browser checks cover
+color selection/save, icon selection/cancel, Notes rendering/save. Screenshots:
+`target/browser-color-presets.jpg`, `target/browser-icon-presets.jpg`.
+WASM build and native desktop check pass. Not deployed yet.
+
 Browser workspace/group icon editing now shares native actions and the existing
 Unicode grapheme validator (one symbol, up to 64 bytes). Empty input clears;
 invalid input keeps the editor open with guidance. Group rows use the native
