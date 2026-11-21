@@ -199,6 +199,7 @@ pub struct Preferences {
     pub macos_option_as_alt: bool,
     pub unfocused_cursor: UnfocusedCursor,
     pub focused_cursor: FocusedCursor,
+    pub cursor_opacity: u8,
     pub foreground_color: Option<HexColor>,
     pub background_color: Option<HexColor>,
     pub background_opacity: u8,
@@ -240,6 +241,7 @@ impl Default for Preferences {
             macos_option_as_alt: true,
             unfocused_cursor: UnfocusedCursor::default(),
             focused_cursor: FocusedCursor::default(),
+            cursor_opacity: 100,
             foreground_color: None,
             background_color: None,
             background_opacity: 100,
@@ -348,8 +350,18 @@ impl Preferences {
         self.cursor_color_setting().map(|setting| setting.resolve(foreground, background)).unwrap_or(engine_color)
     }
     pub fn cursor_text(&self, foreground: rmux_terminal::Color, background: rmux_terminal::Color) -> rmux_terminal::Color {
-        self.cursor_text.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_text))
-            .unwrap_or(CellColor::CellBackground).resolve(foreground, background)
+        let target = self.cursor_text.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_text))
+            .unwrap_or(CellColor::CellBackground).resolve(foreground, background);
+        // Fade the block's inverted glyph back to the original terminal text.
+        // At zero opacity the cursor must not leave an inverted glyph behind.
+        let opacity = u32::from(self.cursor_opacity.min(100));
+        let blend = |original: u8, target: u8| ((u32::from(original) * (100 - opacity) + u32::from(target) * opacity + 50) / 100) as u8;
+        rmux_terminal::Color(blend(foreground.0, target.0), blend(foreground.1, target.1), blend(foreground.2, target.2))
+    }
+    pub fn cursor_paint(&self, fill: rmux_terminal::Color) -> gpui::Hsla {
+        let mut color = crate::color(fill);
+        color.a = f32::from(self.cursor_opacity.min(100)) / 100.;
+        color
     }
     pub fn selection_foreground(&self) -> Option<CellColor> {
         self.selection_foreground.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_foreground))
@@ -424,6 +436,7 @@ impl Preferences {
             && self.theme_file == other.theme_file
             && self.unfocused_cursor == other.unfocused_cursor
             && self.focused_cursor == other.focused_cursor
+            && self.cursor_opacity == other.cursor_opacity
             && self.macos_option_as_alt == other.macos_option_as_alt
             && self.copy_on_select == other.copy_on_select
             && self.native_notifications == other.native_notifications
@@ -454,6 +467,7 @@ impl Preferences {
         latest.theme_file = self.theme_file.clone();
         latest.unfocused_cursor = self.unfocused_cursor;
         latest.focused_cursor = self.focused_cursor;
+        latest.cursor_opacity = self.cursor_opacity;
         latest.macos_option_as_alt = self.macos_option_as_alt;
         latest.copy_on_select = self.copy_on_select;
         latest.native_notifications = self.native_notifications;
@@ -537,6 +551,7 @@ impl Preferences {
             "font_size must be between 8 and 40"
         );
         ensure!(value.background_opacity <= 100, "background_opacity must be between 0 and 100");
+        ensure!(value.cursor_opacity <= 100, "cursor_opacity must be between 0 and 100");
         crate::shortcuts::compile(&value)?;
         Ok(value)
     }
@@ -902,6 +917,33 @@ mod tests {
             } else {
                 assert!(decoded.is_err());
             }
+        }
+        Ok(())
+    }
+    #[test]
+    fn cursor_opacity_preserves_text_and_round_trips_settings() -> Result<()> {
+        use rmux_terminal::Color;
+        let mut settings = Preferences::decode(b"{}")?;
+        let (foreground, background) = (Color(200, 100, 20), Color(20, 40, 60));
+        assert_eq!(settings.cursor_opacity, 100);
+        assert_eq!(settings.cursor_text(foreground, background), background);
+        settings.cursor_opacity = 50;
+        assert_eq!(settings.cursor_text(foreground, background), Color(110, 70, 40));
+        assert_eq!(settings.cursor_paint(foreground).a, 0.5);
+        assert!(!settings.same_saved_appearance(&Preferences::default()));
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        settings.source = Some(path.clone());
+        settings.save_appearance()?;
+        assert_eq!(Preferences::read(&path, false)?.cursor_opacity, 50);
+        for _ in 0..30 { crate::settings_view::adjust(&mut settings, "cursor_opacity", -1); }
+        assert_eq!(settings.cursor_opacity, 0);
+        assert_eq!(settings.cursor_text(foreground, background), foreground);
+        assert_eq!(settings.cursor_paint(foreground).a, 0.);
+        for _ in 0..30 { crate::settings_view::adjust(&mut settings, "cursor_opacity", 1); }
+        assert_eq!(settings.cursor_opacity, 100);
+        for value in ["-1", "101", "256", "0.5", "null"] {
+            assert!(Preferences::decode(format!("{{\"cursor_opacity\":{value}}}").as_bytes()).is_err());
         }
         Ok(())
     }

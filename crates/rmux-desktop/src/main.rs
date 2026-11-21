@@ -2364,6 +2364,7 @@ impl Element for TerminalElement {
         let cursor = frame
             .cursor
             .zip(cursor_shape)
+            .filter(|_| cx.global::<Preferences>().cursor_opacity != 0)
             .map(|((x, y), shape)| {
                 let mut origin =
                     bounds.origin + point(px(x as f32 * cells.width), px(y as f32 * cells.height));
@@ -2390,7 +2391,7 @@ impl Element for TerminalElement {
                     });
                 }
                 let cursor_fill = cell.map(|cell| cx.global::<Preferences>().cursor_fill(cell.foreground, cell.background, frame.cursor_color, frame.cursor_color_explicit)).unwrap_or(frame.cursor_color);
-                cursor_view::quads(shape, origin, width, cells.height, color(cursor_fill))
+                cursor_view::quads(shape, origin, width, cells.height, cx.global::<Preferences>().cursor_paint(cursor_fill))
             })
             .unwrap_or_default();
         let state = TerminalPaint {

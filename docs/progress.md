@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Native settings now expose cursor opacity (0–100%, default 100%) beside cursor
+shape, with live application, keyboard adjustment, theme preview and persistence.
+Partial opacity blends block cursor text toward the original foreground; zero
+skips cursor paint entirely. Five focused cursor tests pass, including validation,
+color blending, opacity bounds and disk round-trip. No timer or terminal engine
+mutation was added. Native visual acceptance remains pending while the Mac is
+locked; this is not yet in the published desktop release or browser settings.
+
 Automatic session checkpoint failures now show a window notice explaining the
 recovery risk and how to save elsewhere. Identical errors are suppressed until
 a successful write, preventing the notice's own notification from creating an

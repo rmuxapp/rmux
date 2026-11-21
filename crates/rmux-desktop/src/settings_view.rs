@@ -7,7 +7,7 @@ pub struct State {
     pub selected: usize,
     pub scroll: ScrollHandle,
 }
-pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
+pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
     "import_theme", "file_editor",
 ];
@@ -32,6 +32,7 @@ pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
 pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
     match key {
         "opacity" => settings.background_opacity = (settings.background_opacity as i32 + 5 * delta.signum()).clamp(0, 100) as u8,
+        "cursor_opacity" => settings.cursor_opacity = (settings.cursor_opacity as i32 + 5 * delta.signum()).clamp(0, 100) as u8,
         "blur" => settings.background_blur = !settings.background_blur,
         "option_as_alt" => settings.macos_option_as_alt = !settings.macos_option_as_alt,
         "font" => settings.font_size = (settings.font_size + delta as f32).clamp(8., 40.),
@@ -110,7 +111,7 @@ fn theme_preview(settings: &Preferences) -> impl IntoElement {
             .child(div().flex().items_center().line_height(px(16.))
                 .child(div().min_w_0().truncate().child("❯ echo hell"))
                 .child(div().id("theme-cursor-sample").w(px(8.)).h(px(16.)).flex_shrink_0().text_center()
-                    .bg(rgb_color(settings.cursor_fill(colors[0].unwrap_or(DEFAULT_FOREGROUND), colors[1].unwrap_or(DEFAULT_BACKGROUND), colors[2].unwrap_or(DEFAULT_CURSOR), false)))
+                    .bg(settings.cursor_paint(settings.cursor_fill(colors[0].unwrap_or(DEFAULT_FOREGROUND), colors[1].unwrap_or(DEFAULT_BACKGROUND), colors[2].unwrap_or(DEFAULT_CURSOR), false)))
                     .text_color(rgb_color(settings.cursor_text(colors[0].unwrap_or(DEFAULT_FOREGROUND), colors[1].unwrap_or(DEFAULT_BACKGROUND))))
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Block cursor text".into())).into())
                     .child("o")))
@@ -173,33 +174,34 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 ))
                 .child(theme_preview(settings)))
             .child(row("Focused cursor", "focused_cursor", settings.focused_cursor.label().into(), false, state.selected == 3, false))
-            .child(row("Unfocused cursor", "cursor", match settings.unfocused_cursor { preferences::UnfocusedCursor::Hollow => "Hollow", preferences::UnfocusedCursor::Hidden => "Hidden" }.into(), false, state.selected == 4, false))
-            .child(row("Copy on select", "copy", if settings.copy_on_select { "On" } else { "Off" }.into(), false, state.selected == 5, false))
+            .child(row("Cursor opacity", "cursor_opacity", format!("{}%", settings.cursor_opacity), true, state.selected == 4, false))
+            .child(row("Unfocused cursor", "cursor", match settings.unfocused_cursor { preferences::UnfocusedCursor::Hollow => "Hollow", preferences::UnfocusedCursor::Hidden => "Hidden" }.into(), false, state.selected == 5, false))
+            .child(row("Copy on select", "copy", if settings.copy_on_select { "On" } else { "Off" }.into(), false, state.selected == 6, false))
             .child(row("Confirm before closing", "close", format!("{}{}", match settings.confirm_close {
                 close_policy::ClosePolicy::Active => "Active tasks", close_policy::ClosePolicy::Always => "Always", close_policy::ClosePolicy::Never => "Never",
-            }, if settings.close_policy_overridden() { " · Environment" } else { "" }), false, state.selected == 6, settings.close_policy_overridden()))
+            }, if settings.close_policy_overridden() { " · Environment" } else { "" }), false, state.selected == 7, settings.close_policy_overridden()))
             .child(row("New group workspace", "group_placement", match settings.group_new_workspace_placement {
                 workspace_groups::Placement::AfterCurrent => "After current",
                 workspace_groups::Placement::Top => "First",
                 workspace_groups::Placement::End => "Last",
-            }.into(), false, state.selected == 7, false))
+            }.into(), false, state.selected == 8, false))
             .child(div()
-                .child(row("New terminal history", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 8, false))
+                .child(row("New terminal history", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 9, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("History budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
-            .child(div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, state.selected == 9, false))
+            .child(div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, state.selected == 10, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.")))
-            .child(row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, state.selected == 10, false))
-            .child(row("Default font family", "font_family", settings.font_family.clone(), false, state.selected == 11, false))
-            .child(row("Terminal background opacity", "opacity", format!("{}%", settings.background_opacity), true, state.selected == 12, false))
-            .child(div().child(row("Blur behind terminal", "blur", if settings.background_blur { "On" } else { "Off" }.into(), false, state.selected == 13, false))
+            .child(row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, state.selected == 11, false))
+            .child(row("Default font family", "font_family", settings.font_family.clone(), false, state.selected == 12, false))
+            .child(row("Terminal background opacity", "opacity", format!("{}%", settings.background_opacity), true, state.selected == 13, false))
+            .child(div().child(row("Blur behind terminal", "blur", if settings.background_blur { "On" } else { "Off" }.into(), false, state.selected == 14, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Blur requires opacity below 100% and OS/compositor support. Text, colored cells, tabs and sidebar remain opaque.")))
             .child(row("New workspace position", "workspace_placement", match settings.new_workspace_placement {
                 workspace_groups::Placement::AfterCurrent => "After current",
                 workspace_groups::Placement::Top => "First",
                 workspace_groups::Placement::End => "Last",
-            }.into(), false, state.selected == 14, false))
+            }.into(), false, state.selected == 15, false))
             .when(cfg!(target_os = "macos"), |panel| panel.child(div()
-                .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 15, false))
+                .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
             .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, state.selected == KEYS.len() - 2, false))
             .child(div()

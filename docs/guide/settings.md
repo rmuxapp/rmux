@@ -318,7 +318,10 @@ Windows; native text commits follow the existing UTF-8/IME path.
 in inactive panes and windows. Set it to `"hidden"` to suppress inactive cursors.
 `focused_cursor` defaults to `"application"`, retaining application-selected
 shapes. Choose `"block"`, `"bar"`, or `"underline"` to override the focused
-cursor shape. Settings exposes both cursor controls, and Save these settings
+cursor shape. `cursor_opacity` accepts an integer percentage from 0 to 100
+(default 100). Settings includes a Cursor opacity control in 5% steps. Zero
+hides the cursor; partial opacity also softens the block cursor's inverted text.
+The theme preview reflects this setting. Settings exposes these cursor controls, and Save these settings
 persists them. Applications that hide their cursor remain hidden, and IME
 composition uses a bar caret. Reload Settings applies these preferences to
 existing windows; neither setting adds a blink timer.
