@@ -349,10 +349,11 @@ impl Render for BrowserHost {
                         let target = entity.entity_id();
                         let container = cx.entity_id();
                         let menu_group = header.map(|group| group.id);
+                        let drop_owner = cx.weak_entity();
                         sidebar_presentation::row(("workspace",target),selected)
                             .when(self.rename.is_none(), |row| row
                                 .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: header.map_or_else(|| name.clone(), |group| group.name.clone()).into() }, |item, _, _, cx| cx.new(|_| item.clone()))
-                                .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && item.item != target))
+                                .can_drop(move |item, _, cx| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && drop_owner.upgrade().is_some_and(|owner| owner.read(cx).workspace_state.can_drop_workspace(item.item, target, |entry| (entry.1.entity_id(), entry.2)))))
                                 .drag_over(move |style, item: &crate::drag_item::DragItem, _, _| if item.container == container && item.item != target { style.bg(rgb(0x435a7b)) } else { style })
                                 .on_drop(cx.listener(move |this, item: &crate::drag_item::DragItem, window, cx| {
                                     if item.container != cx.entity_id() { return; }

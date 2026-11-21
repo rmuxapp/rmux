@@ -109,9 +109,23 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         self.active = next;
         true
     }
+    /// Validate hover feedback without changing membership or selection.
+    pub fn can_drop_workspace(&self, source: W, target: W, metadata: impl Fn(&T) -> (W, bool)) -> bool {
+        if source == target { return false; }
+        let Some(from) = self.entries.iter().find(|entry| metadata(entry).0 == source) else { return false; };
+        let Some(to) = self.entries.iter().find(|entry| metadata(entry).0 == target) else { return false; };
+        let source_group = self.groups.containing(source);
+        let target_group = self.groups.containing(target);
+        let anchor = source_group.is_some_and(|group| group.members.first() == Some(&source));
+        if target_group.is_some() && !anchor { return true; }
+        // A child leaving a group regains its own saved pin state.
+        let source_pinned = if anchor { source_group.unwrap().pinned } else { metadata(from).1 };
+        source_pinned == target_group.map_or_else(|| metadata(to).1, |group| group.pinned)
+    }
     /// Apply a sidebar drop while retaining the previous active identity until
     /// the host selects the returned destination and restores its focus.
     pub fn drop_workspace(&mut self, source: W, target: W, metadata: impl Fn(&T) -> (W, bool)) -> anyhow::Result<Option<usize>> {
+        if !self.can_drop_workspace(source, target, &metadata) { return Ok(None); }
         let Some(from) = self.entries.iter().position(|entry| metadata(entry).0 == source) else { return Ok(None); };
         let Some(to) = self.entries.iter().position(|entry| metadata(entry).0 == target) else { return Ok(None); };
         if source == target { return Ok(None); }
@@ -407,6 +421,11 @@ mod tests {
     fn sidebar_drops_preserve_groups_pin_tiers_and_active_identity() {
         let mut state = State { entries: vec![(1, false), (2, false), (3, false), (4, true), (5, false)], active: 1, ..Default::default() };
         let group = state.groups.create("group".into(), vec![1, 2], false).unwrap();
+        assert!(state.can_drop_workspace(3, 2, |entry| *entry));
+        assert!(!state.can_drop_workspace(2, 4, |entry| *entry));
+        assert!(!state.can_drop_workspace(1, 4, |entry| *entry));
+        assert!(!state.can_drop_workspace(1, 1, |entry| *entry));
+        assert!(!state.can_drop_workspace(99, 1, |entry| *entry));
         assert_eq!(state.drop_workspace(3, 2, |entry| *entry).unwrap(), Some(2));
         assert_eq!(state.groups.get_mut(group).unwrap().members, vec![1, 2, 3]);
         assert_eq!(state.drop_workspace(2, 4, |entry| *entry).unwrap(), None);

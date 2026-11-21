@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Sidebar drop highlights now consult a shared, non-mutating eligibility check
+in both native and browser hosts. Self/stale drops and rejected pin-tier moves
+no longer advertise a valid destination. Native external tab-drop validation
+is retained. The same eligibility check guards the actual model mutation;
+focused group/pin/identity tests and both host compile checks pass.
+
 Browser workspace rows now share desktop's sidebar drop model: reorder rows,
 move members into/out of groups, and move group anchors with membership intact.
 Rejected top-level pin-tier changes leave membership unchanged. Extracted the

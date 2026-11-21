@@ -4256,7 +4256,11 @@ impl Render for WorkspaceWindow {
                                         .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                                         .when(self.rename.is_none(), |row| row
                                             .on_drag(drag_item::DragItem { scope: container, container, item: target, label: entry.name.clone().into() }, |item, _, _, cx| cx.new(|_| item.clone()))
-                                            .can_drop(move |item, _, cx| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.container == container || drop_owner.upgrade().is_some_and(|owner| owner.read(cx).accepts_tab_drop(item, target, cx))))
+                                            .can_drop(move |item, _, cx| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| drop_owner.upgrade().is_some_and(|owner| {
+                                                let owner = owner.read(cx);
+                                                if item.container == container { owner.workspace_state.can_drop_workspace(item.item, target, |entry| (entry.workspace.entity_id(), entry.pinned)) }
+                                                else { owner.accepts_tab_drop(item, target, cx) }
+                                            })))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, cx| {
                                                 if item.container == container || hover_owner.upgrade().is_some_and(|owner| owner.read(cx).accepts_tab_drop(item, target, cx)) { style.bg(rgb(0x435a7b)) } else { style }
                                             })
