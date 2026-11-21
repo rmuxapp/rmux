@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Connected browser terminal search to the desktop's shared find-bar presentation
+and text field. Browser scheduling runs one bounded Ghostty search step per timer,
+cancels replaced queries, and refreshes on output/resize. Cmd+F, Enter/Shift+Enter,
+Cmd+G/Shift+Cmd+G, match counts, selection, and Escape focus restoration are
+wired up; terminal-focused navigation defers selection updates to avoid nested
+entity borrows. Native cargo check and browser build pass. Local browser smoke
+verified forward/reverse selection, terminal-focused navigation, close and resumed
+input; screenshot: target/shared-find-bar.jpg. Browser query history and full
+application/session consolidation remain open. This change is not deployed yet.
+
 Added lazy Ghostty search operations to the direct browser engine adapter:
 query, bounded feed/tick step, explicit output/resize refresh, older/newer selection
 and close. It uses the pinned ABI manifest and the same search/selection APIs as
@@ -10,9 +20,8 @@ references before terminal disposal. No idle search timer or eager handle exists
 Focused real-WASM checks pass for matching, Japanese text, navigation/selected
 text, output refresh, rejected queries preserving prior results, reopen and
 repeated disposal; the existing engine adapter checks pass too. Build packaging
-includes the new module and GitHub CI runs the search check. Find-bar UI and the
-Rust browser session interface are still pending; search is not user-accessible
-or deployed yet.
+includes the new module and GitHub CI runs the search check. The browser UI integration is described above; the production demo still awaits
+a newer GitHub artifact.
 
 Published successful GitHub demo run 44939199824 (source a18ec98) to rmux.app,
 Cloudflare deployment b6c3a2a9. The live demo now includes shared workspace

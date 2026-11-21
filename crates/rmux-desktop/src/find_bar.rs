@@ -165,53 +165,17 @@ impl FindBar {
         }
     }
 }
+impl crate::find_presentation::FindHost for FindBar {
+    fn focus_find(&mut self, window: &mut Window, _: &mut Context<Self>) { self.focus.focus(window); }
+    fn navigate_find(&mut self, older: bool, cx: &mut Context<Self>) {
+        self.navigate(if older { Direction::Older } else { Direction::Newer }, cx);
+    }
+    fn close_find(&mut self, cx: &mut Context<Self>) { cx.emit(Closed); }
+}
 impl Render for FindBar {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div()
-            .key_context("FindInput")
+        crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.status_error, cx)
             .on_key_down(cx.listener(Self::history_key))
-            .min_h(px(34.))
-            .flex_shrink_0()
-            .flex().flex_wrap().min_w_0()
-            .items_center()
-            .gap_1()
-            .px_2().py_1()
-            .bg(rgb(0x242424))
-            .border_b_1()
-            .border_color(rgb(0x353535))
-            .on_mouse_down(
-                MouseButton::Left,
-                cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
-                    cx.stop_propagation();
-                }),
-            )
-            .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
-            .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
-            .on_mouse_move(|_, _, cx| cx.stop_propagation())
-            .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
-            .child(div().id("find-query").flex_1().min_w(px(80.)).max_w_full()
-                .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Find in terminal · Alt+↑/↓ recalls recent searches · Enter / Shift+Enter navigates matches".into())).into())
-                .child(self.input.clone()))
-            .child(div().flex().items_center().gap_1().min_w_0().max_w_full()
-                .child(div().id("find-status").min_w_0().max_w(px(140.))
-                    .text_xs()
-                    .text_color(rgb(if self.status_error { 0xf08080 } else { 0xa0a0a0 }))
-                    .truncate()
-                    .tooltip({ let status: SharedString = self.status.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(status.clone())).into() })
-                    .child(self.status.clone()))
-                .child(pane_view::pane_control("find-older", "Older match · Enter")
-                    .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                        if event.standard_click() { this.navigate(Direction::Older, cx); }
-                    })).child(icons::icon("chevron-up")))
-                .child(pane_view::pane_control("find-newer", "Newer match · Shift+Enter")
-                    .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                        if event.standard_click() { this.navigate(Direction::Newer, cx); }
-                    })).child(icons::icon("chevron-down")))
-                .child(pane_view::pane_control("find-close", "Close Find · Escape")
-                    .on_click(cx.listener(|_, event: &ClickEvent, _, cx| {
-                        if event.standard_click() { cx.emit(Closed); }
-                    })).child(icons::icon("close"))))
     }
 }
 

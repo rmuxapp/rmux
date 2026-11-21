@@ -19,6 +19,9 @@ mod edit_history;
 mod text_field;
 mod text_layout;
 mod fonts;
+mod browser_find;
+#[path = "../../../crates/rmux-desktop/src/find_presentation.rs"]
+mod find_presentation;
 #[path = "../../../crates/rmux-desktop/src/pane_actions.rs"]
 mod pane_actions;
 #[path = "../../../crates/rmux-desktop/src/workspace_actions.rs"]
@@ -51,7 +54,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -482,6 +485,13 @@ pub fn start() {
         ]).expect("bundled UI and terminal fonts");
         let mac = terminal_engine::is_mac();
         cx.bind_keys(workspace_shortcuts::bindings(mac));
+        for context in ["Terminal", "FindInput"] {
+            cx.bind_keys([
+                KeyBinding::new(if mac { "cmd-f" } else { "ctrl-shift-f" }, Find, Some(context)),
+                KeyBinding::new(if mac { "cmd-g" } else { "f3" }, FindOlder, Some(context)),
+                KeyBinding::new(if mac { "cmd-shift-g" } else { "shift-f3" }, FindNewer, Some(context)),
+            ]);
+        }
         cx.bind_keys(pane_shortcuts::tab_numbers(mac));
         cx.bind_keys(pane_shortcuts::pane_numbers(mac));
         cx.bind_keys(pane_shortcuts::directions(mac));

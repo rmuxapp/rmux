@@ -50,6 +50,7 @@ mod copy_buffers;
 mod drag_item;
 mod edit_history;
 mod find_bar;
+mod find_presentation;
 use rmux_core::layout;
 use rmux_core::palette_match;
 mod pane_view;

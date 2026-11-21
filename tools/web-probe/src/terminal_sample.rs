@@ -4,7 +4,8 @@ use std::ops::Range;
 use rmux_core::terminal_frame::Frame;
 use crate::{cell_metrics::CellMetrics, row_cache, row_host, terminal_engine::TerminalEngine};
 pub(crate) struct TerminalSample {
-    engine: TerminalEngine,
+    pub(crate) engine: TerminalEngine,
+    find: Option<Entity<crate::browser_find::FindBar>>,
     frame: Frame,
     font_revision: u64,
     rows: row_cache::RowCache,
@@ -22,7 +23,39 @@ pub(crate) struct TerminalSample {
     selection_scroll: Option<Task<()>>,
     scrollbar_drag: Option<crate::scrollbar_view::Drag>,
 }
+pub(crate) struct SearchChanged;
+impl EventEmitter<SearchChanged> for TerminalSample {}
 impl TerminalSample {
+    pub(crate) fn refresh_search_selection(&mut self, cx: &mut Context<Self>) {
+        self.frame = self.engine.frame(Some(&self.frame));
+        cx.notify();
+    }
+    fn open_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(find) = &self.find {
+            find.update(cx, |find, cx| find.focus_query(window, cx));
+            return;
+        }
+        let parent = cx.entity();
+        let find = cx.new(|cx| crate::browser_find::FindBar::new(parent, window, cx));
+        cx.subscribe_in(&find, window, |this, _, _: &crate::browser_find::Closed, window, cx| {
+            this.find = None;
+            this.engine.search_close();
+            this.focus.focus(window, cx);
+            cx.notify();
+        }).detach();
+        self.find = Some(find);
+        cx.notify();
+    }
+
+    fn navigate_find(&self, older: bool, cx: &mut Context<Self>) {
+        if let Some(find) = self.find.clone() {
+            // Navigation updates the terminal selection, after this entity borrow ends.
+            cx.defer(move |cx| find.update(cx, |find, cx| {
+                crate::find_presentation::FindHost::navigate_find(find, older, cx);
+            }));
+        }
+    }
+
     pub fn scroll(&mut self, scroll: rmux_core::scroll::Scroll, cx: &mut Context<Self>) {
         use rmux_core::scroll::Scroll;
         let (kind,delta) = match scroll {
@@ -67,7 +100,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, find: None, frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -197,6 +230,7 @@ impl TerminalSample {
         }
         self.input_error = None;
         self.frame = self.engine.frame(Some(&self.frame));
+        cx.emit(SearchChanged);
         cx.notify();
     }
 }
@@ -205,6 +239,10 @@ impl Render for TerminalSample {
         let entity = cx.entity();
         let input = entity.clone();
         div().size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
+            .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.open_find(window, cx)))
+            .on_action(cx.listener(|this, _: &crate::FindOlder, _, cx| this.navigate_find(true, cx)))
+            .on_action(cx.listener(|this, _: &crate::FindNewer, _, cx| this.navigate_find(false, cx)))
+            .when_some(self.find.clone(), |root, find| root.child(find))
             .on_mouse_down(MouseButton::Left, cx.listener(|this, event: &MouseDownEvent, window, cx| {
                 this.focus.focus(window, cx);
                 if let Some((bounds,_)) = this.selection_geometry {
@@ -281,6 +319,7 @@ impl Render for TerminalSample {
                     this.engine.resize(columns, height);
                     this.engine.write(&this.command.display(columns));
                     this.frame = this.engine.frame(Some(&this.frame));
+                    cx.emit(SearchChanged);
                 }
                 let (cursor_x, cursor_y) = this.frame.cursor.unwrap_or_default();
                 this.cursor_bounds = Bounds::new(content.origin + point(px(f32::from(cursor_x)*cells.width), px(f32::from(cursor_y)*cells.height)), size(px(cells.width), px(cells.height)));

@@ -132,6 +132,16 @@ under `.deps/zig-global-cache` alongside the source/local build cache.
 The retired ghostty-web npm package is prepared only for legacy benchmarks; it
 is not part of the replacement runtime or optimized artifact.
 
+## Shared terminal find controls
+
+Desktop and browser use `find_presentation.rs` and `TextField` for the same find
+bar, status, and navigation controls. The browser connects these to the direct
+Ghostty search adapter with cancellable, bounded asynchronous scan steps. It
+supports find, forward/reverse match navigation, output/resize refresh, and
+Escape focus restoration. Local browser interaction checks and both compile
+checks pass. Query history is still desktop-only; this does not complete the
+shared application/session architecture. Production deployment is pending.
+
 ## Remaining work and deployment acceptance
 
 1. Continue moving workspace orchestration into shared application state/views;

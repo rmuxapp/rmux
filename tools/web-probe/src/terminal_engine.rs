@@ -4,6 +4,16 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = searchQuery)]
+    fn search_query(id: u32, query: &str) -> Result<String, JsValue>;
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = searchStep)]
+    fn search_step(id: u32) -> Result<String, JsValue>;
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = searchRefresh)]
+    fn search_refresh(id: u32) -> Result<String, JsValue>;
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = searchNavigate)]
+    fn search_navigate(id: u32, older: bool) -> Result<String, JsValue>;
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = searchClose)]
+    fn search_close(id: u32);
     #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = graphemes)]
     fn measure_graphemes(text: &str) -> Result<String, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = focus)]
@@ -49,8 +59,20 @@ struct Patch {
     cursor_color: Color, cursor_color_explicit: bool, scrollback_lines: u64,
     selections: Vec<(usize, Option<(u16,u16)>)>, scrollback_offset: u64,
 }
+#[derive(serde::Deserialize)]
+pub struct SearchProgress { pub matches: usize, pub selected: Option<usize>, pub pending: bool }
+fn search_result(result: Result<String, JsValue>) -> Result<SearchProgress, String> {
+    let json = result.map_err(|error| format!("Search failed: {error:?}"))?;
+    serde_json::from_str(&json).map_err(|error| error.to_string())
+}
 pub struct TerminalEngine(u32);
 impl TerminalEngine {
+    pub fn search_query(&self, query: &str) -> Result<SearchProgress, String> { search_result(search_query(self.0, query)) }
+    pub fn search_step(&self) -> Result<SearchProgress, String> { search_result(search_step(self.0)) }
+    pub fn search_refresh(&self) -> Result<SearchProgress, String> { search_result(search_refresh(self.0)) }
+    pub fn search_navigate(&self, older: bool) -> Result<SearchProgress, String> { search_result(search_navigate(self.0, older)) }
+    pub fn search_close(&self) { search_close(self.0); }
+
     pub fn new(columns: u16, rows: u16) -> Self {
         use rmux_core::terminal_frame::{DEFAULT_FOREGROUND, DEFAULT_BACKGROUND};
         let rgb = |Color(r,g,b)| (u32::from(r)<<16) | (u32::from(g)<<8) | u32::from(b);
