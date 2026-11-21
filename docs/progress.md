@@ -13,8 +13,13 @@ Browser split-tab and join-pane commands now use the same transfer cleanup as
 dragging a tab: session/output ownership is preserved while source render caches,
 selection gestures and held input are released. Splitting reuses `take_tab`;
 joining releases every transferred tab, including inactive tabs, and drops the
-source tab menu subscriptions. WASM cargo check passed. This follow-up still
-needs a GitHub artifact and live split/join interaction check before deployment.
+source tab menu subscriptions. WASM cargo check passed. GitHub Shared WASM run
+44960758565 succeeded for aed790b; its artifact is deployed to Cloudflare
+53035589 and referenced by rmux.app. A live check moved Terminal 2 with existing
+output into a right split, joined it back, and accepted subsequent input with
+the original output intact and no stale text observed in that check. Screenshot:
+`target/live-split-join-aed790b.jpg`. This is browser sample-session acceptance,
+not native platform acceptance or evidence of a real shell in the demo.
 
 Native clipboard exports now stop waiting for the parser when their owning UI
 task is canceled (selection changes, history clear, or pane destruction). A
