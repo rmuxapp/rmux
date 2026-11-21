@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Added a queued-focus release benchmark alongside the retained synchronous mode.
+At 1/4/8/16 output-flooding panes, focus-in admission p99 measured
+2.875/4.875/7.666/6.792 µs; all admissions succeeded and fixture cleanup completed.
+Status-detail probes record parser-busy misses instead of waiting. Raw results
+and hashes are in benchmarks/pty-queued-focus.jsonl; performance.md distinguishes
+queue admission from deferred delivery and full GPUI/display latency.
+
 Native focus loss now queues held-key releases and focus reporting as one bounded
 writer message. Releases are encoded before focus loss under the worker's parser
 lock; UI focus changes no longer synchronously encode each held key. Payloads

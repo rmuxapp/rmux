@@ -201,3 +201,7 @@ run = "mise exec powershell@7.5.4 -- pwsh -NoProfile -NonInteractive -File scrip
 [tasks.test-powershell-startup]
 description = "Check automatic PowerShell startup in a macOS PTY"
 run = "mise exec powershell@7.5.4 -- cargo test -p rmux-terminal automatic_powershell_reports -- --ignored"
+
+[tasks.bench-queued-focus]
+description = "Measure queued focus admission under output pressure, excluding delivery and UI"
+run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-focus"

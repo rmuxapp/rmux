@@ -167,7 +167,7 @@ fn keyboard_benchmark(panes: usize) -> Result<()> {
     Ok(())
 }
 
-fn focus_benchmark(panes: usize) -> Result<()> {
+fn focus_benchmark(panes: usize, queued: bool) -> Result<()> {
     let sessions: Vec<_> = (0..panes).map(|_| spawn("--focus-flood")).collect::<Result<_>>()?;
     let deadline = Instant::now() + Duration::from_secs(5);
     while sessions.iter().any(|session| session.output_bytes() == 0) {
@@ -181,29 +181,36 @@ fn focus_benchmark(panes: usize) -> Result<()> {
     let started = Instant::now();
     let target = &sessions[0];
     let mut revision = 0;
+    let mut status_busy = 0;
     for _ in 0..128 {
         let time = Instant::now();
-        target.focus(true)?;
-        // Include the UI's follow-up summary read, but time the optional full
-        // status panel snapshot separately to expose its additional lock cost.
-        if let Some((next, summary)) = target.program_status_since(revision) {
+        if queued { target.queue_focus(true)?; } else { target.focus(true)?; }
+        // Preserve the legacy synchronous summary read only in baseline mode.
+        // The queued UI path receives metadata on writer completion instead.
+        if !queued && let Some((next, summary)) = target.program_status_since(revision) {
             revision = next;
             black_box(summary);
         }
         entering.push(time.elapsed().as_nanos());
         let time = Instant::now();
-        black_box(target.program_status_records());
+        if queued {
+            let records = target.try_program_status_records();
+            status_busy += usize::from(records.is_none());
+            black_box(records);
+        } else { black_box(target.program_status_records()); }
         details.push(time.elapsed().as_nanos());
         let time = Instant::now();
-        target.focus(false)?;
+        if queued { target.queue_focus_with_releases(false, vec!["up".into()])?; }
+        else { target.focus(false)?; }
         leaving.push(time.elapsed().as_nanos());
         thread::sleep(Duration::from_millis(5));
     }
     entering.sort_unstable(); leaving.sort_unstable(); details.sort_unstable();
     let parsed = sessions.iter().map(Session::output_bytes).sum::<u64>() - before;
     ensure!(parsed > 0, "output stopped during focus sampling");
+    let mode = if queued { "queued_focus_same_pane_output" } else { "focus_same_pane_output" };
     println!(
-        "{{\"mode\":\"focus_same_pane_output\",\"panes\":{panes},\"samples\":128,\"elapsed_seconds\":{:.6},\"parsed_flood_bytes\":{parsed},\"focus_in_p50_ns\":{},\"focus_in_p99_ns\":{},\"focus_in_max_ns\":{},\"focus_out_p99_ns\":{},\"focus_out_max_ns\":{},\"status_details_p99_ns\":{},\"status_details_max_ns\":{}}}",
+        "{{\"mode\":\"{mode}\",\"panes\":{panes},\"samples\":128,\"elapsed_seconds\":{:.6},\"parsed_flood_bytes\":{parsed},\"status_busy\":{status_busy},\"focus_in_p50_ns\":{},\"focus_in_p99_ns\":{},\"focus_in_max_ns\":{},\"focus_out_p99_ns\":{},\"focus_out_max_ns\":{},\"status_details_p99_ns\":{},\"status_details_max_ns\":{}}}",
         started.elapsed().as_secs_f64(), percentile(&entering, 50), percentile(&entering, 99), entering.last().unwrap(),
         percentile(&leaving, 99), leaving.last().unwrap(), percentile(&details, 99), details.last().unwrap(),
     );
@@ -224,8 +231,8 @@ fn main() -> Result<()> {
     }
     if mode == "keyboard" {
         for panes in [1, 4, 8, 16] { keyboard_benchmark(panes)?; }
-    } else if mode == "focus" {
-        for panes in [1, 4, 8, 16] { focus_benchmark(panes)?; }
+    } else if mode == "focus" || mode == "queued-focus" {
+        for panes in [1, 4, 8, 16] { focus_benchmark(panes, mode == "queued-focus")?; }
     } else if mode == "all" {
         for panes in [1, 4, 8, 16] {
             benchmark(panes)?;

@@ -537,3 +537,27 @@ reuse during this workload, not a live-allocation or browser-RSS reduction claim
 Snapshots still transfer every visible row after reclamation; sixteen panes
 produce roughly 1.8 MB of JSON per full reconstruction. Native/browser end-to-end
 frame and memory acceptance remain open.
+
+
+## Native queued focus under output pressure
+
+`mise run bench-queued-focus` measures the new Session queue-admission path in a
+release build while 1/4/8/16 terminals flood output. It samples 128 focus-in/out
+pairs per size and waits for fixture cleanup before the next size. Focus-out
+includes a held-key name in the same queue message. The optional status-details
+probe uses try-lock and records misses separately.
+
+| Flooding panes | Focus-in p99 | Focus-out p99 | Status probe busy / 128 |
+| --- | ---: | ---: | ---: |
+| 1 | 2.875 µs | 0.375 µs | 89 |
+| 4 | 4.875 µs | 0.583 µs | 22 |
+| 8 | 7.666 µs | 0.709 µs | 5 |
+| 16 | 6.792 µs | 0.709 µs | 6 |
+
+[Raw results and binary/source hashes](benchmarks/pty-queued-focus.jsonl).
+All queue admissions succeeded; output continued and fixture cleanup completed.
+The legacy `bench-focus` mode is retained for its synchronous call path, rather
+than silently changing the meaning of prior measurements. These new timings end
+at queue admission: parser work and PTY delivery occur later. They exclude GPUI
+focus dispatch, other callbacks, frame presentation and actual terminal input
+response. This is one uncontrolled local run, not an end-to-end acceptance gate.
