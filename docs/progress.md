@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Published the first shared Rust/GPUI demo to rmux.app using successful GitHub
+artifact 44931993466 / source 0f97882. Cloudflare deployment 82ef2eae succeeded;
+live page and terminal help input verified (target/shared-demo-live.jpg). Website
+and ops source stayed local, off GitHub. Versioned artifact directories prevent
+mixed module versions; site build verifies WASM hashes. Newer resize/startup/paste
+changes are not included in this deployment. Full app parity remains incomplete.
+
 Browser terminal paste now uses pinned Ghostty paste encoding with current mode
 2004 and the same 1 MiB UTF-8 byte limit as desktop. ABI fields come from the
 manifest, temporary buffers are released in finally, and encoding errors show

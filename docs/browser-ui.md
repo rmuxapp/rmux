@@ -7,11 +7,12 @@ the architectural target.
 
 ## Published versus shared build
 
-The published Cloudflare demo still uses JavaScript and ghostty-web 0.4.0. It is
-a layout showcase, not the shared Rust application. The marketing site remains
-local and off GitHub.
+The Cloudflare site now embeds the optimized shared Rust/GPUI demo from GitHub
+run 44931993466, source 0f97882. Production terminal input was verified at rmux.app.
+The old JavaScript/ghostty-web layout imitation is no longer published. The marketing
+site remains local and off GitHub. Newer changes on main are not yet deployed.
 
-`tools/web-probe` contains the replacement under development. It uses GPUI CE
+`tools/web-probe` contains the shared browser application under development. It uses GPUI CE
 0.3.0 for browser rendering while desktop remains on GPUI 0.2.2. The browser
 build shares substantial application code, but its workspace orchestration and
 platform services are still separate. Do not describe it as full parity yet.
@@ -102,6 +103,6 @@ is not part of the replacement runtime or optimized artifact.
 4. Measure optimized startup, idle work, input latency and memory at representative
    pane counts. Verify resize, workspace switching, zoom, Unicode and retained
    output using the optimized browser artifact.
-5. Embed the verified shared build in the existing local Cloudflare site and
-   replace the published imitation. Keep native performance and release builds
-   working throughout; do not publish parity or performance claims beyond evidence.
+5. Keep importing verified GitHub artifacts into the existing local Cloudflare
+   site as parity improves. The first shared build is deployed. Keep native
+   performance and release builds working; do not publish claims beyond evidence.
