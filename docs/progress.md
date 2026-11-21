@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser terminal Select All and Clear Scrollback now use the pinned Ghostty
+engine APIs. Both are palette actions; Select All uses Cmd+A on macOS and
+Ctrl+Shift+A elsewhere while text fields retain their own binding. Clear history
+resets selection, preserves the screen and parser state, restores the history
+budget and refreshes find state. Engine integration checks cover an incomplete
+escape sequence, preserved visible text and resumed history retention. WASM build
+passes. Browser smoke generated 80 log lines, cleared history from the palette,
+selected/copied all, and confirmed only the retained visible lines 51–80 remained.
+Screenshot: target/browser-clear-scrollback-selection.jpg. Not deployed.
+
 Desktop terminal menus, desktop tab menus and browser tab menus now use the same
 keyboard navigation resolver. Up/Down wrap through enabled items, Home/End pick
 enabled endpoints, and stale selections are bounded before navigation. Empty or

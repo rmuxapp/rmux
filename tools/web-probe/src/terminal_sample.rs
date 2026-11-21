@@ -270,6 +270,23 @@ impl Render for TerminalSample {
                 }
                 cx.notify();
             }))
+            .on_action(cx.listener(|this, _: &crate::EditorSelectAll, _, cx| {
+                this.selection_scroll = None;
+                this.selecting = false;
+                this.selection_pointer = None;
+                this.input_error = this.engine.select_all().err().map(|_| "Could not select terminal text.".into());
+                this.frame = this.engine.frame(Some(&this.frame));
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &crate::ClearScrollback, _, cx| {
+                this.selection_scroll = None;
+                this.selecting = false;
+                this.selection_pointer = None;
+                this.input_error = this.engine.clear_scrollback().err().map(|_| "Could not clear scrollback.".into());
+                this.frame = this.engine.frame(Some(&this.frame));
+                cx.emit(SearchChanged);
+                cx.notify();
+            }))
             .on_key_down(cx.listener(Self::key))
             .on_key_up(cx.listener(Self::key_up))
             .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _, cx| {

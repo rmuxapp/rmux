@@ -7,6 +7,21 @@ const bridge = createNativeHost(host,()=>true);
 assert.deepEqual(JSON.parse(bridge.graphemes('a界e\u0301👩‍💻')), [{end:1,width:1},{end:4,width:2},{end:7,width:1},{end:18,width:2}]);
 for (const text of ['👍🏽','🇮🇪','❤️']) assert.deepEqual(JSON.parse(bridge.graphemes(text)),[{end:Buffer.byteLength(text),width:2}]);
 assert.deepEqual(JSON.parse(bridge.graphemes('')),[]);
+const historySession = bridge.create(40, 3, undefined, undefined, 1024 * 1024);
+try {
+  bridge.write(historySession, 'old-history\r\n'.repeat(20) + 'visible-screen');
+  bridge.selectAll(historySession);
+  assert.match(bridge.selectedText(historySession), /old-history/);
+  bridge.write(historySession, '\x1b[31');
+  bridge.clearScrollback(historySession);
+  assert.equal(JSON.parse(bridge.snapshot(historySession)).scrollback_lines, 0);
+  assert.equal(bridge.selectedText(historySession), null);
+  bridge.write(historySession, 'm-red');
+  bridge.selectAll(historySession);
+  assert.match(bridge.selectedText(historySession), /visible-screen-red/);
+  bridge.write(historySession, '\r\nnew-history'.repeat(10));
+  assert.ok(JSON.parse(bridge.snapshot(historySession)).scrollback_lines > 0, 'retention restored after clearing');
+} finally { bridge.free(historySession); }
 assert.throws(()=>bridge.graphemes('a\nb'),RangeError);
 assert.throws(()=>bridge.graphemes('\ud800'),RangeError);
 assert.throws(()=>bridge.graphemes('é'.repeat(524289)),RangeError);

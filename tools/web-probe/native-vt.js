@@ -225,6 +225,19 @@ export async function loadNativeVt(bytes) {
             check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption','SELECTION'), selection));
           });
         },
+        clearScrollback() {
+          alive();
+          selection?.reset();
+          this.clearSelection();
+          // Preserve parser state and screen content; do not inject an escape
+          // sequence into a potentially incomplete application sequence.
+          buffer(4, saved => buffer(4, zero => {
+            check(api.ghostty_terminal_get(terminal, value('GhosttyTerminalData', 'SCROLLBACK_MAX_BYTES'), saved));
+            new DataView(api.memory.buffer).setUint32(zero, 0, true);
+            check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption', 'SCROLLBACK_MAX_BYTES'), zero));
+            check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption', 'SCROLLBACK_MAX_BYTES'), saved));
+          }));
+        },
         clearSelection() {
           alive();
           check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption','SELECTION'), 0));
@@ -287,6 +300,8 @@ export function createNativeHost(engine, isMac) {
     searchClose(id) { sessions.get(id).searchClose(); },
     select(id,...args) { return sessions.get(id).select(...args); },
     selectedText(id) { return sessions.get(id).selectedText(); },
+    selectAll(id) { sessions.get(id).selectAll(); },
+    clearScrollback(id) { sessions.get(id).clearScrollback(); },
     selectedSearchQuery(id) { return sessions.get(id).selectedSearchQuery(); },
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },

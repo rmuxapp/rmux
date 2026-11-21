@@ -38,6 +38,10 @@ extern "C" {
     fn select(id: u32, action: &str, x: f32, y: f32, cell_width: f32, cell_height: f32, columns: u16, rows: usize, rectangle: bool, clicks: usize) -> bool;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedText, catch)]
     fn selected_text(id: u32) -> Result<Option<String>, JsValue>;
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectAll, catch)]
+    fn select_all(id: u32) -> Result<(), JsValue>;
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = clearScrollback, catch)]
+    fn clear_scrollback(id: u32) -> Result<(), JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedSearchQuery, catch)]
     fn selected_search_query(id: u32) -> Result<Option<String>, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = scroll)]
@@ -69,6 +73,8 @@ fn search_result(result: Result<String, JsValue>) -> Result<SearchProgress, Stri
 }
 pub struct TerminalEngine(u32);
 impl TerminalEngine {
+    pub fn select_all(&self) -> Result<(), JsValue> { select_all(self.0) }
+    pub fn clear_scrollback(&self) -> Result<(), JsValue> { clear_scrollback(self.0) }
     pub fn search_query(&self, query: &str) -> Result<SearchProgress, String> { search_result(search_query(self.0, query)) }
     pub fn search_step(&self) -> Result<SearchProgress, String> { search_result(search_step(self.0)) }
     pub fn search_refresh(&self) -> Result<SearchProgress, String> { search_result(search_refresh(self.0)) }
