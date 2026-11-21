@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Shared-demo build optimization: successful CI run 44933212995 spent ~104s in
+Ghostty source build, 52.38s in Cargo, and ~51s generating the compressed-size
+report. CI now puts Zig's global cache under already-cached `.deps`; a subsequent
+warm CI run is required to establish its benefit. Report-only Brotli changes from
+Node default quality 11 to explicit quality 6, recorded in the manifest. On the
+same local GitHub artifact 44931038517 (20,413,507-byte UI WASM), one serial sample
+measured quality 6 at 225.9ms / 5,832,677 bytes versus quality 11 at 22,888.4ms /
+5,021,623 bytes. These are report generation timings, not runtime performance or
+actual HTTP transfer sizes. Executing the updated reporter against both artifact
+modules confirms raw sizes, hashes and gzip sizes unchanged. Release compiler
+optimization and Cloudflare settings remain unchanged.
+
 New desktop terminals, desktop tab-to-split transfers and browser splits now use
 one shared pane insertion transaction. It validates the target, unique pane
 identity and nesting limit before changing the tree, and returns visual order

@@ -21,6 +21,10 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 45
+    env:
+      # .deps is already cached. Without the global Zig cache, each fresh
+      # runner recompiles the pinned engine despite restoring its local cache.
+      ZIG_GLOBAL_CACHE_DIR: ${{ github.workspace }}/.deps/zig-global-cache
     defaults:
       run:
         working-directory: tools/web-probe

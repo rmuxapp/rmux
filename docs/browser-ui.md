@@ -108,6 +108,11 @@ starts the UI only after both succeed. `rmux-initialization` Performance entries
 measure this initialization interval, not first paint or input latency.
 
 `build-sizes.json` records raw/gzip/Brotli WASM payload sizes and SHA-256 hashes.
+Brotli estimates use quality 6, recorded in `compression.brotliQuality`, to keep
+report generation fast. Older reports used Node's default quality 11; their
+Brotli sizes are not directly comparable. This does not change the WASM binaries
+or configure Cloudflare's HTTP compression. CI also caches Zig's global cache
+under `.deps/zig-global-cache` alongside the source/local build cache.
 The retired ghostty-web npm package is prepared only for legacy benchmarks; it
 is not part of the replacement runtime or optimized artifact.
 
