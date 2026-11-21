@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Published successful GitHub Shared WASM demo run 44941009912, source dae6f46,
+to rmux.app via Cloudflare deployment eae8c1f4. Production now includes the shared
+find controls, bounded incremental Ghostty search, query history and unified
+keyboard/status handling. Browser smoke on the root site's embedded demo verified
+sample input, Cmd+F query, Enter match selection, Escape/reopen and Alt+Up history
+recall. Screenshot: target/live-demo-dae6f46.jpg. Website source stays local and
+off GitHub; only the built site/artifact was uploaded. The later shared workspace
+state/navigation changes are not in this deployment. Native downloads remain
+v0.1.4 and the overall parity/performance roadmap remains open.
+
 Workspace navigation now belongs to shared `State`: logical ordering, cycle,
 numbered/last selection targets and sidebar-row resolution. Both hosts call the
 same methods, including pinned/group ordering and collapsed-member header mapping.

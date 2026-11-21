@@ -142,7 +142,9 @@ Escape focus restoration. Local browser interaction checks and both compile
 checks pass. Query history now uses the same bounded core model on both platforms, including
 Alt+Up/Down recall, unfinished draft restoration, and retention across find-bar
 close/reopen. Focused history tests and browser recall checks pass. This does not
-complete the shared application/session architecture. Production deployment is pending.
+complete the shared application/session architecture. These search changes are
+live at rmux.app from GitHub run 44941009912 (dae6f46), Cloudflare eae8c1f4.
+Embedded production smoke verified query selection and history recall.
 
 ## Shared workspace ownership
 
