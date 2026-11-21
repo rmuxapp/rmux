@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Connected shared CommandId entries for workspace creation, new empty group,
+next/previous workspace and ungrouping to browser host events from the native
+palette presentation/input. Ungrouping materializes logical order and preserves
+selected entity/session, following native behavior. WASM build passes; browser
+verified searching/running new group, adding a child, running ls, then searching/
+running ungroup with output and selection retained. Captured the eight-command
+palette at target/shared-workspace-palette-wasm.png. Other native commands,
+workspace-name search, contextual availability and shortcut hints remain pending.
+
+
 Connected browser group creation through the shared native Ctrl+Cmd+G binding.
 New workspaces inherit the active group through Groups::add_new; sidebar rows use
 the model's visible order, anchor titles and member indentation. Disclosure toggles

@@ -19,7 +19,13 @@ mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
-const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
+const COMMANDS: &[CommandId] = &[
+    CommandId::NewWorkspace, CommandId::NewWorkspaceGroup,
+    CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
+    CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
+];
+struct WorkspaceCommand(CommandId);
+impl EventEmitter<WorkspaceCommand> for InputProbe {}
 
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace]);
@@ -128,6 +134,12 @@ impl InputProbe {
                 }
             }
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
+            command @ (CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
+                | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
+                self.close_palette(window, cx);
+                cx.emit(WorkspaceCommand(command));
+                return;
+            }
             _ => return,
         }
         self.close_palette(window, cx);

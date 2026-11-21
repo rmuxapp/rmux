@@ -150,3 +150,10 @@ to collapse/expand without changing the active session. Numbered/cyclic navigati
 includes collapsed children and reveals a selected child. Browser checks verified
 creation, inheritance, collapse and numbered reveal with retained terminal output.
 Group editing, ungrouping and drag/reorder controls remain pending.
+
+The shared palette now exposes New Workspace, New Empty Workspace Group,
+Next/Previous Workspace and Ungroup Workspaces through shared command identities.
+Workspace actions emit events to the browser host. Ungroup retains logical order,
+selection and sessions. Browser checks cover palette group creation and ungrouping
+with retained terminal output; WASM build passes. Workspace-name search and the
+rest of the native command catalog are still pending.

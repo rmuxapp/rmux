@@ -1,6 +1,6 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
-use crate::{InputProbe, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
+use crate::{InputProbe, WorkspaceCommand, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
@@ -9,10 +9,35 @@ pub(crate) struct BrowserHost {
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
-            (name.to_owned(), cx.new(|cx| InputProbe::new(window, cx)))).collect();
+            (name.to_owned(), Self::new_workspace_view(window, cx))).collect();
         let mut host = Self { workspaces, active: 0, groups: Default::default() };
         host.select(0,window,cx);
         host
+    }
+    fn new_workspace_view(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputProbe> {
+        let entity = cx.new(|cx| InputProbe::new(window, cx));
+        cx.subscribe_in(&entity, window, |this, _, command: &WorkspaceCommand, window, cx| {
+            match command.0 {
+                CommandId::NewWorkspace => this.add(window, cx),
+                CommandId::NewWorkspaceGroup => this.new_group(window, cx),
+                CommandId::NextWorkspace => this.cycle(1, window, cx),
+                CommandId::PreviousWorkspace => this.cycle(-1, window, cx),
+                CommandId::UngroupWorkspaces => this.ungroup(cx),
+                _ => {}
+            }
+        }).detach();
+        entity
+    }
+    fn ungroup(&mut self, cx: &mut Context<Self>) {
+        let selected = self.workspaces[self.active].1.entity_id();
+        let Some(group) = self.groups.containing(selected).map(|group| group.id) else { return; };
+        // Materialize logical order before removing the group, as native does.
+        let ranks: std::collections::HashMap<_, _> = self.workspace_order(true).into_iter().enumerate()
+            .map(|(rank, index)| (self.workspaces[index].1.entity_id(), rank)).collect();
+        self.groups.ungroup(group);
+        self.workspaces.sort_by_key(|(_, entity)| ranks[&entity.entity_id()]);
+        self.active = self.workspaces.iter().position(|(_, entity)| entity.entity_id() == selected).unwrap();
+        cx.notify();
     }
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.workspaces.len() { return; }
@@ -49,7 +74,7 @@ impl BrowserHost {
         let current = self.workspaces[self.active].1.entity_id();
         let group = inherit_group.then(|| self.groups.containing(current).map(|group| group.id)).flatten();
         let name = format!("Workspace {}", self.workspaces.len()+1);
-        let entity = cx.new(|cx| InputProbe::new(window,cx));
+        let entity = Self::new_workspace_view(window, cx);
         if let Some(group) = group {
             self.groups.add_new(group, entity.entity_id(), Some(current), rmux_core::workspace_groups::Placement::AfterCurrent)
                 .expect("current group exists");
