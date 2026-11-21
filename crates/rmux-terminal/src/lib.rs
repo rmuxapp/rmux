@@ -926,6 +926,7 @@ impl Terminal {
                 // Raw-cell equality includes packed background colors. Keep
                 // this cache row-local because style IDs are page-local.
                 let mut last_style = None;
+                let mut last_width = None;
                 let mut x = 0;
                 while ghostty_render_state_row_cells_next(self.cells) {
                     let mut raw = GhosttyCell::default();
@@ -934,17 +935,22 @@ impl Terminal {
                         GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_RAW,
                         out(&mut raw),
                     ))?;
-                    let mut wide = GHOSTTY_CELL_WIDE_NARROW;
-                    check(ghostty_cell_get(
-                        raw,
-                        GHOSTTY_CELL_DATA_WIDE,
-                        out(&mut wide),
-                    ))?;
-                    let width = match wide {
-                        GHOSTTY_CELL_WIDE_WIDE => 2,
-                        GHOSTTY_CELL_WIDE_SPACER_TAIL | GHOSTTY_CELL_WIDE_SPACER_HEAD => 0,
-                        _ => 1,
+                    let width = match last_width {
+                        Some((previous, width)) if previous == raw => width,
+                        _ => {
+                            let mut wide = GHOSTTY_CELL_WIDE_NARROW;
+                            check(ghostty_cell_get(raw, GHOSTTY_CELL_DATA_WIDE, out(&mut wide)))?;
+                            let width = match wide {
+                                GHOSTTY_CELL_WIDE_WIDE => 2,
+                                GHOSTTY_CELL_WIDE_SPACER_TAIL | GHOSTTY_CELL_WIDE_SPACER_HEAD => 0,
+                                _ => 1,
+                            };
+                            last_width = Some((raw, width));
+                            width
+                        }
                     };
+                    // Grapheme extensions belong to the individual cell, so
+                    // never reuse text based solely on equal packed values.
                     let scratch = if overflow_glyph.is_empty() { &mut inline_glyph[..] } else { &mut overflow_glyph[..] };
                     let mut buf = GhosttyBuffer {
                         ptr: scratch.as_mut_ptr(),
@@ -1133,6 +1139,17 @@ mod tests {
         assert!(terminal.render_delay().is_none());
         terminal.write(b"\x1b[?2026h\x1bc");
         assert!(terminal.render_delay().is_none());
+        Ok(())
+    }
+    #[test]
+    fn snapshot_equal_base_cells_keep_distinct_graphemes_and_wide_tails() -> Result<()> {
+        let mut terminal = Terminal::new(12, 2)?;
+        terminal.write("e\u{301}e\u{300}界界  ".as_bytes());
+        let frame = terminal.frame()?;
+        assert_eq!(frame.rows[0][0].text.as_str(), "e\u{301}");
+        assert_eq!(frame.rows[0][1].text.as_str(), "e\u{300}");
+        let widths: Vec<_> = frame.rows[0][..8].iter().map(|cell| cell.width).collect();
+        assert_eq!(widths, vec![1, 1, 2, 0, 2, 0, 1, 1]);
         Ok(())
     }
     #[test]

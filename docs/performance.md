@@ -644,3 +644,10 @@ in this small sample. Snapshot p99 ranges overlapped (4.65–5.71 ms before,
 All runs completed and reaped their workloads. The comparison excludes GUI
 rendering/presentation and does not control other host activity.
 [Alternating runs and binary/source hashes](benchmarks/pty-row-style-cache.jsonl).
+
+The same row-local raw-cell equality now also reuses character-width metadata,
+skipping another engine query for repeated cells. Grapheme text remains a
+per-cell lookup: equal packed base characters can have different combining
+extensions. The regression fixture covers acute/grave variants and wide tails.
+This follow-up has correctness coverage but no separate timing claim; the
+comparison above measures the earlier style-only change.

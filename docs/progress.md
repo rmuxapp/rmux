@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Native snapshot extraction also reuses width metadata for consecutive equal
+raw cells. Grapheme text is deliberately fetched per cell because packed base
+values do not identify combining extensions. Existing snapshot tests and a new
+adjacent-acute/grave plus wide-tail regression pass. No extra timing claim for
+this follow-up; the recorded A/B run covers style reuse only.
+
 Native snapshot extraction reuses resolved styles/colors for consecutive
 identical raw cells within each row, avoiding redundant FFI queries and color
 work without heap allocation. Five focused snapshot tests passed, including a
