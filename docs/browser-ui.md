@@ -139,8 +139,10 @@ bar, status, and navigation controls. The browser connects these to the direct
 Ghostty search adapter with cancellable, bounded asynchronous scan steps. It
 supports find, forward/reverse match navigation, output/resize refresh, and
 Escape focus restoration. Local browser interaction checks and both compile
-checks pass. Query history is still desktop-only; this does not complete the
-shared application/session architecture. Production deployment is pending.
+checks pass. Query history now uses the same bounded core model on both platforms, including
+Alt+Up/Down recall, unfinished draft restoration, and retention across find-bar
+close/reopen. Focused history tests and browser recall checks pass. This does not
+complete the shared application/session architecture. Production deployment is pending.
 
 ## Remaining work and deployment acceptance
 

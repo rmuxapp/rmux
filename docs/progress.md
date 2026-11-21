@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Moved terminal query history into `rmux-core::search_state`, used by native and
+browser find bars. Both now use the same deduplication, draft restoration,
+eight-query/16 KiB limits and 4096-byte query bound. Browser history survives
+closing/reopening its terminal's find bar and supports Alt+Up/Down without
+intercepting composition. Focused shared-core history tests pass, as do the native
+check and browser build. Browser smoke verified saved-query recall after reopening
+and restoration of an unfinished draft. Screenshot: target/shared-find-history.jpg.
+Full application/session consolidation remains open; production deployment pending.
+
 Connected browser terminal search to the desktop's shared find-bar presentation
 and text field. Browser scheduling runs one bounded Ghostty search step per timer,
 cancels replaced queries, and refreshes on output/resize. Cmd+F, Enter/Shift+Enter,
@@ -9,8 +18,7 @@ Cmd+G/Shift+Cmd+G, match counts, selection, and Escape focus restoration are
 wired up; terminal-focused navigation defers selection updates to avoid nested
 entity borrows. Native cargo check and browser build pass. Local browser smoke
 verified forward/reverse selection, terminal-focused navigation, close and resumed
-input; screenshot: target/shared-find-bar.jpg. Browser query history and full
-application/session consolidation remain open. This change is not deployed yet.
+input; screenshot: target/shared-find-bar.jpg. Full application/session consolidation remains open. This change is not deployed yet.
 
 Added lazy Ghostty search operations to the direct browser engine adapter:
 query, bounded feed/tick step, explicit output/resize refresh, older/newer selection
