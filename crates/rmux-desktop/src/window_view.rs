@@ -3967,6 +3967,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
             CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
+            CommandId::ToggleWorkspacePin => self.toggle_workspace_pin(cx),
             CommandId::RenameWorkspaceGroup => self.edit_metadata(MetadataField::GroupName, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
@@ -4278,7 +4279,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ShowWorkspaceMergePicker, window, cx| this.show_workspace_merge_picker(window, cx)))
             .on_action(cx.listener(|this, _: &ShowWorkspaceWindowPicker, window, cx| this.show_workspace_window_picker(window, cx)))
             .on_action(cx.listener(|this, _: &MoveWorkspaceToNextWindow, window, cx| this.move_workspace_to_next_window(window, cx)))
-            .on_action(cx.listener(|this, _: &ToggleWorkspacePin, _, cx| this.toggle_workspace_pin(cx)))
             .on_action(cx.listener(|this, action: &SetWorkspaceColor, _, cx| this.set_workspace_color(action.color, cx)))
             .on_action(cx.listener(|this, action: &SetWorkspaceIcon, _, cx| this.set_workspace_icon(action.icon.clone(), cx)))
             .on_action(cx.listener(|this, _: &MoveTabNextWorkspace, window, cx| this.move_tab_next_workspace(window, cx)))
