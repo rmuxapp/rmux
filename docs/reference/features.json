@@ -136,7 +136,7 @@
       ],
       "acceptance": "Move a live surface between panes and workspaces without restarting its process.",
       "rmux_status": "in_progress",
-      "implementation": "Tab reorder, movement between panes, palette transfer to named workspaces, tab drops onto sidebar workspaces, and detachment into a new window preserving the terminal entity/PTY with rebound focus subscriptions. Native macOS palette transfer of the last source tab preserved shell PID/state and removed the empty source.",
+      "implementation": "Tab reorder, movement between panes, palette transfer to named workspaces, tab drops onto sidebar workspaces, and detachment into a new window preserving the terminal entity/PTY with rebound focus subscriptions. Native macOS palette transfer of the last source tab preserved shell PID/state and removed the empty source. Browser pointer reorder uses the native insertion rule; cross-pane drops transfer the existing sample terminal with output/focus preserved and remove empty source panes. Both sole-tab and multi-tab source gestures were checked locally. Transfer resets transient rendering/input state.",
       "remaining": "Native palette/detachment/sidebar drag and OS-focus acceptance. Live macOS RPC checks now verify the shared cross-window transfer path's PID/state continuity, multi-tab round trip, sole-tab source workspace/window cleanup and stale targets. Busy/restore destinations and complete multi-pane, zoom and cross-platform acceptance remain pending.",
       "implementation_sources": [
         "crates/rmux-desktop/src/pane_view.rs",

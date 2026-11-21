@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Deployed source 69d0bfb from successful GitHub Shared WASM run 44958579013
+to Cloudflare a417c7f9. Live rmux.app references this artifact. Verified a tab
+transfer between split panes retained earlier output, removed the empty source
+split and accepted subsequent typing. Screenshot:
+`target/live-cross-pane-69d0bfb.jpg`. This publishes cross-pane dragging and
+transient geometry cleanup. Native downloads remain v0.1.4.
+
 Cross-pane pointer transfer now releases the moved terminal's rendering caches
 and transient input gestures before changing owners. This preserves the engine
 and session while rebuilding cursor/selection geometry at the destination.
