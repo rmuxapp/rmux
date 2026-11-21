@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Browser clipboard extraction now uses the bounded streaming formatter introduced
+for search seeds, preserving OUT_OF_SPACE on oversized copy without a full
+selection sizing retry. A focused 10,000-line/4 KiB-limit local engine comparison
+measured median 1.916 ms for fixed-buffer retry versus 0.025 ms for streaming;
+method and limitations are in performance.md. Real-WASM selection/copy and search
+checks pass. No UI semantics changed; the production artifact remains older.
+
 Browser Find now seeds from selected terminal text when it is nonempty, at most
 4096 UTF-8 bytes and contains no control characters; otherwise it uses the last
 query. Older/newer navigation keeps preferring the remembered query. The adapter

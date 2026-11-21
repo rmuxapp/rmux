@@ -409,3 +409,26 @@ Memory control requires bounded scrollback, images, event retention, notificatio
 cmux documents git watcher churn and the tradeoff of disabling Git/PR updates. rmux should account for metadata work as part of idle CPU, share watchers where possible and suspend unnecessary refreshes. [Shell integration](https://github.com/manaflow-ai/cmux/blob/a76816e4f0788003758b9434ab702068a640fb5d/docs/shell-integration.md), [watcher investigation](https://github.com/manaflow-ai/cmux/blob/a76816e4f0788003758b9434ab702068a640fb5d/docs/performance/15067-bash-watcher-churn.md)
 
 Renderer and lifecycle regressions need explicit stress coverage, including hidden surfaces, queued output and destruction during rendering. [Ghostty fork notes](https://github.com/manaflow-ai/cmux/blob/a76816e4f0788003758b9434ab702068a640fb5d/docs/ghostty-fork.md)
+
+### Bounded browser selection formatting (2026-11-21)
+
+The direct browser adapter now uses Ghostty's synchronous streaming writer for
+clipboard text as well as selection-seeded search. On overflow, copying retains
+its existing OUT_OF_SPACE error; search seeding returns no query. This avoids
+`format_buf` retrying the entire selection with a discarding writer to compute
+its required length. Output allocation stays bounded by the requested copy limit.
+
+A local Node 24.22.0 / pinned Ghostty WASM comparison at source 367fc83 used an
+80×24 terminal, 8 MiB scrollback, 10,000 lines of 79 `x` characters plus CRLF,
+select-all and a 4096-byte output limit. One warm-up preceded ten sequential
+samples per path on the same terminal/engine instance:
+
+| Path | Median | Maximum |
+| --- | ---: | ---: |
+| Fixed buffer with full size retry | 1.916 ms | 2.363 ms |
+| Streaming, stop on overflow | 0.025 ms | 0.031 ms |
+
+This is one local engine-boundary observation, not browser frame/input latency
+or a general speedup guarantee. Existing real-WASM checks cover copy contents,
+wrapped/unwrapped text, oversized-copy rejection, selection gestures, Unicode
+search seeds, exact-limit seeds, multiline/oversized rejection and disposal.

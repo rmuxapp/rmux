@@ -233,7 +233,7 @@ export async function loadNativeVt(bytes) {
           const text = this.selectedText(4096, true, true);
           return text && !/[\u0000-\u001f\u007f-\u009f]/u.test(text) ? text : null;
         },
-        selectedText(limit = 1024 * 1024, unwrap = true, streaming = false) {
+        selectedText(limit = 1024 * 1024, unwrap = true, overflowIsEmpty = false) {
           alive();
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 16 * 1024 * 1024) throw new RangeError('Invalid copy limit');
           return buffer(manifest.types.GhosttySelection.size, selection => {
@@ -246,12 +246,9 @@ export async function loadNativeVt(bytes) {
               return buffer(1, flag => {
                 memory()[flag] = Number(unwrap);
                 check(api.ghostty_formatter_set(formatter, value('GhosttyFormatterOption','UNWRAP'), flag));
-                if (streaming) return streamPrefix(formatter,limit);
-                return buffer(4, written => buffer(limit, output => {
-                  check(api.ghostty_formatter_format_buf(formatter, output, limit, written));
-                  const length = new DataView(api.memory.buffer).getUint32(written, true);
-                  return decoder.decode(memory().subarray(output, output + length));
-                }));
+                const text = streamPrefix(formatter,limit);
+                if (text === null && !overflowIsEmpty) check(value('GhosttyResult','OUT_OF_SPACE'));
+                return text;
               });
             } finally { api.ghostty_formatter_free(formatter); }
           });
