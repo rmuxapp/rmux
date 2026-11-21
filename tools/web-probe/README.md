@@ -1,10 +1,16 @@
 # Shared rmux web compatibility probe
 
+Native Ghostty gestures now drive mouse selection. Drag, double-click word and
+triple-click line selection and copying pass browser checks. Cmd+C (macOS) or
+Ctrl+Shift+C (other platforms) copies; browser copy events handle native menu
+commands too. Palette clipboard behavior stays independent. Rectangular geometry
+passes engine tests; browser Alt-drag and edge autoscroll remain unverified.
+
 The browser now uses desktop's pinned libghostty-vt 1.0.1 WASM build directly.
 `mise run build` includes this engine build; `mise run check-native-vt` checks
 selection export, keyboard modes and sparse styled snapshots. Browser checks
-cover typing, Ctrl+U, splits and workspace restoration. Selection gestures/copy
-UI, scrollback and keyboard release routing remain incomplete. Historical notes
+cover typing, Ctrl+U, splits and workspace restoration. Scrollback, selection
+edge autoscroll and keyboard release routing remain incomplete. Historical notes
 below describe the migration; legacy-engine.js preserves the old ghostty-web
 benchmark, whose recorded timings do not measure this new runtime adapter.
 

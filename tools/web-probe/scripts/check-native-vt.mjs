@@ -61,4 +61,17 @@ try {
   assert.equal(resized.columns,30); assert.equal(resized.height,6);
   assert.equal(resized.rows.length,6);
 } finally { rendered.dispose(); }
-console.log('Pinned native VT WASM: selection/copy, keyboard modes and sparse styled snapshots passed.');
+const gestures=host.create(20,4);
+try {
+  gestures.write('abcdef\r\nuvwxyz');
+  const select=(action,column,row,rectangle=false,clicks=1)=>gestures.select(action,column*8.5,row*20,8.5,20,20,4,rectangle,clicks);
+  select('PRESS',1,0); select('DRAG',4,0);
+  assert.equal(gestures.selectedText(),'bcd');
+  select('DRAG',4,1,true); select('RELEASE',4,1,true);
+  assert.equal(gestures.selectedText(),'bcd\nvwx');
+  select('PRESS',2,0,false,2);
+  assert.equal(gestures.selectedText(),'abcdef');
+  select('PRESS',2,1,false,3);
+  assert.equal(gestures.selectedText(),'uvwxyz');
+} finally { gestures.dispose(); }
+console.log('Pinned native VT WASM: selection gestures/copy, keyboard modes and sparse styled snapshots passed.');

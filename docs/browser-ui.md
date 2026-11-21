@@ -4,11 +4,17 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Mouse selection and copying now use native Ghostty gestures and selection export.
+The shared painter highlights the resulting ranges. Browser checks cover drag,
+word/line clicks, Cmd+C clipboard text and palette clipboard isolation. Browser
+copy events supplement GPUI keybindings because OS menu copying may not emit a
+keydown. Edge autoscroll and context menus remain incomplete.
+
 The local browser runtime now uses the same pinned libghostty-vt 1.0.1 as desktop,
 through a direct WASM C API adapter. Sparse row/selection decoding and native key
 encoding are connected to the shared Rust painter/input host. Focused engine and
-browser interaction checks pass. Selection gestures, copy UI and other platform
-services remain unfinished; the published website still has the old demo.
+browser interaction checks pass. Scrollback, selection edge autoscroll and other
+platform services remain unfinished; the published website still has the old demo.
 
 The local shared browser build now also uses native pane framing, control sizes
 and SVG icons. Tooltips select the host font explicitly, avoiding the unavailable

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser mouse selection now uses the same libghostty-vt gesture API as desktop:
+fractional cell geometry, tracked anchors, word/line behavior and rectangular
+ranges stay engine-owned. Shared Rust row painting displays selection ranges.
+Copy uses Cmd+C/macOS or Ctrl+Shift+C elsewhere, plus browser copy events for OS
+menu shortcuts that arrive without keydown. Only the focused terminal supplies
+that event; palette copying remains independent. WASM build/engine tests pass;
+browser verified drag, double-click word, triple-click line, exact clipboard text
+and palette copy isolation with no console errors. Screenshot:
+target/shared-native-selection-wasm.png. Rectangle geometry is engine-tested;
+Alt-drag browser coverage, edge autoscroll and terminal context menus remain.
+
 The local browser now runs desktop's pinned libghostty-vt 1.0.1 directly, replacing
 ghostty-web in its runtime path. The new render-state adapter emits dirty rows,
 cursor and selection updates, wide/combining glyphs, custom underline colors,

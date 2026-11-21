@@ -12,10 +12,14 @@ pub(crate) struct TerminalSample {
     command: String,
     composition: crate::composition::Composition,
     cursor_bounds: Bounds<Pixels>,
+    selection_geometry: Option<(Bounds<Pixels>, CellMetrics)>,
+    selecting: bool,
 }
 impl TerminalSample {
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
     pub fn release_render_cache(&mut self) {
+        self.selecting = false;
+        self.engine.focus(false);
         self.rows.release();
         self.cursor_cache = Default::default();
     }
@@ -24,7 +28,21 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default() }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false }
+    }
+    fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
+        let Some((bounds,cells)) = self.selection_geometry else { return; };
+        let point = position - bounds.origin;
+        self.engine.select(action, f32::from(point.x), f32::from(point.y), cells, &self.frame, rectangle, clicks);
+        self.frame = self.engine.frame(Some(&self.frame));
+        cx.notify();
+    }
+    fn mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if self.selecting {
+            self.selecting = false;
+            self.select("RELEASE", event.position, event.modifiers.alt, 1, cx);
+            cx.stop_propagation();
+        }
     }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
@@ -77,12 +95,30 @@ impl Render for TerminalSample {
         let entity = cx.entity();
         let input = entity.clone();
         div().size_full().key_context("Terminal").track_focus(&self.focus)
-            .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.focus.focus(window, cx)))
+            .on_mouse_down(MouseButton::Left, cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                this.focus.focus(window, cx);
+                this.selecting = true;
+                this.select("PRESS", event.position, event.modifiers.alt, event.click_count as usize, cx);
+            }))
+            .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
+                if this.selecting && event.dragging() {
+                    this.select("DRAG", event.position, event.modifiers.alt, 1, cx);
+                    cx.stop_propagation();
+                } else if !event.dragging() { this.selecting = false; }
+            }))
+            .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
+            .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
+            .on_action(cx.listener(|this, _: &crate::CopySelection, _, cx| {
+                if let Some(text) = this.engine.selected_text() {
+                    crate::clipboard::write(ClipboardItem::new_string(text), cx);
+                }
+            }))
             .on_key_down(cx.listener(Self::key))
             .child(canvas(move |bounds, window, cx| entity.update(cx, |this, _| {
                 let family: SharedString = "Fira Mono".into();
                 let cells = CellMetrics::measured(14., family.clone(), window);
                 let content = crate::cell_metrics::content_bounds(bounds, 8);
+                this.selection_geometry = Some((content,cells));
                 let (columns, height) = cells.grid_size(content.size);
                 // Initial/hidden canvas layout may have zero space. Do not
                 // reflow a live session through a synthetic 1×1 viewport.
@@ -103,13 +139,14 @@ impl Render for TerminalSample {
                         .then(|| this.cursor_cache.shape(cell, cell.background, cells, &family, window, None));
                     Some((quads, glyph, origin))
                 });
-                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor)
-            }), move |_, (rows, cells, background, bounds, content, cursor), window, cx| {
+                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor, this.frame.selections.clone())
+            }), move |_, (rows, cells, background, bounds, content, cursor, selections), window, cx| {
                 window.handle_input(&input.read(cx).focus, ElementInputHandler::new(bounds, input.clone()), cx);
+                input.read(cx).engine.focus(input.read(cx).focus.is_focused(window));
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
                     window.paint_quad(fill(bounds, background));
                     for (y, row) in rows.iter().enumerate() {
-                        row_cache::paint_row(row, content.origin + point(px(0.), px(y as f32 * cells.height)), None, None, cells, window, cx);
+                        row_cache::paint_row(row, content.origin + point(px(0.), px(y as f32 * cells.height)), selections.get(y).copied().flatten(), None, cells, window, cx);
                     }
                     if let Some((quads, glyph, origin)) = cursor {
                         for quad in quads { window.paint_quad(quad); }

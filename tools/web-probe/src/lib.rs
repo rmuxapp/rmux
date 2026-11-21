@@ -328,6 +328,7 @@ pub fn start() {
         cx.bind_keys(pane_shortcuts::directions(mac));
         cx.bind_keys(pane_shortcuts::splits(mac));
         cx.bind_keys([
+            KeyBinding::new(if mac { "cmd-c" } else { "ctrl-shift-c" }, CopySelection, Some("Terminal")),
             KeyBinding::new("ctrl-tab", NextPane, Some("Terminal")),
             KeyBinding::new("ctrl-shift-tab", PreviousPane, Some("Terminal")),
         ]);

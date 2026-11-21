@@ -1,5 +1,6 @@
 // Direct adapter for the same pinned libghostty-vt C API used by rmux desktop.
 import {createRenderAdapter} from './native-vt-render.js';
+import {createSelectionAdapter} from './native-vt-selection.js';
 export async function loadNativeVt(bytes) {
   const {instance} = await WebAssembly.instantiate(bytes, {});
   const api = instance.exports;
@@ -27,9 +28,14 @@ export async function loadNativeVt(bytes) {
     manifest,
     create(columns, rows) {
       let terminal = handle(slot => api.ghostty_terminal_new(0, slot, columns, rows));
-      let encoder = 0, event = 0, renderer;
+      let encoder = 0, event = 0, renderer, selection;
       const alive = () => { if (!terminal) throw new Error('Terminal disposed'); };
       return {
+        select(...args) {
+          alive();
+          selection ??= createSelectionAdapter(api,manifest,terminal,{buffer,handle,check,value});
+          selection.select(...args);
+        },
         snapshot() {
           alive();
           renderer ??= createRenderAdapter(api,manifest,terminal,{buffer,handle,check,value});
@@ -92,6 +98,7 @@ export async function loadNativeVt(bytes) {
         },
         selectAll() {
           alive();
+          selection?.reset();
           buffer(manifest.types.GhosttySelection.size, selection => {
             check(api.ghostty_terminal_select_all(terminal, selection));
             check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption','SELECTION'), selection));
@@ -124,6 +131,7 @@ export async function loadNativeVt(bytes) {
           });
         },
         dispose() {
+          selection?.dispose(); selection = undefined;
           renderer?.dispose(); renderer = undefined;
           if (event) { api.ghostty_key_event_free(event); event = 0; }
           if (encoder) { api.ghostty_key_encoder_free(encoder); encoder = 0; }
@@ -136,16 +144,20 @@ export async function loadNativeVt(bytes) {
 
 export function createNativeHost(engine, isMac) {
   const sessions = new Map();
-  let next = 0;
+  let next = 0, focused = null;
   return {
     isMac,
     create(columns,rows) { const id=next++; sessions.set(id,engine.create(columns,rows)); return id; },
     write(id,text) { sessions.get(id).write(text); },
     resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
+    select(id,...args) { sessions.get(id).select(...args); },
+    selectedText(id) { return sessions.get(id).selectedText(); },
+    focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },
+    copySelection() { return focused===null ? null : sessions.get(focused)?.selectedText() ?? null; },
     encode(id,key,mods,repeat,text) {
       return new TextDecoder().decode(sessions.get(id).encode(key,{shift:!!(mods&1),control:!!(mods&2),alt:!!(mods&4),action:repeat?'REPEAT':'PRESS',text}));
     },
-    free(id) { sessions.get(id)?.dispose(); sessions.delete(id); },
+    free(id) { if (focused===id) focused=null; sessions.get(id)?.dispose(); sessions.delete(id); },
   };
 }
