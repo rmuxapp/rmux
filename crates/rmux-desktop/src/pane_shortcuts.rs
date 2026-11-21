@@ -12,3 +12,13 @@ pub(crate) fn tabs() -> Vec<KeyBinding> {
          KeyBinding::new("cmd-shift-[", PreviousTab, Some("Terminal")),
          KeyBinding::new("cmd-shift-]", NextTab, Some("Terminal"))]
 }
+
+pub(crate) fn directions(mac: bool) -> Vec<KeyBinding> {
+    use crate::{FocusLeft, FocusRight, FocusUp, FocusDown};
+    vec![
+        KeyBinding::new(if mac { "cmd-ctrl-left" } else { "alt-shift-left" }, FocusLeft, None),
+        KeyBinding::new(if mac { "cmd-ctrl-right" } else { "alt-shift-right" }, FocusRight, None),
+        KeyBinding::new(if mac { "cmd-ctrl-up" } else { "alt-shift-up" }, FocusUp, None),
+        KeyBinding::new(if mac { "cmd-ctrl-down" } else { "alt-shift-down" }, FocusDown, None),
+    ]
+}

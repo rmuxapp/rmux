@@ -25,6 +25,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
+    CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
 ];
 struct WorkspaceCommand(CommandId);
 impl EventEmitter<WorkspaceCommand> for InputProbe {}
@@ -32,7 +33,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -118,6 +119,13 @@ impl InputProbe {
         }
     }
 
+    fn focus_direction(&mut self, direction: rmux_core::layout::Direction, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(next) = self.tree.as_ref().and_then(|tree| tree.neighbor(&self.focused, direction)) {
+            self.focused = next;
+            self.samples[&next].update(cx, |pane, cx| pane.focus(window, cx));
+            cx.notify();
+        }
+    }
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
@@ -161,6 +169,14 @@ impl InputProbe {
                     self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
+            }
+            command @ (CommandId::FocusLeft | CommandId::FocusRight | CommandId::FocusUp | CommandId::FocusDown) => {
+                use rmux_core::layout::Direction;
+                let direction = match command {
+                    CommandId::FocusLeft => Direction::Left, CommandId::FocusRight => Direction::Right,
+                    CommandId::FocusUp => Direction::Up, _ => Direction::Down,
+                };
+                self.focus_direction(direction, window, cx);
             }
             CommandId::EqualizePanes => { if let Some(tree) = &mut self.tree { tree.equalize(); } }
             command @ (CommandId::ResizePaneLeft | CommandId::ResizePaneRight | CommandId::ResizePaneUp | CommandId::ResizePaneDown) => {
@@ -209,6 +225,10 @@ impl Render for InputProbe {
                 .into_any_element()
         };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
+            .on_action(cx.listener(|this, _: &FocusLeft, window, cx| this.focus_direction(rmux_core::layout::Direction::Left, window, cx)))
+            .on_action(cx.listener(|this, _: &FocusRight, window, cx| this.focus_direction(rmux_core::layout::Direction::Right, window, cx)))
+            .on_action(cx.listener(|this, _: &FocusUp, window, cx| this.focus_direction(rmux_core::layout::Direction::Up, window, cx)))
+            .on_action(cx.listener(|this, _: &FocusDown, window, cx| this.focus_direction(rmux_core::layout::Direction::Down, window, cx)))
             .on_action(cx.listener(|this, _: &NextPane, window, cx| this.cycle_pane(1, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
@@ -266,6 +286,7 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
         cx.bind_keys(workspace_shortcuts::bindings(true));
+        cx.bind_keys(pane_shortcuts::directions(true));
         cx.bind_keys(pane_shortcuts::brackets());
         cx.bind_keys(pane_shortcuts::tabs());
         cx.bind_keys([

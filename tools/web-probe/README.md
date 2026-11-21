@@ -193,3 +193,8 @@ path/count delivery and the resulting frame restored equal heights. Diagnostics
 were removed. The palette also offers four Resize Pane directions and Equalize
 Pane Sizes through native core operations. Clean WASM build and browser Up/Equalize
 interaction checks pass.
+
+Directional focus uses native PaneTree::neighbor and shared shortcut definitions.
+Cmd+Ctrl+arrows or Focus Pane commands choose geometrically adjacent panes, retaining
+zoom state. Native check/WASM build pass; browser nested Up/Left checks confirmed
+subsequent input reaches the intended terminal and other sessions remain intact.

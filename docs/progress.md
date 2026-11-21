@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser directional focus now uses the same PaneTree::neighbor geometry as native,
+with shared macOS Cmd+Ctrl+arrow / desktop non-macOS Alt+Shift+arrow definitions.
+The browser currently selects macOS bindings; automatic platform selection remains
+pending. Focus commands are also in the shared palette catalog. Native check and
+WASM build pass. Browser verified Up from bottom-right to top-right then ls, and
+Left to the full-height left pane then help, retaining other sessions. Evidence:
+target/shared-directional-focus-wasm.png. Zoomed navigation uses the same focused
+pane state but has not been separately checked in this iteration.
+
+
 Resolved the nested equalization investigation: temporary event tracing confirmed
 correct nested path and click counts 1/2; the subsequent frame restored equal
 heights. Prior captures were premature, not evidence of a hit-test defect. Trace

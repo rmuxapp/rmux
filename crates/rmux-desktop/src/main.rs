@@ -3696,10 +3696,6 @@ fn main() {
                 KeyBinding::new("cmd-q", Quit, None),
                 KeyBinding::new("cmd-p", ShowCommandPalette, None),
                 KeyBinding::new("cmd-shift-f", ShowTerminalSearch, None),
-                KeyBinding::new("cmd-ctrl-left", FocusLeft, None),
-                KeyBinding::new("cmd-ctrl-right", FocusRight, None),
-                KeyBinding::new("cmd-ctrl-up", FocusUp, None),
-                KeyBinding::new("cmd-ctrl-down", FocusDown, None),
                 KeyBinding::new("cmd-shift-n", NewWindow, None),
                 KeyBinding::new("cmd-shift-w", CloseWindow, None),
                 KeyBinding::new("cmd-d", Split, None),
@@ -3745,10 +3741,6 @@ fn main() {
                 KeyBinding::new("ctrl-shift-q", Quit, None),
                 KeyBinding::new("ctrl-shift-p", ShowCommandPalette, None),
                 KeyBinding::new("ctrl-alt-shift-f", ShowTerminalSearch, None),
-                KeyBinding::new("alt-shift-left", FocusLeft, None),
-                KeyBinding::new("alt-shift-right", FocusRight, None),
-                KeyBinding::new("alt-shift-up", FocusUp, None),
-                KeyBinding::new("alt-shift-down", FocusDown, None),
                 KeyBinding::new("ctrl-alt-n", NewWindow, None),
                 KeyBinding::new("ctrl-alt-w", CloseWindow, None),
                 KeyBinding::new("ctrl-shift-d", Split, None),
@@ -3793,6 +3785,7 @@ fn main() {
                 KeyBinding::new("ctrl-shift-w", ClosePane, Some("Terminal")),
             ]);
         }
+        cx.bind_keys(pane_shortcuts::directions(cfg!(target_os = "macos")));
         cx.bind_keys(workspace_shortcuts::bindings(cfg!(target_os = "macos")));
         cx.bind_keys((1..=9).map(|number| {
             let modifier = if cfg!(target_os = "macos") {
