@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Deployed source cab241d from successful GitHub Shared WASM run 44956760426
+to Cloudflare deployment 1741f7d9. The live rmux.app page references this
+artifact; a live pointer gesture reordered website above rmux and retained
+terminal focus/selection. Screenshot: `target/live-workspace-drop-cab241d.jpg`.
+This includes shared workspace/group drag behavior, bundled drag-preview fonts
+and drop eligibility feedback. Experimental browser run 44956760421 also
+passed. Native downloadable releases remain v0.1.4.
+
 Sidebar drop highlights now consult a shared, non-mutating eligibility check
 in both native and browser hosts. Self/stale drops and rejected pin-tier moves
 no longer advertise a valid destination. Native external tab-drop validation
