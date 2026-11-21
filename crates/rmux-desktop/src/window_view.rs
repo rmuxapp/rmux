@@ -3920,29 +3920,10 @@ impl WorkspaceWindow {
     }
 
     fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
-        if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
-            let id = entry.workspace.entity_id();
-            if self.workspace_state.groups.containing(id).is_some_and(|group| group.members.first() != Some(&id)) {
-                if self.workspace_state.groups.reorder_member(id, delta) {
-                    self.scroll_to_workspace(self.workspace_state.active);
-                    cx.notify();
-                }
-                return;
-            }
+        if self.workspace_state.reorder(delta, |entry| (entry.workspace.entity_id(), entry.pinned)) {
+            self.scroll_to_workspace(self.workspace_state.active);
+            cx.notify();
         }
-        let top: Vec<_> = self.sidebar_order().into_iter().filter(|index| {
-            let id = self.workspace_state.entries[*index].workspace.entity_id();
-            self.workspace_state.groups.containing(id).is_none_or(|group| group.members.first() == Some(&id))
-        }).collect();
-        let Some(position) = top.iter().position(|index| *index == self.workspace_state.active) else { return; };
-        let next = position as isize + delta;
-        if next < 0 || next >= top.len() as isize { return; }
-        let next = top[next as usize];
-        if self.top_level_pinned(next) != self.top_level_pinned(self.workspace_state.active) { return; }
-        self.workspace_state.entries.swap(self.workspace_state.active, next);
-        self.workspace_state.active = next;
-        self.scroll_to_workspace(next);
-        cx.notify();
     }
 
     fn accepts_tab_drop(&self, item: &drag_item::DragItem, target: EntityId, cx: &App) -> bool {
@@ -4035,6 +4016,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
             CommandId::ToggleGroupPin => self.toggle_group_pin(cx),
             CommandId::RemoveWorkspaceFromGroup => self.remove_workspace_from_group(cx),
             CommandId::SetGroupAnchor => self.set_group_anchor(cx),
+            CommandId::MoveWorkspaceUp => self.reorder(-1, cx),
+            CommandId::MoveWorkspaceDown => self.reorder(1, cx),
             CommandId::UngroupWorkspaces => self.ungroup_active(cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),
             CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
@@ -4347,8 +4330,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ToggleNotifications, window, cx| this.toggle_notifications(window, cx)))
             .on_action(cx.listener(|this, _: &DismissAllNotifications, _, cx| this.dismiss_all_notifications(cx)))
             .on_action(cx.listener(|this, _: &MarkAllRead, _, cx| this.mark_all_read(cx)))
-            .on_action(cx.listener(|this, _: &MoveWorkspaceUp, _, cx| this.reorder(-1, cx)))
-            .on_action(cx.listener(|this, _: &MoveWorkspaceDown, _, cx| this.reorder(1, cx)))
             .map(|root| crate::workspace_actions::bind(root, cx))
             .when(self.sidebar, |div| {
                 div.child(

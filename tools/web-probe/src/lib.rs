@@ -36,6 +36,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[
     CommandId::NewWorkspace, CommandId::NewTab, CommandId::ToggleSidebar,
     CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,
+    CommandId::MoveWorkspaceUp, CommandId::MoveWorkspaceDown,
     CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::GroupCurrentWorkspace, CommandId::ToggleGroupPin, CommandId::RemoveWorkspaceFromGroup, CommandId::SetGroupAnchor, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
@@ -55,7 +56,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -381,7 +382,7 @@ impl InputProbe {
                 self.samples.len(),
             ).is_some(),
             command @ (CommandId::ToggleSidebar | CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
-                | CommandId::ToggleGroupPin | CommandId::RemoveWorkspaceFromGroup | CommandId::SetGroupAnchor | CommandId::GroupCurrentWorkspace | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
+                | CommandId::MoveWorkspaceUp | CommandId::MoveWorkspaceDown | CommandId::ToggleGroupPin | CommandId::RemoveWorkspaceFromGroup | CommandId::SetGroupAnchor | CommandId::GroupCurrentWorkspace | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);
                 cx.emit(WorkspaceCommand(command));
                 return;

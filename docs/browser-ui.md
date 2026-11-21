@@ -190,5 +190,8 @@ the working directory of a `uses` action. The pinned mise action declares the
 Baseline run 44941009912 (dae6f46) took 19 seconds for the root mise action plus
 12 seconds for browser tool preparation, 85 seconds for the optimized build,
 24 seconds restoring build dependencies and 39 seconds saving them. These are
-one-run observations. The revised tool-cache path needs a successful CI run;
-no measured speedup is claimed yet.
+one-run observations. The revised tool-cache path passed run 44942264961 (a4f9160): mise setup took
+23 seconds, dependency restore 24 seconds, optimized build 126 seconds and cache
+save 29 seconds. Tool setup was shorter in this observation, but compilation was
+longer; different source revisions and runner variability prevent an overall
+speedup claim. The workflow and browser checks completed successfully.

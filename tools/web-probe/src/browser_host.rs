@@ -155,6 +155,13 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
                     cx.notify();
                 }
             }
+            command @ (CommandId::MoveWorkspaceUp | CommandId::MoveWorkspaceDown) => {
+                let delta = if command == CommandId::MoveWorkspaceUp { -1 } else { 1 };
+                if self.workspace_state.reorder(delta, |(_, entity)| (entity.entity_id(), false)) {
+                    self.scroll_to_workspace();
+                    cx.notify();
+                }
+            }
             CommandId::UngroupWorkspaces => self.ungroup(cx),
             _ => {}
         }

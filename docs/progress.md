@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Workspace Up/Down now routes through shared actions and `State::reorder` in both
+hosts. It preserves selection by identity, reorders children within their group,
+keeps anchors fixed within groups and prevents top-level moves across pin tiers.
+Browser palette exposes both commands. Native check and WASM build pass; ten
+focused lifecycle tests pass, including pin boundaries, child/anchor restrictions,
+collapsed-group moves and an out-of-range delta. Browser smoke verified moving
+rmux below website while retaining its selected terminal/output. Screenshot:
+target/shared-workspace-reorder.jpg. Not deployed.
+
 Browser keyboard copy catches Ghostty/JS errors at the wasm-bindgen boundary and
 reports a terminal notice instead of letting an exception escape; successful copy
 clears that notice. Browser menu/OS copy now catches failures, prevents fallback

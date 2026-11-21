@@ -41,6 +41,28 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         let visible = self.groups.visible_workspace(metadata(self.entries.get(index)?).0);
         self.order(false, &metadata).iter().position(|index| metadata(&self.entries[*index]).0 == visible)
     }
+    /// Reorder within a group, or within the same top-level pin tier. Selection
+    /// remains attached to its workspace, even when storage positions change.
+    pub fn reorder(&mut self, delta: isize, metadata: impl Fn(&T) -> (W, bool)) -> bool {
+        let Some((member, _)) = self.entries.get(self.active).map(&metadata) else { return false; };
+        if self.groups.containing(member).is_some_and(|group| group.members.first() != Some(&member)) {
+            return self.groups.reorder_member(member, delta);
+        }
+        let top: Vec<_> = self.order(false, &metadata).into_iter().filter(|index| {
+            let id = metadata(&self.entries[*index]).0;
+            self.groups.containing(id).is_none_or(|group| group.members.first() == Some(&id))
+        }).collect();
+        let Some(position) = top.iter().position(|index| *index == self.active) else { return false; };
+        let Some(next) = position.checked_add_signed(delta).and_then(|index| top.get(index)).copied() else { return false; };
+        let pinned = |index: usize| {
+            let (id, pinned) = metadata(&self.entries[index]);
+            self.groups.containing(id).map_or(pinned, |group| group.pinned)
+        };
+        if next == self.active || pinned(next) != pinned(self.active) { return false; }
+        self.entries.swap(self.active, next);
+        self.active = next;
+        true
+    }
     pub fn group_anchor_slot(&self, member: W, key: impl Fn(&T) -> W) -> Option<(u64, W, usize)> {
         let group = self.groups.containing(member)?;
         let anchor = *group.members.first()?;
@@ -231,6 +253,27 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn reorder_keeps_pin_tiers_group_anchor_and_selected_identity() {
+        let mut state = State { entries: vec![(1, true), (2, false), (3, false), (4, false), (5, false)], active: 1, ..Default::default() };
+        assert!(!state.reorder(-1, |entry| *entry)); // Unpinned cannot cross pin tier.
+        assert!(state.reorder(1, |entry| *entry));
+        assert_eq!(state.entries[state.active].0, 2);
+        assert_eq!(state.entries.iter().map(|entry| entry.0).collect::<Vec<_>>(), vec![1,3,2,4,5]);
+        let group = state.groups.create("group".into(), vec![2,4,5], false).unwrap();
+        state.active = 4;
+        assert!(state.reorder(-1, |entry| *entry));
+        assert_eq!(state.groups.containing(5).unwrap().members, vec![2,5,4]);
+        assert!(!state.reorder(-1, |entry| *entry)); // Child cannot replace anchor.
+        assert_eq!(state.entries[state.active].0, 5);
+        state.active = 2;
+        state.groups.get_mut(group).unwrap().collapsed = true;
+        assert!(state.reorder(-1, |entry| *entry));
+        assert_eq!(state.entries[state.active].0, 2);
+        assert_eq!(state.order(true, |entry| *entry), vec![0,1,4,3,2]);
+        assert!(!state.reorder(isize::MAX, |entry| *entry));
+    }
 
     #[test]
     fn moving_anchor_between_groups_preserves_selection_and_reveals_destination() {
