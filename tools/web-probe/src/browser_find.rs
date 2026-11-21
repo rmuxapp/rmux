@@ -15,8 +15,8 @@ pub(crate) struct FindBar {
 }
 impl EventEmitter<Closed> for FindBar {}
 impl FindBar {
-    pub fn new(parent: Entity<TerminalSample>, history: rmux_core::search_state::QueryHistory, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| TextField::new("", cx));
+    pub fn new(parent: Entity<TerminalSample>, history: rmux_core::search_state::QueryHistory, query: &str, progress: Result<SearchProgress, String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let input = cx.new(|cx| TextField::new(query, cx));
         input.read(cx).focus.clone().focus(window, cx);
         cx.subscribe(&input, |this, _, event: &EditEvent, cx| match event {
             EditEvent::Changed(query) => {
@@ -35,13 +35,16 @@ impl FindBar {
             let result = this.parent.read_with(cx, |terminal, _| terminal.engine.search_refresh());
             this.accept(result.unwrap_or_else(|_| Err("Terminal closed".into())), cx);
         }).detach();
-        Self { input, history, parent: parent.downgrade(), status: "Find in terminal".into(), error: false,
-            pending: false, navigation: Default::default(), task: None }
+        let mut view = Self { input, history, parent: parent.downgrade(), status: "Find in terminal".into(), error: false,
+            pending: false, navigation: Default::default(), task: None };
+        view.accept(progress, cx);
+        view
     }
     pub fn focus_query(&self, window: &mut Window, cx: &mut Context<Self>) {
         self.input.update(cx, |input, cx| input.select_all_text(cx));
         self.input.read(cx).focus.clone().focus(window, cx);
     }
+    pub fn query<'a>(&'a self, cx: &'a App) -> &'a str { self.input.read(cx).value() }
     pub fn saved_history(&self, cx: &App) -> rmux_core::search_state::QueryHistory {
         let mut history = self.history.clone();
         history.remember(self.input.read(cx).value());

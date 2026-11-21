@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser terminals retain their last find query and reopen search for older/newer
+match actions when the bar is closed, matching desktop's remembered-query flow.
+Initial queries initialize Ghostty search before constructing the bar; bounded
+scan scheduling and deferred navigation remain intact. WASM build passes. Browser
+smoke verified Cmd+G reopening the saved query and selecting the older match,
+then palette Find Newer Match reopening and selecting the opposite end. Screenshot:
+target/search-reopen-navigation.jpg. Selection-seeded queries remain a browser
+gap; this does not claim complete search parity. Not deployed.
+
 Added the browser palette's missing Find in Terminal / Find Older Match / Find
 Newer Match entries. Native and browser palettes use the same find action factory;
 browser entries display shortcuts from current bindings and dispatch after focus

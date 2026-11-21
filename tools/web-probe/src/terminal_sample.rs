@@ -7,6 +7,7 @@ pub(crate) struct TerminalSample {
     pub(crate) engine: TerminalEngine,
     find: Option<Entity<crate::browser_find::FindBar>>,
     find_history: rmux_core::search_state::QueryHistory,
+    last_find_query: String,
     frame: Frame,
     font_revision: u64,
     rows: row_cache::RowCache,
@@ -38,9 +39,11 @@ impl TerminalSample {
         }
         let parent = cx.entity();
         let history = self.find_history.clone();
-        let find = cx.new(|cx| crate::browser_find::FindBar::new(parent, history, window, cx));
+        let progress = self.engine.search_query(&self.last_find_query);
+        let find = cx.new(|cx| crate::browser_find::FindBar::new(parent, history, &self.last_find_query, progress, window, cx));
         cx.subscribe_in(&find, window, |this, find, _: &crate::browser_find::Closed, window, cx| {
             this.find_history = find.read(cx).saved_history(cx);
+            this.last_find_query = find.read(cx).query(cx).to_owned();
             this.find = None;
             this.engine.search_close();
             this.focus.focus(window, cx);
@@ -50,7 +53,8 @@ impl TerminalSample {
         cx.notify();
     }
 
-    fn navigate_find(&self, older: bool, cx: &mut Context<Self>) {
+    fn navigate_find(&mut self, older: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.find.is_none() { self.open_find(window, cx); }
         if let Some(find) = self.find.clone() {
             // Navigation updates the terminal selection, after this entity borrow ends.
             cx.defer(move |cx| find.update(cx, |find, cx| {
@@ -103,7 +107,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, find: None, find_history: Default::default(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -243,8 +247,8 @@ impl Render for TerminalSample {
         let input = entity.clone();
         div().size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.open_find(window, cx)))
-            .on_action(cx.listener(|this, _: &crate::FindOlder, _, cx| this.navigate_find(true, cx)))
-            .on_action(cx.listener(|this, _: &crate::FindNewer, _, cx| this.navigate_find(false, cx)))
+            .on_action(cx.listener(|this, _: &crate::FindOlder, window, cx| this.navigate_find(true, window, cx)))
+            .on_action(cx.listener(|this, _: &crate::FindNewer, window, cx| this.navigate_find(false, window, cx)))
             .when_some(self.find.clone(), |root, find| root.child(find))
             .on_mouse_down(MouseButton::Left, cx.listener(|this, event: &MouseDownEvent, window, cx| {
                 this.focus.focus(window, cx);
