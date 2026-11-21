@@ -34,3 +34,26 @@ input-to-display latency. Whole-process Node memory is not browser/per-pane
 memory or a transient-allocation peak. These are synthetic workloads, not a
 claim of end-to-end native performance. Historical ghostty-web results use a
 different engine and wire payload; do not compare them as equivalent workloads.
+
+## Engine WASM capacity across session lifetimes
+
+Run `mise run bench-memory` in `tools/web-probe`. Raw results are in
+[native-vt-memory.jsonl](native-vt-memory.jsonl). Node 24.22.0, macOS ARM64,
+Apple M4 Max; native libghostty-vt WASM, 80×24 cells, 4 MiB history limit,
+2,000 sample log lines (164,890 UTF-8 bytes) per pane, fresh engine per pane count.
+
+| Panes | Allocated engine linear memory after output |
+| --- | ---: |
+| 1 | 3,670,016 bytes (3.50 MiB) |
+| 4 | 11,075,584 bytes (10.56 MiB) |
+| 16 | 40,697,856 bytes (38.81 MiB) |
+
+All sessions were removed on close. Linear memory retained its capacity after
+close and reused it for two further identical cycles without growing. This is
+not evidence that all allocator objects were freed, a peak-allocation measurement,
+or total app memory. UI WASM, JavaScript, GPU and browser overhead are excluded.
+
+The demo exposes an on-demand `rmuxDiagnostics()` function reporting UI and engine
+linear-memory capacity plus terminal session count. It does not sample on a timer
+or send telemetry. Browser totals and representative input-latency measurements
+remain outstanding.

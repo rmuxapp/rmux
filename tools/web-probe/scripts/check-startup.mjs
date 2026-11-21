@@ -10,18 +10,18 @@ function deferred() {
 
 test('loads concurrently but does not start the UI before both dependencies', async () => {
   const engine = deferred(), ui = deferred(), events = [];
-  const module = {};
+  const module = {}, exports = {memory: {buffer: new ArrayBuffer(65536)}};
   const ready = startDemo({
     initializeEngine: () => { events.push('engine-load'); return engine.promise; },
     loadUi: () => { events.push('ui-load'); return ui.promise; },
-    initializeUi: async options => { assert.equal(options.module_or_path, module); events.push('ui-start'); },
+    initializeUi: async options => { assert.equal(options.module_or_path, module); events.push('ui-start'); return exports; },
   });
   assert.deepEqual(events, ['engine-load', 'ui-load']);
   ui.resolve(module);
   await ui.promise;
   assert.equal(events.includes('ui-start'), false);
   engine.resolve();
-  await ready;
+  assert.equal(await ready, exports);
   assert.deepEqual(events, ['engine-load', 'ui-load', 'ui-start']);
 });
 

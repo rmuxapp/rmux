@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Added on-demand UI/engine WASM capacity diagnostics and a reproducible engine
+session-lifetime benchmark. At 1/4/16 panes with 2,000 sample log lines per pane,
+engine linear-memory capacity was 3.50/10.56/38.81 MiB. All sessions close and
+capacity stays stable over three identical cycles. This excludes UI/JS/GPU/browser
+memory and does not prove allocator leak freedom. Raw results and scope are in
+docs/benchmarks/native-vt-memory.jsonl and native-vt.md. Startup and engine adapter
+checks pass; browser diagnostics have not yet been sampled on an optimized build.
+
 Published the first shared Rust/GPUI demo to rmux.app using successful GitHub
 artifact 44931993466 / source 0f97882. Cloudflare deployment 82ef2eae succeeded;
 live page and terminal help input verified (target/shared-demo-live.jpg). Website

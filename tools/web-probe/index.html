@@ -7,6 +7,9 @@
 import init from './rmux_web_probe.js';
 import {initializeEngine} from './engine.js';
 import {startDemo} from './boot.js';
-try { await startDemo({initializeEngine, initializeUi: init}); document.querySelector('#status').remove(); }
+try { const ui = await startDemo({initializeEngine, initializeUi: init});
+// Read on demand; no periodic sampling or telemetry.
+globalThis.rmuxDiagnostics = () => ({scope:'allocated WASM linear memory, not live allocations or total browser memory',
+  ui_linear_memory_bytes:ui.memory.buffer.byteLength,...globalThis.rmuxEngine.memoryStats()}); document.querySelector('#status').remove(); }
 catch(error) { document.querySelector('#status').textContent='Could not load rmux: '+error.message;console.error(error); }
 </script></html>

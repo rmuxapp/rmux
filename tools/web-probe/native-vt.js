@@ -26,6 +26,7 @@ export async function loadNativeVt(bytes) {
   }
   return {
     manifest,
+    memoryBytes() { return api.memory.buffer.byteLength; },
     create(columns, rows, options = {}) {
       let terminal = handle(slot => api.ghostty_terminal_new(0, slot, columns, rows));
       try {
@@ -200,6 +201,7 @@ export function createNativeHost(engine, isMac) {
   let next = 0, focused = null;
   return {
     isMac,
+    memoryStats() { return {engine_linear_memory_bytes: engine.memoryBytes(), sessions: sessions.size}; },
     create(columns,rows,foreground,background,scrollback) {
       const terminal=engine.create(columns,rows,{foreground,background,scrollback});
       const id=next++; sessions.set(id,terminal); return id;

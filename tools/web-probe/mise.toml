@@ -44,3 +44,7 @@ run = ["npm ci --ignore-scripts", "mkdir -p dist", "cp legacy-engine.js dist/", 
 [tasks.check-startup]
 description = "Check parallel loading and engine-before-UI startup ordering"
 run = "node --test scripts/check-startup.mjs"
+
+[tasks.bench-memory]
+description = "Measure engine WASM memory capacity across pane create/write/close cycles"
+run = "node scripts/bench-memory.mjs"

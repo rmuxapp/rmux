@@ -17,7 +17,8 @@ export async function startDemo({initializeEngine, initializeUi, loadUi = () =>
     initializeEngine().then(() => performance.mark('rmux-engine-ready')),
     loadUi().then(module => { performance.mark('rmux-ui-compiled'); return module; }),
   ]);
-  await initializeUi({module_or_path: module});
+  const ui = await initializeUi({module_or_path: module});
   performance.mark('rmux-init-end');
   performance.measure('rmux-initialization', 'rmux-init-start', 'rmux-init-end');
+  return ui;
 }
