@@ -3571,19 +3571,11 @@ fn main() {
                 KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
                 KeyBinding::new("cmd-shift-t", ShowTabPicker, Some("Terminal")),
                 KeyBinding::new("cmd-shift-u", NextUnreadTerminal, None),
-                KeyBinding::new("cmd-alt-shift-up", MoveWorkspaceUp, None),
-                KeyBinding::new("cmd-alt-shift-down", MoveWorkspaceDown, None),
                 KeyBinding::new("cmd-v", Paste, Some("Terminal")),
                 KeyBinding::new("cmd-c", CopySelection, Some("Terminal")),
                 KeyBinding::new("cmd-a", EditorSelectAll, Some("Terminal")),
                 KeyBinding::new("cmd-up", PreviousPrompt, Some("Terminal")),
                 KeyBinding::new("cmd-down", NextPrompt, Some("Terminal")),
-                KeyBinding::new("cmd-f", Find, Some("Terminal")),
-                KeyBinding::new("cmd-f", Find, Some("FindInput")),
-                KeyBinding::new("cmd-g", FindOlder, Some("Terminal")),
-                KeyBinding::new("cmd-shift-g", FindNewer, Some("Terminal")),
-                KeyBinding::new("cmd-g", FindOlder, Some("FindInput")),
-                KeyBinding::new("cmd-shift-g", FindNewer, Some("FindInput")),
                 KeyBinding::new("cmd-=", IncreaseFontSize, Some("Terminal")),
                 KeyBinding::new("cmd--", DecreaseFontSize, Some("Terminal")),
                 KeyBinding::new("cmd-0", ResetFontSize, Some("Terminal")),
@@ -3614,19 +3606,11 @@ fn main() {
                 KeyBinding::new("ctrl-alt-shift-t", ShowTabPicker, Some("Terminal")),
                 KeyBinding::new("ctrl-pageup", PreviousTab, Some("Terminal")),
                 KeyBinding::new("ctrl-alt-u", NextUnreadTerminal, None),
-                KeyBinding::new("ctrl-alt-shift-up", MoveWorkspaceUp, None),
-                KeyBinding::new("ctrl-alt-shift-down", MoveWorkspaceDown, None),
                 KeyBinding::new("ctrl-shift-v", Paste, Some("Terminal")),
                 KeyBinding::new("ctrl-shift-c", CopySelection, Some("Terminal")),
                 KeyBinding::new("ctrl-shift-a", EditorSelectAll, Some("Terminal")),
                 KeyBinding::new("ctrl-shift-up", PreviousPrompt, Some("Terminal")),
                 KeyBinding::new("ctrl-shift-down", NextPrompt, Some("Terminal")),
-                KeyBinding::new("ctrl-shift-f", Find, Some("Terminal")),
-                KeyBinding::new("ctrl-shift-f", Find, Some("FindInput")),
-                KeyBinding::new("f3", FindOlder, Some("Terminal")),
-                KeyBinding::new("shift-f3", FindNewer, Some("Terminal")),
-                KeyBinding::new("f3", FindOlder, Some("FindInput")),
-                KeyBinding::new("shift-f3", FindNewer, Some("FindInput")),
                 KeyBinding::new("ctrl-=", IncreaseFontSize, Some("Terminal")),
                 KeyBinding::new("ctrl--", DecreaseFontSize, Some("Terminal")),
                 KeyBinding::new("ctrl-0", ResetFontSize, Some("Terminal")),
@@ -3648,6 +3632,7 @@ fn main() {
         cx.bind_keys(pane_shortcuts::splits(cfg!(target_os = "macos")));
         cx.bind_keys(pane_shortcuts::directions(cfg!(target_os = "macos")));
         cx.bind_keys(workspace_shortcuts::bindings(cfg!(target_os = "macos")));
+        cx.bind_keys(find_presentation::bindings(cfg!(target_os = "macos")));
         cx.bind_keys(pane_shortcuts::pane_numbers(cfg!(target_os = "macos")));
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-," } else { "ctrl-," }, ToggleSettings, None)]);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-s" } else { "ctrl-s" }, SaveAppearanceSettings, Some("Settings"))]);

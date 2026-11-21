@@ -1,6 +1,13 @@
 //! Find controls shared by desktop and browser session adapters.
 use gpui::{prelude::*, *};
 use crate::text_field::TextField;
+pub(crate) fn bindings(mac: bool) -> Vec<KeyBinding> {
+    ["Terminal", "FindInput"].into_iter().flat_map(|context| [
+        KeyBinding::new(if mac { "cmd-f" } else { "ctrl-shift-f" }, crate::Find, Some(context)),
+        KeyBinding::new(if mac { "cmd-g" } else { "f3" }, crate::FindOlder, Some(context)),
+        KeyBinding::new(if mac { "cmd-shift-g" } else { "shift-f3" }, crate::FindNewer, Some(context)),
+    ]).collect()
+}
 pub(crate) fn action(command: rmux_core::commands::CommandId) -> Option<Box<dyn Action>> {
     use rmux_core::commands::CommandId;
     match command {

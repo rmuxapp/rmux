@@ -502,13 +502,7 @@ pub fn start() {
         ]).expect("bundled UI and terminal fonts");
         let mac = terminal_engine::is_mac();
         cx.bind_keys(workspace_shortcuts::bindings(mac));
-        for context in ["Terminal", "FindInput"] {
-            cx.bind_keys([
-                KeyBinding::new(if mac { "cmd-f" } else { "ctrl-shift-f" }, Find, Some(context)),
-                KeyBinding::new(if mac { "cmd-g" } else { "f3" }, FindOlder, Some(context)),
-                KeyBinding::new(if mac { "cmd-shift-g" } else { "shift-f3" }, FindNewer, Some(context)),
-            ]);
-        }
+        cx.bind_keys(find_presentation::bindings(mac));
         cx.bind_keys(pane_shortcuts::tab_numbers(mac));
         cx.bind_keys(pane_shortcuts::pane_numbers(mac));
         cx.bind_keys(pane_shortcuts::directions(mac));

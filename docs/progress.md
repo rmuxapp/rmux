@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Moved workspace Up/Down keybindings into shared workspace defaults, adding missing
+browser shortcuts: Cmd+Option+Shift+Up/Down on macOS and Ctrl+Alt+Shift+Up/Down
+elsewhere. Terminal/find-input search bindings now come from one shared factory;
+native copy-mode-specific Find bindings stay in their existing context. Native
+check and WASM build pass. Browser smoke verified keyboard reordering followed by
+Cmd+F search and match selection. Screenshot:
+target/shared-workspace-find-bindings.jpg. Non-mac runtime shortcuts were not
+exercised. Not deployed; full application parity remains open.
+
 Workspace Up/Down now routes through shared actions and `State::reorder` in both
 hosts. It preserves selection by identity, reorders children within their group,
 keeps anchors fixed within groups and prevents top-level moves across pin tiers.
