@@ -6,6 +6,7 @@ on:
     paths:
       - crates/rmux-desktop/**
       - crates/rmux-terminal/**
+      - crates/rmux-core/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml
@@ -15,6 +16,7 @@ on:
     paths:
       - crates/rmux-desktop/**
       - crates/rmux-terminal/**
+      - crates/rmux-core/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml
@@ -58,6 +60,7 @@ jobs:
         run: mise run bootstrap
       - name: Test nonblocking focus input
         run: |
+          mise exec -- cargo test --locked -p rmux-core keyboard::tests
           mise exec -- cargo test --locked -p rmux-terminal queued_
           mise exec -- cargo test --locked -p rmux-terminal opportunistic_snapshot_and_targeted_input_do_not_wait_for_parser_lock
       - name: Test browser policy and state transitions

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Fixed held-key ownership on native focus queue rejection. The tracker now
+clears a release batch only after the bounded writer queue accepts it; rejected
+keys remain available to key-up or the next focus transition. Focus gain also
+retries leftover releases before the focus-in report. This is event-driven
+recovery, not a promise of delivery while the queue remains full. Three core
+keyboard tests (including full/closed queue rejection, shifted alias ownership
+and successful retry) and the terminal release-before-focus-in/out encoding
+test pass; native desktop check passes. Native CI now includes core keyboard
+tests and triggers for rmux-core changes. The previous shared UI revision
+ee11e6a also passed native CI run 44954176117. Native fix is not released yet.
+
 Deployed GitHub Shared WASM run 44954176105, source ee11e6a, to rmux.app
 (Cloudflare deployment 0d57063b). This includes workspace descriptions,
 collapsed metadata editor reveal, workspace/group colors and icons, shared

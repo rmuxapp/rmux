@@ -1130,14 +1130,16 @@ impl TerminalView {
             self.schedule_compression(cx);
         }
         cx.emit(TabMetadataChanged);
-        let releases = if focused { Vec::new() } else { self.pressed_keys.drain().collect() };
         if !focused {
             self.mouse_button = None;
             self.selecting = false;
             self.selection_scroll = None;
             self.selection_pointer = None;
         }
-        if let Err(error) = self.session.queue_focus_with_releases(focused, releases) {
+        // Retain held keys on queue rejection. Focus gain also retries cleanup
+        // left over from a rejected focus loss, before reporting focus gained.
+        let session = &self.session;
+        if let Err(error) = self.pressed_keys.try_release_all(|releases| session.queue_focus_with_releases(focused, releases)) {
             self.error = Some(error.to_string());
         }
         // The writer wakes the existing nonblocking metadata observer after

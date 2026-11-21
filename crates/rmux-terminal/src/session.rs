@@ -1445,7 +1445,7 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn queued_held_key_releases_precede_focus_loss() -> Result<()> {
+    fn queued_held_key_releases_precede_focus_changes() -> Result<()> {
         let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
         terminal.lock().unwrap().write(b"\x1b[>3u\x1b[?1004h");
         let expected = {
@@ -1453,11 +1453,14 @@ mod tests {
             let mut bytes = engine.encode_key_action("a", crate::keyboard::Modifiers::default(), crate::keyboard::Action::Release)?.unwrap();
             bytes.extend(engine.encode_key_action("enter", crate::keyboard::Modifiers::default(), crate::keyboard::Action::Release)?.unwrap());
             assert!(!bytes.is_empty());
-            bytes.extend(b"\x1b[O");
             bytes
         };
-        let payload = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused: false, releases: vec!["a".into(), "enter".into()] };
-        assert_eq!(payload.encode()?, expected);
+        for focused in [false, true] {
+            let mut expected = expected.clone();
+            expected.extend(if focused { b"\x1b[I" } else { b"\x1b[O" });
+            let payload = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused, releases: vec!["a".into(), "enter".into()] };
+            assert_eq!(payload.encode()?, expected);
+        }
         Ok(())
     }
     #[test]

@@ -36,6 +36,13 @@ impl PressedKeys {
     pub fn release(&mut self, name: &str) -> Option<String> {
         self.0.remove(&key(name)?)
     }
+    /// Keep release ownership until a bounded input queue accepts the batch.
+    /// On rejection, key-up or a later focus transition can retry the same keys.
+    pub fn try_release_all<E>(&mut self, enqueue: impl FnOnce(Vec<String>) -> Result<(), E>) -> Result<(), E> {
+        enqueue(self.0.values().cloned().collect())?;
+        self.0.clear();
+        Ok(())
+    }
     pub fn drain(&mut self) -> impl Iterator<Item = String> + '_ {
         self.0.drain().map(|(_, name)| name)
     }
@@ -116,6 +123,28 @@ mod tests {
         assert_eq!(held.release("é"),Some("é".into()));
         assert_eq!(held.drain().collect::<Vec<_>>(),vec!["界"]);
         assert_eq!(held.release("界"),None);
+    }
+    #[test]
+    fn rejected_release_batch_keeps_keys_until_queue_accepts() {
+        let mut held = super::PressedKeys::default();
+        held.press("{");
+        held.press("["); // A repeat/alias must not add a second release.
+        held.press("界");
+        let (sender, receiver) = std::sync::mpsc::sync_channel(1);
+        sender.try_send(vec!["occupied".to_owned()]).unwrap();
+        assert!(held.try_release_all(|keys| sender.try_send(keys)).is_err());
+        assert_eq!(receiver.recv().unwrap(), vec!["occupied"]);
+        // A key-up arriving after the failed batch still owns its release.
+        assert_eq!(held.release("["), Some("{".into()));
+        held.try_release_all(|keys| sender.try_send(keys)).unwrap();
+        assert_eq!(receiver.recv().unwrap(), vec!["界"]);
+        assert_eq!(held.release("界"), None);
+        held.try_release_all(|keys| sender.try_send(keys)).unwrap();
+        assert!(receiver.recv().unwrap().is_empty());
+        held.press("up");
+        drop(receiver);
+        assert!(held.try_release_all(|keys| sender.try_send(keys)).is_err());
+        assert_eq!(held.release("up"), Some("up".into()));
     }
     #[test]
     fn aliases_preserve_identity_and_unicode() {
