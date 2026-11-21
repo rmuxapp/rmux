@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Extended the native live-RPC fixture with pane-swap identity checks after the
+shared pane-state migration. The fresh debug build and live-shell run pass:
+RPC swap rejects a zoomed workspace without changing zoom/layout; after unzoom,
+swap preserves surface-to-pane ownership and process IDs, and a second swap
+restores the layout. Existing same/cross-window transfer and merge checks also
+pass with live shell state retained. The initial test incorrectly expected RPC
+swap to operate while zoomed; inspection confirmed its existing deliberate guard,
+so the assertion now checks that contract. This verifies RPC state behavior, not
+native pointer/keyboard presentation or cross-platform acceptance.
+
 Published the optimized GitHub artifact from run 44947179213 (376e37b) to
 Cloudflare deployment f2dcd3d8 at rmux.app. Build, font/startup/engine/search
 checks passed. Production embedded-demo clipboard smoke verified a complete

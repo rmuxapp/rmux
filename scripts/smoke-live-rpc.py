@@ -138,6 +138,23 @@ def run(binary, live_shell=False):
                 assert restored["layout"] == workspace["layout"]
                 assert {item["id"] for item in send("surface.list")["result"]["surfaces"]} == original_ids
                 checks.append("idempotent zoom, focus follows sibling, unzoom preserves layout and IDs")
+                before_swap = send("surface.list")["result"]["surfaces"]
+                identities = {item["id"]: (item["pane_id"], item.get("process_id")) for item in before_swap}
+                assert send("pane.zoom.set", {"pane_id": pane["id"], "zoomed": True})["result"]["zoomed"]
+                swap = {"pane_id": pane["id"], "other_pane_id": sibling["id"]}
+                assert "error" in send("pane.swap", swap)
+                assert current_workspace()["zoomed_pane_id"] == pane["id"]
+                assert current_workspace()["layout"] == restored["layout"]
+                assert not send("pane.zoom.set", {"pane_id": pane["id"], "zoomed": False})["result"]["zoomed"]
+                assert send("pane.swap", swap)["result"]["changed"]
+                swapped = current_workspace()
+                assert swapped["zoomed_pane_id"] is None
+                assert swapped["layout"] != restored["layout"]
+                after_swap = send("surface.list")["result"]["surfaces"]
+                assert {item["id"]: (item["pane_id"], item.get("process_id")) for item in after_swap} == identities
+                assert send("pane.swap", swap)["result"]["changed"]
+                assert current_workspace()["layout"] == restored["layout"]
+                checks.append("pane swap rejects zoom without mutation, preserves surface/pane/process identities and round-trips layout")
                 assert send("workspace.select", {"workspace_id": workspace["id"]})["result"]["selected"]
                 assert send("surface.focus", {"surface_id": surface["id"]})["result"]["selected"]
                 assert send("surface.focus", {"surface_id": "missing"})["error"]["code"] == -32004
