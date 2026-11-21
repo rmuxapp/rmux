@@ -55,6 +55,7 @@ struct InputProbe {
     zoomed: bool,
     split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
+    palette_origin: Option<FocusHandle>,
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
@@ -73,7 +74,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -139,11 +140,42 @@ impl InputProbe {
         self.scroll.reset(self.search.matches.len());
         cx.notify();
     }
+    fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
+        let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
+            match command {
+                CommandId::NewWorkspace => Box::new(NewWorkspace),
+                CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
+                CommandId::NextWorkspace => Box::new(NextWorkspace),
+                CommandId::PreviousWorkspace => Box::new(PreviousWorkspace),
+                CommandId::Split => Box::new(Split),
+                CommandId::SplitBelow => Box::new(SplitBelow),
+                CommandId::TogglePaneZoom => Box::new(TogglePaneZoom),
+                CommandId::FocusLeft => Box::new(FocusLeft),
+                CommandId::FocusRight => Box::new(FocusRight),
+                CommandId::FocusUp => Box::new(FocusUp),
+                CommandId::FocusDown => Box::new(FocusDown),
+                _ => return None,
+            }
+        } else {
+            let position = index.checked_sub(COMMANDS.len())?;
+            let number = if position < 8 { position + 1 }
+                else if position + 1 == self.workspace_results.len() { 9 }
+                else { return None; };
+            Box::new(SelectWorkspaceNumber { number })
+        };
+        let focus = self.palette_origin.as_ref()?;
+        window.highest_precedence_binding_for_action_in(action.as_ref(), focus).map(|binding| {
+            let mac = terminal_engine::is_mac();
+            binding.keystrokes().iter().map(|key|
+                shortcut_label::format_key_parts(key.key(), *key.modifiers(), mac)).collect::<Vec<_>>().join(" ")
+        })
+    }
     fn result_title(&self, index: usize) -> &str {
         if let Some(command) = COMMANDS.get(index) { command.title() }
         else { &self.workspace_results[index - COMMANDS.len()].1 }
     }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_origin = window.focused(cx);
         self.palette_open = true;
         cx.emit(PaletteRequest::Open);
         self.input.update(cx, |input, cx| { input.replace_draft("", cx); input.focus.focus(window, cx); });
@@ -266,11 +298,13 @@ impl Render for InputProbe {
                 .child(palette_view::search(self.input.clone()))
                 .child({
                     let entity = cx.entity();
-                    list(self.scroll.clone(), move |row, _, cx| {
+                    list(self.scroll.clone(), move |row, window, cx| {
                         entity.update(cx, |this, cx| {
                             let index = this.search.matches[row];
                             palette_view::result(index, 36., row == this.selected)
                                 .child(div().flex_1().min_w_0().truncate().child(this.result_title(index).to_owned()))
+                                .when_some(this.result_hint(index, window, cx), |row, hint| row.child(
+                                    div().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0)).child(hint)))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                     if event.standard_click() { this.selected = row; this.choose(window, cx); }
                                 })).into_any_element()
@@ -366,3 +400,6 @@ impl split_interaction::SplitHost for InputProbe {
         (&mut self.tree, &mut self.split_drag)
     }
 }
+
+#[path = "../../../crates/rmux-desktop/src/shortcut_label.rs"]
+mod shortcut_label;

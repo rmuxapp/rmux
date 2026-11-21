@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser palette displays shortcut hints resolved from the active keymap against
+the originating terminal's focus handle, using the extracted native key-label
+formatter. Unsupported/unbound actions show no invented hint; numbered workspace
+results map to the actual native number bindings. Preserving origin avoids empty
+hints while the new palette input has not entered the rendered dispatch tree.
+All 15 native shortcut tests and WASM build pass. Browser capture verifies workspace,
+group, navigation, split and zoom labels: target/shared-palette-hints-wasm.png.
+Browser shortcut overrides and non-macOS visual verification remain pending.
+
+
 Browser now selects macOS or Windows/Linux keymaps from browser platform metadata
 instead of hard-coding macOS. Workspace/directional/split definitions are shared
 native sources; editor, tab and pane-cycle defaults match desktop equivalents.

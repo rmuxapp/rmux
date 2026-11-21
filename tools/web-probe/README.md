@@ -205,3 +205,8 @@ bindings. Available-browser macOS checks cover Cmd+D, Cmd+Shift+D and
 Cmd+Shift+Enter zoom/unzoom. Native check, WASM build and engine/platform selector
 checks pass; Windows/Linux browser interaction and reserved shortcut behavior
 remain separate acceptance work.
+
+Palette hints now resolve actual key bindings against the terminal that opened
+it and format them with native shortcut_label code. Unbound actions omit hints;
+workspace results use their numbered navigation bindings. All 15 native shortcut
+tests and WASM build pass; browser visual check confirms macOS labels.

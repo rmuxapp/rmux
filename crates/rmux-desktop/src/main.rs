@@ -37,6 +37,7 @@ mod diagnostics;
 mod memory_view;
 mod settings_view;
 mod shortcuts;
+mod shortcut_label;
 use rmux_core::focus_trail;
 mod process_metrics;
 mod ports;
