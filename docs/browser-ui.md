@@ -45,7 +45,7 @@ views and core policies are useful migration steps, not completion evidence.
 
 ## Shared implementation
 
-- **Application state:** pane trees, directional focus, resizing/equalization,
+- **Application state:** shared pane layout/zoom ownership, directional focus, resizing/equalization,
   workspace groups and logical ordering, shared creation/visibility rules,
   previous-workspace identity tracking, sidebar multi-selection/range anchors, selected-workspace grouping and removal cleanup, tab ownership/selection/reordering and join transfer order, tab-to-split placement,
   command identities, palette matching, terminal frames and style runs.

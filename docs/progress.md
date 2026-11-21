@@ -2,6 +2,19 @@
 
 ## Current implementation focus
 
+Desktop Workspace and browser now own the same pane layout State: split tree,
+explicit zoom target, zoom/focus transition, resize guard and equalization. Browser
+zoom was previously a boolean coupled to its separate focused field; it now tracks
+the zoom target by pane identity and renders that target. Native snapshot,
+automation, transfer and split-drag access uses the shared owner. Process/session
+and view ownership remain host-specific migration work. Eight focused pane tests,
+native build/check and WASM build pass. Native live-session smoke passed restored
+layouts, zoom/focus, transfers/merges and shell PID/variable preservation, including
+fixture cleanup. Browser split → zoom → numbered pane selection → unzoom retained
+independent output in both panes. Screenshot: target/shared-pane-layout-state.jpg.
+Not deployed; this is layout-state consolidation, not the shared app entry point
+or completion of platform/performance acceptance.
+
 Published shared WASM source 246240b to rmux.app from successful GitHub run
 44944665222. Cloudflare deployment c3c998c4; the local site imported the exact CI
 artifact and verified WASM hashes before uploading static output. Website source

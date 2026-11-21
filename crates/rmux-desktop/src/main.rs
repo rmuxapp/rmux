@@ -2536,10 +2536,9 @@ struct Workspace {
     spawning_split: Option<Task<()>>,
     split_launch_canceled: Option<Arc<AtomicBool>>,
     pane_subscriptions: std::collections::HashMap<EntityId, Vec<Subscription>>,
-    zoomed: Option<EntityId>,
+    pane_state: rmux_core::pane_commands::State<Entity<PaneView>, EntityId>,
     split_drag: Option<split_view::SplitDrag>,
     panes: Vec<Entity<PaneView>>,
-    layout: Option<PaneTree<Entity<PaneView>>>,
     error: Option<String>,
     benchmark: bool,
 }
@@ -2562,23 +2561,23 @@ impl Workspace {
         anyhow::ensure!(source.entity_id() != cx.entity_id(), "Cannot merge a workspace into itself");
         anyhow::ensure!(!self.benchmark && !other.benchmark && self.spawning_split.is_none() && other.spawning_split.is_none()
             && self.split_drag.is_none() && other.split_drag.is_none(), "A workspace is busy");
-        let destination_tree = self.layout.as_ref().ok_or_else(|| anyhow::anyhow!("Destination has no layout"))?;
-        let source_tree = other.layout.as_ref().ok_or_else(|| anyhow::anyhow!("Source has no layout"))?;
+        let destination_tree = self.pane_state.layout.as_ref().ok_or_else(|| anyhow::anyhow!("Destination has no layout"))?;
+        let source_tree = other.pane_state.layout.as_ref().ok_or_else(|| anyhow::anyhow!("Source has no layout"))?;
         anyhow::ensure!(destination_tree.can_merge(source_tree), "Merged layout would exceed the split nesting limit");
         // Validation is complete. Both entities are owned by this UI thread;
         // no fallible operation or event-loop yield occurs during ownership transfer.
         let (tree, panes) = source.update(cx, |source, cx| {
             source.pane_subscriptions.clear();
-            source.zoomed = None;
+            source.pane_state.zoomed = None;
             source.split_drag = None;
-            let tree = source.layout.take().expect("validated source layout");
+            let tree = source.pane_state.layout.take().expect("validated source layout");
             let panes = std::mem::take(&mut source.panes);
             cx.notify();
             (tree, panes)
         });
-        self.layout = Some(PaneTree::Split {
+        self.pane_state.layout = Some(PaneTree::Split {
             axis: SplitAxis::Columns,
-            children: vec![self.layout.take().expect("validated destination layout"), tree],
+            children: vec![self.pane_state.layout.take().expect("validated destination layout"), tree],
             weights: vec![1., 1.],
         });
         for pane in &panes {
@@ -2595,7 +2594,7 @@ impl Workspace {
             self.observe_pane(pane, window, cx);
         }
         self.panes.extend(panes);
-        self.zoomed = None;
+        self.pane_state.zoomed = None;
         cx.emit(WorkspaceMetadataChanged);
         cx.notify();
         Ok(())
@@ -2652,24 +2651,21 @@ impl Workspace {
     }
     fn toggle_zoom(&mut self, window: &Window, cx: &mut Context<Self>) {
         self.split_drag = None;
-        self.zoomed = rmux_core::pane_commands::toggle_zoom(
-            self.zoomed,
-            self.focused_index(window, cx).map(|index| self.panes[index].entity_id()),
-            self.panes.len(),
-        );
+        let focused = self.focused_index(window, cx).map(|index| self.panes[index].entity_id());
+        self.pane_state.toggle_zoom(focused);
         cx.notify();
     }
     fn resize_pane(&mut self, direction: layout::Direction, window: &Window, cx: &mut Context<Self>) {
         if self.spawning_split.is_some() || cx.global::<Shutdowns>().quitting { return; }
         let Some(index) = self.focused_index(window, cx) else { return; };
-        if rmux_core::pane_commands::resize(&mut self.layout, &self.panes[index], direction, self.zoomed.is_some()) {
+        if self.pane_state.resize(&self.panes[index], direction) {
             self.split_drag = None;
             cx.notify();
         }
     }
     fn equalize_panes(&mut self, cx: &mut Context<Self>) {
-        if self.layout.is_some() {
-            rmux_core::pane_commands::equalize(&mut self.layout, &mut self.zoomed);
+        if self.pane_state.layout.is_some() {
+            self.pane_state.equalize();
             self.split_drag = None;
             cx.notify();
         }
@@ -2689,10 +2685,10 @@ impl Workspace {
         if cx.global::<Shutdowns>().quitting { return; }
         let Some(index) = self.focused_index(window, cx) else { return; };
         let source = self.panes[index].clone();
-        let Some(tree) = &self.layout else { return; };
+        let Some(tree) = &self.pane_state.layout else { return; };
         let target = match rmux_core::pane_commands::join_target(tree, &source, direction,
             rmux_core::pane_commands::JoinState {
-                zoomed: self.zoomed.is_some(), resizing: self.split_drag.is_some(), splitting: self.spawning_split.is_some(),
+                zoomed: self.pane_state.zoomed.is_some(), resizing: self.split_drag.is_some(), splitting: self.spawning_split.is_some(),
             }) {
             Ok(Some(target)) => target,
             Ok(None) => return,
@@ -2720,7 +2716,7 @@ impl Workspace {
         let Some((id, tab)) = source.read(cx).active_tab_for_split() else {
             return;
         };
-        let Some(tree) = &mut self.layout else {
+        let Some(tree) = &mut self.pane_state.layout else {
             return;
         };
         if !tree.can_split(&source) {
@@ -2733,14 +2729,14 @@ impl Workspace {
         // Remove the original tab only after the tree accepts its destination.
         // Both handles refer to the existing terminal; no PTY is created.
         let Some(inserted) = rmux_core::pane_commands::insert(
-            &mut self.layout, Some(&source), target.clone(), axis, before,
+            &mut self.pane_state.layout, Some(&source), target.clone(), axis, before,
         ) else { return; };
         self.error = None;
         source.update(cx, |pane, cx| pane.take_tab(id, cx));
         self.panes.insert(inserted, target.clone());
         self.observe_pane(&target, window, cx);
         self.split_drag = None;
-        self.zoomed = None;
+        self.pane_state.zoomed = None;
         target.read(cx).focus(window, cx);
         cx.notify();
     }
@@ -2762,11 +2758,11 @@ impl Workspace {
         }
     }
     fn swap_target_index(&self, current: usize, direction: Option<layout::Direction>) -> Option<usize> {
-        let next = rmux_core::pane_commands::swap_target(self.layout.as_ref()?, self.panes.get(current)?, direction, self.zoomed.is_some())?;
+        let next = rmux_core::pane_commands::swap_target(self.pane_state.layout.as_ref()?, self.panes.get(current)?, direction, self.pane_state.zoomed.is_some())?;
         self.panes.iter().position(|pane| *pane == next)
     }
     fn swap_panes(&mut self, current: usize, next: usize, cx: &mut Context<Self>) -> bool {
-        let Some(tree) = &mut self.layout else {
+        let Some(tree) = &mut self.pane_state.layout else {
             return false;
         };
         if tree.swap(&self.panes[current], &self.panes[next]) {
@@ -2774,7 +2770,7 @@ impl Workspace {
             // keyboard cycling. The focused entity and its sessions stay alive.
             self.panes.swap(current, next);
             self.split_drag = None;
-            self.zoomed = None;
+            self.pane_state.zoomed = None;
             cx.notify();
             return true;
         }
@@ -2914,9 +2910,7 @@ impl Workspace {
         let Some(pane) = self.panes.get(index) else {
             return;
         };
-        if self.zoomed.is_some() {
-            self.zoomed = Some(pane.entity_id());
-        }
+        self.pane_state.focus_changed(pane.entity_id());
         pane.read(cx).focus(window, cx);
         cx.notify();
     }
@@ -2928,24 +2922,20 @@ impl Workspace {
     ) {
         let Some(current) = self.focused_index(window, cx) else { return; };
         if let Some(next) = self.directional_neighbor(current, direction) {
-            if self.zoomed.is_some() {
-                self.zoomed = Some(self.panes[next].entity_id());
-            }
+            self.pane_state.focus_changed(self.panes[next].entity_id());
             self.panes[next].read(cx).focus(window, cx);
             cx.notify();
         }
     }
     fn directional_neighbor(&self, current: usize, direction: layout::Direction) -> Option<usize> {
-        let next = self.layout.as_ref()?.neighbor(self.panes.get(current)?, direction)?;
+        let next = self.pane_state.layout.as_ref()?.neighbor(self.panes.get(current)?, direction)?;
         self.panes.iter().position(|pane| *pane == next)
     }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
         let focused = self.focused_index(window, cx).and_then(|index| self.panes.get(index));
-        let Some(next) = self.layout.as_ref().and_then(|tree|
+        let Some(next) = self.pane_state.layout.as_ref().and_then(|tree|
             rmux_core::pane_commands::cycle(tree, focused, direction)) else { return; };
-        if self.zoomed.is_some() {
-            self.zoomed = Some(next.entity_id());
-        }
+        self.pane_state.focus_changed(next.entity_id());
         next.read(cx).focus(window, cx);
         cx.notify();
     }
@@ -2955,7 +2945,7 @@ impl Workspace {
         let focused = self.panes.iter().find(|candidate|
             *candidate != pane && candidate.read(cx).is_focused(window, cx));
         let preserve_focus = focused.is_some();
-        let next = self.layout.as_ref().and_then(|tree|
+        let next = self.pane_state.layout.as_ref().and_then(|tree|
             rmux_core::pane_commands::focus_after_close(tree, pane, focused));
         if self.remove_pane(pane, cx).is_none() { return; }
         if !preserve_focus && let Some(survivor) = next {
@@ -2969,8 +2959,8 @@ impl Workspace {
         self.split_drag = None;
         let removed = self.panes.remove(index);
         self.pane_subscriptions.remove(&removed.entity_id());
-        self.zoomed = None;
-        self.layout = self.layout.take().and_then(|tree| tree.remove(&removed));
+        self.pane_state.zoomed = None;
+        self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&removed));
         if self.panes.is_empty() {
             cx.emit(WorkspaceEmpty);
         }
@@ -2995,7 +2985,7 @@ impl Workspace {
         if self.spawning_split.is_some() || cx.global::<Shutdowns>().quitting { return; }
         let Some(index) = self.focused_index(window, cx).or_else(|| self.panes.len().checked_sub(1)) else { return; };
         let pane = &self.panes[index];
-        if self.layout.as_ref().is_some_and(|tree| !tree.can_split(pane)) {
+        if self.pane_state.layout.as_ref().is_some_and(|tree| !tree.can_split(pane)) {
             self.error = Some(format!("Cannot split this pane: maximum nesting is {}", layout::MAX_SPLIT_DEPTH));
             cx.notify();
             return;
@@ -3068,7 +3058,7 @@ impl Workspace {
             Some(self.panes.iter().position(|pane| pane.entity_id() == target)?)
         } else { self.focused_index(window, cx) };
         let split_index = anchor.unwrap_or(self.panes.len().saturating_sub(1));
-        if !self.benchmark && self.layout.as_ref().is_some_and(|tree| {
+        if !self.benchmark && self.pane_state.layout.as_ref().is_some_and(|tree| {
             self.panes.get(split_index).is_none_or(|pane| !tree.can_split(pane))
         }) {
             self.error = Some(format!("Cannot split this pane: maximum nesting is {}", layout::MAX_SPLIT_DEPTH));
@@ -3126,7 +3116,7 @@ impl Workspace {
                 let focused = split_index;
                 self.error = None;
                 self.split_drag = None;
-                self.zoomed = None;
+                self.pane_state.zoomed = None;
                 let terminal = cx.new(|cx| {
                     let mut terminal = TerminalView::from_prepared(prepared, window, cx);
                     terminal.cells = cells;
@@ -3140,7 +3130,7 @@ impl Workspace {
                 if self.benchmark {
                     // Preserve the existing equal-width benchmark fixture.
                     self.panes.push(view.clone());
-                    self.layout = Some(PaneTree::Split {
+                    self.pane_state.layout = Some(PaneTree::Split {
                         axis: SplitAxis::Columns,
                         children: self.panes.iter().cloned().map(PaneTree::Pane).collect(),
                         weights: vec![1.; self.panes.len()],
@@ -3148,7 +3138,7 @@ impl Workspace {
                 } else {
                     let anchor = self.panes.get(focused);
                     let Some(inserted) = rmux_core::pane_commands::insert(
-                        &mut self.layout, anchor, view.clone(), axis, before,
+                        &mut self.pane_state.layout, anchor, view.clone(), axis, before,
                     ) else {
                         self.error = Some("Cannot insert terminal into the current layout".into());
                         cx.notify();
@@ -3212,7 +3202,7 @@ impl pane_actions::PaneCommandHost for Workspace {
 }
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if let Some(zoomed) = self.zoomed {
+        if let Some(zoomed) = self.pane_state.zoomed {
             for pane in &self.panes {
                 if pane.entity_id() != zoomed {
                     pane.update(cx, |pane, cx| pane.release_render_caches(cx));
@@ -3233,8 +3223,8 @@ impl Render for Workspace {
                     view.dump_metrics(window, cx)
                 }),
             )
-            .when(self.zoomed.is_some(), |root| {
-                let focus = self.panes.iter().find(|pane| Some(pane.entity_id()) == self.zoomed)
+            .when(self.pane_state.zoomed.is_some(), |root| {
+                let focus = self.panes.iter().find(|pane| Some(pane.entity_id()) == self.pane_state.zoomed)
                     .and_then(|pane| {
                         let pane = pane.read(cx);
                         pane.terminals.iter().find(|terminal| Some(terminal.entity_id()) == pane.active_terminal_id())
@@ -3248,11 +3238,11 @@ impl Render for Workspace {
                     .flex()
                     .flex_1()
                     .min_h_0()
-                    .when_some(self.layout.as_ref(), |div, tree| {
+                    .when_some(self.pane_state.layout.as_ref(), |div, tree| {
                         if let Some(pane) = self
                             .panes
                             .iter()
-                            .find(|pane| Some(pane.entity_id()) == self.zoomed)
+                            .find(|pane| Some(pane.entity_id()) == self.pane_state.zoomed)
                         {
                             return div.child(
                                 gpui::div()

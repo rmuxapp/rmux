@@ -84,10 +84,9 @@ struct InputProbe {
     selected: usize,
     scroll: ListState,
     feedback: Option<String>,
-    tree: Option<PaneTree<usize>>,
+    pane_state: rmux_core::pane_commands::State<usize, usize>,
     focused: usize,
     next_pane: usize,
-    zoomed: bool,
     split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
     palette_origin: Option<FocusHandle>,
@@ -110,7 +109,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, next_pane: 1, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -123,12 +122,12 @@ impl InputProbe {
     fn register_pane(&mut self, id: usize, pane: Entity<sample_pane::SamplePane>, window: &mut Window, cx: &mut Context<Self>) {
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
             this.split_drag = None;
-            let next = this.tree.as_ref().and_then(|tree|
+            let next = this.pane_state.layout.as_ref().and_then(|tree|
                 rmux_core::pane_commands::focus_after_close(tree, &id, Some(&this.focused)));
-            this.tree = this.tree.take().and_then(|tree| tree.remove(&id));
+            this.pane_state.layout = this.pane_state.layout.take().and_then(|tree| tree.remove(&id));
             this.samples.remove(&id);
-            if this.tree.is_none() { this.empty_focus.focus(window,cx); }
-            this.zoomed = false;
+            if this.pane_state.layout.is_none() { this.empty_focus.focus(window,cx); }
+            this.pane_state.zoomed = None;
             if let Some(next) = next.filter(|next| *next != this.focused) {
                 this.focused = next;
                 this.samples[&next].update(cx, |pane, cx| pane.focus(window, cx));
@@ -141,7 +140,7 @@ impl InputProbe {
         let id = self.next_pane;
         self.next_pane += 1;
         self.add_pane(id, window, cx);
-        self.tree = Some(PaneTree::Pane(id));
+        self.pane_state.layout = Some(PaneTree::Pane(id));
         self.focused = id;
         self.close_palette(window, cx);
     }
@@ -158,28 +157,28 @@ impl InputProbe {
             cx.notify(); return;
         }
         let id = self.next_pane;
-        if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), id, axis, before).is_none() {
+        if rmux_core::pane_commands::insert(&mut self.pane_state.layout, Some(&self.focused), id, axis, before).is_none() {
             self.feedback = Some("Cannot add another split at this nesting depth.".into());
             cx.notify(); return;
         }
         // The destination is accepted before releasing the source's ownership.
         // No terminal is spawned and no event-loop yield occurs during transfer.
         let Some(transfer) = source.update(cx, |pane, cx| pane.take_active_for_split(cx)) else {
-            self.tree = self.tree.take().and_then(|tree| tree.remove(&id));
+            self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&id));
             return;
         };
         let pane = cx.new(|_| sample_pane::SamplePane::from_transfer(transfer));
         self.register_pane(id, pane, window, cx);
         self.focused = id;
         self.next_pane += 1;
-        self.zoomed = false;
+        self.pane_state.zoomed = None;
         cx.notify();
     }
 
     fn join_pane(&mut self, direction: Option<rmux_core::layout::Direction>, was_dragging: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(tree) = &self.tree else { return; };
+        let Some(tree) = &self.pane_state.layout else { return; };
         let target = match rmux_core::pane_commands::join_target(tree, &self.focused, direction,
-            rmux_core::pane_commands::JoinState { zoomed: self.zoomed, resizing: was_dragging, splitting: false }) {
+            rmux_core::pane_commands::JoinState { zoomed: self.pane_state.zoomed.is_some(), resizing: was_dragging, splitting: false }) {
             Ok(Some(target)) => target,
             Ok(None) => return,
             Err(message) => { self.feedback = Some(message.into()); cx.notify(); return; }
@@ -194,24 +193,27 @@ impl InputProbe {
         // terminal entities/labels alive and focus the source's active tab once.
         let tabs = source.update(cx, |pane, cx| pane.take_all_tabs(cx));
         destination.update(cx, |pane, cx| pane.append_tabs(tabs, window, cx));
-        self.tree = self.tree.take().and_then(|tree| tree.remove(&self.focused));
+        self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&self.focused));
         self.samples.remove(&self.focused);
         self.focused = target;
+        self.pane_state.focus_changed(target);
         cx.notify();
     }
 
     fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(next) = self.tree.as_ref().and_then(|tree|
+        if let Some(next) = self.pane_state.layout.as_ref().and_then(|tree|
             rmux_core::pane_commands::cycle(tree, Some(&self.focused), direction)) {
             self.focused = next;
+            self.pane_state.focus_changed(next);
             self.samples[&next].update(cx, |sample, cx| sample.focus(window, cx));
             cx.notify();
         }
     }
 
     fn focus_direction(&mut self, direction: rmux_core::layout::Direction, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(next) = self.tree.as_ref().and_then(|tree| tree.neighbor(&self.focused, direction)) {
+        if let Some(next) = self.pane_state.layout.as_ref().and_then(|tree| tree.neighbor(&self.focused, direction)) {
             self.focused = next;
+            self.pane_state.focus_changed(next);
             self.samples[&next].update(cx, |pane, cx| pane.focus(window, cx));
             cx.notify();
         }
@@ -308,7 +310,7 @@ impl InputProbe {
             // Restore terminal focus before dispatching, just like the native
             // palette. Actions then use the same handlers as keyboard input.
             self.close_palette(window, cx);
-            if command == CommandId::NewTab && self.tree.is_none() {
+            if command == CommandId::NewTab && self.pane_state.layout.is_none() {
                 self.start_terminal(window, cx);
             } else {
                 window.dispatch_action(action, cx);
@@ -340,10 +342,10 @@ impl InputProbe {
                 if self.samples.len() >= 16 { self.feedback = Some("Demo limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if matches!(command, CommandId::Split | CommandId::SplitLeft) { Axis::Columns } else { Axis::Rows };
                 let before = matches!(command, CommandId::SplitLeft | CommandId::SplitAbove);
-                if self.tree.is_none() { self.start_terminal(window, cx); return; }
-                if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), self.next_pane, axis, before).is_some() {
+                if self.pane_state.layout.is_none() { self.start_terminal(window, cx); return; }
+                if rmux_core::pane_commands::insert(&mut self.pane_state.layout, Some(&self.focused), self.next_pane, axis, before).is_some() {
                     self.add_pane(self.next_pane, window, cx);
-                    self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
+                    self.focused = self.next_pane; self.next_pane += 1; self.pane_state.zoomed = None;
                 }
             }
             command @ (CommandId::FocusLeft | CommandId::FocusRight | CommandId::FocusUp | CommandId::FocusDown) => {
@@ -363,16 +365,14 @@ impl InputProbe {
                     CommandId::SwapPaneDown => Some(Direction::Down),
                     _ => None,
                 };
-                if let Some(tree) = &mut self.tree {
-                    if let Some(next) = rmux_core::pane_commands::swap_target(tree, &self.focused, direction, self.zoomed) {
-                        if tree.swap(&self.focused, &next) { self.zoomed = false; }
+                if let Some(tree) = &mut self.pane_state.layout {
+                    if let Some(next) = rmux_core::pane_commands::swap_target(tree, &self.focused, direction, self.pane_state.zoomed.is_some()) {
+                        if tree.swap(&self.focused, &next) { self.pane_state.zoomed = None; }
                     }
                 }
             }
             CommandId::EqualizePanes => {
-                let mut zoomed = self.zoomed.then_some(self.focused);
-                rmux_core::pane_commands::equalize(&mut self.tree, &mut zoomed);
-                self.zoomed = zoomed.is_some();
+                self.pane_state.equalize();
             }
             command @ (CommandId::ResizePaneLeft | CommandId::ResizePaneRight | CommandId::ResizePaneUp | CommandId::ResizePaneDown) => {
                 use rmux_core::layout::Direction;
@@ -382,13 +382,10 @@ impl InputProbe {
                     CommandId::ResizePaneUp => Direction::Up,
                     _ => Direction::Down,
                 };
-                rmux_core::pane_commands::resize(&mut self.tree, &self.focused, direction, self.zoomed);
+                self.pane_state.resize(&self.focused, direction);
             }
-            CommandId::TogglePaneZoom => self.zoomed = rmux_core::pane_commands::toggle_zoom(
-                self.zoomed.then_some(self.focused),
-                self.samples.contains_key(&self.focused).then_some(self.focused),
-                self.samples.len(),
-            ).is_some(),
+            CommandId::TogglePaneZoom => self.pane_state.toggle_zoom(
+                self.samples.contains_key(&self.focused).then_some(self.focused)),
             command @ (CommandId::ToggleSidebar | CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
                 | CommandId::MoveWorkspaceUp | CommandId::MoveWorkspaceDown | CommandId::ToggleGroupPin | CommandId::RemoveWorkspaceFromGroup | CommandId::SetGroupAnchor | CommandId::GroupCurrentWorkspace | CommandId::GroupSelectedWorkspaces | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);
@@ -403,7 +400,7 @@ impl InputProbe {
         split_interaction::render_panes(tree, path, false, cx, &|id, cx| {
                 let id = *id;
                 split_presentation::leaf(("pane", id))
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| { this.focused = id; this.samples[&id].update(cx, |sample, cx| sample.focus(window, cx)); }))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| { this.focused = id; this.pane_state.focus_changed(id); this.samples[&id].update(cx, |sample, cx| sample.focus(window, cx)); }))
                     .child(self.samples[&id].clone())
                     .into_any_element()
         })
@@ -412,8 +409,9 @@ impl InputProbe {
 }
 impl pane_actions::PaneCommandHost for InputProbe {
     fn select_pane_command(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(target) = number.checked_sub(1).and_then(|index| self.tree.as_ref()?.pane_at(index)).copied() else { return; };
+        let Some(target) = number.checked_sub(1).and_then(|index| self.pane_state.layout.as_ref()?.pane_at(index)).copied() else { return; };
         self.focused = target;
+        self.pane_state.focus_changed(target);
         self.samples[&target].update(cx, |pane, cx| pane.focus(window, cx));
         cx.notify();
     }
@@ -427,8 +425,8 @@ impl pane_actions::PaneCommandHost for InputProbe {
 impl Render for InputProbe {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let height = f32::from(window.viewport_size().height);
-        let panes = if let Some(tree) = &self.tree {
-            if self.zoomed { self.panes(&PaneTree::Pane(self.focused), vec![], cx) } else { self.panes(tree, vec![], cx) }
+        let panes = if let Some(tree) = &self.pane_state.layout {
+            if let Some(zoomed) = self.pane_state.zoomed { self.panes(&PaneTree::Pane(zoomed), vec![], cx) } else { self.panes(tree, vec![], cx) }
         } else {
             div().size_full().flex().items_center().justify_center().track_focus(&self.empty_focus).key_context("Terminal")
                 .child(div().id("restart-terminal").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
@@ -437,7 +435,7 @@ impl Render for InputProbe {
         };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
             .on_action(cx.listener(|this, _: &NewTab, window, cx| {
-                if this.tree.is_none() { this.start_terminal(window,cx); }
+                if this.pane_state.layout.is_none() { this.start_terminal(window,cx); }
             }))
             .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
@@ -449,7 +447,7 @@ impl Render for InputProbe {
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);
                     }))))
-            .when(self.zoomed, |root| {
+            .when(self.pane_state.zoomed.is_some(), |root| {
                 let shortcut = window.focused(cx).and_then(|focus|
                     window.highest_precedence_binding_for_action_in(&TogglePaneZoom, &focus))
                     .map(|binding| binding.keystrokes().iter().map(|key|
@@ -589,7 +587,7 @@ mod split_interaction;
 impl split_interaction::SplitHost for InputProbe {
     type Pane = usize;
     fn split_state(&mut self) -> (&mut Option<PaneTree<usize>>, &mut Option<split_interaction::SplitDrag>) {
-        (&mut self.tree, &mut self.split_drag)
+        (&mut self.pane_state.layout, &mut self.split_drag)
     }
 }
 

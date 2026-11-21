@@ -33,7 +33,7 @@ pub(super) fn terminal_is_visible(terminal: EntityId, cx: &mut App) -> bool {
             let Some(entry) = root.workspace_state.entries.get(root.workspace_state.active) else { return false; };
             let workspace = entry.workspace.read(cx);
             workspace.panes.iter().any(|pane| {
-                workspace.zoomed.is_none_or(|zoomed| zoomed == pane.entity_id())
+                workspace.pane_state.zoomed.is_none_or(|zoomed| zoomed == pane.entity_id())
                     && pane.read(cx).active_terminal_id() == Some(terminal)
             })
         }).unwrap_or(false)
@@ -950,10 +950,10 @@ impl WorkspaceWindow {
             .map(|entry| entry.workspace.clone())
             .ok_or(automation::Failure { code: -32004, message: "Workspace not found" })?;
         let changed = workspace.update(cx, |workspace, cx| {
-            if workspace.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
+            if workspace.pane_state.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
                 return Err(automation::Failure { code: -32005, message: "Workspace layout is busy or zoomed" });
             }
-            let changed = workspace.layout.as_mut().is_some_and(|tree| tree.equalize());
+            let changed = workspace.pane_state.layout.as_mut().is_some_and(|tree| tree.equalize());
             if changed { cx.notify(); }
             Ok(changed)
         })?;
@@ -965,7 +965,7 @@ impl WorkspaceWindow {
         let (workspace, _) = self.automation_pane_target(target, cx)
             .ok_or(automation::Failure { code: -32004, message: "Pane not found" })?;
         let changed = workspace.update(cx, |workspace, cx| {
-            if workspace.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
+            if workspace.pane_state.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
                 return Err(automation::Failure { code: -32005, message: "Pane layout is busy or zoomed" });
             }
             let current = workspace.panes.iter().position(|pane| pane.entity_id() == target).unwrap();
@@ -982,10 +982,10 @@ impl WorkspaceWindow {
         let (workspace, pane) = self.automation_pane_target(target, cx)
             .ok_or(automation::Failure { code: -32004, message: "Pane not found" })?;
         let changed = workspace.update(cx, |workspace, cx| {
-            if workspace.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
+            if workspace.pane_state.zoomed.is_some() || workspace.spawning_split.is_some() || workspace.split_drag.is_some() {
                 return Err(automation::Failure { code: -32005, message: "Pane layout is busy or zoomed" });
             }
-            let changed = workspace.layout.as_mut().is_some_and(|tree| tree.resize_direction(&pane, resize.direction));
+            let changed = workspace.pane_state.layout.as_mut().is_some_and(|tree| tree.resize_direction(&pane, resize.direction));
             if changed { cx.notify(); }
             Ok(changed)
         })?;
@@ -999,7 +999,7 @@ impl WorkspaceWindow {
         let (workspace, pane) = self.automation_pane_target(target, cx)
             .ok_or(automation::Failure { code: -32004, message: "Pane not found" })?;
         if workspace.read(cx).panes.len() >= 64 || workspace.read(cx).spawning_split.is_some()
-            || workspace.read(cx).layout.as_ref().is_none_or(|tree| !tree.can_split(&pane)) {
+            || workspace.read(cx).pane_state.layout.as_ref().is_none_or(|tree| !tree.can_split(&pane)) {
             return Err(automation::Failure { code: -32005, message: "Pane split busy or limit reached" });
         }
         let destination = split.ssh_destination.clone();
@@ -1028,7 +1028,7 @@ impl WorkspaceWindow {
             return Err(automation::Failure { code: -32004, message: "Pane not found" });
         };
         if workspace.read(cx).panes.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Workspace pane limit reached" }); }
-        if workspace.read(cx).layout.as_ref().is_none_or(|tree| !tree.can_split(&target_pane)) {
+        if workspace.read(cx).pane_state.layout.as_ref().is_none_or(|tree| !tree.can_split(&target_pane)) {
             return Err(automation::Failure { code: -32005, message: "Pane split nesting limit reached" });
         }
         let axis = match split.direction { automation::SplitDirection::Left | automation::SplitDirection::Right => SplitAxis::Columns, automation::SplitDirection::Up | automation::SplitDirection::Down => SplitAxis::Rows };
@@ -1061,10 +1061,10 @@ impl WorkspaceWindow {
         }
         workspace.update(cx, |workspace, cx| {
             let next = if zoom.zoomed { Some(pane.entity_id()) }
-                else { workspace.zoomed.filter(|id| *id != pane.entity_id()) };
-            if workspace.zoomed != next { workspace.zoomed = next; cx.notify(); }
+                else { workspace.pane_state.zoomed.filter(|id| *id != pane.entity_id()) };
+            if workspace.pane_state.zoomed != next { workspace.pane_state.zoomed = next; cx.notify(); }
         });
-        Ok(serde_json::json!({"pane_id":zoom.pane_id,"zoomed":workspace.read(cx).zoomed == Some(pane.entity_id())}))
+        Ok(serde_json::json!({"pane_id":zoom.pane_id,"zoomed":workspace.read(cx).pane_state.zoomed == Some(pane.entity_id())}))
     }
     pub(super) fn automation_children(&self, window_id: String, surfaces: bool, workspace_filter: Option<&str>, history: bool, cx: &App) -> Vec<serde_json::Value> {
         let mut items = Vec::new();
@@ -1082,7 +1082,7 @@ impl WorkspaceWindow {
                         "id":pane_id, "window_id":window_id, "workspace_id":workspace_id,
                         "index":index, "surface_count":pane.terminals.len(),
                         "selected_surface_id":pane.active_terminal_id().map(|id| id.to_string()),
-                        "zoomed":workspace.zoomed == Some(entity.entity_id()),
+                        "zoomed":workspace.pane_state.zoomed == Some(entity.entity_id()),
                     }));
                 }
             }
@@ -1149,10 +1149,10 @@ impl WorkspaceWindow {
                 "icon":entry.icon, "color":entry.color.map(|color| format!("#{color:06x}")),
                 "pinned":entry.pinned, "selected":*index == self.workspace_state.active,
                 "pane_count":workspace.panes.len(),
-                "zoomed_pane_id":workspace.zoomed.map(|id| id.to_string()),
+                "zoomed_pane_id":workspace.pane_state.zoomed.map(|id| id.to_string()),
                 "terminal_count":workspace.panes.iter().map(|pane| pane.read(cx).terminals.len()).sum::<usize>(),
             });
-            result["layout"] = workspace.layout.as_ref().map(|tree| automation::layout_snapshot(tree, &|pane| pane.entity_id().to_string())).unwrap_or(serde_json::Value::Null);
+            result["layout"] = workspace.pane_state.layout.as_ref().map(|tree| automation::layout_snapshot(tree, &|pane| pane.entity_id().to_string())).unwrap_or(serde_json::Value::Null);
             result
         }).collect();
         let groups: Vec<_> = order.iter().filter_map(|index| {
@@ -1551,7 +1551,7 @@ impl WorkspaceWindow {
         self.remember_focus(window, cx);
         self.workspace_state.entries[index].last_pane = Some(pane.entity_id());
         self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
-            workspace.zoomed = None;
+            workspace.pane_state.zoomed = None;
             cx.notify();
         });
         pane.update(cx, |pane, cx| pane.select(tab, window, cx));
@@ -1584,7 +1584,7 @@ impl WorkspaceWindow {
             self.remember_focus(window, cx);
             self.workspace_state.entries[index].last_pane = Some(pane.entity_id());
             self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
-                workspace.zoomed = None;
+                workspace.pane_state.zoomed = None;
                 cx.notify();
             });
             // Select the intended tab before select() focuses this pane. Otherwise
@@ -1779,10 +1779,9 @@ impl WorkspaceWindow {
                 spawning_split: None,
                 split_launch_canceled: None,
                 pane_subscriptions: Default::default(),
-                zoomed: None,
                 split_drag: None,
                 panes: vec![pane.clone()],
-                layout: Some(PaneTree::Pane(pane.clone())),
+                pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(pane.clone())), ..Default::default() },
                 error: None,
                 benchmark: false,
             };
@@ -1912,9 +1911,7 @@ impl WorkspaceWindow {
         self.scroll_to_workspace(index);
         window.set_window_title(&format!("{} — rmux", self.workspace_state.entries[index].name));
         self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
-            if workspace.zoomed.is_some() {
-                workspace.zoomed = Some(pane.entity_id());
-            }
+            workspace.pane_state.focus_changed(pane.entity_id());
             cx.notify();
         });
         pane.update(cx, |pane, cx| pane.select(tab, window, cx));
@@ -3028,7 +3025,7 @@ impl WorkspaceWindow {
             destination.remember_focus(window, cx);
             tab.terminal.update(cx, |terminal, cx| terminal.rebind_window(window, cx));
             workspace.update(cx, |workspace, cx| {
-                if workspace.zoomed.is_some() { workspace.zoomed = Some(pane.entity_id()); }
+                workspace.pane_state.focus_changed(pane.entity_id());
                 cx.notify();
             });
             destination.activate_workspace(index);
@@ -3142,9 +3139,7 @@ impl WorkspaceWindow {
             source_workspace.update(cx, |workspace, cx| workspace.remove_pane(&source, cx));
         }
         destination_workspace.update(cx, |workspace, cx| {
-            if workspace.zoomed.is_some() {
-                workspace.zoomed = Some(target.entity_id());
-            }
+            workspace.pane_state.focus_changed(target.entity_id());
             cx.notify();
         });
         // Set the destination before selecting the transferred terminal, without
@@ -3238,16 +3233,15 @@ impl WorkspaceWindow {
                     spawning_split: None,
                     split_launch_canceled: None,
                     pane_subscriptions: Default::default(),
-                    zoomed: None,
                     split_drag: None,
                     panes: Vec::new(),
-                    layout: None,
+                    pane_state: Default::default(),
                     error: None,
                     benchmark: false,
                 };
-                workspace.layout =
+                workspace.pane_state.layout =
                     Some(workspace.restore_node(saved.layout, &mut sessions, window, cx));
-                workspace.zoomed = saved.zoomed_pane.map(|index| workspace.panes[index].entity_id());
+                workspace.pane_state.zoomed = saved.zoomed_pane.map(|index| workspace.panes[index].entity_id());
                 workspace
             });
             let last_pane = Some(workspace.read(cx).panes[saved.zoomed_pane.unwrap_or(saved.active_pane)].entity_id());
@@ -3471,7 +3465,7 @@ impl WorkspaceWindow {
                     .map(|entry| {
                         let workspace = entry.workspace.read(cx);
                         let layout = workspace
-                            .layout
+                            .pane_state.layout
                             .as_ref()
                             .ok_or_else(|| anyhow::anyhow!("workspace has no terminal layout"))?;
                         Ok(snapshot::WorkspaceSnapshot {
@@ -3486,7 +3480,7 @@ impl WorkspaceWindow {
                                 .find(|pane| Some(pane.entity_id()) == entry.last_pane)
                                 .and_then(|pane| layout.pane_index(pane))
                                 .unwrap_or(0),
-                            zoomed_pane: workspace.zoomed.and_then(|id| workspace.panes.iter().find(|pane| pane.entity_id() == id))
+                            zoomed_pane: workspace.pane_state.zoomed.and_then(|id| workspace.panes.iter().find(|pane| pane.entity_id() == id))
                                 .and_then(|pane| layout.pane_index(pane)),
                             layout: Workspace::snapshot_tree(layout, cx),
                         })
@@ -3723,10 +3717,9 @@ impl WorkspaceWindow {
                 spawning_split: None,
                 split_launch_canceled: None,
                 pane_subscriptions: Default::default(),
-                zoomed: None,
                 split_drag: None,
                 panes: Vec::new(),
-                layout: None,
+                pane_state: Default::default(),
                 error: None,
                 benchmark: self.benchmark,
             };

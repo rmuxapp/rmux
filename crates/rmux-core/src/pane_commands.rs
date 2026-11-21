@@ -1,6 +1,28 @@
 //! Pane command transitions shared by desktop and browser application hosts.
 use crate::layout::{Direction, PaneTree};
 
+/// Shared layout ownership. Hosts retain session/view handles and process guards;
+/// the split tree and zoom target belong to the application model.
+pub struct State<T, Z> {
+    pub layout: Option<PaneTree<T>>,
+    pub zoomed: Option<Z>,
+}
+impl<T, Z> Default for State<T, Z> {
+    fn default() -> Self { Self { layout: None, zoomed: None } }
+}
+impl<T: Clone + PartialEq, Z> State<T, Z> {
+    pub fn resize(&mut self, focused: &T, direction: Direction) -> bool {
+        resize(&mut self.layout, focused, direction, self.zoomed.is_some())
+    }
+    pub fn focus_changed(&mut self, focused: Z) {
+        if self.zoomed.is_some() { self.zoomed = Some(focused); }
+    }
+    pub fn equalize(&mut self) { equalize(&mut self.layout, &mut self.zoomed); }
+    pub fn toggle_zoom(&mut self, focused: Option<Z>) {
+        self.zoomed = toggle_zoom(self.zoomed.take(), focused, self.layout.as_ref().map_or(0, PaneTree::pane_count));
+    }
+}
+
 /// Zoom only a focused pane in a split layout. Invoking again exits zoom.
 pub fn toggle_zoom<T>(current: Option<T>, focused: Option<T>, pane_count: usize) -> Option<T> {
     if current.is_some() || pane_count < 2 {
@@ -108,6 +130,28 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn owned_layout_keeps_zoom_focus_and_resize_policy_together() {
+        let mut state = State { layout: Some(PaneTree::Split {
+            axis: Axis::Columns, weights: vec![2., 1.],
+            children: vec![PaneTree::Pane(1), PaneTree::Pane(2)],
+        }), zoomed: None };
+        state.toggle_zoom(Some(1));
+        state.focus_changed(2);
+        assert_eq!(state.zoomed, Some(2));
+        assert!(!state.resize(&2, Direction::Left));
+        state.equalize();
+        assert_eq!(state.zoomed, None);
+        if let Some(PaneTree::Split { weights, .. }) = &state.layout {
+            assert_eq!(weights, &vec![1., 1.]);
+        } else { panic!("split layout was lost"); }
+        state.focus_changed(1);
+        assert_eq!(state.zoomed, None);
+        state.layout = Some(PaneTree::Pane(1));
+        state.toggle_zoom(Some(1));
+        assert_eq!(state.zoomed, None);
+    }
 
     #[test]
     fn join_resolves_visual_order_and_rejects_busy_layouts() {

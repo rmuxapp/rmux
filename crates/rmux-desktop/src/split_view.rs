@@ -4,7 +4,7 @@ pub(super) use crate::split_interaction::{SplitDrag, drag_capture};
 impl crate::split_interaction::SplitHost for Workspace {
     type Pane = Entity<PaneView>;
     fn split_state(&mut self) -> (&mut Option<PaneTree<Self::Pane>>, &mut Option<SplitDrag>) {
-        (&mut self.layout, &mut self.split_drag)
+        (&mut self.pane_state.layout, &mut self.split_drag)
     }
 }
 
