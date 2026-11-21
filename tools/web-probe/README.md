@@ -115,3 +115,7 @@ the shared pane tree; closing all panes exposes New Terminal. Removed terminal
 entities drop their Ghostty engine. Browser verification covered active-tab close,
 split removal, final empty state and fresh session creation/input. Background-tab
 close and middle-click interaction coverage remain pending.
+
+Symbolic key normalization now comes from rmux-core::keyboard, also used by
+native Ghostty encoding. Browser Enter/Backspace dispatch uses those shared keys.
+This does not yet connect full terminal keyboard encoding or native IME handling.

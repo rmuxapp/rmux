@@ -1,19 +1,7 @@
 //! Terminal-state-aware input encoding. Native IME commits remain UTF-8 text.
 use super::*;
 
-#[derive(Clone, Copy, Default)]
-pub struct Modifiers {
-    pub shift: bool,
-    pub control: bool,
-    pub alt: bool,
-}
-
-#[derive(Clone, Copy, PartialEq, Eq)]
-pub enum Action {
-    Press,
-    Repeat,
-    Release,
-}
+pub use rmux_core::keyboard::{Modifiers, Action};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum KeyIdentity {
@@ -60,57 +48,47 @@ impl Drop for Encoder {
 }
 
 fn key_code(key: &str) -> Option<GhosttyKey> {
-    Some(match key {
-        "enter" => GHOSTTY_KEY_ENTER,
-        "backspace" => GHOSTTY_KEY_BACKSPACE,
-        "tab" => GHOSTTY_KEY_TAB,
-        "escape" => GHOSTTY_KEY_ESCAPE,
-        "up" => GHOSTTY_KEY_ARROW_UP,
-        "down" => GHOSTTY_KEY_ARROW_DOWN,
-        "left" => GHOSTTY_KEY_ARROW_LEFT,
-        "right" => GHOSTTY_KEY_ARROW_RIGHT,
-        "home" => GHOSTTY_KEY_HOME,
-        "end" => GHOSTTY_KEY_END,
-        "insert" => GHOSTTY_KEY_INSERT,
-        "delete" => GHOSTTY_KEY_DELETE,
-        "pageup" => GHOSTTY_KEY_PAGE_UP,
-        "pagedown" => GHOSTTY_KEY_PAGE_DOWN,
-        "space" | " " => GHOSTTY_KEY_SPACE,
-        "[" | "{" => GHOSTTY_KEY_BRACKET_LEFT,
-        "]" | "}" => GHOSTTY_KEY_BRACKET_RIGHT,
-        "\\" | "|" => GHOSTTY_KEY_BACKSLASH,
-        "/" | "?" => GHOSTTY_KEY_SLASH,
-        "-" | "_" => GHOSTTY_KEY_MINUS,
-        "=" | "+" => GHOSTTY_KEY_EQUAL,
-        "`" | "~" => GHOSTTY_KEY_BACKQUOTE,
-        ";" | ":" => GHOSTTY_KEY_SEMICOLON,
-        "'" | "\"" => GHOSTTY_KEY_QUOTE,
-        "," | "<" => GHOSTTY_KEY_COMMA,
-        "." | ">" => GHOSTTY_KEY_PERIOD,
-        "!" => GHOSTTY_KEY_DIGIT_1,
-        "@" => GHOSTTY_KEY_DIGIT_2,
-        "#" => GHOSTTY_KEY_DIGIT_3,
-        "$" => GHOSTTY_KEY_DIGIT_4,
-        "%" => GHOSTTY_KEY_DIGIT_5,
-        "^" => GHOSTTY_KEY_DIGIT_6,
-        "&" => GHOSTTY_KEY_DIGIT_7,
-        "*" => GHOSTTY_KEY_DIGIT_8,
-        "(" => GHOSTTY_KEY_DIGIT_9,
-        ")" => GHOSTTY_KEY_DIGIT_0,
-        value if value.len() == 1 && value.as_bytes()[0].is_ascii_alphabetic() => {
-            GHOSTTY_KEY_A + (value.as_bytes()[0].to_ascii_lowercase() - b'a') as GhosttyKey
-        }
-        value if value.len() == 1 && value.as_bytes()[0].is_ascii_digit() => {
-            GHOSTTY_KEY_DIGIT_0 + (value.as_bytes()[0] - b'0') as GhosttyKey
-        }
-        value if value.chars().count() == 1 => GHOSTTY_KEY_UNIDENTIFIED,
-        value => {
-            let number: u32 = value.strip_prefix('f')?.parse().ok()?;
-            if !(1..=24).contains(&number) {
-                return None;
-            }
-            GHOSTTY_KEY_F1 + number as GhosttyKey - 1
-        }
+    use rmux_core::keyboard::{key as shared_key, Key};
+    Some(match shared_key(key)? {
+        Key::Enter => GHOSTTY_KEY_ENTER,
+        Key::Backspace => GHOSTTY_KEY_BACKSPACE,
+        Key::Tab => GHOSTTY_KEY_TAB,
+        Key::Escape => GHOSTTY_KEY_ESCAPE,
+        Key::ArrowUp => GHOSTTY_KEY_ARROW_UP,
+        Key::ArrowDown => GHOSTTY_KEY_ARROW_DOWN,
+        Key::ArrowLeft => GHOSTTY_KEY_ARROW_LEFT,
+        Key::ArrowRight => GHOSTTY_KEY_ARROW_RIGHT,
+        Key::Home => GHOSTTY_KEY_HOME,
+        Key::End => GHOSTTY_KEY_END,
+        Key::Insert => GHOSTTY_KEY_INSERT,
+        Key::Delete => GHOSTTY_KEY_DELETE,
+        Key::PageUp => GHOSTTY_KEY_PAGE_UP,
+        Key::PageDown => GHOSTTY_KEY_PAGE_DOWN,
+        Key::Space => GHOSTTY_KEY_SPACE,
+        Key::BracketLeft => GHOSTTY_KEY_BRACKET_LEFT,
+        Key::BracketRight => GHOSTTY_KEY_BRACKET_RIGHT,
+        Key::Backslash => GHOSTTY_KEY_BACKSLASH,
+        Key::Slash => GHOSTTY_KEY_SLASH,
+        Key::Minus => GHOSTTY_KEY_MINUS,
+        Key::Equal => GHOSTTY_KEY_EQUAL,
+        Key::Backquote => GHOSTTY_KEY_BACKQUOTE,
+        Key::Semicolon => GHOSTTY_KEY_SEMICOLON,
+        Key::Quote => GHOSTTY_KEY_QUOTE,
+        Key::Comma => GHOSTTY_KEY_COMMA,
+        Key::Period => GHOSTTY_KEY_PERIOD,
+        Key::Digit1 => GHOSTTY_KEY_DIGIT_1,
+        Key::Digit2 => GHOSTTY_KEY_DIGIT_2,
+        Key::Digit3 => GHOSTTY_KEY_DIGIT_3,
+        Key::Digit4 => GHOSTTY_KEY_DIGIT_4,
+        Key::Digit5 => GHOSTTY_KEY_DIGIT_5,
+        Key::Digit6 => GHOSTTY_KEY_DIGIT_6,
+        Key::Digit7 => GHOSTTY_KEY_DIGIT_7,
+        Key::Digit8 => GHOSTTY_KEY_DIGIT_8,
+        Key::Digit9 => GHOSTTY_KEY_DIGIT_9,
+        Key::Digit0 => GHOSTTY_KEY_DIGIT_0,
+        Key::Letter(index) => GHOSTTY_KEY_A + GhosttyKey::from(index),
+        Key::Function(number) => GHOSTTY_KEY_F1 + GhosttyKey::from(number) - 1,
+        Key::Character(_) => GHOSTTY_KEY_UNIDENTIFIED,
     })
 }
 

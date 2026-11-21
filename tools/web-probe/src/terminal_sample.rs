@@ -26,8 +26,8 @@ impl TerminalSample {
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
         if key.modifiers.platform || key.modifiers.control || key.modifiers.alt { return; }
-        match key.key.as_str() {
-            "enter" => {
+        match rmux_core::keyboard::key(&key.key) {
+            Some(rmux_core::keyboard::Key::Enter) => {
                 self.engine.write("\r\n");
                 let response = match self.command.trim() {
                     "help" => "Sample commands: help, clear, ls\r\nNo shell or server access.\r\n",
@@ -40,7 +40,7 @@ impl TerminalSample {
                 self.engine.write("$ ");
                 self.command.clear();
             }
-            "backspace" if !self.command.is_empty() => {
+            Some(rmux_core::keyboard::Key::Backspace) if !self.command.is_empty() => {
                 self.command.pop(); self.engine.write("\x08 \x08");
             }
             _ => {

@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Moved symbolic terminal key normalization, modifiers and press/repeat/release
+identity into rmux-core::keyboard. Native keyboard encoding maps shared symbols
+to Ghostty FFI constants; the browser sample handler uses the same normalization
+for control keys. Shifted punctuation/letter aliases, distinct Unicode and F1–F24
+bounds are covered by a focused core test; all eight native keyboard tests pass,
+including negotiated press/repeat/release encoding. WASM check passes. Browser
+IME, full Ghostty key encoding and a shared terminal input view remain pending;
+this extraction does not claim full input parity or expand sample-shell commands.
+
 Added browser tab close controls, middle-click and Cmd+W. Closing a tab drops
 its terminal entity/engine; selection adjustment follows native behavior and
 only replaces keyboard focus when the closed terminal held it. Empty panes emit

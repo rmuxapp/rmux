@@ -6,3 +6,4 @@ pub mod commands;
 pub mod palette_match;
 pub mod terminal_frame;
 pub mod terminal_runs;
+pub mod keyboard;
