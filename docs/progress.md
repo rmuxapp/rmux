@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Workspace navigation now belongs to shared `State`: logical ordering, cycle,
+numbered/last selection targets and sidebar-row resolution. Both hosts call the
+same methods, including pinned/group ordering and collapsed-member header mapping.
+Destination lookup is read-only; host focus/activation remains separate. Six
+focused lifecycle tests pass, including the new composed-state case for pin order,
+collapsed visibility, selection reveal, closed-history removal and empty-state
+navigation. Native and WASM checks pass. GitHub source dae6f46 finished successfully;
+workspace-state source 03a7d1d was still building when checked. Production remains
+on the previously recorded deployment.
+
 Both native `WorkspaceWindow` and browser `BrowserHost` now own
 `rmux_core::workspace_lifecycle::State`: workspace entries, active index, groups,
 and previous selection. Their select/insert/close/ungroup paths call state methods

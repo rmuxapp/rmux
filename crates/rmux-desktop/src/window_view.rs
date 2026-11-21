@@ -745,8 +745,7 @@ impl WorkspaceWindow {
         self.workspace_state.groups.containing(entry.workspace.entity_id()).map(|group| group.pinned).unwrap_or(entry.pinned)
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
-        let workspaces: Vec<_> = self.workspace_state.entries.iter().map(|entry| (entry.workspace.entity_id(), entry.pinned)).collect();
-        self.workspace_state.groups.ordered_indices(&workspaces, include_collapsed)
+        self.workspace_state.order(include_collapsed, |entry| (entry.workspace.entity_id(), entry.pinned))
     }
 
     fn ungroup_preserving_order(&mut self, id: u64) {
@@ -759,10 +758,7 @@ impl WorkspaceWindow {
     fn sidebar_order(&self) -> Vec<usize> { self.workspace_order(false) }
 
     fn scroll_to_workspace(&self, index: usize) {
-        let Some(entry) = self.workspace_state.entries.get(index) else { return; };
-        let visible = self.workspace_state.groups.visible_workspace(entry.workspace.entity_id());
-        if let Some(row) = self.sidebar_order().iter().position(|candidate|
-            self.workspace_state.entries[*candidate].workspace.entity_id() == visible) {
+        if let Some(row) = self.workspace_state.sidebar_row(index, |entry| (entry.workspace.entity_id(), entry.pinned)) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
@@ -2341,11 +2337,7 @@ impl WorkspaceWindow {
     }
 
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self
-            .workspace_state.entries
-            .iter()
-            .position(|entry| Some(entry.workspace.entity_id()) == self.workspace_state.previous.target())
-        {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Previous, |entry| (entry.workspace.entity_id(), entry.pinned)) {
             self.select(index, window, cx);
         }
     }
@@ -3949,12 +3941,8 @@ impl WorkspaceWindow {
     }
 
     fn cycle(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.workspace_state.entries.is_empty() {
-            return;
-        }
-        let order = self.workspace_order(true);
-        if let Some(next) = workspace_groups::cycle_target(&order, self.workspace_state.active, delta) {
-            self.select(next, window, cx);
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Cycle(delta), |entry| (entry.workspace.entity_id(), entry.pinned)) {
+            self.select(index, window, cx);
         }
     }
 
@@ -4083,7 +4071,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         }
     }
     fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = workspace_groups::numbered_target(&self.workspace_order(true), number) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Number(number), |entry| (entry.workspace.entity_id(), entry.pinned)) {
             self.select(index, window, cx);
         }
     }

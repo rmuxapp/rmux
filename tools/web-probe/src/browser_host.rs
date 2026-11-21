@@ -79,25 +79,20 @@ impl BrowserHost {
         cx.notify();
     }
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.workspace_state.entries.iter().position(|(_, entity)|
-            Some(entity.entity_id()) == self.workspace_state.previous.target()) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Previous, |(_, entity)| (entity.entity_id(), false)) {
             self.select(index, window, cx);
         }
     }
     fn scroll_to_workspace(&self) {
-        let Some((_, entity)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let visible = self.workspace_state.groups.visible_workspace(entity.entity_id());
-        if let Some(row) = self.workspace_order(false).iter().position(|index|
-            self.workspace_state.entries[*index].1.entity_id() == visible) {
+        if let Some(row) = self.workspace_state.sidebar_row(self.workspace_state.active, |(_, entity)| (entity.entity_id(), false)) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
-        let entries: Vec<_> = self.workspace_state.entries.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
-        self.workspace_state.groups.ordered_indices(&entries, include_collapsed)
+        self.workspace_state.order(include_collapsed, |(_, entity)| (entity.entity_id(), false))
     }
-    fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = rmux_core::workspace_groups::cycle_target(&self.workspace_order(true), self.workspace_state.active, direction) {
+    fn cycle(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Cycle(delta), |(_, entity)| (entity.entity_id(), false)) {
             self.select(index, window, cx);
         }
     }
@@ -143,7 +138,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
         }
     }
     fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = rmux_core::workspace_groups::numbered_target(&self.workspace_order(true), number) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Number(number), |(_, entity)| (entity.entity_id(), false)) {
             self.select(index, window, cx);
         }
     }

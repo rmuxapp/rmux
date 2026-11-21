@@ -15,7 +15,29 @@ impl<T, W> Default for State<T, W> {
         Self { entries: Vec::new(), active: 0, groups: Groups::default(), previous: PreviousSelection::default() }
     }
 }
+/// Resolve a destination without changing focus or selection.
+#[derive(Clone, Copy)]
+pub enum Navigation { Cycle(isize), Number(usize), Previous }
+
 impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
+    pub fn order(&self, include_collapsed: bool, metadata: impl Fn(&T) -> (W, bool)) -> Vec<usize> {
+        let identities: Vec<_> = self.entries.iter().map(metadata).collect();
+        self.groups.ordered_indices(&identities, include_collapsed)
+    }
+    pub fn navigation_target(&self, request: Navigation, metadata: impl Fn(&T) -> (W, bool)) -> Option<usize> {
+        match request {
+            Navigation::Previous => {
+                let previous = self.previous.target()?;
+                self.entries.iter().position(|entry| metadata(entry).0 == previous)
+            }
+            Navigation::Cycle(delta) => workspace_groups::cycle_target(&self.order(true, metadata), self.active, delta),
+            Navigation::Number(number) => workspace_groups::numbered_target(&self.order(true, metadata), number),
+        }
+    }
+    pub fn sidebar_row(&self, index: usize, metadata: impl Fn(&T) -> (W, bool)) -> Option<usize> {
+        let visible = self.groups.visible_workspace(metadata(self.entries.get(index)?).0);
+        self.order(false, &metadata).iter().position(|index| metadata(&self.entries[*index]).0 == visible)
+    }
     pub fn select(&mut self, index: usize, key: impl Fn(&T) -> W) -> bool {
         select(&self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, key)
     }
@@ -149,6 +171,32 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn state_navigation_tracks_group_order_visibility_and_closed_history() {
+        let mut state = State { entries: vec![(1, false), (2, true), (3, false), (4, false)], ..Default::default() };
+        let group = state.groups.create("group".into(), vec![1, 4], false).unwrap();
+        state.groups.get_mut(group).unwrap().collapsed = true;
+        assert_eq!(state.order(true, |entry| *entry), vec![1, 0, 3, 2]);
+        assert_eq!(state.order(false, |entry| *entry), vec![1, 0, 2]);
+        assert_eq!(state.sidebar_row(3, |entry| *entry), Some(1));
+        assert_eq!(state.sidebar_row(99, |entry| *entry), None);
+        assert_eq!(state.navigation_target(Navigation::Number(1), |entry| *entry), Some(1));
+        assert_eq!(state.navigation_target(Navigation::Number(9), |entry| *entry), Some(2));
+        assert_eq!(state.navigation_target(Navigation::Cycle(1), |entry| *entry), Some(3));
+        assert_eq!(state.navigation_target(Navigation::Cycle(-1), |entry| *entry), Some(1));
+        // Target lookup alone must not reveal a collapsed group or change MRU.
+        assert!(state.groups.entries().iter().find(|entry| entry.id == group).unwrap().collapsed);
+        assert!(state.select(3, |entry| entry.0));
+        assert!(!state.groups.entries().iter().find(|entry| entry.id == group).unwrap().collapsed);
+        assert_eq!(state.navigation_target(Navigation::Previous, |entry| *entry), Some(0));
+        state.close(0, |entry| *entry).unwrap();
+        assert_eq!(state.navigation_target(Navigation::Previous, |entry| *entry), None);
+        assert_eq!(state.entries[state.active].0, 4);
+        let empty: State<(i32, bool), i32> = State::default();
+        assert_eq!(empty.navigation_target(Navigation::Cycle(1), |entry| *entry), None);
+        assert_eq!(empty.navigation_target(Navigation::Number(9), |entry| *entry), None);
+    }
 
     #[test]
     fn insertion_preserves_outgoing_identity_and_group_member_order() {

@@ -148,7 +148,8 @@ complete the shared application/session architecture. Production deployment is p
 
 Native and browser hosts now own the same generic `workspace_lifecycle::State`
 containing entries, selection, groups and previous selection. Core lifecycle
-methods operate on this state. Entries still contain platform-specific views;
+methods operate on this state. Logical navigation and sidebar-row resolution also
+use the shared state, including pinned order, collapsed groups and MRU targets. Entries still contain platform-specific views;
 restoration/metadata code retains field access during migration. This removes
 separate ownership models without claiming a shared top-level application yet.
 Native live-shell transfer/merge checks and browser create/switch/close checks
