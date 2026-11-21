@@ -624,7 +624,7 @@ impl PaneView {
         if tabs.is_empty() {
             return;
         }
-        let selected = self.terminals.len() + active.min(tabs.len() - 1);
+        let mut incoming = Vec::with_capacity(tabs.len());
         for tab in tabs {
             let title = cx.subscribe(&tab.terminal, |this, _, _: &TabMetadataChanged, cx| {
                 this.reconcile_tab_picker(cx);
@@ -632,9 +632,10 @@ impl PaneView {
                 cx.notify();
             });
             self.titles.insert(tab.terminal.entity_id(), title);
-            self.terminals.push(tab.terminal);
+            incoming.push(tab.terminal);
             self.labels.push(tab.label);
         }
+        let selected = self.terminals.append(incoming, active).expect("nonempty transfer checked above");
         cx.emit(PaneMetadataChanged);
         // Select only once, without acknowledging other unread tabs in transit.
         self.select(selected, window, cx);

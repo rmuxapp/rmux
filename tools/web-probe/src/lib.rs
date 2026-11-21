@@ -32,6 +32,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::SplitLeft, CommandId::SplitAbove, CommandId::TogglePaneZoom,
+    CommandId::JoinPaneNext, CommandId::JoinPaneLeft, CommandId::JoinPaneRight, CommandId::JoinPaneUp, CommandId::JoinPaneDown,
     CommandId::SwapPaneNext, CommandId::SwapPaneLeft, CommandId::SwapPaneRight,
     CommandId::SwapPaneUp, CommandId::SwapPaneDown,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
@@ -45,7 +46,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -132,6 +133,33 @@ impl InputProbe {
         self.close_palette(window, cx);
     }
 
+    fn join_pane(&mut self, direction: Option<rmux_core::layout::Direction>, was_dragging: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.zoomed || was_dragging {
+            self.feedback = Some("Finish resizing and unzoom before joining panes.".into());
+            cx.notify(); return;
+        }
+        let Some(tree) = &self.tree else { return; };
+        let target = match direction {
+            Some(direction) => tree.neighbor(&self.focused, direction),
+            None => rmux_core::pane_commands::cycle(tree, Some(&self.focused), 1),
+        };
+        let Some(target) = target.filter(|target| *target != self.focused) else { return; };
+        let source = self.samples[&self.focused].clone();
+        let destination = self.samples[&target].clone();
+        if source.read(cx).tab_count() + destination.read(cx).tab_count() > 16 {
+            self.feedback = Some("Joining would exceed the demo limit of 16 tabs per pane.".into());
+            cx.notify(); return;
+        }
+        // No event-loop yield between validation and ownership transfer. Keep
+        // terminal entities/labels alive and focus the source's active tab once.
+        let tabs = source.update(cx, |pane, cx| pane.take_all_tabs(cx));
+        destination.update(cx, |pane, cx| pane.append_tabs(tabs, window, cx));
+        self.tree = self.tree.take().and_then(|tree| tree.remove(&self.focused));
+        self.samples.remove(&self.focused);
+        self.focused = target;
+        cx.notify();
+    }
+
     fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(next) = self.tree.as_ref().and_then(|tree|
             rmux_core::pane_commands::cycle(tree, Some(&self.focused), direction)) {
@@ -215,7 +243,9 @@ impl InputProbe {
         } else { self.execute(command, window, cx); }
     }
     fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        let was_dragging = self.split_drag.is_some();
         self.split_drag = None;
+        self.feedback = None;
         if let Some(action) = tab_action(command) {
             // Restore terminal focus before dispatching, just like the native
             // palette. Actions then use the same handlers as keyboard input.
@@ -228,6 +258,17 @@ impl InputProbe {
             return;
         }
         match command {
+            command @ (CommandId::JoinPaneNext | CommandId::JoinPaneLeft | CommandId::JoinPaneRight | CommandId::JoinPaneUp | CommandId::JoinPaneDown) => {
+                use rmux_core::layout::Direction;
+                let direction = match command {
+                    CommandId::JoinPaneLeft => Some(Direction::Left),
+                    CommandId::JoinPaneRight => Some(Direction::Right),
+                    CommandId::JoinPaneUp => Some(Direction::Up),
+                    CommandId::JoinPaneDown => Some(Direction::Down),
+                    _ => None,
+                };
+                self.join_pane(direction, was_dragging, window, cx);
+            }
             CommandId::ScrollToTop | CommandId::ScrollToBottom => {
                 let scroll = if command == CommandId::ScrollToTop { rmux_core::scroll::Scroll::Top } else { rmux_core::scroll::Scroll::Bottom };
                 if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.scroll(scroll,cx)); }
@@ -340,6 +381,8 @@ impl Render for InputProbe {
                         this.open_palette(window, cx);
                     }))))
             .child(div().flex_1().min_h_0().relative().child(split_interaction::drag_capture(cx)).child(panes))
+            .when_some(self.feedback.clone().filter(|_| !self.palette_open), |root, message|
+                root.child(div().flex_shrink_0().px_3().py_2().text_sm().text_color(rgb(0xf0b85b)).child(message)))
             .when(self.palette_open, |root| root.child(div().absolute().inset_0().bg(rgba(0x00000066))
                 .flex().items_start().justify_center().pt(px(palette_view::top_inset(height)))
                 .child(palette_view::panel(height)

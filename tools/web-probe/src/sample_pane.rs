@@ -9,7 +9,29 @@ pub(crate) struct SamplePane {
     next_number: usize,
     tab_scroll: ScrollHandle,
 }
+pub(crate) struct TabTransfer {
+    terminals: Vec<Entity<TerminalSample>>,
+    labels: std::collections::HashMap<EntityId, String>,
+    active: usize,
+    next_number: usize,
+}
 impl SamplePane {
+    pub fn tab_count(&self) -> usize { self.terminals.len() }
+    pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> TabTransfer {
+        let active = self.terminals.active_index();
+        let transfer = TabTransfer { terminals: self.terminals.take_all(),
+            labels: std::mem::take(&mut self.labels), active, next_number: self.next_number };
+        cx.notify();
+        transfer
+    }
+    pub fn append_tabs(&mut self, transfer: TabTransfer, window: &mut Window, cx: &mut Context<Self>) {
+        self.labels.extend(transfer.labels);
+        self.next_number = self.next_number.max(transfer.next_number);
+        if let Some(selected) = self.terminals.append(transfer.terminals, transfer.active) {
+            self.select(selected, window, cx);
+        }
+    }
+
     pub fn scroll(&self, scroll: rmux_core::scroll::Scroll, cx: &mut App) {
         if let Some(terminal) = self.terminals.active() {
             terminal.update(cx, |terminal,cx| terminal.scroll(scroll,cx));

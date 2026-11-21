@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser now supports Join Pane into Next/Left/Right/Up/Down through the shared
+pane action routing. Native and browser append transferred tabs using the same
+core ordering/selection rule, then perform host subscriptions/cache cleanup and
+focus exactly once. Browser joining retains terminal entities and labels, removes
+the empty source split, blocks zoom/resizing and enforces its 16-tab pane limit
+before ownership changes. Command failures now remain visible outside the palette.
+Focused transfer test, desktop check and WASM build pass. Browser smoke joined a
+two-tab source into a one-tab destination, verified all three outputs and retained
+typing focus on the source's active tab. Screenshot: target/shared-pane-join.jpg.
+Native runtime and browser capacity/zoom rejection UI not re-tested. Not deployed.
+
 Pane keyboard/action routing now uses one shared GPUI module in both hosts for
 19 split/focus/zoom/resize/swap commands plus next/previous pane. Both palettes
 use its action factory; the browser restores focus and dispatches pane actions

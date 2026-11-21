@@ -3169,6 +3169,12 @@ impl pane_actions::PaneCommandHost for Workspace {
             CommandId::TogglePaneZoom => self.toggle_zoom(window, cx),
             CommandId::EqualizePanes => self.equalize_panes(cx),
             CommandId::SwapPaneNext => self.swap_pane_next(window, cx),
+            CommandId::JoinPaneNext => self.join_pane_next(window, cx),
+            CommandId::JoinPaneLeft => self.join_pane_direction(layout::Direction::Left, window, cx),
+            CommandId::JoinPaneRight => self.join_pane_direction(layout::Direction::Right, window, cx),
+            CommandId::JoinPaneUp => self.join_pane_direction(layout::Direction::Up, window, cx),
+            CommandId::JoinPaneDown => self.join_pane_direction(layout::Direction::Down, window, cx),
+
             CommandId::ResizePaneLeft => self.resize_pane(layout::Direction::Left, window, cx),
             CommandId::ResizePaneRight => self.resize_pane(layout::Direction::Right, window, cx),
             CommandId::ResizePaneUp => self.resize_pane(layout::Direction::Up, window, cx),
@@ -3206,21 +3212,6 @@ impl Render for Workspace {
             .flex_col()
             .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CancelSplit, _, cx| this.cancel_split(cx)))
-            .on_action(
-                cx.listener(|view, _: &JoinPaneNext, window, cx| view.join_pane_next(window, cx)),
-            )
-            .on_action(cx.listener(|view, _: &JoinPaneLeft, window, cx| {
-                view.join_pane_direction(layout::Direction::Left, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &JoinPaneRight, window, cx| {
-                view.join_pane_direction(layout::Direction::Right, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &JoinPaneUp, window, cx| {
-                view.join_pane_direction(layout::Direction::Up, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &JoinPaneDown, window, cx| {
-                view.join_pane_direction(layout::Direction::Down, window, cx)
-            }))
             .on_action(cx.listener(|view, _: &BreakTabLeft, window, cx| {
                 view.break_tab(SplitAxis::Columns, true, window, cx)
             }))

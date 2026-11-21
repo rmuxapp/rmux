@@ -28,6 +28,14 @@ impl<T> Tabs<T> {
         self.swap(from, to);
         Some((from, to))
     }
+    /// Append transferred tabs and resolve the incoming active tab. Keep the
+    /// existing selection until the host finishes subscriptions/cache cleanup.
+    pub fn append(&mut self, items: Vec<T>, active: usize) -> Option<usize> {
+        if items.is_empty() { return None; }
+        let selected = self.items.len() + active.min(items.len() - 1);
+        self.items.extend(items);
+        Some(selected)
+    }
     pub fn push(&mut self, item: T) { self.items.push(item); }
     /// Keep the selected tab when inserting before it. The host may then select
     /// the inserted tab explicitly, after completing subscriptions and focus.
@@ -72,6 +80,20 @@ impl<T> IntoIterator for Tabs<T> {
 #[cfg(test)]
 mod tests {
     use super::Tabs;
+    #[test]
+    fn joining_tabs_preserves_order_and_incoming_selection() {
+        let mut source = Tabs::new(vec!["source-a", "source-b"], 1);
+        let mut target = Tabs::new(vec!["target"], 0);
+        let active = source.active_index();
+        let selected = target.append(source.take_all(), active).unwrap();
+        assert!(source.is_empty());
+        assert_eq!(target.active(), Some(&"target"));
+        target.select(selected);
+        assert_eq!(&*target, &["target", "source-a", "source-b"]);
+        assert_eq!(target.active(), Some(&"source-b"));
+        assert_eq!(target.append(vec![], 99), None);
+        assert_eq!(target.active(), Some(&"source-b"));
+    }
     #[test]
     fn moving_keeps_the_same_tab_selected_without_wrapping() {
         let mut tabs=Tabs::new(vec!["a","b","c"],0);
