@@ -3170,6 +3170,11 @@ impl pane_actions::PaneCommandHost for Workspace {
             CommandId::EqualizePanes => self.equalize_panes(cx),
             CommandId::SwapPaneNext => self.swap_pane_next(window, cx),
             CommandId::JoinPaneNext => self.join_pane_next(window, cx),
+            CommandId::BreakTabRight => self.break_tab(SplitAxis::Columns, false, window, cx),
+            CommandId::BreakTabBelow => self.break_tab(SplitAxis::Rows, false, window, cx),
+            CommandId::BreakTabLeft => self.break_tab(SplitAxis::Columns, true, window, cx),
+            CommandId::BreakTabAbove => self.break_tab(SplitAxis::Rows, true, window, cx),
+
             CommandId::JoinPaneLeft => self.join_pane_direction(layout::Direction::Left, window, cx),
             CommandId::JoinPaneRight => self.join_pane_direction(layout::Direction::Right, window, cx),
             CommandId::JoinPaneUp => self.join_pane_direction(layout::Direction::Up, window, cx),
@@ -3212,18 +3217,6 @@ impl Render for Workspace {
             .flex_col()
             .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CancelSplit, _, cx| this.cancel_split(cx)))
-            .on_action(cx.listener(|view, _: &BreakTabLeft, window, cx| {
-                view.break_tab(SplitAxis::Columns, true, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &BreakTabAbove, window, cx| {
-                view.break_tab(SplitAxis::Rows, true, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &BreakTabRight, window, cx| {
-                view.break_tab(SplitAxis::Columns, false, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &BreakTabBelow, window, cx| {
-                view.break_tab(SplitAxis::Rows, false, window, cx)
-            }))
             .on_action(
                 cx.listener(|view, _: &DumpRenderMetrics, window, cx| {
                     view.dump_metrics(window, cx)

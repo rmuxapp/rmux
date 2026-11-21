@@ -1,7 +1,7 @@
 //! Shared event routing for pane commands; hosts supply session/platform work.
 use gpui::{prelude::*, *};
 use rmux_core::commands::CommandId;
-use crate::{Split, SplitBelow, SplitLeft, SplitAbove, TogglePaneZoom, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, FocusLeft, FocusRight, FocusUp, FocusDown, NextPane, PreviousPane};
+use crate::{Split, SplitBelow, SplitLeft, SplitAbove, TogglePaneZoom, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, JoinPaneNext, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, FocusLeft, FocusRight, FocusUp, FocusDown, NextPane, PreviousPane};
 
 pub(crate) trait PaneCommandHost: Sized + 'static {
     fn run_pane_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>);
@@ -21,4 +21,4 @@ macro_rules! pane_commands {
         }
     };
 }
-pane_commands! {Split, SplitBelow, SplitLeft, SplitAbove, TogglePaneZoom, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, FocusLeft, FocusRight, FocusUp, FocusDown }
+pane_commands! {Split, SplitBelow, SplitLeft, SplitAbove, TogglePaneZoom, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, JoinPaneNext, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, FocusLeft, FocusRight, FocusUp, FocusDown }

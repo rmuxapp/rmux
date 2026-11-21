@@ -32,6 +32,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::SplitLeft, CommandId::SplitAbove, CommandId::TogglePaneZoom,
+    CommandId::BreakTabRight, CommandId::BreakTabBelow, CommandId::BreakTabLeft, CommandId::BreakTabAbove,
     CommandId::JoinPaneNext, CommandId::JoinPaneLeft, CommandId::JoinPaneRight, CommandId::JoinPaneUp, CommandId::JoinPaneDown,
     CommandId::SwapPaneNext, CommandId::SwapPaneLeft, CommandId::SwapPaneRight,
     CommandId::SwapPaneUp, CommandId::SwapPaneDown,
@@ -46,7 +47,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -108,6 +109,9 @@ impl InputProbe {
 
     fn add_pane(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
         let pane = cx.new(|cx| sample_pane::SamplePane::new(window,cx));
+        self.register_pane(id, pane, window, cx);
+    }
+    fn register_pane(&mut self, id: usize, pane: Entity<sample_pane::SamplePane>, window: &mut Window, cx: &mut Context<Self>) {
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
             this.split_drag = None;
             let next = this.tree.as_ref().and_then(|tree|
@@ -131,6 +135,36 @@ impl InputProbe {
         self.tree = Some(PaneTree::Pane(id));
         self.focused = id;
         self.close_palette(window, cx);
+    }
+
+    fn break_tab(&mut self, axis: Axis, before: bool, was_dragging: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if was_dragging {
+            self.feedback = Some("Finish resizing before moving tabs.".into());
+            cx.notify(); return;
+        }
+        let Some(source) = self.samples.get(&self.focused).cloned() else { return; };
+        if source.read(cx).tab_count() < 2 { return; }
+        if self.samples.len() >= 16 {
+            self.feedback = Some("Demo limit: 16 panes".into());
+            cx.notify(); return;
+        }
+        let id = self.next_pane;
+        if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), id, axis, before).is_none() {
+            self.feedback = Some("Cannot add another split at this nesting depth.".into());
+            cx.notify(); return;
+        }
+        // The destination is accepted before releasing the source's ownership.
+        // No terminal is spawned and no event-loop yield occurs during transfer.
+        let Some(transfer) = source.update(cx, |pane, cx| pane.take_active_for_split(cx)) else {
+            self.tree = self.tree.take().and_then(|tree| tree.remove(&id));
+            return;
+        };
+        let pane = cx.new(|_| sample_pane::SamplePane::from_transfer(transfer));
+        self.register_pane(id, pane, window, cx);
+        self.focused = id;
+        self.next_pane += 1;
+        self.zoomed = false;
+        cx.notify();
     }
 
     fn join_pane(&mut self, direction: Option<rmux_core::layout::Direction>, was_dragging: bool, window: &mut Window, cx: &mut Context<Self>) {
@@ -258,6 +292,11 @@ impl InputProbe {
             return;
         }
         match command {
+            command @ (CommandId::BreakTabRight | CommandId::BreakTabBelow | CommandId::BreakTabLeft | CommandId::BreakTabAbove) => {
+                let axis = if matches!(command, CommandId::BreakTabRight | CommandId::BreakTabLeft) { Axis::Columns } else { Axis::Rows };
+                let before = matches!(command, CommandId::BreakTabLeft | CommandId::BreakTabAbove);
+                self.break_tab(axis, before, was_dragging, window, cx);
+            }
             command @ (CommandId::JoinPaneNext | CommandId::JoinPaneLeft | CommandId::JoinPaneRight | CommandId::JoinPaneUp | CommandId::JoinPaneDown) => {
                 use rmux_core::layout::Direction;
                 let direction = match command {

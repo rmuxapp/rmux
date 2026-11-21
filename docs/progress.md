@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser now supports Move Tab to Split Right/Below/Left/Above through the shared
+pane action factory/handlers. It validates capacity/layout acceptance before
+taking the active tab, builds a pane around the existing entity and label, keeps
+the source's neighboring tab selected, and exits zoom. No terminal is created.
+Desktop handlers use the same routing; native session transfer behavior remains
+in its host. Desktop check and WASM build pass. Browser smoke moved Terminal 2
+right, continued input, and joined it back into Terminal 1's pane with title and
+output preserved. Screenshot: target/shared-tab-split.jpg. Other directions and
+rejection boundaries were not browser-tested this cycle. Not deployed yet.
+
 Browser now supports Join Pane into Next/Left/Right/Up/Down through the shared
 pane action routing. Native and browser append transferred tabs using the same
 core ordering/selection rule, then perform host subscriptions/cache cleanup and
