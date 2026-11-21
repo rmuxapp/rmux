@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser workspace descriptions now use the shared desktop command action,
+TextField editor and description normalization (trimmed, control-free, 256
+characters). The sidebar uses native selected/unselected description colors.
+Local WASM build and native desktop check pass. Browser UI checks cover saving,
+cancelling and clearing a description; screenshot:
+`target/browser-workspace-description.jpg`. Metadata remains session-local in
+the browser and resets on reload. This change is not yet deployed.
+
 Rebuilt native desktop/CLI and ran the live-shell RPC fixture at 59d83de with
 queued focus/key input. All checks pass: pane swap/zoom guards, cross-window tab
 and workspace transfers, same/cross-window merge, retained nested layouts,

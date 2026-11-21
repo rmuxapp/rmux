@@ -1,6 +1,10 @@
 //! Workspace ownership transitions, shared by native and browser applications.
 use crate::{focus_trail::PreviousSelection, workspace_groups::{self, Groups}};
 
+pub fn normalized_description(text: &str) -> String {
+    text.trim().chars().filter(|c| !c.is_control()).take(256).collect()
+}
+
 pub fn normalized_name(text: &str) -> Option<String> {
     let name: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
     let name = name.trim().to_owned();

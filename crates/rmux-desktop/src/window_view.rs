@@ -3846,7 +3846,7 @@ impl WorkspaceWindow {
                                 MetadataField::GroupName | MetadataField::GroupColor | MetadataField::GroupIcon => {}
                                 MetadataField::Icon => entry.icon = (!text.is_empty()).then(|| text.to_owned()),
                                 MetadataField::Color => entry.color = color,
-                                MetadataField::Description => entry.description = text.chars().filter(|c| !c.is_control()).take(256).collect(),
+                                MetadataField::Description => entry.description = rmux_core::workspace_lifecycle::normalized_description(text),
                                 MetadataField::Name => {
                                     if let Some(name) = normalized_workspace_name(text) { entry.name = name; }
                                 }
@@ -3965,6 +3965,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
+            CommandId::EditWorkspaceDescription => self.edit_metadata(MetadataField::Description, window, cx),
             CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
             CommandId::CloseWorkspaceGroup => self.request_close_group(window, cx),
             CommandId::ToggleWorkspacePin => self.toggle_workspace_pin(cx),
@@ -4254,7 +4255,6 @@ impl Render for WorkspaceWindow {
                     this.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &EditWorkspaceDescription, window, cx| this.edit_metadata(MetadataField::Description, window, cx)))
             .on_action(cx.listener(|this, _: &EditWorkspaceIcon, window, cx| this.edit_metadata(MetadataField::Icon, window, cx)))
             .on_action(cx.listener(|this, _: &EditWorkspaceColor, window, cx| this.edit_metadata(MetadataField::Color, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))

@@ -1,9 +1,11 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
 use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
+#[derive(Clone, Copy)]
+enum WorkspaceField { Name, GroupName, Description }
 pub(crate) struct BrowserHost {
     rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
-    workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool), EntityId>,
+    workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, String), EntityId>,
     sidebar: bool,
     sidebar_width: f32,
     sidebar_drag: Option<(Pixels, f32)>,
@@ -13,7 +15,7 @@ pub(crate) struct BrowserHost {
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
-            (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false)).collect();
+            (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, String::new())).collect();
         let mut host = Self { rename: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
@@ -27,7 +29,7 @@ impl BrowserHost {
             match request {
                 PaletteRequest::Open => {
                     let workspaces = this.workspace_order(true).into_iter().enumerate().map(|(position, index)| {
-                        let (name, entity, _) = &this.workspace_state.entries[index];
+                        let (name, entity, _, _) = &this.workspace_state.entries[index];
                         (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
                     }).collect();
                     let groups = this.workspace_state.groups.entries().iter().map(|group|
@@ -35,7 +37,7 @@ impl BrowserHost {
                     source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, window, cx));
                 }
                 PaletteRequest::SelectWorkspace(id) => {
-                    if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity, _)| entity.entity_id() == *id) {
+                    if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity, _, _)| entity.entity_id() == *id) {
                         this.select(index, window, cx);
                     }
                 }
@@ -43,24 +45,28 @@ impl BrowserHost {
         }).detach();
         entity
     }
-    fn rename_workspace(&mut self, group: bool, window: &mut Window, cx: &mut Context<Self>) {
+    fn rename_workspace(&mut self, field: WorkspaceField, window: &mut Window, cx: &mut Context<Self>) {
         if let Some((_, input)) = &self.rename { input.read(cx).focus.clone().focus(window, cx); return; }
-        let Some((name, workspace, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let group = if group {
+        let Some((name, workspace, _, description)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let group = if matches!(field, WorkspaceField::GroupName) {
             let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
             Some(group)
         } else { None };
         let target = group.map_or(workspace.entity_id(), |group| group.members[0]);
-        let name = group.map_or(name, |group| &group.name);
+        let name = if matches!(field, WorkspaceField::Description) { description } else { group.map_or(name, |group| &group.name) };
         let group_id = group.map(|group| group.id);
         let input = cx.new(|cx| crate::text_field::TextField::new(name, cx));
         cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
             match event {
                 crate::text_field::EditEvent::Submitted { text, .. } => {
-                    if let Some(name) = rmux_core::workspace_lifecycle::normalized_name(text) {
+                    if matches!(field, WorkspaceField::Description) {
+                        if let Some(entry) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _, _)| workspace.entity_id() == target) {
+                            entry.3 = rmux_core::workspace_lifecycle::normalized_description(text);
+                        }
+                    } else if let Some(name) = rmux_core::workspace_lifecycle::normalized_name(text) {
                         if let Some(id) = group_id {
                             if let Some(group) = this.workspace_state.groups.get_mut(id) { group.name = name; }
-                        } else if let Some((label, workspace, _)) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _)| workspace.entity_id() == target) {
+                        } else if let Some((label, workspace, _, _)) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _, _)| workspace.entity_id() == target) {
                             *label = name.clone();
                             workspace.update(cx, |workspace, cx| { workspace.name = name; cx.notify(); });
                         }
@@ -81,13 +87,13 @@ impl BrowserHost {
     fn close_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.rename = None;
         let index = self.workspace_state.active;
-        let Some(_closed) = self.workspace_state.close(index, |(_, entity, pinned)| (entity.entity_id(), *pinned),
+        let Some(_closed) = self.workspace_state.close(index, |(_, entity, pinned, _)| (entity.entity_id(), *pinned),
         ) else { return; };
         if self.workspace_state.entries.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
         else { self.select(self.workspace_state.active, window, cx); }
     }
     fn close_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let Some((_, workspace, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let Some((_, workspace, _, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
         let id = group.id;
         let members = group.members.clone();
@@ -95,18 +101,18 @@ impl BrowserHost {
         // Sample sessions have no external processes or unsaved local files.
         // Resolve each captured identity after the preceding close changes slots.
         for member in members.into_iter().rev() {
-            if let Some(index) = self.workspace_state.group_close_index(id, member, |(_, entity, _)| entity.entity_id()) {
-                self.workspace_state.close(index, |(_, entity, pinned)| (entity.entity_id(), *pinned));
+            if let Some(index) = self.workspace_state.group_close_index(id, member, |(_, entity, _, _)| entity.entity_id()) {
+                self.workspace_state.close(index, |(_, entity, pinned, _)| (entity.entity_id(), *pinned));
             }
         }
         if self.workspace_state.entries.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
         else { self.select(self.workspace_state.active, window, cx); }
     }
     fn ungroup(&mut self, cx: &mut Context<Self>) {
-        let Some((_, selected, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let Some((_, selected, _, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let Some(group) = self.workspace_state.groups.containing(selected.entity_id()).map(|group| group.id) else { return; };
         if !self.workspace_state.ungroup(group,
-            |(_, entity, pinned)| (entity.entity_id(), *pinned),
+            |(_, entity, pinned, _)| (entity.entity_id(), *pinned),
         ) { return; }
         self.scroll_to_workspace();
         cx.notify();
@@ -120,7 +126,7 @@ impl BrowserHost {
                 pane.update(cx, |pane,cx| pane.release_render_caches(cx));
             }
         });
-        self.workspace_state.select(index, |(_, entity, _)| entity.entity_id(),
+        self.workspace_state.select(index, |(_, entity, _, _)| entity.entity_id(),
         );
         self.scroll_to_workspace();
         self.workspace_state.entries[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
@@ -129,26 +135,26 @@ impl BrowserHost {
     fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar = !self.sidebar;
         self.sidebar_drag = None;
-        if let Some((_, workspace, _)) = self.workspace_state.entries.get(self.workspace_state.active) {
+        if let Some((_, workspace, _, _)) = self.workspace_state.entries.get(self.workspace_state.active) {
             workspace.update(cx, |workspace, cx| workspace.close_palette(window, cx));
         } else { self.empty_focus.focus(window, cx); }
         cx.notify();
     }
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Previous, |(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Previous, |(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
             self.select(index, window, cx);
         }
     }
     fn scroll_to_workspace(&self) {
-        if let Some(row) = self.workspace_state.sidebar_row(self.workspace_state.active, |(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+        if let Some(row) = self.workspace_state.sidebar_row(self.workspace_state.active, |(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
-        self.workspace_state.order(include_collapsed, |(_, entity, pinned)| (entity.entity_id(), *pinned))
+        self.workspace_state.order(include_collapsed, |(_, entity, pinned, _)| (entity.entity_id(), *pinned))
     }
     fn cycle(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Cycle(delta), |(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Cycle(delta), |(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
             self.select(index, window, cx);
         }
     }
@@ -157,14 +163,14 @@ impl BrowserHost {
     }
     fn add_workspace(&mut self, inherit_group: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.workspace_state.entries.len() >= 16 { return false; }
-        let current = self.workspace_state.entries.get(self.workspace_state.active).map(|(_, entity, _)| entity.entity_id());
+        let current = self.workspace_state.entries.get(self.workspace_state.active).map(|(_, entity, _, _)| entity.entity_id());
         let name = (1..).map(|number| format!("Workspace {number}"))
-            .find(|name| !self.workspace_state.entries.iter().any(|(existing, _, _)| existing == name)).unwrap();
+            .find(|name| !self.workspace_state.entries.iter().any(|(existing, _, _, _)| existing == name)).unwrap();
         let entity = Self::new_workspace_view(name.clone(), window, cx);
-        let Ok(index) = self.workspace_state.insert((name, entity, false),
+        let Ok(index) = self.workspace_state.insert((name, entity, false, String::new()),
             rmux_core::workspace_lifecycle::Insertion {
                 origin: current, inherit_group, placement: Default::default(),
-            }, |(_, entity, pinned)| (entity.entity_id(), *pinned),
+            }, |(_, entity, pinned, _)| (entity.entity_id(), *pinned),
         ) else { return false; };
         self.select(index,window,cx);
         true
@@ -172,7 +178,7 @@ impl BrowserHost {
     fn create_group(&mut self, empty: bool, window: &mut Window, cx: &mut Context<Self>) {
         if empty && !self.add_workspace(false, window, cx) { return; }
         if self.workspace_state.entries.get(self.workspace_state.active).is_none() { return; }
-        self.workspace_state.create_group(self.workspace_state.active, empty, |(_, entity, _)| entity.entity_id())
+        self.workspace_state.create_group(self.workspace_state.active, empty, |(_, entity, _, _)| entity.entity_id())
             .expect("new workspace is a valid group anchor");
         self.sidebar = true;
         self.scroll_to_workspace();
@@ -182,7 +188,7 @@ impl BrowserHost {
 }
 impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
     fn move_workspace_to_group(&mut self, group: u64, cx: &mut Context<Self>) {
-        if self.workspace_state.move_to_group(self.workspace_state.active, group, |(_, entity, _)| entity.entity_id()).is_ok() {
+        if self.workspace_state.move_to_group(self.workspace_state.active, group, |(_, entity, _, _)| entity.entity_id()).is_ok() {
             self.scroll_to_workspace();
             cx.notify();
         }
@@ -192,19 +198,20 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
             CommandId::CloseWorkspaceGroup => self.close_group(window, cx),
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
             CommandId::ToggleWorkspacePin => {
-                if let Some((_, _, pinned)) = self.workspace_state.entries.get_mut(self.workspace_state.active) {
+                if let Some((_, _, pinned, _)) = self.workspace_state.entries.get_mut(self.workspace_state.active) {
                     *pinned = !*pinned;
                     self.scroll_to_workspace();
                     cx.notify();
                 }
             }
-            CommandId::RenameWorkspace => self.rename_workspace(false, window, cx),
-            CommandId::RenameWorkspaceGroup => self.rename_workspace(true, window, cx),
+            CommandId::EditWorkspaceDescription => self.rename_workspace(WorkspaceField::Description, window, cx),
+            CommandId::RenameWorkspace => self.rename_workspace(WorkspaceField::Name, window, cx),
+            CommandId::RenameWorkspaceGroup => self.rename_workspace(WorkspaceField::GroupName, window, cx),
             CommandId::NewWorkspace => self.add(window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
             CommandId::GroupSelectedWorkspaces => {
-                match self.workspace_state.group_sidebar_selection(|(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+                match self.workspace_state.group_sidebar_selection(|(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
                     Ok(Some(_)) => { self.sidebar = true; self.scroll_to_workspace(); cx.notify(); }
                     Ok(None) => cx.propagate(),
                     Err(error) => eprintln!("Could not group workspaces: {error}"),
@@ -221,14 +228,14 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
                     CommandId::SetGroupAnchor => GroupEdit::SetAnchor,
                     _ => GroupEdit::Remove,
                 };
-                if self.workspace_state.edit_group(self.workspace_state.active, edit, |(_, entity, _)| entity.entity_id()).unwrap_or(false) {
+                if self.workspace_state.edit_group(self.workspace_state.active, edit, |(_, entity, _, _)| entity.entity_id()).unwrap_or(false) {
                     self.scroll_to_workspace();
                     cx.notify();
                 }
             }
             command @ (CommandId::MoveWorkspaceUp | CommandId::MoveWorkspaceDown) => {
                 let delta = if command == CommandId::MoveWorkspaceUp { -1 } else { 1 };
-                if self.workspace_state.reorder(delta, |(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+                if self.workspace_state.reorder(delta, |(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
                     self.scroll_to_workspace();
                     cx.notify();
                 }
@@ -238,7 +245,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
         }
     }
     fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Number(number), |(_, entity, pinned)| (entity.entity_id(), *pinned)) {
+        if let Some(index) = self.workspace_state.navigation_target(rmux_core::workspace_lifecycle::Navigation::Number(number), |(_, entity, pinned, _)| (entity.entity_id(), *pinned)) {
             self.select(index, window, cx);
         }
     }
@@ -253,7 +260,7 @@ impl Render for BrowserHost {
             // Resolve palette commands here too, restoring the active terminal
             // context without changing sidebar selection.
             .on_action(cx.listener(|this, _: &crate::CommandPalette, window, cx| {
-                if let Some((_, workspace, _)) = this.workspace_state.entries.get(this.workspace_state.active) {
+                if let Some((_, workspace, _, _)) = this.workspace_state.entries.get(this.workspace_state.active) {
                     workspace.update(cx, |workspace, cx| {
                         workspace.focus_terminal(window, cx);
                         workspace.open_palette(window, cx);
@@ -267,7 +274,7 @@ impl Render for BrowserHost {
                         .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
                 .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
                     .children(self.workspace_order(false).into_iter().map(|index| {
-                        let (name, entity, pinned) = &self.workspace_state.entries[index];
+                        let (name, entity, pinned, description) = &self.workspace_state.entries[index];
                         let group = self.workspace_state.groups.containing(entity.entity_id());
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
                         let selected = self.workspace_state.sidebar_selection.contains(&entity.entity_id()) || index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
@@ -289,19 +296,20 @@ impl Render for BrowserHost {
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some()))))
+                            .when(!description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 div().flex().flex_col().gap_1().child(input.clone())
                                     .child(div().text_xs().child("Enter to save · Esc to cancel"))))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
-                                let Some((_, entity, _)) = this.workspace_state.entries.get(index) else { return; };
+                                let Some((_, entity, _, _)) = this.workspace_state.entries.get(index) else { return; };
                                 let target = entity.entity_id();
                                 if this.rename.as_ref().is_some_and(|(id, _)| *id == target) { return; }
                                 if let ClickEvent::Mouse(mouse) = event {
                                     let modifiers = mouse.down.modifiers;
                                     let toggle = if crate::terminal_engine::is_mac() { modifiers.platform } else { modifiers.control };
                                     if toggle || modifiers.shift {
-                                        this.workspace_state.extend_sidebar_selection(target, modifiers.shift, |(_, entity, pinned)| (entity.entity_id(), *pinned));
+                                        this.workspace_state.extend_sidebar_selection(target, modifiers.shift, |(_, entity, pinned, _)| (entity.entity_id(), *pinned));
                                         cx.notify();
                                         return;
                                     }
@@ -310,12 +318,12 @@ impl Render for BrowserHost {
                                 this.workspace_state.sidebar_selection_anchor = Some(target);
                                 this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { let is_anchor = this.workspace_state.groups.containing(target).is_some_and(|group| group.members.first() == Some(&target));
-                                    this.rename_workspace(is_anchor, window, cx); }
+                                    this.rename_workspace(if is_anchor { WorkspaceField::GroupName } else { WorkspaceField::Name }, window, cx); }
                             }))
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
              .child(div().flex_1().min_w_0().h_full().child(
-                if let Some((_, workspace, _)) = self.workspace_state.entries.get(self.workspace_state.active) {
+                if let Some((_, workspace, _, _)) = self.workspace_state.entries.get(self.workspace_state.active) {
                     workspace.clone().into_any_element()
                 } else {
                     div().size_full().bg(rgb(0x151517)).flex().flex_col().items_center().justify_center().gap_3()
