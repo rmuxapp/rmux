@@ -1145,22 +1145,14 @@ impl TerminalView {
             self.schedule_compression(cx);
         }
         cx.emit(TabMetadataChanged);
+        let releases = if focused { Vec::new() } else { self.pressed_keys.drain().collect() };
         if !focused {
-            // Finish the old pane's presses before reporting focus loss.
-            for key in self.pressed_keys.drain() {
-                if let Err(error) = self
-                    .session
-                    .key_release(&key, rmux_terminal::keyboard::Modifiers::default())
-                {
-                    self.error = Some(error.to_string());
-                }
-            }
             self.mouse_button = None;
             self.selecting = false;
             self.selection_scroll = None;
             self.selection_pointer = None;
         }
-        if let Err(error) = self.session.queue_focus(focused) {
+        if let Err(error) = self.session.queue_focus_with_releases(focused, releases) {
             self.error = Some(error.to_string());
         }
         // The writer wakes the existing nonblocking metadata observer after

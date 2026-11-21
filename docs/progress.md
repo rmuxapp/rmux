@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Native focus loss now queues held-key releases and focus reporting as one bounded
+writer message. Releases are encoded before focus loss under the worker's parser
+lock; UI focus changes no longer synchronously encode each held key. Payloads
+hold weak engine references and enforce key-count/name bounds. One queue slot
+admits the whole transition; full/closed queues report failure rather than partly
+enqueuing it. Focused tests pass for Kitty release ordering, busy-parser admission,
+focus-only notification/order and closed-engine cleanup; desktop check passes.
+This does not change ordinary key-up delivery or establish end-to-end latency.
+Not released.
+
 Native TerminalView focus reporting and program-status acknowledgement now enqueue
 on the existing bounded PTY writer instead of locking the parser on the UI thread.
 Focus messages preserve writer order and hold weak engine references. Completion

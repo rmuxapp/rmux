@@ -63,7 +63,7 @@ impl Drop for PastePermit {
 
 enum InputPayload {
     Bytes(Vec<u8>),
-    Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool },
+    Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
     Paste { text: String, bracketed: bool },
 }
 impl InputPayload {
@@ -78,11 +78,18 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
-            Self::Focus { terminal, focused } => {
+            Self::Focus { terminal, focused, releases } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
+                let mut bytes = Vec::new();
+                for key in releases {
+                    if let Some(release) = terminal.encode_key_action(&key, crate::keyboard::Modifiers::default(), crate::keyboard::Action::Release)? {
+                        bytes.extend(release);
+                    }
+                }
                 if focused { terminal.acknowledge_program_status(); }
-                Ok(terminal.encode_focus(focused)?.map_or_else(Vec::new, |bytes| bytes.to_vec()))
+                if let Some(focus) = terminal.encode_focus(focused)? { bytes.extend(focus); }
+                Ok(bytes)
             }
             Self::Paste { text, bracketed } => crate::keyboard::encode_paste(&text, bracketed),
         }
@@ -608,8 +615,13 @@ impl Session {
     /// The writer wakes metadata observers after processing even if focus
     /// reporting is disabled and therefore produces no PTY bytes.
     pub fn queue_focus(&self, focused: bool) -> Result<()> {
+        self.queue_focus_with_releases(focused, Vec::new())
+    }
+    /// Reserve one queue slot for all held-key releases followed by focus change.
+    pub fn queue_focus_with_releases(&self, focused: bool, releases: Vec<String>) -> Result<()> {
+        anyhow::ensure!(releases.len() <= 256 && releases.iter().all(|key| key.len() <= 128), "too many held keys or oversized key name");
         self.writer.try_send(InputMessage {
-            payload: InputPayload::Focus { terminal: Arc::downgrade(&self.terminal), focused },
+            payload: InputPayload::Focus { terminal: Arc::downgrade(&self.terminal), focused, releases },
             _paste: None,
         }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))
     }
@@ -1250,7 +1262,7 @@ mod tests {
         let paste_error = session.paste("must-not-be-queued").unwrap_err();
         assert!(paste_error.to_string().contains("No paste input was queued"));
         assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
-        session.queue_focus(false)?;
+        session.queue_focus_with_releases(false, vec!["a".into(), "enter".into()])?;
         session.queue_focus(true)?;
         session.input_without_scroll("state-世界\n".as_bytes())?;
         let elapsed = started_at.elapsed();
@@ -1329,6 +1341,22 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn queued_held_key_releases_precede_focus_loss() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
+        terminal.lock().unwrap().write(b"\x1b[>3u\x1b[?1004h");
+        let expected = {
+            let mut engine = terminal.lock().unwrap();
+            let mut bytes = engine.encode_key_action("a", crate::keyboard::Modifiers::default(), crate::keyboard::Action::Release)?.unwrap();
+            bytes.extend(engine.encode_key_action("enter", crate::keyboard::Modifiers::default(), crate::keyboard::Action::Release)?.unwrap());
+            assert!(!bytes.is_empty());
+            bytes.extend(b"\x1b[O");
+            bytes
+        };
+        let payload = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused: false, releases: vec!["a".into(), "enter".into()] };
+        assert_eq!(payload.encode()?, expected);
+        Ok(())
+    }
+    #[test]
     fn queued_focus_preserves_order_and_wakes_without_reporting() -> Result<()> {
         let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
         for reporting in [false, true] {
@@ -1336,7 +1364,7 @@ mod tests {
             let (sender, receiver) = mpsc::sync_channel(4);
             for focused in [false, true] {
                 sender.send(InputMessage { payload: InputPayload::Focus {
-                    terminal: Arc::downgrade(&terminal), focused,
+                    terminal: Arc::downgrade(&terminal), focused, releases: Vec::new(),
                 }, _paste: None })?;
             }
             sender.send(b"after-focus".to_vec().into())?;
@@ -1347,7 +1375,7 @@ mod tests {
             assert_eq!(wakes, 2, "focus acknowledgement wakes quiet metadata observers");
             assert_eq!(output, if reporting { b"\x1b[O\x1b[Iafter-focus".as_slice() } else { b"after-focus".as_slice() });
         }
-        let pending = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused: true };
+        let pending = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused: true, releases: Vec::new() };
         drop(terminal);
         assert!(pending.encode()?.is_empty(), "queued focus must not retain a closed terminal");
         Ok(())
