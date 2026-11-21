@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Resolved the missing grouping hint: this was a real keybinding conflict, not a
+lost focus handle. Cmd+Shift+G for grouping was shadowed by terminal Find Previous.
+Grouping now uses Ctrl+Cmd+Shift+G on macOS; Ctrl+Alt+Shift+G elsewhere is unchanged.
+Both hosts share the corrected binding and the user guide documents it. Browser
+palette hints are resolved once from the opening context, like native, rather
+than repeatedly querying bindings while rendering rows. Native check and WASM
+build pass. Browser verified the hint after sidebar selection, grouping from
+terminal focus with the full modifier combination, and Cmd+Shift+G opening Find
+Previous. Screenshot: target/group-shortcut-conflict-fixed.jpg. Not deployed;
+native runtime/non-mac shortcut checks and full app migration remain open.
+
 Browser host now handles CommandPalette when sidebar clicks move focus outside
 the active workspace's action path. It restores the active terminal context and
 opens that workspace's palette without clearing multi-selection. WASM build

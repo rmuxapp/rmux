@@ -91,6 +91,7 @@ struct InputProbe {
     split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
     palette_origin: Option<FocusHandle>,
+    result_hints: Vec<Option<String>>,
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
@@ -109,7 +110,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -224,9 +225,13 @@ impl InputProbe {
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         else { self.empty_focus.focus(window,cx); }
     }
-    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, cx: &mut Context<Self>) {
+    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, window: &Window, cx: &mut Context<Self>) {
         self.workspace_results = workspaces;
         self.group_results = groups;
+        // Like the native palette, resolve bindings once from the originating
+        // focus path, before later frames replace it with the palette input.
+        self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
+            .map(|index| self.result_hint(index, window, cx)).collect();
         self.search = palette_match::RankedSearch::new(COMMANDS.iter().map(|command| command.title().to_lowercase())
             .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase()))
             .chain(self.group_results.iter().map(|(_, title)| title.to_lowercase())).collect());
@@ -475,12 +480,12 @@ impl Render for InputProbe {
                 .child(palette_view::search(self.input.clone()))
                 .child({
                     let entity = cx.entity();
-                    list(self.scroll.clone(), move |row, window, cx| {
+                    list(self.scroll.clone(), move |row, _window, cx| {
                         entity.update(cx, |this, cx| {
                             let index = this.search.matches[row];
                             palette_view::result(index, 36., row == this.selected)
                                 .child(div().flex_1().min_w_0().truncate().child(this.result_title(index).to_owned()))
-                                .when_some(this.result_hint(index, window, cx), |row, hint| row.child(
+                                .when_some(this.result_hints.get(index).cloned().flatten(), |row, hint| row.child(
                                     div().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0)).child(hint)))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                     if event.standard_click() { this.selected = row; this.choose(window, cx); }

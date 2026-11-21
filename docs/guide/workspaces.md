@@ -129,7 +129,8 @@ notifications.
 Close Workspace Group in the File menu/palette closes its terminals after one
 confirmation for a multi-member group. Ungroup Workspaces keeps them running.
 Cmd-click (macOS) or Ctrl-click toggles sidebar selections; Shift-click selects
-a visible range. Group Selected Workspaces groups them in sidebar order with no
+a visible range. Group Selected Workspaces (Ctrl+Cmd+Shift+G on macOS,
+Ctrl+Alt+Shift+G on Linux/Windows) groups them in sidebar order with no
 new shell. Its shortcut is Cmd-Shift-G on macOS, Ctrl-Alt-Shift-G elsewhere.
 
 Settings → New group workspace chooses After current (default), First or Last

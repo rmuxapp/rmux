@@ -31,7 +31,7 @@ impl BrowserHost {
                     }).collect();
                     let groups = this.workspace_state.groups.entries().iter().map(|group|
                         (group.id, format!("Move Workspace to Group: {} (#{})", group.name, group.id))).collect();
-                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, cx));
+                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, window, cx));
                 }
                 PaletteRequest::SelectWorkspace(id) => {
                     if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity)| entity.entity_id() == *id) {

@@ -4,7 +4,7 @@ use crate::{NewWorkspace, NewWorkspaceGroup, GroupSelectedWorkspaces, NextWorksp
 
 pub(crate) fn bindings(mac: bool) -> Vec<KeyBinding> {
     let mut bindings = vec![
-        KeyBinding::new(if mac { "cmd-shift-g" } else { "ctrl-alt-shift-g" }, GroupSelectedWorkspaces, None),
+        KeyBinding::new(if mac { "ctrl-cmd-shift-g" } else { "ctrl-alt-shift-g" }, GroupSelectedWorkspaces, None),
         KeyBinding::new(if mac { "cmd-alt-shift-up" } else { "ctrl-alt-shift-up" }, MoveWorkspaceUp, None),
         KeyBinding::new(if mac { "cmd-alt-shift-down" } else { "ctrl-alt-shift-down" }, MoveWorkspaceDown, None),
         KeyBinding::new(if mac { "cmd-b" } else { "ctrl-shift-b" }, ToggleSidebar, None),
