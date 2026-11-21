@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Native scroll requests no longer wait for the parser lock. Busy requests are
+applied before the next coherent frame; same-direction line motion coalesces,
+opposite directions retain clamping order, and absolute navigation or later input
+supersedes older requests. The queue holds at most 64 requests, reports saturation,
+and retains its small allocation across gestures. No background scroll timer or
+worker is added. The held-parser fixture verifies nonblocking admission, bounded
+queue recovery, viewport edge behavior and typing-after-scroll precedence; CI
+includes it. Mouse-wheel dispatch still checks application mouse reporting via
+a separate parser-lock path; removing that wait remains follow-up work. GUI
+scrolling latency and cross-platform acceptance remain open.
+
 Explicit terminal shutdown now cancels queued paste before requesting process
 termination, even if the session remains owned by UI code. Native and automation
 paste admission reject a closing terminal. The retained-session close fixture

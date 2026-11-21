@@ -24,7 +24,7 @@ pub struct Session {
     input_errors: async_channel::Receiver<String>,
     paste_pending: Arc<AtomicBool>,
     paste_generation: Arc<AtomicU64>,
-    follow_output_pending: AtomicBool,
+    pending_scroll: Mutex<Vec<crate::Scroll>>,
     report_all_keys: Arc<AtomicBool>,
     shutdown: ShutdownHandle,
     pub updates: async_channel::Receiver<()>,
@@ -353,7 +353,7 @@ impl Session {
             input_errors,
             paste_pending: Arc::new(AtomicBool::new(false)),
             paste_generation: paste_generation.clone(),
-            follow_output_pending: AtomicBool::new(false),
+            pending_scroll: Mutex::new(Vec::new()),
             shutdown: ShutdownHandle {
                 exit: exit.clone(),
                 closing: Arc::new(AtomicBool::new(false)),
@@ -645,28 +645,43 @@ impl Session {
             Ok(false)
         }
     }
-    /// Input delivery must not wait behind output parsing just to move the viewport.
-    /// A busy parser defers this coalesced request until the next frame acquisition.
+    /// Input supersedes queued navigation and follows output without parser waits.
     fn follow_output(&self) -> Result<()> {
-        self.follow_output_pending.store(true, Ordering::Release);
+        self.scroll(crate::Scroll::Bottom)
+    }
+    fn apply_pending_scroll(&self, terminal: &mut Terminal) -> Result<()> {
+        let mut pending = self.pending_scroll.lock().unwrap_or_else(|error| error.into_inner());
+        // Only viewport operations hold this small queue lock, never parsing or
+        // PTY I/O. Retain its bounded allocation across gestures.
+        for scroll in pending.drain(..) { terminal.scroll(scroll)?; }
+        Ok(())
+    }
+    /// Apply immediately when idle, otherwise before the next coherent frame.
+    /// Opposite directions remain ordered because viewport edges clamp each step.
+    pub fn scroll(&self, scroll: crate::Scroll) -> Result<()> {
+        {
+            let mut pending = self.pending_scroll.lock().unwrap_or_else(|error| error.into_inner());
+            if matches!(scroll, crate::Scroll::Top | crate::Scroll::Bottom | crate::Scroll::Row(_) | crate::Scroll::LastPrompt) {
+                pending.clear();
+            }
+            let merged = match (pending.last_mut(), scroll) {
+                (Some(crate::Scroll::Lines(previous)), crate::Scroll::Lines(lines)) if previous.signum() == lines.signum() => {
+                    *previous = previous.saturating_add(lines);
+                    true
+                }
+                _ => false,
+            };
+            if !merged {
+                anyhow::ensure!(pending.len() < 64, "terminal scroll queue is full; retry navigation");
+                pending.push(scroll);
+            }
+        }
         let mut terminal = match self.terminal.try_lock() {
             Ok(terminal) => terminal,
             Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
             Err(std::sync::TryLockError::WouldBlock) => return Ok(()),
         };
-        self.apply_pending_follow(&mut terminal)
-    }
-    fn apply_pending_follow(&self, terminal: &mut Terminal) -> Result<()> {
-        if self.follow_output_pending.swap(false, Ordering::AcqRel) {
-            terminal.scroll(crate::Scroll::Bottom)?;
-        }
-        Ok(())
-    }
-    pub fn scroll(&self, scroll: crate::Scroll) -> Result<()> {
-        let mut terminal = self.terminal.lock().unwrap_or_else(|e| e.into_inner());
-        // Explicit navigation after input supersedes a deferred follow request.
-        self.follow_output_pending.store(false, Ordering::Release);
-        terminal.scroll(scroll)
+        self.apply_pending_scroll(&mut terminal)
     }
     /// Queue focus reporting/acknowledgement without waiting for the parser.
     /// The writer wakes metadata observers after processing even if focus
@@ -813,7 +828,7 @@ impl Session {
     }
     pub fn frame(&self) -> Result<Frame> {
         let mut terminal = self.terminal.lock().unwrap_or_else(|e| e.into_inner());
-        self.apply_pending_follow(&mut terminal)?;
+        self.apply_pending_scroll(&mut terminal)?;
         terminal.frame()
     }
     pub fn try_frame(&self) -> Result<Option<Frame>> {
@@ -822,7 +837,7 @@ impl Session {
             Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
             Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
         };
-        self.apply_pending_follow(&mut terminal)?;
+        self.apply_pending_scroll(&mut terminal)?;
         terminal.frame().map(Some)
     }
     pub fn history_export(&self, max_bytes: usize) -> HistoryExport {
@@ -1877,7 +1892,7 @@ trap - EXIT HUP TERM
             anyhow::ensure!(std::time::Instant::now() < deadline, "shell not ready");
             thread::sleep(std::time::Duration::from_millis(5));
         }
-        for explicit_navigation in [false, true] {
+        for (explicit_navigation, later_input) in [(false, false), (true, false), (true, true)] {
             session.scroll(crate::Scroll::Top)?;
             assert!(session.frame()?.scrollback_offset > 0);
             let terminal = session.terminal.clone();
@@ -1891,17 +1906,31 @@ trap - EXIT HUP TERM
             });
             waiting.recv()?;
             let start = std::time::Instant::now();
+            if !explicit_navigation {
+                for index in 0..64 {
+                    session.scroll(crate::Scroll::Lines(if index % 2 == 0 { -1 } else { 1 }))?;
+                }
+                assert!(session.scroll(crate::Scroll::Lines(-1)).is_err());
+                assert_eq!(session.pending_scroll.lock().unwrap().len(), 64);
+            }
             session.input(b"x")?;
+            if explicit_navigation {
+                session.scroll(crate::Scroll::Top)?;
+                for _ in 0..100 { session.scroll(crate::Scroll::Lines(-1))?; }
+                session.scroll(crate::Scroll::Lines(1))?;
+                assert_eq!(session.pending_scroll.lock().unwrap().as_slice(),
+                    &[crate::Scroll::Top, crate::Scroll::Lines(-100), crate::Scroll::Lines(1)]);
+            }
+            if later_input { session.input(b"y")?; }
             let elapsed = start.elapsed();
-            let pending = session.follow_output_pending.load(Ordering::Acquire);
+            let pending = !session.pending_scroll.lock().unwrap().is_empty();
             let _ = release.send(());
             parser.join().unwrap();
             assert!(elapsed < std::time::Duration::from_millis(500), "input waited for parser: {elapsed:?}");
             assert!(pending);
-            if explicit_navigation { session.scroll(crate::Scroll::Top)?; }
             let frame = session.try_frame()?.expect("parser released");
-            assert_eq!(frame.scrollback_offset > 0, explicit_navigation);
-            assert!(!session.follow_output_pending.load(Ordering::Acquire));
+            assert_eq!(frame.scrollback_offset, if explicit_navigation && !later_input { frame.scrollback_lines - 1 } else { 0 });
+            assert!(session.pending_scroll.lock().unwrap().is_empty());
         }
         Ok(())
     }
