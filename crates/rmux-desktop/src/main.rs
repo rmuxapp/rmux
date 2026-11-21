@@ -69,6 +69,7 @@ mod text_layout;
 mod terminal_menu;
 use pane_view::{PaneEmpty, PaneView};
 mod split_view;
+mod split_presentation;
 mod window_view;
 mod window_geometry;
 mod workspace_groups;

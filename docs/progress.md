@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Extracted native pane sizing, weighted children, branch orientation and divider
+appearance into shared split_presentation components. Desktop retains its existing
+drag capture and resize handlers. The browser host now executes shared command
+identities for Split Right/Below through rmux-core PaneTree::split_positioned and
+supports focused-pane zoom without replacing the tree. Browser check passed
+right split → nested below split → zoom → unzoom, preserving all three panes.
+Native compile and WASM build pass. Browser pane contents are clearly labeled
+placeholders; terminal rendering, tab/workspace integration and divider dragging
+remain pending. The public site remains unchanged.
+
 Moved all 136 static palette command identities/display names into rmux-core.
 Native command registration now references those identities while preserving its
 existing order, availability conditions and action dispatch. The browser probe

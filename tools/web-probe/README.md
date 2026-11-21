@@ -1,44 +1,30 @@
-# Shared UI web compatibility probe
+# Shared rmux web compatibility probe
 
-This isolated crate compiles the actual rmux desktop `TextField`, composition
-and undo modules against GPUI CE 0.3.0. It does not copy those implementations
-and does not change the production GPUI dependency. Clipboard forwarding is a
-small host adapter; the probe declares the actions the existing field consumes.
+This isolated host runs actual desktop sources against GPUI CE 0.3.0 without
+changing the production GPUI 0.2.2 dependency. Shared sources include the text
+field, composition/undo, tooltip, palette presentation/navigation, and split
+presentation. rmux-core supplies command identities, search ranking and PaneTree.
+Host adapters cover the GPUI text layout API differences and clipboard forwarding.
 
-Run `mise install`, then `mise run check` here.
-Run `mise run build` and `mise run serve` to open the probe at
-http://127.0.0.1:4319. The build uses pinned mise-managed wasm-bindgen, and the
-bundled Inter Regular font is distributed under `assets/Inter-OFL.txt`. The WASM Rust target is managed
-by this directory's mise configuration, with no independent rust-toolchain file.
+Use `mise install`, `mise run build`, then `mise run serve` in this directory.
+Open http://127.0.0.1:4319. Rust's WASM target and wasm-bindgen are mise-managed.
+Bundled Inter Regular is licensed under `assets/Inter-OFL.txt`.
 
-A successful check establishes source compatibility only. The browser host includes a bundled licensed font, WASM loader and macOS editing
-shortcuts. Browser rendering, typing, select-all/replacement and undo were verified in the
-in-app browser. IME and clipboard behavior remain unverified. This is not a finished demo. The next gate
-is rendering the shared input and exercising editing/IME in a browser, before
-attempting the full workspace or changing rmux's native renderer.
+## Current behavior
 
-## Compatibility result
+Commands opens the shared palette. Split Right/Below mutate the shared PaneTree;
+Toggle Pane Zoom retains the tree and displays the focused pane. Click a pane to
+focus it. The probe is limited to 16 panes. Escape closes the palette. The macOS
+text-editing shortcuts are bound. Unsupported command services are not listed.
 
-`mise run check` passes for `wasm32-unknown-unknown`. The same desktop field
-also passes the native desktop compile. Small `text_layout` adapters translate
-focus, text shaping, caret geometry, clipping and painting between GPUI 0.2.2
-and GPUI CE 0.3.0. The text field source, composition, undo and tooltip are shared.
+The terminal renderer is not connected: pane bodies explicitly say so. This is
+not the public demo replacement yet. Divider dragging, terminals, tabs, multiple
+workspaces, IME/clipboard acceptance, browser coverage and performance remain.
 
-The CE adapter uses its backend caret geometry and byte-index hit testing; it
-does not approximate glyph positions. Native calls preserve the previous APIs.
-The bundled font and shared field render in the in-app browser. Typing,
-select-all/replacement and undo passed a focused interaction check. IME, clipboard,
-other browsers and full application parity remain unverified.
+## Verified
 
-## Shared palette presentation
-
-The probe imports the same `palette_view` panel, input surround, result row,
-footer and keyboard-navigation functions used by the native command palette.
-It also uses native `RankedSearch`. The seven fixture commands only report
-selection; they do not pretend to create workspaces or terminals. A browser check
-verified `splt` fuzzy matching and Down/Enter selection of Split Below, and the
-panel fits its contents. Full application actions and result metadata are pending.
-
-Command labels/identities and RankedSearch now come from `rmux-core`, also used
-by desktop. The probe exposes a small subset of the shared catalog; dispatch
-still reports selection only. Adding a label does not implement its service.
+Native compilation and the WASM build pass. In-app browser checks covered the
+bundled font, typing, select-all/replacement, undo, fuzzy palette search and arrow/
+Enter selection. Split Right followed by nested Split Below produces three panes;
+zoom/unzoom restores that layout. Compilation and these focused checks do not
+establish full native/browser parity.

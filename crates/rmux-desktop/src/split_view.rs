@@ -83,12 +83,7 @@ pub(super) fn render_panes(
     cx: &mut Context<Workspace>,
 ) -> AnyElement {
     match tree {
-        PaneTree::Pane(view) => div()
-            .id(("pane", view.entity_id()))
-            .size_full()
-            .min_w_0()
-            .min_h_0()
-            .overflow_hidden()
+        PaneTree::Pane(view) => split_presentation::leaf(("pane", view.entity_id()))
             .child(view.clone())
             .into_any_element(),
         PaneTree::Split {
@@ -108,22 +103,8 @@ pub(super) fn render_panes(
                     let weights = weights.clone();
                     let count = children.len();
                     elements.push(
-                        div()
-                            .id(SharedString::from(format!("divider-{path:?}-{index}")))
-                            .flex_shrink_0()
-                            .bg(rgb(0x242424))
-                            .flex().items_center().justify_center()
-                            .child(if axis == SplitAxis::Columns {
-                                div().w(px(1.)).h_full().bg(rgb(0x383838))
-                            } else {
-                                div().h(px(1.)).w_full().bg(rgb(0x383838))
-                            })
-                            .when(axis == SplitAxis::Columns, |bar| {
-                                bar.w(px(divider_width)).h_full()
-                            })
-                            .when(axis == SplitAxis::Rows, |bar| {
-                                bar.h(px(divider_width)).w_full()
-                            })
+                        split_presentation::divider(
+                            SharedString::from(format!("divider-{path:?}-{index}")), axis, divider_width)
                             .when(!benchmark, |bar| {
                                 bar.cursor(if axis == SplitAxis::Columns {
                                     CursorStyle::ResizeLeftRight
@@ -180,25 +161,12 @@ pub(super) fn render_panes(
                 let mut child_path = path.clone();
                 child_path.push(index);
                 elements.push(
-                    div()
-                        .flex_basis(px(0.))
-                        .map(|mut child| {
-                            child.style().flex_grow = Some(weights[index]);
-                            child
-                        })
-                        .min_w_0()
-                        .min_h_0()
-                        .overflow_hidden()
+                    split_presentation::weighted(weights[index])
                         .child(render_panes(child, child_path, benchmark, cx))
                         .into_any_element(),
                 );
             }
-            div()
-                .size_full()
-                .flex()
-                .min_w_0()
-                .min_h_0()
-                .when(axis == SplitAxis::Rows, |root| root.flex_col())
+            split_presentation::branch(axis)
                 .child(
                     canvas(move |bounds, _, _| measured.set(bounds), |_, _, _, _| {})
                         .absolute()
