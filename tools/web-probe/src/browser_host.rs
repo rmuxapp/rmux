@@ -5,7 +5,10 @@ use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_pre
 enum WorkspaceField { Name, GroupName, Description, Color, GroupColor, Icon, GroupIcon }
 #[derive(Default)]
 struct WorkspaceMetadata { description: String, color: Option<u32>, icon: Option<String> }
+include!("browser_workspace_menu.rs");
 pub(crate) struct BrowserHost {
+    menu: Option<WorkspaceMenu>,
+    menu_blur: Option<Subscription>,
     rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
     workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, WorkspaceMetadata), EntityId>,
     editor_hint: String,
@@ -20,7 +23,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, WorkspaceMetadata::default())).collect();
-        let mut host = Self { rename: None, editor_hint: String::new(), editor_presets: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
+        let mut host = Self { menu: None, menu_blur: None, rename: None, editor_hint: String::new(), editor_presets: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
     }
@@ -170,6 +173,8 @@ impl BrowserHost {
     }
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.workspace_state.entries.len() { return; }
+        self.menu = None;
+        self.menu_blur = None;
         self.rename = None;
         self.workspace_state.entries[self.workspace_state.active].1.update(cx, |workspace,cx| {
             workspace.split_drag = None;
@@ -255,6 +260,13 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
                     cx.notify();
                 }
             }
+            CommandId::ShowWorkspaceMenu => {
+                if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
+                    let target = entry.1.entity_id();
+                    let bounds = self.workspace_scroll.bounds();
+                    self.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
+                }
+            }
             CommandId::EditWorkspaceIcon => self.rename_workspace(WorkspaceField::Icon, window, cx),
             CommandId::EditGroupIcon => self.rename_workspace(WorkspaceField::GroupIcon, window, cx),
             CommandId::EditWorkspaceColor => self.rename_workspace(WorkspaceField::Color, window, cx),
@@ -334,7 +346,13 @@ impl Render for BrowserHost {
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
                         let selected = self.workspace_state.sidebar_selection.contains(&entity.entity_id()) || index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
                             self.workspace_state.entries[self.workspace_state.active].1.entity_id()) == entity.entity_id();
-                        sidebar_presentation::row(("workspace",entity.entity_id()),selected)
+                        let target = entity.entity_id();
+                        let menu_group = header.map(|group| group.id);
+                        sidebar_presentation::row(("workspace",target),selected)
+                            .on_mouse_down(MouseButton::Right, cx.listener(move |this,event: &MouseDownEvent,window,cx| {
+                                cx.stop_propagation();
+                                this.show_workspace_menu(target, menu_group, event.position, window, cx);
+                            }))
                             .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                             .child(div().flex().items_center().gap_2()
                                 .when_some(header, |row, group| {
@@ -390,6 +408,7 @@ impl Render for BrowserHost {
                             .child("New Workspace").on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
                         .into_any_element()
                 }))
+            .when_some(self.menu.clone(), |root, menu| root.child(self.workspace_menu_element(menu, window, cx)))
     }
 }
 

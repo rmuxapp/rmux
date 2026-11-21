@@ -221,21 +221,13 @@ impl WorkspaceWindow {
 
     fn workspace_menu_element(&self, menu: WorkspaceMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pinned = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == menu.target).is_some_and(|entry| entry.pinned);
-        let labels = if let Some(id) = menu.group {
-            let pinned = self.workspace_state.groups.entries().iter().any(|group| group.id == id && group.pinned);
-            ["Rename Group", "Change Group Color", "Change Group Icon", if pinned { "Unpin Group" } else { "Pin Group" }, "Ungroup Workspaces", "Close Group…"]
-        } else {
-            ["Rename Workspace", "Edit Description", "Change Color", "Change Icon", if pinned { "Unpin Workspace" } else { "Pin Workspace" }, "Close Workspace…"]
-        };
-        let actions: [Box<dyn Action>; 6] = if menu.group.is_some() {
-            [Box::new(RenameWorkspaceGroup), Box::new(EditGroupColor), Box::new(EditGroupIcon), Box::new(ToggleGroupPin), Box::new(UngroupWorkspaces), Box::new(CloseWorkspaceGroup)]
-        } else {
-            [Box::new(RenameWorkspace), Box::new(EditWorkspaceDescription), Box::new(EditWorkspaceColor), Box::new(EditWorkspaceIcon), Box::new(ToggleWorkspacePin), Box::new(CloseWorkspace)]
-        };
+        let pinned = menu.group.map_or(pinned, |id| self.workspace_state.groups.entries().iter().any(|group| group.id == id && group.pinned));
+        let labels = crate::workspace_menu_view::labels(menu.group.is_some(), pinned);
+        let actions = crate::workspace_menu_view::commands(menu.group.is_some()).map(|command|
+            crate::workspace_actions::action(command).expect("workspace menu command"));
         let hints: Vec<_> = actions.iter().map(|action| menu.return_focus.as_ref().and_then(|focus| shortcuts::hint(action.as_ref(), focus, window))).collect();
         deferred(anchored().position(menu.position).snap_to_window().child(
-            div().id("workspace-context-menu").track_focus(&menu.focus).key_context("WorkspaceMenu")
-                .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.)))).py_1().bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md().occlude()
+            crate::workspace_menu_view::frame(window).track_focus(&menu.focus).key_context("WorkspaceMenu")
                 .on_mouse_down_out(cx.listener(|this, _, window, cx| this.dismiss_workspace_menu(window, cx)))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
@@ -264,8 +256,7 @@ impl WorkspaceWindow {
                     .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(labels.into_iter().enumerate().map(|(index, label)| {
-                    div().id(("workspace-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).cursor_pointer().flex().items_center().gap_3()
-                        .when(index == menu.selected, |row| row.bg(rgb(0x354969)))
+                    crate::workspace_menu_view::row(index, menu.selected)
                         .on_mouse_move(cx.listener(move |this, _, _, cx| {
                             if let Some(menu) = &mut this.workspace_menu {
                                 if menu.selected != index { menu.selected = index; cx.notify(); }
@@ -3931,6 +3922,13 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
+            CommandId::ShowWorkspaceMenu => {
+                if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
+                    let target = entry.workspace.entity_id();
+                    let bounds = self.workspace_scroll.bounds();
+                    self.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
+                }
+            }
             CommandId::EditWorkspaceIcon => self.edit_metadata(MetadataField::Icon, window, cx),
             CommandId::EditGroupIcon => self.edit_metadata(MetadataField::GroupIcon, window, cx),
             CommandId::EditWorkspaceColor => self.edit_metadata(MetadataField::Color, window, cx),
@@ -4218,13 +4216,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
             .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
             .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
-            .on_action(cx.listener(|this, _: &ShowWorkspaceMenu, window, cx| {
-                if let Some(entry) = this.workspace_state.entries.get(this.workspace_state.active) {
-                    let target = entry.workspace.entity_id();
-                    let bounds = this.workspace_scroll.bounds();
-                    this.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
-                }
-            }))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))
             .on_action(cx.listener(|this, _: &RefreshTerminalMemory, window, cx| this.refresh_memory(window, cx)))
             .on_action(cx.listener(|this, _: &CycleTerminalMemorySort, _, cx| this.sort_memory(cx)))

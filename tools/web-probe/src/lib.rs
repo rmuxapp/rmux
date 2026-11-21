@@ -53,7 +53,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
     CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
-    CommandId::IncreaseFontSize, CommandId::DecreaseFontSize, CommandId::ResetFontSize, CommandId::EditWorkspaceIcon, CommandId::EditGroupIcon, CommandId::EditWorkspaceColor, CommandId::EditGroupColor, CommandId::EditWorkspaceDescription, CommandId::CloseWorkspaceGroup, CommandId::ToggleWorkspacePin, CommandId::RenameWorkspaceGroup, CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
+    CommandId::IncreaseFontSize, CommandId::DecreaseFontSize, CommandId::ResetFontSize, CommandId::ShowWorkspaceMenu, CommandId::EditWorkspaceIcon, CommandId::EditGroupIcon, CommandId::EditWorkspaceColor, CommandId::EditGroupColor, CommandId::EditWorkspaceDescription, CommandId::CloseWorkspaceGroup, CommandId::ToggleWorkspacePin, CommandId::RenameWorkspaceGroup, CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
     CommandId::ScrollToTop, CommandId::ScrollToBottom,
 ];
 struct WorkspaceCommand(CommandId);
@@ -62,7 +62,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [IncreaseFontSize, DecreaseFontSize, ResetFontSize, EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [IncreaseFontSize, DecreaseFontSize, ResetFontSize, ShowWorkspaceMenu, EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -594,6 +594,8 @@ mod key_adapter;
 mod sidebar_presentation;
 #[path = "../../../crates/rmux-desktop/src/metadata_presets.rs"]
 mod metadata_presets;
+#[path = "../../../crates/rmux-desktop/src/workspace_menu_view.rs"]
+mod workspace_menu_view;
 #[path = "../../../crates/rmux-desktop/src/sidebar_interaction.rs"]
 mod sidebar_interaction;
 #[path = "../../../crates/rmux-desktop/src/workspace_presentation.rs"]

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser sidebar workspace/group context menus now share native labels, command
+order, frame/row geometry and action routing. Right-click captures the target
+identity; group actions reject stale group membership. Menus support keyboard
+navigation/typeahead, scrolling, pointer selection, outside-click/blur/Escape
+dismissal and return focus. Show Workspace Actions is available in the browser
+palette. UI checks cover palette opening, typeahead pinning, inactive-target
+description editing, group menu content and terminal input after Escape.
+Screenshot: `target/browser-workspace-menu.jpg`. WASM build and native desktop
+check pass; not deployed. The default group text glyph appears missing in the
+browser font and needs replacement with an embedded icon in a follow-up.
+
 Fixed held-key ownership on native focus queue rejection. The tracker now
 clears a release batch only after the bounded writer queue accepts it; rejected
 keys remain available to key-up or the next focus transition. Focus gain also

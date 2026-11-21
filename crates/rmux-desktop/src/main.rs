@@ -72,6 +72,7 @@ mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;
 mod metadata_presets;
+mod workspace_menu_view;
 mod sidebar_interaction;
 mod workspace_presentation;
 mod list_navigation;
