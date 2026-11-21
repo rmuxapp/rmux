@@ -132,3 +132,14 @@ Verified browser Ctrl+U with a partial draft followed by a sample command. Draft
 erasure uses one engine write; an empty draft skips snapshot work. Automated
 browser input needed the explicit Control modifier. Ctrl+C UI delivery remains
 unverified, although its engine encoding is covered.
+
+Workspaces now use shared native sidebar/header/row styling and workspace shortcut
+definitions. Each retains its pane tree, tabs and terminal output while hidden;
+hidden workspace shaping caches are released. The plus button or Cmd+N creates
+another workspace (16 maximum). Cmd+Option+Up/Down cycles; Cmd+1–8 selects by
+position, Cmd+9 selects the last, matching desktop semantics. The current probe
+uses macOS bindings; automatic browser-platform keymap selection remains pending.
+Native check and WASM build pass. Browser checks verified Cmd+N, Cmd+1 and
+Cmd+Option+Up wraparound with restored output, plus mouse switching with split/tab
+restoration. Workspace groups, persistence and the full native state/service model
+are still separate acceptance work; this is not the published demo yet.

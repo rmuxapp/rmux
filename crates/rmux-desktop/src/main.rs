@@ -59,7 +59,9 @@ mod row_cache;
 mod row_host;
 mod cursor_view;
 mod pane_shortcuts;
+mod workspace_shortcuts;
 mod tab_presentation;
+mod sidebar_presentation;
 mod list_navigation;
 mod menu_navigation;
 mod snapshot;
@@ -3702,15 +3704,12 @@ fn main() {
                 KeyBinding::new("cmd-d", Split, None),
                 KeyBinding::new("cmd-shift-d", SplitBelow, None),
                 KeyBinding::new("cmd-shift-enter", TogglePaneZoom, None),
-                KeyBinding::new("cmd-n", NewWorkspace, None),
                 KeyBinding::new("ctrl-cmd-g", NewWorkspaceGroup, None),
                 KeyBinding::new("cmd-shift-g", GroupSelectedWorkspaces, None),
                 KeyBinding::new("cmd-shift-r", RenameWorkspace, None),
                 KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
                 KeyBinding::new("cmd-shift-t", ShowTabPicker, Some("Terminal")),
-                KeyBinding::new("cmd-alt-down", NextWorkspace, None),
                 KeyBinding::new("cmd-shift-u", NextUnreadTerminal, None),
-                KeyBinding::new("cmd-alt-up", PreviousWorkspace, None),
                 KeyBinding::new("cmd-alt-shift-up", MoveWorkspaceUp, None),
                 KeyBinding::new("cmd-alt-shift-down", MoveWorkspaceDown, None),
                 KeyBinding::new("cmd-b", ToggleSidebar, None),
@@ -3755,7 +3754,6 @@ fn main() {
                 KeyBinding::new("ctrl-shift-d", Split, None),
                 KeyBinding::new("ctrl-shift-e", SplitBelow, None),
                 KeyBinding::new("ctrl-shift-enter", TogglePaneZoom, None),
-                KeyBinding::new("ctrl-shift-n", NewWorkspace, None),
                 KeyBinding::new("ctrl-alt-g", NewWorkspaceGroup, None),
                 KeyBinding::new("ctrl-alt-shift-g", GroupSelectedWorkspaces, None),
                 KeyBinding::new("ctrl-shift-r", RenameWorkspace, None),
@@ -3763,9 +3761,7 @@ fn main() {
                 KeyBinding::new("ctrl-pagedown", NextTab, Some("Terminal")),
                 KeyBinding::new("ctrl-alt-shift-t", ShowTabPicker, Some("Terminal")),
                 KeyBinding::new("ctrl-pageup", PreviousTab, Some("Terminal")),
-                KeyBinding::new("ctrl-alt-down", NextWorkspace, None),
                 KeyBinding::new("ctrl-alt-u", NextUnreadTerminal, None),
-                KeyBinding::new("ctrl-alt-up", PreviousWorkspace, None),
                 KeyBinding::new("ctrl-alt-shift-up", MoveWorkspaceUp, None),
                 KeyBinding::new("ctrl-alt-shift-down", MoveWorkspaceDown, None),
                 KeyBinding::new("ctrl-shift-b", ToggleSidebar, None),
@@ -3798,18 +3794,7 @@ fn main() {
                 KeyBinding::new("ctrl-shift-w", ClosePane, Some("Terminal")),
             ]);
         }
-        cx.bind_keys((1..=9).map(|number| {
-            let modifier = if cfg!(target_os = "macos") {
-                "cmd"
-            } else {
-                "ctrl-alt"
-            };
-            KeyBinding::new(
-                &format!("{modifier}-{number}"),
-                SelectWorkspaceNumber { number },
-                None,
-            )
-        }));
+        cx.bind_keys(workspace_shortcuts::bindings(cfg!(target_os = "macos")));
         cx.bind_keys((1..=9).map(|number| {
             let modifier = if cfg!(target_os = "macos") {
                 "cmd-alt"

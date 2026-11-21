@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Browser workspaces now retain independent pane trees, tab selection and live
+sample terminal engines. Sidebar/header/row presentation and workspace shortcut
+definitions are actual native sources consumed by both hosts. Hidden workspaces
+release shaping/cursor caches, retaining sessions. Native check and WASM build
+pass. Browser checks verified split/tab/output restoration after switching,
+Cmd+N creation with terminal focus, Cmd+1 selection and Cmd+Option+Up wraparound
+restoring output. Captures: target/shared-workspaces-wasm.png and
+ target/shared-workspace-shortcuts-wasm.png. Host state remains browser-specific;
+full native workspace services, groups, persistence and browser platform keymap
+selection are not yet shared. Public demo remains unchanged.
+
+
 Resolved the Ctrl+U interaction question with a clean browser regression:
 type ab → explicit Control+U → ls → Enter clears the draft and runs ls correctly.
 The earlier generic ctrl chord was not delivered to the page. Batched draft

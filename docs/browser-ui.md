@@ -53,3 +53,11 @@ unchanged Rust Arc identities. Sample commands exercise basic ASCII input and
 independent state. Native input/IME, cursor painting, selection, resize and
 workspace integration remain acceptance work. Browser engine cell exports also
 lack native custom underline decoration and overline details.
+
+The browser host now retains independent workspace entities with live pane/tab
+state. Native sidebar presentation and workspace shortcut defaults are shared
+source modules. Switching releases hidden rendering caches without dropping
+terminal engines. Browser checks cover restoring split layouts/tabs/output and
+keyboard workspace creation, numbered selection and wraparound. The host still
+owns a separate workspace service model; this is progress toward shared UI, not
+completion of the Rustable-style single application model.

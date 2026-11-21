@@ -8,6 +8,11 @@ pub(crate) struct SamplePane {
     active: usize,
 }
 impl SamplePane {
+    pub fn release_render_caches(&mut self, cx: &mut Context<Self>) {
+        for terminal in &self.terminals {
+            terminal.update(cx, |terminal,_| terminal.release_render_cache());
+        }
+    }
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() { return; }
         let replace_focus = self.terminals[index].read(cx).is_focused(window);

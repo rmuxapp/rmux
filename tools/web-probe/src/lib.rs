@@ -22,7 +22,10 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspace, NextWorkspace, PreviousWorkspace]);
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct SelectWorkspaceNumber { number: usize }
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -41,6 +44,27 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
+    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+            let input = cx.new(|cx| text_field::TextField::new("", cx));
+            input.update(cx, |input, cx| {
+                input.placeholder = Some("Type a command or workspace name…");
+                input.focus.focus(window, cx);
+            });
+            cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
+                match event {
+                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
+                    text_field::EditEvent::Cancelled => this.close_palette(window, cx),
+                }
+                cx.notify();
+            }).detach();
+            let samples = std::collections::HashMap::new();
+            let mut host = InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            host.add_pane(0, window, cx);
+            host
+
+    }
+
     fn add_pane(&mut self, id: usize, window: &Window, cx: &mut Context<Self>) {
         let pane = cx.new(sample_pane::SamplePane::new);
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
@@ -185,6 +209,7 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/Inter-Regular.ttf").as_slice()),
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
+        cx.bind_keys(workspace_shortcuts::bindings(true));
         cx.bind_keys(pane_shortcuts::brackets());
         cx.bind_keys(pane_shortcuts::tabs());
         cx.bind_keys([
@@ -201,25 +226,7 @@ pub fn start() {
             KeyBinding::new("cmd-c", CopySelection, Some("TextInput")),
             KeyBinding::new("cmd-x", EditorCut, Some("TextInput")),
         ]);
-        cx.open_window(WindowOptions::default(), |window, cx| cx.new(|cx| {
-            let input = cx.new(|cx| text_field::TextField::new("", cx));
-            input.update(cx, |input, cx| {
-                input.placeholder = Some("Type a command or workspace name…");
-                input.focus.focus(window, cx);
-            });
-            cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
-                match event {
-                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.selected = 0; this.feedback = None; },
-                    text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
-                    text_field::EditEvent::Cancelled => this.close_palette(window, cx),
-                }
-                cx.notify();
-            }).detach();
-            let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: true };
-            host.add_pane(0, window, cx);
-            host
-        })).expect("open probe window");
+        cx.open_window(WindowOptions::default(), |window, cx| cx.new(|cx| browser_host::BrowserHost::new(window, cx))).expect("open probe window");
     });
 }
 
@@ -242,3 +249,10 @@ mod tab_presentation;
 mod sample_pane;
 
 mod key_adapter;
+
+#[path = "../../../crates/rmux-desktop/src/sidebar_presentation.rs"]
+mod sidebar_presentation;
+mod browser_host;
+
+#[path = "../../../crates/rmux-desktop/src/workspace_shortcuts.rs"]
+mod workspace_shortcuts;

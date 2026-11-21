@@ -4479,24 +4479,9 @@ impl Render for WorkspaceWindow {
             }))
             .when(self.sidebar, |div| {
                 div.child(
-                    gpui::div()
-                        .w(px(sidebar_width))
-                        .overflow_hidden()
-                        .flex_shrink_0()
-                        .h_full()
-                        .flex()
-                        .flex_col()
-                        .bg(rgb(0x242424))
+                    crate::sidebar_presentation::sidebar(sidebar_width)
                         .child(
-                            gpui::div()
-                                .h(px(36.))
-                                .flex_shrink_0()
-                                .px_3()
-                                .flex()
-                                .items_center()
-                                .border_b_1().border_color(rgb(0x383838))
-                                .text_sm()
-                                .id("workspace-list-header")
+                            crate::sidebar_presentation::header()
                                 .when(cfg!(target_os = "macos"), |header| header.pl(px(80.)))
                                  .child(gpui::div().id("sidebar-title-drag").flex_1().min_w_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } })
@@ -4547,18 +4532,8 @@ impl Render for WorkspaceWindow {
                                     let title_hint: SharedString = display_name.clone().into();
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
-                                    gpui::div()
-                                        .id(("workspace", entry.workspace.entity_id()))
-                                        .mx_1()
-                                        .mb(px(2.))
-                                        .px_3()
+                                    crate::sidebar_presentation::row(("workspace", entry.workspace.entity_id()), selected)
                                         .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
-                                        .py_2()
-                                        .rounded(px(5.))
-                                        .text_size(px(13.))
-                                        .cursor_pointer()
-                                        .when(selected, |div| div.bg(rgb(0x007aff)).text_color(rgb(0xffffff)))
-                                        .hover(move |style| style.bg(rgb(if selected { 0x1685ff } else { 0x303030 })))
                                         .when(self.rename.is_none(), |row| row
                                             .on_drag(drag_item::DragItem { scope: container, container, item: target, label: entry.name.clone().into() }, |item, _, _, cx| cx.new(|_| item.clone()))
                                             .can_drop(move |item, _, cx| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.container == container || drop_owner.upgrade().is_some_and(|owner| owner.read(cx).accepts_tab_drop(item, target, cx))))
