@@ -1,5 +1,18 @@
 # rmux performance acceptance plan
 
+## Native paste admission under output pressure
+
+Native clipboard paste now enqueues before consulting the terminal parser. The
+existing writer resolves bracketed-paste mode when it processes the request,
+polling a busy parser only for that pending request and checking cancellation
+between retries. Borrowed payloads allocate after obtaining the one-paste permit;
+owned clipboard strings move into the queue. Neither path locks the parser on
+the UI thread. Queue saturation still reports an error and releases the permit.
+Automation's opportunistic paste API retains its busy/no-admission semantics.
+Ten focused paste tests pass, including 896 KiB Unicode delivery with concurrent
+output and ordered following input, plus held-parser native admission. These
+checks do not establish GUI latency or Windows/Linux runtime acceptance.
+
 ## Cancel abandoned clipboard exports
 
 Native copies carry a per-request cancellation guard owned by the UI task.

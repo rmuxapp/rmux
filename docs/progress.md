@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Native paste now reserves the bounded writer queue without acquiring the parser
+lock on the UI thread. The writer resolves bracketed-paste mode immediately
+before encoding and honors cancellation while waiting for the parser. The 1 MiB
+limit, one-paste permit, ordered whole-payload delivery and completion wakeup are
+unchanged. Automation retains its explicit busy/no-admission retry contract.
+Ten paste tests plus the held-parser admission fixture pass; the concurrent
+output fixture now requires native paste admission without any retry loop.
+Native clipboard interaction and cross-platform runtime acceptance remain open.
+
 The Shared WASM workflow excludes native `main.rs`, `window_view.rs`, and
 `clipboard.rs` from its desktop source trigger. The browser supplies its own
 versions of those hosts, so native-only edits no longer queue an unchanged demo

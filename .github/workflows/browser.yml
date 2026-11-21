@@ -62,6 +62,7 @@ jobs:
         run: |
           mise exec -- cargo test --locked -p rmux-core keyboard::tests
           mise exec -- cargo test --locked -p rmux-terminal queued_
+          mise exec -- cargo test --locked -p rmux-terminal paste
           mise exec -- cargo test --locked -p rmux-terminal opportunistic_snapshot_and_targeted_input_do_not_wait_for_parser_lock
       - name: Test browser policy and state transitions
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser browser_

@@ -69,11 +69,26 @@ enum InputPayload {
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
     ClearScrollback { terminal: std::sync::Weak<Mutex<Terminal>> },
     Paste { text: String, bracketed: bool },
+    NativePaste { terminal: std::sync::Weak<Mutex<Terminal>>, text: String },
 }
 impl InputPayload {
     fn encode_pending(self, paste: Option<&PastePermit>) -> Result<Option<Vec<u8>>> {
         if paste.is_some_and(PastePermit::canceled) { return Ok(None); }
-        let bytes = self.encode()?;
+        let payload = if let Self::NativePaste { terminal, text } = self {
+            let Some(terminal) = terminal.upgrade() else { return Ok(None); };
+            let engine = loop {
+                if paste.is_some_and(PastePermit::canceled) { return Ok(None); }
+                match terminal.try_lock() {
+                    Ok(engine) => break engine,
+                    Err(std::sync::TryLockError::Poisoned(error)) => break error.into_inner(),
+                    Err(std::sync::TryLockError::WouldBlock) => thread::sleep(std::time::Duration::from_millis(1)),
+                }
+            };
+            let bracketed = engine.bracketed_paste()?;
+            drop(engine);
+            Self::Paste { text, bracketed }
+        } else { self };
+        let bytes = payload.encode()?;
         // Cancellation ends at this boundary: write_all must preserve a whole
         // accepted payload, including bracketed-paste closing delimiters.
         if paste.is_some_and(PastePermit::canceled) { return Ok(None); }
@@ -116,6 +131,7 @@ impl InputPayload {
                 Ok(bytes)
             }
             Self::Paste { text, bracketed } => crate::keyboard::encode_paste(&text, bracketed),
+            Self::NativePaste { .. } => unreachable!("native paste is resolved by encode_pending"),
         }
     }
 }
@@ -716,7 +732,12 @@ impl Session {
         self.paste_input(std::borrow::Cow::Owned(text))
     }
     fn paste_input(&self, text: std::borrow::Cow<'_, str>) -> Result<()> {
-        anyhow::ensure!(self.queue_paste(text)?, "Terminal is busy; paste again to retry. No paste input was queued.");
+        anyhow::ensure!(self.exit_status().is_none(), "process has exited");
+        let permit = PastePermit::acquire(&self.paste_pending, &self.paste_generation)?;
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::NativePaste { terminal: Arc::downgrade(&self.terminal), text: text.into_owned() },
+            _paste: Some(permit),
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))?;
         self.follow_output()
     }
     /// Bounded automation paste. Never waits for parser access or changes viewport.
@@ -1301,9 +1322,8 @@ mod tests {
         assert!(session.history_export(4096)()?.is_none(), "busy parser must return no history export");
         assert!(session.selection_export(4096, true)()?.is_none(), "busy parser must return no selection export");
         assert!(session.memory_sample()()?.is_none(), "busy parser must return no memory sample");
-        let paste_error = session.paste("must-not-be-queued").unwrap_err();
-        assert!(paste_error.to_string().contains("No paste input was queued"));
-        assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
+        session.paste("must-be-canceled-before-delivery")?;
+        session.cancel_queued_paste();
         assert!(!session.key_with_text("a", Default::default(), false, Some("a"))?, "ordinary text should remain native while parser is busy");
         session.report_all_keys.store(true, Ordering::Release);
         assert!(session.key_with_text("a", Default::default(), false, Some("A"))?, "report-all text should queue while parser is busy");
@@ -1565,6 +1585,45 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn native_paste_resolves_mode_on_worker_and_cancels_while_parser_busy() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 3)?));
+        let pending = Arc::new(AtomicBool::new(false));
+        let generation = Arc::new(AtomicU64::new(0));
+        for bracketed in [true, false] {
+            let payload = InputPayload::NativePaste { terminal: Arc::downgrade(&terminal), text: "hello 世界\n".into() };
+            terminal.lock().unwrap().write(if bracketed { b"\x1b[?2004h" } else { b"\x1b[?2004l" });
+            let permit = PastePermit::acquire(&pending, &generation)?;
+            assert_eq!(payload.encode_pending(Some(&permit))?, Some(crate::keyboard::encode_paste("hello 世界\n", bracketed)?));
+        }
+        let engine = terminal.lock().unwrap();
+        let message = InputMessage {
+            payload: InputPayload::NativePaste { terminal: Arc::downgrade(&terminal), text: "discard".into() },
+            _paste: Some(PastePermit::acquire(&pending, &generation)?),
+        };
+        let (started, starting) = mpsc::channel();
+        let (finished, completion) = mpsc::channel();
+        let worker = thread::spawn(move || {
+            started.send(()).unwrap();
+            let mut output = Vec::new();
+            let mut errors = Vec::new();
+            assert!(write_message(message, &mut output, &mut |error| errors.push(error)));
+            finished.send((output, errors)).unwrap();
+        });
+        starting.recv_timeout(std::time::Duration::from_secs(2))?;
+        generation.fetch_add(1, Ordering::AcqRel);
+        let result = completion.recv_timeout(std::time::Duration::from_secs(2));
+        drop(engine);
+        worker.join().unwrap();
+        let (output, errors) = result?;
+        assert!(output.is_empty() && errors.is_empty());
+        assert!(!pending.load(Ordering::Acquire));
+        let payload = InputPayload::NativePaste { terminal: Arc::downgrade(&terminal), text: "closed".into() };
+        drop(terminal);
+        assert!(payload.encode_pending(None)?.is_none());
+        Ok(())
+    }
+
+    #[test]
     fn canceled_paste_behind_blocked_writer_preserves_following_input() -> Result<()> {
         struct BlockedWriter {
             entered: Option<mpsc::Sender<()>>,
@@ -1720,18 +1779,8 @@ trap - EXIT HUP TERM
         }
         let before = session.output_bytes();
         session.input(b"G")?;
-        // A busy parser rejects before enqueueing; retry only that documented
-        // condition, never a request which may already have been accepted.
-        loop {
-            match session.paste(&text) {
-                Ok(()) => break,
-                Err(error) if error.to_string().contains("No paste input was queued") => {
-                    anyhow::ensure!(std::time::Instant::now() < deadline, "parser never admitted paste");
-                    thread::sleep(std::time::Duration::from_millis(1));
-                }
-                Err(error) => return Err(error),
-            }
-        }
+        // Native paste admission must succeed without retrying parser contention.
+        session.paste(&text)?;
         session.input(b"AFTER")?;
         while session.exit_status().is_none() || session.output_bytes() - before < 250_000 {
             anyhow::ensure!(std::time::Instant::now() < deadline, "concurrent paste/output timed out");
