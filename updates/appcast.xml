@@ -3,14 +3,14 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.3</title>
-            <pubDate>Sat, 21 Nov 2026 04:59:31 +0000</pubDate>
+            <title>0.1.4</title>
+            <pubDate>Sat, 21 Nov 2026 14:52:57 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:version>0.1.3</sparkle:version>
-            <sparkle:shortVersionString>0.1.3</sparkle:shortVersionString>
+            <sparkle:version>0.1.4</sparkle:version>
+            <sparkle:shortVersionString>0.1.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.3/rmux-0.1.3-macos-arm64.zip" length="6886588" type="application/octet-stream" sparkle:edSignature="KtxgqM4UhtqfPGEe/o1dzk1dDusgtvnCOnQwPPN76kiRspOevfVHe/oPUMWLwkHKwUcG3zUIAPsyeA5wdDyFBQ=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.4/rmux-0.1.4-macos-arm64.zip" length="6896052" type="application/octet-stream" sparkle:edSignature="tUawYqWkFWq8psbLe2aN51ctxDuqwRwk565EipF1C5gEriaHeg4TD2HTlUa1P+CRY8//IIMj/QRBkE8tt8FQCQ=="/>
         </item>
     </channel>
 </rss>

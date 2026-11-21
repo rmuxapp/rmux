@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Published v0.1.4 with all six GitHub-built assets. All native jobs succeeded;
+publication succeeded, then the Sparkle-feed push collided with a concurrent main
+update. Recovered the unchanged generated appcast from the published release.
+Added bounded retry that reapplies only the feed when main advances; it never
+force-pushes and still fails on permission errors or exhausted retries.
+
 Built and ran the actual shared rmux text field in the browser through GPUI CE.
 The isolated host bundles licensed Inter, uses a mise-managed wasm-bindgen loader,
 and binds editing shortcuts. Browser interaction verified typing, select-all,

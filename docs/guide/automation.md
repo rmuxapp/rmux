@@ -226,7 +226,7 @@ selects that pane's terminal within its window without requesting OS activation.
 Busy, missing and invalid destinations retain the RPC error behavior. These are
 rmux command forms, not a claim of complete cmux CLI compatibility.
 
-## Focus history (next release)
+## Focus history (v0.1.4+)
 
 Use `rmuxctl focus-back --window ID` or `rmuxctl focus-forward --window ID`.
 Both support `--activate` and offline shell completion. Obtain the window ID

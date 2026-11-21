@@ -47,12 +47,27 @@ run('gh', 'release', 'create', tag, *(str(path) for path in assets), str(checksu
     '--repo', repo, '--verify-tag', '--title', f'rmux {version} — preview',
     '--notes-file', f'docs/releases/{tag}.md', '--prerelease', '--draft')
 run('gh', 'release', 'edit', tag, '--repo', repo, '--draft=false')
-run('git', 'fetch', 'origin', 'main')
-run('git', 'checkout', '-B', 'main', 'origin/main')
-Path('updates').mkdir(exist_ok=True)
-shutil.copyfile(output/'appcast.xml', 'updates/appcast.xml')
+# Source development can advance main between fetch and feed push. Reapply only
+# the generated feed on the latest main; never force-push or replay other edits.
 run('git', 'config', 'user.name', 'github-actions[bot]')
 run('git', 'config', 'user.email', '41898282+github-actions[bot]@users.noreply.github.com')
-run('git', 'add', 'updates/appcast.xml')
-run('git', 'commit', '-m', f'Publish Sparkle feed for {tag}')
-run('git', 'push', 'origin', 'main')
+for attempt in range(3):
+    run('git', 'fetch', 'origin', 'main')
+    base = subprocess.check_output(['git', 'rev-parse', 'origin/main'], text=True).strip()
+    run('git', 'checkout', '-B', 'main', 'origin/main')
+    Path('updates').mkdir(exist_ok=True)
+    shutil.copyfile(output/'appcast.xml', 'updates/appcast.xml')
+    run('git', 'add', 'updates/appcast.xml')
+    changed = subprocess.run(['git', 'diff', '--cached', '--quiet']).returncode
+    if changed == 0:
+        break
+    if changed != 1:
+        raise SystemExit('Cannot inspect staged Sparkle feed')
+    run('git', 'commit', '-m', f'Publish Sparkle feed for {tag}')
+    pushed = subprocess.run(['git', 'push', 'origin', 'main'])
+    if pushed.returncode == 0:
+        break
+    run('git', 'fetch', 'origin', 'main')
+    current = subprocess.check_output(['git', 'rev-parse', 'origin/main'], text=True).strip()
+    if current == base or attempt == 2:
+        raise SystemExit('Sparkle feed push failed; release assets are already published')
