@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Measured startup readiness of the installed GitHub-built v0.1.4 release with its
+bundled CLI and the isolated fixture shell. Three fresh processes exited normally;
+median socket / terminal registration / readable shell output were
+227.7 / 231.4 / 234.7 ms. Raw samples and binary hash are recorded in
+docs/benchmarks/startup-release-v0.1.4.jsonl, with method and limits in
+performance.md. This is a release readiness baseline, not first-frame latency or
+controlled cold-start acceptance, and does not establish a speedup over debug.
+
 Added optional native startup milestone measurement to the split harness:
 socket availability, first terminal registration and parsed fixture shell output.
 A fresh debug build and three isolated one-pane runs completed normally. Median

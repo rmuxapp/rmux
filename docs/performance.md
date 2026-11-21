@@ -490,3 +490,21 @@ RPC milestones include CLI subprocess and request overhead. Parsed output does
 not prove a presented frame, interactive window, IME readiness or normal user
 shell startup. Three samples do not establish tail percentiles. Release startup
 and input-to-display acceptance remain open.
+
+The same harness also measured the installed GitHub-built v0.1.4 release, using
+its bundled `rmuxctl`, on the same macOS ARM64 host:
+
+| Milestone | Run 1 | Run 2 | Run 3 | Median |
+| --- | ---: | ---: | ---: | ---: |
+| Socket available | 261.6 ms | 227.7 ms | 209.5 ms | 227.7 ms |
+| First terminal registered | 267.5 ms | 231.4 ms | 221.5 ms | 231.4 ms |
+| Fixture shell output readable | 303.3 ms | 234.7 ms | 224.7 ms | 234.7 ms |
+
+[Release raw samples and binary hash](benchmarks/startup-release-v0.1.4.jsonl).
+All three runs exited normally. Reproduce with the command above plus
+`--binary <v0.1.4-app>/Contents/MacOS/rmux
+--cli <v0.1.4-app>/Contents/MacOS/rmuxctl --label release-v0.1.4`.
+This establishes a shipped-binary readiness baseline with the same polling and
+fixture limitations. It is not a release-versus-debug speed comparison: the
+product revisions differ, and OS caches/background load were not controlled.
+Cold-start and first-presented-frame acceptance still need dedicated measurement.
