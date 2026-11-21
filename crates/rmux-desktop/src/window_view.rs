@@ -4668,9 +4668,7 @@ impl Render for WorkspaceWindow {
                         div.child(
                             crate::workspace_presentation::toolbar()
                                 .when(cfg!(target_os = "macos") && !self.sidebar, |header| header.pl(px(80.)))
-                                .child(pane_view::pane_control("toolbar-sidebar", "Toggle Sidebar")
-                                    .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSidebar), cx); } })
-                                    .child(icons::icon("sidebar")))
+                                .child(crate::workspace_presentation::sidebar_toggle())
                                 .child(crate::workspace_presentation::title("workspace-title-drag", entry.name.clone())
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } }))
                                 .child(pane_view::pane_control("toolbar-notifications", "Toggle Notifications")

@@ -8,3 +8,12 @@ pub(crate) fn title(id: impl Into<ElementId>, name: impl Into<SharedString>) -> 
     div().id(id).flex_1().min_w_0().truncate().text_size(px(13.))
         .font_weight(FontWeight::SEMIBOLD).child(name.into())
 }
+
+pub(crate) fn sidebar_toggle() -> Stateful<Div> {
+    crate::pane_presentation::control_button("toolbar-sidebar")
+        .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Toggle Sidebar".into())).into())
+        .on_click(|event, window, cx| {
+            if event.standard_click() { window.dispatch_action(Box::new(crate::ToggleSidebar), cx); }
+        })
+        .child(crate::icons::icon("sidebar"))
+}

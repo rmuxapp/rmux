@@ -1,9 +1,10 @@
 //! Workspace defaults shared by native and browser hosts.
 use gpui::KeyBinding;
-use crate::{NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
+use crate::{NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, ToggleSidebar, SelectWorkspaceNumber};
 
 pub(crate) fn bindings(mac: bool) -> Vec<KeyBinding> {
     let mut bindings = vec![
+        KeyBinding::new(if mac { "cmd-b" } else { "ctrl-shift-b" }, ToggleSidebar, None),
         KeyBinding::new(if mac { "ctrl-cmd-g" } else { "ctrl-alt-g" }, NewWorkspaceGroup, None),
         KeyBinding::new(if mac { "cmd-n" } else { "ctrl-shift-n" }, NewWorkspace, None),
         KeyBinding::new(if mac { "cmd-alt-down" } else { "ctrl-alt-down" }, NextWorkspace, None),

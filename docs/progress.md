@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Sidebar toggle control and default shortcut are now shared by both hosts. Browser
+supports the toolbar icon, palette command and Cmd+B (Ctrl+Shift+B off macOS).
+A mouse smoke check caught lost terminal focus after collapsing; browser now
+restores the active terminal/empty-workspace focus. Verified mouse collapse, help
+input, Cmd+B restoration and retained output. Native check and WASM build pass.
+Evidence: target/shared-sidebar-toggle.jpg.
+
 Workspace toolbar frame/title styling is now shared through workspace_presentation.
 Browser uses the native 36px toolbar, border, spacing and truncated semibold title;
 its title now follows the workspace instead of always saying rmux. Native check

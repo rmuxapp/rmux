@@ -24,7 +24,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
-    CommandId::NewWorkspace, CommandId::NewTab,
+    CommandId::NewWorkspace, CommandId::NewTab, CommandId::ToggleSidebar,
     CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
@@ -40,7 +40,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -165,6 +165,7 @@ impl InputProbe {
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
             if let Some(action) = tab_action(*command) { action } else { match command {
+                CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
                 CommandId::LastWorkspace => Box::new(LastWorkspace),
@@ -263,7 +264,7 @@ impl InputProbe {
                 if let Some(tree) = &mut self.tree { tree.resize_direction(&self.focused, direction); }
             }
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
-            command @ (CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
+            command @ (CommandId::ToggleSidebar | CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
                 | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);
                 cx.emit(WorkspaceCommand(command));
@@ -310,6 +311,7 @@ impl Render for InputProbe {
             .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(workspace_presentation::toolbar()
+                .child(workspace_presentation::sidebar_toggle())
                 .child(workspace_presentation::title("workspace-title", self.name.clone()))
                 .child(div().text_xs().text_color(rgb(0x9b9ba3)).child("Sample sessions"))
                 .child(div().id("open-commands").px_2().py_1().rounded_sm().text_size(px(13.)).cursor_pointer().hover(|style| style.bg(rgb(0x353535))).child("Commands")

@@ -1,9 +1,10 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
-use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, LastWorkspace, SelectWorkspaceNumber};
+use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar, SelectWorkspaceNumber};
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
+    sidebar: bool,
     previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     empty_focus: FocusHandle,
     workspace_scroll: ScrollHandle,
@@ -13,7 +14,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
+        let mut host = Self { workspaces, active: 0, sidebar: true, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -24,6 +25,7 @@ impl BrowserHost {
                 CommandId::CloseWorkspace => this.close_workspace(window, cx),
                 CommandId::NewWorkspace => this.add(window, cx),
                 CommandId::NewWorkspaceGroup => this.new_group(window, cx),
+                CommandId::ToggleSidebar => this.toggle_sidebar(window, cx),
                 CommandId::LastWorkspace => this.last_workspace(window, cx),
                 CommandId::NextWorkspace => this.cycle(1, window, cx),
                 CommandId::PreviousWorkspace => this.cycle(-1, window, cx),
@@ -100,6 +102,13 @@ impl BrowserHost {
         self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
     }
+    fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.sidebar = !self.sidebar;
+        if let Some((_, workspace)) = self.workspaces.get(self.active) {
+            workspace.update(cx, |workspace, cx| workspace.close_palette(window, cx));
+        } else { self.empty_focus.focus(window, cx); }
+        cx.notify();
+    }
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(index) = self.workspaces.iter().position(|(_, entity)|
             Some(entity.entity_id()) == self.previous_workspace.target()) {
@@ -160,6 +169,7 @@ impl BrowserHost {
 impl Render for BrowserHost {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div().size_full().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
+            .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| this.toggle_sidebar(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.new_group(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.add(window, cx)))
             .on_action(cx.listener(|this, _: &LastWorkspace, window, cx| this.last_workspace(window, cx)))
@@ -170,7 +180,7 @@ impl Render for BrowserHost {
                     this.select(index, window, cx);
                 }
             }))
-            .child(sidebar_presentation::sidebar(220.)
+            .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(220.)
                 .child(sidebar_presentation::header()
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child("Workspaces"))
                     .child(div().id("new-workspace").px_2().cursor_pointer().child("+")
@@ -199,7 +209,7 @@ impl Render for BrowserHost {
                                 })
                                 .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                             .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx)))
-                    })) ))
+                    })) )))
 
              .child(div().flex_1().min_w_0().h_full().child(
                 if let Some((_, workspace)) = self.workspaces.get(self.active) {
