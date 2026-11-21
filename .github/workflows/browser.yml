@@ -58,11 +58,12 @@ jobs:
             browser-macos-
       - name: Prepare pinned Ghostty dependency
         run: mise run bootstrap
-      - name: Test nonblocking focus input
+      - name: Test nonblocking input and close lifecycle
         run: |
           mise exec -- cargo test --locked -p rmux-core keyboard::tests
           mise exec -- cargo test --locked -p rmux-terminal queued_
           mise exec -- cargo test --locked -p rmux-terminal paste
+          mise exec -- cargo test --locked -p rmux-terminal explicit_close_reaps_child_while_session_is_retained
           mise exec -- cargo test --locked -p rmux-terminal opportunistic_snapshot_and_targeted_input_do_not_wait_for_parser_lock
       - name: Test browser policy and state transitions
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser browser_

@@ -191,6 +191,8 @@ pub struct MetadataUpdate {
 #[derive(Clone)]
 pub struct ShutdownHandle {
     exit: Arc<Mutex<Option<String>>>,
+    closing: Arc<AtomicBool>,
+    paste_generation: Arc<AtomicU64>,
     completed: async_channel::Receiver<()>,
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     process_wakeup: crate::process_wakeup::ProcessWakeup,
@@ -199,6 +201,10 @@ pub struct ShutdownHandle {
 }
 impl ShutdownHandle {
     pub fn request(&self) -> Result<()> {
+        // Cancel pending paste before touching the process, including when the
+        // engine is busy or the UI retains this session after closing its pane.
+        self.closing.store(true, Ordering::Release);
+        self.paste_generation.fetch_add(1, Ordering::AcqRel);
         if self
             .exit
             .lock()
@@ -334,6 +340,7 @@ impl Session {
         let input_notify = notify.clone();
         let (completion, completed) = async_channel::bounded(1);
         let reply_writer = writer.clone();
+        let paste_generation = Arc::new(AtomicU64::new(0));
         let session = Self {
             initial_directory,
             remote_destination: None,
@@ -345,10 +352,12 @@ impl Session {
             writer,
             input_errors,
             paste_pending: Arc::new(AtomicBool::new(false)),
-            paste_generation: Default::default(),
+            paste_generation: paste_generation.clone(),
             follow_output_pending: AtomicBool::new(false),
             shutdown: ShutdownHandle {
                 exit: exit.clone(),
+                closing: Arc::new(AtomicBool::new(false)),
+                paste_generation,
                 completed,
                 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
                 killer: Arc::new(Mutex::new(killer)),
@@ -734,6 +743,7 @@ impl Session {
     fn paste_input(&self, text: std::borrow::Cow<'_, str>) -> Result<()> {
         anyhow::ensure!(self.exit_status().is_none(), "process has exited");
         let permit = PastePermit::acquire(&self.paste_pending, &self.paste_generation)?;
+        anyhow::ensure!(!self.shutdown.closing.load(Ordering::Acquire), "terminal is closing");
         self.writer.try_send(InputMessage {
             payload: InputPayload::NativePaste { terminal: Arc::downgrade(&self.terminal), text: text.into_owned() },
             _paste: Some(permit),
@@ -749,6 +759,7 @@ impl Session {
     fn queue_paste(&self, text: std::borrow::Cow<'_, str>) -> Result<bool> {
         anyhow::ensure!(self.exit_status().is_none(), "process has exited");
         let permit = PastePermit::acquire(&self.paste_pending, &self.paste_generation)?;
+        anyhow::ensure!(!self.shutdown.closing.load(Ordering::Acquire), "terminal is closing");
         let bracketed = {
             let terminal = match self.terminal.try_lock() {
                 Ok(terminal) => terminal,
@@ -1905,7 +1916,18 @@ trap - EXIT HUP TERM
             thread::sleep(std::time::Duration::from_millis(10));
         }
         let shutdown = session.shutdown_handle();
+        let engine = session.terminal.lock().unwrap();
+        session.paste("must not reach the closing shell\n")?;
         shutdown.request()?;
+        while session.paste_pending() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "closing paste waited for parser release");
+            thread::sleep(std::time::Duration::from_millis(1));
+        }
+        assert!(session.paste("new paste").is_err());
+        assert!(session.try_paste_without_scroll("automation paste").is_err());
+        assert!(!session.paste_pending(), "rejected paste retained its permit");
+        assert!(session.take_input_error().is_none());
+        drop(engine);
         shutdown.request()?; // Repeated close and later Drop remain safe.
         while !shutdown.is_finished() {
             anyhow::ensure!(std::time::Instant::now() < deadline, "retained session kept child alive");

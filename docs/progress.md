@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Explicit terminal shutdown now cancels queued paste before requesting process
+termination, even if the session remains owned by UI code. Native and automation
+paste admission reject a closing terminal. The retained-session close fixture
+holds the parser lock, queues a paste, closes the session, and verifies the paste
+permit is released before unlocking; subsequent pastes fail without retaining a
+permit. The child then reaps normally. This fixture and the ten paste tests pass
+on macOS; CI now includes the focused close fixture as well.
+
 Native paste now reserves the bounded writer queue without acquiring the parser
 lock on the UI thread. The writer resolves bracketed-paste mode immediately
 before encoding and honors cancellation while waiting for the parser. The 1 MiB
