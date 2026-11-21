@@ -113,10 +113,13 @@ impl BrowserHost {
         self.select(index,window,cx);
         true
     }
-    fn new_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if !self.add_workspace(false, window, cx) { return; }
-        self.workspace_state.create_group(self.workspace_state.active, true, |(_, entity)| entity.entity_id())
+    fn create_group(&mut self, empty: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if empty && !self.add_workspace(false, window, cx) { return; }
+        if self.workspace_state.entries.get(self.workspace_state.active).is_none() { return; }
+        self.workspace_state.create_group(self.workspace_state.active, empty, |(_, entity)| entity.entity_id())
             .expect("new workspace is a valid group anchor");
+        self.sidebar = true;
+        self.scroll_to_workspace();
         cx.notify();
     }
 
@@ -126,7 +129,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
         match command {
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
             CommandId::NewWorkspace => self.add(window, cx),
-            CommandId::NewWorkspaceGroup => self.new_group(window, cx),
+            CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
+            CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
             CommandId::ToggleSidebar => self.toggle_sidebar(window, cx),
             CommandId::LastWorkspace => self.last_workspace(window, cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),

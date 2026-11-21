@@ -4052,6 +4052,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
+            CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
             CommandId::UngroupWorkspaces => self.ungroup_active(cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),
             CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
@@ -4341,7 +4342,6 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &GroupCurrentWorkspace, window, cx| this.create_group(false, window, cx)))
             .on_action(cx.listener(|this, _: &GroupSelectedWorkspaces, window, cx| this.group_selected(window, cx)))
             .on_action(cx.listener(|this, _: &RenameWorkspaceGroup, window, cx| this.edit_metadata(MetadataField::GroupName, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))

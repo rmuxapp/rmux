@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added the browser palette's missing New Group from Current Workspace command,
+routed through shared workspace actions and shared group-creation state. Native
+uses the same action binding instead of a separate listener. Browser grouping
+retains the existing terminal, reveals the sidebar, and scrolls to the active
+group; new empty groups use the same path with explicit generated provenance.
+Native check and WASM build pass. Browser smoke verified grouping an existing
+sample session, new-workspace group inheritance, and switching back with retained
+output. Screenshot: target/shared-current-workspace-group.jpg. Not deployed yet.
+
 Single-workspace group creation and automatic group naming now live in shared
 workspace `State`, used by native and browser hosts. Moving an existing anchor
 into a new group preserves the old group's promoted-anchor sidebar slot and the
