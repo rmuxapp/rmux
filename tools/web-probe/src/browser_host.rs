@@ -125,21 +125,15 @@ impl BrowserHost {
     fn add_workspace(&mut self, inherit_group: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.workspaces.len() >= 16 { return false; }
         let current = self.workspaces.get(self.active).map(|(_, entity)| entity.entity_id());
-        let group = current.filter(|_| inherit_group).and_then(|id| self.groups.containing(id)).map(|group| group.id);
         let name = (1..).map(|number| format!("Workspace {number}"))
             .find(|name| !self.workspaces.iter().any(|(existing, _)| existing == name)).unwrap();
         let entity = Self::new_workspace_view(name.clone(), window, cx);
-        if let Some(group) = group {
-            self.groups.add_new(group, entity.entity_id(), current, rmux_core::workspace_groups::Placement::AfterCurrent)
-                .expect("current group exists");
-        }
-        let index = if group.is_some() { self.workspaces.len() } else {
-            let entries: Vec<_> = self.workspaces.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
-            self.groups.new_workspace_index(&entries, self.active, Default::default())
-        };
-        // Preserve the outgoing workspace identity until select releases its caches.
-        if !self.workspaces.is_empty() && index <= self.active { self.active += 1; }
-        self.workspaces.insert(index, (name,entity));
+        let Ok(index) = rmux_core::workspace_lifecycle::insert(
+            &mut self.workspaces, &mut self.active, &mut self.groups, (name, entity),
+            rmux_core::workspace_lifecycle::Insertion {
+                origin: current, inherit_group, placement: Default::default(),
+            }, |(_, entity)| (entity.entity_id(), false),
+        ) else { return false; };
         self.select(index,window,cx);
         true
     }

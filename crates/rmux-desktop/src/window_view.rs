@@ -3808,13 +3808,11 @@ impl WorkspaceWindow {
         let closed = Self::observe_workspace(&workspace, window, cx);
         let metadata = Self::observe_metadata(&workspace, window, cx);
         let last_pane = workspace.read(cx).panes.last().map(Entity::entity_id);
-        let index = if parent_group.is_some() { self.entries.len() } else {
-            let entries: Vec<_> = self.entries.iter().map(|entry| (entry.workspace.entity_id(), entry.pinned)).collect();
-            self.groups.new_workspace_index(&entries, origin_index,
-                placement.unwrap_or(cx.global::<Preferences>().new_workspace_placement))
-        };
-        if !self.entries.is_empty() && index <= self.active { self.active += 1; }
-        self.entries.insert(index, Entry {
+        let origin = self.entries.get(origin_index).map(|entry| entry.workspace.entity_id());
+        let placement = placement.unwrap_or(if parent_group.is_some() {
+            cx.global::<Preferences>().group_new_workspace_placement
+        } else { cx.global::<Preferences>().new_workspace_placement });
+        let entry = Entry {
             workspace,
             name: format!("Workspace {}", self.next_number),
             description: String::new(),
@@ -3824,15 +3822,16 @@ impl WorkspaceWindow {
             last_pane,
             _closed: closed,
             _metadata: metadata,
-        });
+        };
+        let index = match rmux_core::workspace_lifecycle::insert(
+            &mut self.entries, &mut self.active, &mut self.groups, entry,
+            rmux_core::workspace_lifecycle::Insertion { origin, inherit_group, placement },
+            |entry| (entry.workspace.entity_id(), entry.pinned),
+        ) {
+            Ok(index) => index,
+            Err(error) => { self.notice = Some(format!("Add workspace: {error}")); cx.notify(); return None; }
+        };
         self.next_number += 1;
-        if let Some((group, after)) = parent_group {
-            let member = self.entries[index].workspace.entity_id();
-            if let Err(error) = self.groups.add_new(group, member, Some(after), placement.unwrap_or(cx.global::<Preferences>().group_new_workspace_placement)) {
-                self.notice = Some(format!("Add workspace to group: {error}"));
-            }
-            if let Some(group) = self.groups.get_mut(group) { group.collapsed = false; }
-        }
         if focus {
         self.activate_workspace(index);
         self.scroll_to_workspace(self.active);

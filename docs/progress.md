@@ -2,6 +2,19 @@
 
 ## Current implementation focus
 
+Workspace insertion now uses the shared lifecycle in desktop configured creation
+and browser sample creation. It accepts an already-created entry, resolves origin
+by identity, handles group inheritance/placement, reveals the parent and preserves
+the outgoing active identity until explicit selection. Duplicate identities and
+missing origins reject before membership/list mutation. Native directory lookup,
+process creation, subscriptions and placement preferences stay in host services;
+browser limits and sample construction remain its adapter. Five lifecycle tests
+pass, covering grouped insertion, top insertion before the active workspace,
+invalid origins/duplicates and empty-window creation, plus prior close/select/
+ungroup cases. Desktop and WASM checks pass. Runtime startup behavior was not
+re-tested; not deployed. Full shared views, terminal services and application
+entry-point migration remain unfinished.
+
 Workspace selection now commits active identity, previous-workspace history and
 collapsed-group reveal through one core lifecycle operation. Native regular
 selection, terminal targeting, same/cross-window tab transfer and focused creation

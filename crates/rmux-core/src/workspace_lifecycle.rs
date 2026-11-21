@@ -15,6 +15,41 @@ pub fn select<T, W: Copy + Eq>(
     true
 }
 
+pub struct Insertion<W> {
+    pub origin: Option<W>,
+    pub inherit_group: bool,
+    pub placement: workspace_groups::Placement,
+}
+
+/// Attach an already-created workspace without selecting it. Preserve the old
+/// active identity until the host explicitly selects the new entry. Validate
+/// identity/origin before mutating membership or entry ownership.
+pub fn insert<T, W: Copy + Eq>(
+    entries: &mut Vec<T>, active: &mut usize, groups: &mut Groups<W>,
+    entry: T, request: Insertion<W>, metadata: impl Fn(&T) -> (W, bool),
+) -> anyhow::Result<usize> {
+    let member = metadata(&entry).0;
+    let identities: Vec<_> = entries.iter().map(&metadata).collect();
+    anyhow::ensure!(!identities.iter().any(|(id, _)| *id == member), "workspace already exists");
+    let origin = match request.origin {
+        Some(id) => identities.iter().position(|(candidate, _)| *candidate == id)
+            .ok_or_else(|| anyhow::anyhow!("workspace origin no longer exists"))?,
+        None => { anyhow::ensure!(entries.is_empty(), "workspace origin is required"); 0 }
+    };
+    let parent = request.origin.filter(|_| request.inherit_group)
+        .and_then(|id| groups.containing(id)).map(|group| group.id);
+    let index = if let Some(parent) = parent {
+        groups.add_new(parent, member, request.origin, request.placement)?;
+        groups.get_mut(parent).unwrap().collapsed = false;
+        entries.len()
+    } else {
+        groups.new_workspace_index(&identities, origin, request.placement)
+    };
+    if !entries.is_empty() && index <= *active { *active += 1; }
+    entries.insert(index, entry);
+    Ok(index)
+}
+
 pub struct ClosedWorkspace<T> {
     /// Keep ownership alive until the host finishes its subscriptions/UI cleanup.
     pub removed: T,
@@ -85,6 +120,43 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn insertion_preserves_outgoing_identity_and_group_member_order() {
+        use workspace_groups::Placement;
+        let mut entries = vec![(1, false), (2, false)];
+        let mut active = 1;
+        let mut groups = Groups::default();
+        let group = groups.create("group".into(), vec![1, 2], false).unwrap();
+        groups.get_mut(group).unwrap().collapsed = true;
+        let index = insert(&mut entries, &mut active, &mut groups, (3, false), Insertion {
+            origin: Some(2), inherit_group: true, placement: Placement::AfterCurrent,
+        }, |entry| *entry).unwrap();
+        assert_eq!(index, 2);
+        assert_eq!(entries[active].0, 2);
+        assert_eq!(groups.entries()[0].members, vec![1, 2, 3]);
+        assert!(!groups.entries()[0].collapsed);
+        let index = insert(&mut entries, &mut active, &mut groups, (4, false), Insertion {
+            origin: Some(2), inherit_group: false, placement: Placement::Top,
+        }, |entry| *entry).unwrap();
+        assert_eq!(index, 0);
+        assert_eq!(entries[active].0, 2);
+        let before = entries.clone();
+        for (member, origin) in [(4, Some(2)), (5, Some(99)), (5, None)] {
+            assert!(insert(&mut entries, &mut active, &mut groups, (member, false), Insertion {
+                origin, inherit_group: true, placement: Placement::End,
+            }, |entry| *entry).is_err());
+            assert_eq!(entries, before);
+            assert_eq!(entries[active].0, 2);
+            assert_eq!(groups.entries()[0].members, vec![1, 2, 3]);
+        }
+        let mut empty = vec![];
+        let mut first = 0;
+        assert_eq!(insert(&mut empty, &mut first, &mut Groups::default(), (9, false), Insertion {
+            origin: None, inherit_group: true, placement: Placement::AfterCurrent,
+        }, |entry| *entry).unwrap(), 0);
+        assert_eq!(empty[first].0, 9);
+    }
 
     #[test]
     fn selection_reveals_groups_preserves_toggle_and_ignores_stale_indices() {
