@@ -3849,18 +3849,9 @@ impl WorkspaceWindow {
         let metadata = Self::observe_metadata(&workspace, window, cx);
         let last_pane = workspace.read(cx).panes.last().map(Entity::entity_id);
         let index = if parent_group.is_some() { self.entries.len() } else {
-            let anchor = self.entries.get(origin_index).and_then(|entry| self.groups.containing(entry.workspace.entity_id()))
-                .and_then(|group| group.members.first()).and_then(|anchor| self.entries.iter().position(|entry| entry.workspace.entity_id() == *anchor))
-                .unwrap_or(origin_index);
-            let placement = placement.unwrap_or(cx.global::<Preferences>().new_workspace_placement);
-            // A new unpinned row cannot enter the pinned tier. Its nearest visual
-            // position after a pinned origin is the start of the unpinned tier,
-            // regardless of where the origin's anchor lives in storage.
-            let placement = if placement == workspace_groups::Placement::AfterCurrent
-                && !self.entries.is_empty() && self.top_level_pinned(origin_index) {
-                workspace_groups::Placement::Top
-            } else { placement };
-            workspace_groups::insertion_index(self.entries.len(), anchor, placement)
+            let entries: Vec<_> = self.entries.iter().map(|entry| (entry.workspace.entity_id(), entry.pinned)).collect();
+            self.groups.new_workspace_index(&entries, origin_index,
+                placement.unwrap_or(cx.global::<Preferences>().new_workspace_placement))
         };
         if !self.entries.is_empty() && index <= self.active { self.active += 1; }
         self.entries.insert(index, Entry {

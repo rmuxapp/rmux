@@ -88,6 +88,20 @@ impl<W> Default for Groups<W> {
 }
 
 impl<W: Copy + Eq> Groups<W> {
+    /// Storage position for a new top-level workspace. Group children use their
+    /// anchor as the origin; new unpinned rows cannot enter the pinned tier.
+    pub fn new_workspace_index(&self, workspaces: &[(W, bool)], current: usize, placement: Placement) -> usize {
+        let origin = workspaces.get(current);
+        let group = origin.and_then(|(id, _)| self.containing(*id));
+        let anchor = group.and_then(|group| group.members.first())
+            .and_then(|anchor| workspaces.iter().position(|(id, _)| id == anchor))
+            .unwrap_or(current);
+        let pinned = group.map(|group| group.pinned)
+            .unwrap_or_else(|| origin.is_some_and(|(_, pinned)| *pinned));
+        let placement = if placement == Placement::AfterCurrent && pinned { Placement::Top } else { placement };
+        insertion_index(workspaces.len(), anchor, placement)
+    }
+
     /// Pinned top-level rows first; member pins never split a group. Navigation
     /// can include collapsed children so hiding rows does not renumber shortcuts.
     pub fn ordered_indices(&self, workspaces: &[(W, bool)], include_collapsed: bool) -> Vec<usize> {
@@ -260,6 +274,19 @@ impl<W: Copy + Eq> Groups<W> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn new_workspaces_follow_group_anchors_and_respect_pinned_tiers() {
+        let mut groups = super::Groups::default();
+        let id = groups.create("Project".into(), vec![2u64, 4], false).unwrap();
+        let entries = [(1, false), (2, false), (3, false), (4, false)];
+        assert_eq!(groups.new_workspace_index(&entries, 3, Placement::AfterCurrent), 2);
+        assert_eq!(groups.new_workspace_index(&entries, 0, Placement::AfterCurrent), 1);
+        groups.get_mut(id).unwrap().pinned = true;
+        assert_eq!(groups.new_workspace_index(&entries, 3, Placement::AfterCurrent), 0);
+        assert_eq!(groups.new_workspace_index(&entries, 3, Placement::End), 4);
+        assert_eq!(groups.new_workspace_index(&[(1, true)], 0, Placement::AfterCurrent), 0);
+        assert_eq!(groups.new_workspace_index(&[], 0, Placement::AfterCurrent), 0);
+    }
     #[test]
     fn navigation_reveals_children_but_preserves_collapsed_anchors() {
         let mut groups = super::Groups::default();

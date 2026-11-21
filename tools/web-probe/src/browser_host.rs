@@ -124,8 +124,14 @@ impl BrowserHost {
             self.groups.add_new(group, entity.entity_id(), current, rmux_core::workspace_groups::Placement::AfterCurrent)
                 .expect("current group exists");
         }
-        self.workspaces.push((name,entity));
-        self.select(self.workspaces.len()-1,window,cx);
+        let index = if group.is_some() { self.workspaces.len() } else {
+            let entries: Vec<_> = self.workspaces.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
+            self.groups.new_workspace_index(&entries, self.active, Default::default())
+        };
+        // Preserve the outgoing workspace identity until select releases its caches.
+        if !self.workspaces.is_empty() && index <= self.active { self.active += 1; }
+        self.workspaces.insert(index, (name,entity));
+        self.select(index,window,cx);
         true
     }
     fn new_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {

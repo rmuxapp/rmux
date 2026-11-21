@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Workspace creation now uses the same top-level insertion policy in desktop and
+browser: after-current placement resolves grouped origins through their anchor
+and keeps new unpinned rows out of the pinned tier. Browser previously appended
+every new workspace. Core edge-case test, native check and WASM build pass.
+Browser smoke confirms Workspace 1 inserted between rmux and website and accepts
+help input; evidence: target/shared-workspace-placement.jpg.
+
 Desktop and browser now share grouped-workspace reveal and visible-row resolution.
 The browser sidebar tracks scroll position and requests the selected row into view
 on workspace switches, matching the native host. Focused core navigation test and
