@@ -8,6 +8,8 @@ extern "C" {
     fn create(columns: u16, rows: u16) -> u32;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = write)]
     fn write(id: u32, text: &str);
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = resize)]
+    fn resize(id: u32, columns: u16, rows: u16);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = snapshot)]
     fn snapshot(id: u32) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
@@ -23,6 +25,7 @@ pub struct TerminalEngine(u32);
 impl TerminalEngine {
     pub fn new(columns: u16, rows: u16) -> Self { Self(create(columns, rows)) }
     pub fn write(&self, text: &str) { write(self.0, text); }
+    pub fn resize(&self, columns: u16, rows: u16) { resize(self.0, columns, rows); }
     pub fn frame(&self, previous: Option<&Frame>) -> Frame {
         let patch: Patch = serde_json::from_str(&snapshot(self.0)).expect("browser Ghostty frame");
         let mut rows = previous.map(|f| f.rows.as_ref().clone()).unwrap_or_default();

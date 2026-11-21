@@ -56,13 +56,19 @@ impl Render for TerminalSample {
             .child(canvas(move |bounds, window, cx| entity.update(cx, |this, _| {
                 let family: SharedString = "Fira Mono".into();
                 let cells = CellMetrics::measured(14., family.clone(), window);
+                let content = crate::cell_metrics::content_bounds(bounds, 8);
+                let (columns, height) = cells.grid_size(content.size);
+                if columns != this.frame.columns || usize::from(height) != this.frame.rows.len() {
+                    this.engine.resize(columns, height);
+                    this.frame = this.engine.frame(Some(&this.frame));
+                }
                 let rows = this.rows.update(&this.frame, cells, &family, window, None);
-                (rows, cells, row_host::color(this.frame.background), bounds)
-            }), move |_, (rows, cells, background, bounds), window, cx| {
+                (rows, cells, row_host::color(this.frame.background), bounds, content)
+            }), move |_, (rows, cells, background, bounds, content), window, cx| {
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
                     window.paint_quad(fill(bounds, background));
                     for (y, row) in rows.iter().enumerate() {
-                        row_cache::paint_row(row, bounds.origin + point(px(8.), px(8. + y as f32 * cells.height)), None, None, cells, window, cx);
+                        row_cache::paint_row(row, content.origin + point(px(0.), px(y as f32 * cells.height)), None, None, cells, window, cx);
                     }
                 });
             }).size_full())

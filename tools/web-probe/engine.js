@@ -13,6 +13,12 @@ export function createHost(engine) {
       return id;
     },
     write(id, text) { sessions.get(id).terminal.write(text); },
+    resize(id, columns, rows) {
+      const state = sessions.get(id);
+      if (state.terminal.cols === columns && state.terminal.rows === rows) return;
+      state.terminal.resize(columns, rows);
+      state.first = true;
+    },
     free(id) { sessions.get(id)?.terminal.free(); sessions.delete(id); },
     snapshot(id) {
       const state = sessions.get(id), t = state.terminal;

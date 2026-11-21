@@ -2362,8 +2362,7 @@ impl Element for TerminalElement {
             .metrics
             .as_ref()
             .map(|_| std::time::Instant::now());
-        let columns = ((f32::from(bounds.size.width) / cells.width) as u16).max(1);
-        let rows = ((f32::from(bounds.size.height) / cells.height) as u16).max(1);
+        let (columns, rows) = cells.grid_size(bounds.size);
         let (frame, marked, focused) = self.view.update(cx, |view, cx| {
             let ready = match view.session.try_resize(columns, rows) {
                 Ok(Some(changed)) => {

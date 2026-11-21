@@ -33,7 +33,7 @@ measurements; JSON is not the final optimized transport.
 
 The engine's exported cells omit custom underline colors/styles and overline;
 those fields currently use foreground/straight underline/no overline. Cursor
-metadata is transferred but not painted yet. Resize, selection, tabs, workspaces,
+metadata is transferred but not painted yet. Selection, tabs, workspaces,
 divider dragging, broader input and browser acceptance remain pending. This is
 not the public demo replacement yet.
 
@@ -61,3 +61,8 @@ All eight native row-cache tests pass after the adapter extraction.
 colors, pane isolation, clear and disposal/recreation against the actual WASM
 engine. Browser typing verified different sample commands in two independent
 panes. Dependency licensing is copied into the build alongside the engine.
+
+Terminal geometry follows shared native cell metrics and padding on split/zoom.
+Resizes keep the same engine/session, invalidate all viewport rows, and skip work
+when dimensions are unchanged. Engine checks cover shrinking, growing, a 1×1
+viewport and repeated no-op geometry. Browser split/zoom retains visible output.

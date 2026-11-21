@@ -22,3 +22,18 @@ const reused = host.create(20,4);
 assert.ok(snap(reused).rows.every(([,cells])=>cells.every(c=>!c.text.trim())),'reused WASM memory starts clear');
 host.free(reused);
 console.log('Sparse updates, styles, pane isolation, clear and recreation passed.');
+const sized = host.create(40,8);
+host.write(sized,'left marker\r\nright marker');
+snap(sized);
+for (const [columns,height] of [[20,4],[80,24],[1,1],[40,8]]) {
+  host.resize(sized,columns,height);
+  const frame = snap(sized);
+  assert.equal(frame.columns,columns);
+  assert.equal(frame.height,height);
+  assert.equal(frame.rows.length,height,'resizes replace all cached rows');
+  assert.ok(frame.rows.every(([,cells])=>cells.length===columns));
+  host.resize(sized,columns,height);
+  assert.equal(snap(sized).rows.length,0,'unchanged geometry stays clean');
+}
+host.free(sized);
+console.log('Resize dimensions, full invalidation and unchanged-size no-op passed.');

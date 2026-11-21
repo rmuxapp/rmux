@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser terminal dimensions now follow pane content bounds through the same
+CellMetrics::grid_size and padding calculation used by native. Split/zoom resize
+the existing Ghostty instance; unchanged geometry skips resizing and snapshots.
+The adapter forces full row replacement after resize so old-width cached rows
+cannot survive. Three native cell-metric tests, WASM build and engine resize
+checks pass; browser split/zoom preserves visible session output. Cursor/input
+sharing and workspace integration remain the next browser parity work.
+
 Connected the shared browser row painter to live ghostty-web 0.4.0 engine
 instances per pane. The host transfers dirty rows only and Rust retains unchanged
 row Arc identities; there is no idle polling. ASCII sample commands now exercise

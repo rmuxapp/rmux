@@ -15,6 +15,10 @@ pub struct CellMetrics {
     pub height: f32,
 }
 impl CellMetrics {
+    pub fn grid_size(self, size: gpui::Size<gpui::Pixels>) -> (u16, u16) {
+        (((f32::from(size.width) / self.width) as u16).max(1),
+         ((f32::from(size.height) / self.height) as u16).max(1))
+    }
     pub fn measured(font_size: f32, family: gpui::SharedString, window: &gpui::Window) -> Self {
         let mut cells = Self::new(font_size);
         let system = window.text_system();
@@ -48,6 +52,14 @@ impl CellMetrics {
 #[cfg(test)]
 mod tests {
     use super::CellMetrics;
+    #[test]
+    fn grid_dimensions_floor_partial_cells_and_keep_one_cell() {
+        use gpui::{px, size};
+        let cells = CellMetrics::new(14.);
+        assert_eq!(cells.grid_size(size(px(84.), px(59.))), (9, 2));
+        assert_eq!(cells.grid_size(size(px(85.), px(60.))), (10, 3));
+        assert_eq!(cells.grid_size(size(px(0.), px(0.))), (1, 1));
+    }
     #[test]
     fn padding_preserves_origin_and_bounds_small_panes() {
         use gpui::{Bounds, point, px, size};
