@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser palette now snapshots workspace names/identities in logical order when
+opened, combines them with shared command titles in RankedSearch, and dispatches
+workspace selection by stable entity identity. Result labels follow native
+Switch to Workspace N: name wording. A scroll container bounds the combined
+catalog. WASM build passes; browser verified searching website, entering ls,
+switching away, then searching back with output and terminal focus retained.
+Evidence: target/shared-workspace-search-wasm.png. Collapsed-member search uses
+the existing reveal path but was not separately rechecked. Keyboard scrolling
+of off-screen results, contextual commands and shortcut hints remain pending.
+
+
 Connected shared CommandId entries for workspace creation, new empty group,
 next/previous workspace and ungrouping to browser host events from the native
 palette presentation/input. Ungrouping materializes logical order and preserves

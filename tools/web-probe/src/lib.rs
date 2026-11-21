@@ -26,6 +26,8 @@ const COMMANDS: &[CommandId] = &[
 ];
 struct WorkspaceCommand(CommandId);
 impl EventEmitter<WorkspaceCommand> for InputProbe {}
+enum PaletteRequest { Open, SelectWorkspace(EntityId) }
+impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace]);
@@ -40,6 +42,7 @@ mod clipboard {
 struct InputProbe {
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
+    workspace_results: Vec<(EntityId, String)>,
     selected: usize,
     feedback: Option<String>,
     tree: Option<PaneTree<usize>>,
@@ -65,7 +68,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -115,14 +118,33 @@ impl InputProbe {
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         cx.notify();
     }
+    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, cx: &mut Context<Self>) {
+        self.workspace_results = workspaces;
+        self.search = palette_match::RankedSearch::new(COMMANDS.iter().map(|command| command.title().to_lowercase())
+            .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase())).collect());
+        self.selected = 0;
+        cx.notify();
+    }
+    fn result_title(&self, index: usize) -> &str {
+        if let Some(command) = COMMANDS.get(index) { command.title() }
+        else { &self.workspace_results[index - COMMANDS.len()].1 }
+    }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = true;
+        cx.emit(PaletteRequest::Open);
         self.input.update(cx, |input, cx| { input.replace_draft("", cx); input.focus.focus(window, cx); });
         cx.notify();
     }
 
     fn choose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
+        if index >= COMMANDS.len() {
+            let Some((id, _)) = self.workspace_results.get(index - COMMANDS.len()) else { return; };
+            let id = *id;
+            self.close_palette(window, cx);
+            cx.emit(PaletteRequest::SelectWorkspace(id));
+            return;
+        }
         match COMMANDS[index] {
             CommandId::Split | CommandId::SplitBelow => {
                 if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
@@ -201,13 +223,13 @@ impl Render for InputProbe {
                 }))
                 .child(palette_view::heading("Shared rmux palette · development probe"))
                 .child(palette_view::search(self.input.clone()))
-                .children(self.search.matches.iter().enumerate().map(|(row, &index)| {
+                .child(div().id("palette-results").min_h_0().overflow_y_scroll().children(self.search.matches.iter().enumerate().map(|(row, &index)| {
                     palette_view::result(index, 36., row == self.selected)
-                        .child(div().flex_1().min_w_0().truncate().child(COMMANDS[index].title()))
+                        .child(div().flex_1().min_w_0().truncate().child(self.result_title(index).to_owned()))
                         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                             if event.standard_click() { this.selected = row; this.choose(window, cx); }
                         }))
-                }))
+                })))
                 .when(self.search.matches.is_empty(), |panel| panel.child(div().p_3().text_sm().child("No matching commands")))
                 .child(palette_view::footer().child(self.feedback.clone().unwrap_or_else(|| "↑↓ Navigate     ↵ Run     Esc Close".into()))))))
     }

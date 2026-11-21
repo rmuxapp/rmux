@@ -1,6 +1,6 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
-use crate::{InputProbe, WorkspaceCommand, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
+use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, SelectWorkspaceNumber};
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
@@ -24,6 +24,22 @@ impl BrowserHost {
                 CommandId::PreviousWorkspace => this.cycle(-1, window, cx),
                 CommandId::UngroupWorkspaces => this.ungroup(cx),
                 _ => {}
+            }
+        }).detach();
+        cx.subscribe_in(&entity, window, |this, source, request: &PaletteRequest, window, cx| {
+            match request {
+                PaletteRequest::Open => {
+                    let workspaces = this.workspace_order(true).into_iter().enumerate().map(|(position, index)| {
+                        let (name, entity) = &this.workspaces[index];
+                        (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
+                    }).collect();
+                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, cx));
+                }
+                PaletteRequest::SelectWorkspace(id) => {
+                    if let Some(index) = this.workspaces.iter().position(|(_, entity)| entity.entity_id() == *id) {
+                        this.select(index, window, cx);
+                    }
+                }
             }
         }).detach();
         entity

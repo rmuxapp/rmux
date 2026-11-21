@@ -157,3 +157,10 @@ Workspace actions emit events to the browser host. Ungroup retains logical order
 selection and sessions. Browser checks cover palette group creation and ungrouping
 with retained terminal output; WASM build passes. Workspace-name search and the
 rest of the native command catalog are still pending.
+
+Workspace-name search is now connected. Opening the palette takes a fresh logical
+workspace snapshot and indexes it alongside commands with the shared fuzzy matcher.
+Selecting a workspace result targets its stable entity and restores terminal focus.
+WASM build and browser search/switch/return checks pass with retained output.
+The combined list scrolls; keyboard-driven off-screen result visibility still
+needs completion.
