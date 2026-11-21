@@ -200,14 +200,7 @@ pub mod session;
 mod text_export;
 mod shell_integration;
 
-#[derive(Clone, Copy)]
-pub enum Scroll {
-    Lines(isize),
-    Prompts(isize),
-    LastPrompt,
-    Top,
-    Bottom,
-}
+pub use rmux_core::scroll::Scroll;
 
 /// Ghostty screen-page storage, excluding Rust snapshots, fonts and GPU assets.
 #[derive(Clone, Copy, Debug)]

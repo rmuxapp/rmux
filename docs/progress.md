@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Desktop and browser now share the Scroll command type and Shift navigation
+mapping in rmux-core. Shift+PageUp/Down overlaps one row between pages;
+Shift+Home/End selects top/bottom. Browser palette exposes native Scroll to Top
+and Scroll to Bottom commands for the active terminal. Two focused scroll tests,
+native check and WASM build pass. Browser verified Shift+Home, the PageDown
+overlap and palette return to the bottom without errors. Evidence:
+target/shared-scroll-navigation-wasm.png. Scrollbar controls and selection edge
+autoscroll remain pending.
+
 Measured and optimized the current direct browser-engine adapter, rather than
 reusing timings from ghostty-web. In the 80×24 synthetic benchmark, dense updates
 across 16 panes fell from 24.418 to 5.650 ms median (26.689 to 6.594 ms p95);

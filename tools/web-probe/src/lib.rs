@@ -26,6 +26,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
     CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
+    CommandId::ScrollToTop, CommandId::ScrollToBottom,
 ];
 struct WorkspaceCommand(CommandId);
 impl EventEmitter<WorkspaceCommand> for InputProbe {}
@@ -196,6 +197,10 @@ impl InputProbe {
     fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
         match command {
+            CommandId::ScrollToTop | CommandId::ScrollToBottom => {
+                let scroll = if command == CommandId::ScrollToTop { rmux_core::scroll::Scroll::Top } else { rmux_core::scroll::Scroll::Bottom };
+                if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.scroll(scroll,cx)); }
+            }
             CommandId::Split | CommandId::SplitBelow => {
                 if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if command == CommandId::Split { Axis::Columns } else { Axis::Rows };

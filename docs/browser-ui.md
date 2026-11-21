@@ -4,6 +4,10 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Scroll command types and Shift+PageUp/Down/Home/End navigation are now shared
+with desktop. Native command identities also expose top/bottom in the browser
+palette. Browser checks verify top, one-row page overlap and returning to bottom.
+
 Wheel scrollback now uses the native viewport API and shared Rust wheel
 accumulation. The browser check covers historical selection/copy and returning
 to the prompt on input. Scrollbar controls, keyboard scroll navigation and

@@ -17,6 +17,24 @@ pub(crate) struct TerminalSample {
     scroll_remainder: f32,
 }
 impl TerminalSample {
+    pub fn scroll(&mut self, scroll: rmux_core::scroll::Scroll, cx: &mut Context<Self>) {
+        use rmux_core::scroll::Scroll;
+        let (kind,delta) = match scroll {
+            Scroll::Lines(delta) => ("DELTA",delta),
+            Scroll::Prompts(delta) => ("DELTA_PROMPT",delta),
+            Scroll::Top => ("TOP",0),
+            Scroll::Bottom => ("BOTTOM",0),
+            Scroll::LastPrompt => {
+                self.engine.scroll("BOTTOM",0);
+                self.engine.scroll("DELTA_PROMPT",-1);
+                ("DELTA_PROMPT",i32::MAX as isize)
+            }
+        };
+        self.engine.scroll(kind,delta as i32);
+        self.frame = self.engine.frame(Some(&self.frame));
+        self.scroll_remainder = 0.;
+        cx.notify();
+    }
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
     pub fn release_render_cache(&mut self) {
         self.selecting = false;
@@ -48,6 +66,13 @@ impl TerminalSample {
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
         if key.modifiers.platform { return; }
+        if key.modifiers.shift && !key.modifiers.control && !key.modifiers.alt {
+            if let Some(scroll) = rmux_core::scroll::navigation(&key.key, self.frame.rows.len()) {
+                self.scroll(scroll,cx);
+                cx.stop_propagation();
+                return;
+            }
+        }
         // Printable text is committed by the platform input handler, as on desktop.
         if !key.modifiers.control && !key.modifiers.alt && key.key_char.is_some() { return; }
         let Some(symbol) = rmux_core::keyboard::key(&key.key) else { return; };

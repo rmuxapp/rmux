@@ -8,6 +8,11 @@ pub(crate) struct SamplePane {
     active: usize,
 }
 impl SamplePane {
+    pub fn scroll(&self, scroll: rmux_core::scroll::Scroll, cx: &mut App) {
+        if let Some(terminal) = self.terminals.get(self.active) {
+            terminal.update(cx, |terminal,cx| terminal.scroll(scroll,cx));
+        }
+    }
     pub fn release_render_caches(&mut self, cx: &mut Context<Self>) {
         for terminal in &self.terminals {
             terminal.update(cx, |terminal,_| terminal.release_render_cache());

@@ -1,5 +1,9 @@
 # Shared rmux web compatibility probe
 
+Shift+PageUp/Down and Shift+Home/End use the same scroll command type and
+navigation calculation as desktop. The palette also offers Scroll to Top and
+Scroll to Bottom. Browser checks cover top, page overlap and the bottom command.
+
 `mise run bench-native-vt` measures the current engine/JSON adapter at 1/4/16
 panes. See ../../docs/benchmarks/native-vt.md for baseline/optimized results and
 scope. It excludes Rust decoding and rendering. `bench-browser-engine` remains

@@ -1487,14 +1487,7 @@ impl TerminalView {
             return;
         }
         if key.modifiers.shift && !key.modifiers.control && !key.modifiers.alt {
-            let page = self.frame.rows.len().saturating_sub(1).max(1) as isize;
-            let scroll = match key.key.as_str() {
-                "pageup" => Some(Scroll::Lines(-page)),
-                "pagedown" => Some(Scroll::Lines(page)),
-                "home" => Some(Scroll::Top),
-                "end" => Some(Scroll::Bottom),
-                _ => None,
-            };
+            let scroll = rmux_core::scroll::navigation(&key.key, self.frame.rows.len());
             if let Some(scroll) = scroll {
                 self.scroll_remainder = 0.;
                 self.scroll(scroll, cx);
