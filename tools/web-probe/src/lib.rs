@@ -21,6 +21,8 @@ mod text_layout;
 mod fonts;
 #[path = "../../../crates/rmux-desktop/src/pane_actions.rs"]
 mod pane_actions;
+#[path = "../../../crates/rmux-desktop/src/workspace_actions.rs"]
+mod workspace_actions;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
@@ -47,7 +49,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -223,7 +225,7 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            if let Some(action) = tab_action(*command).or_else(|| pane_actions::action(*command)) { action } else { match command {
+            if let Some(action) = tab_action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)) { action } else { match command {
                 CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
@@ -268,7 +270,7 @@ impl InputProbe {
             return;
         }
         let command = COMMANDS[index];
-        if let Some(action) = pane_actions::action(command) {
+        if let Some(action) = pane_actions::action(command).or_else(|| workspace_actions::action(command)) {
             self.close_palette(window, cx);
             window.dispatch_action(action, cx);
         } else { self.execute(command, window, cx); }

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Workspace action routing now shares one GPUI module between WorkspaceWindow and
+BrowserHost: create/close workspace, create/ungroup group, next/previous/last
+workspace, toggle sidebar and numbered selection. Both palettes use its action
+factory; browser palette dispatch restores focus before bubbling the action to
+the host. Native handlers retain async shell startup, close confirmation and
+rename cleanup. Desktop check and WASM build pass. Browser smoke created a
+workspace with Cmd+N, closed it from Cmd+P, then typed into the selected successor;
+output/focus remained correct. Screenshot: target/shared-workspace-actions.jpg.
+Native runtime routing and every command were not re-tested. Not deployed.
+The full shared application entry point and GPUI backend boundary remain open.
+
 Workspace insertion now uses the shared lifecycle in desktop configured creation
 and browser sample creation. It accepts an already-created entry, resolves origin
 by identity, handles group inheritance/placement, reveals the parent and preserves

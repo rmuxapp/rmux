@@ -1,6 +1,6 @@
 //! Browser service host; workspace presentation comes from native sources.
 use gpui::{prelude::*, *};
-use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation, NewWorkspace, NewWorkspaceGroup, NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar, SelectWorkspaceNumber};
+use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
@@ -23,17 +23,7 @@ impl BrowserHost {
     fn new_workspace_view(name: String, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputProbe> {
         let entity = cx.new(|cx| InputProbe::new(name, window, cx));
         cx.subscribe_in(&entity, window, |this, _, command: &WorkspaceCommand, window, cx| {
-            match command.0 {
-                CommandId::CloseWorkspace => this.close_workspace(window, cx),
-                CommandId::NewWorkspace => this.add(window, cx),
-                CommandId::NewWorkspaceGroup => this.new_group(window, cx),
-                CommandId::ToggleSidebar => this.toggle_sidebar(window, cx),
-                CommandId::LastWorkspace => this.last_workspace(window, cx),
-                CommandId::NextWorkspace => this.cycle(1, window, cx),
-                CommandId::PreviousWorkspace => this.cycle(-1, window, cx),
-                CommandId::UngroupWorkspaces => this.ungroup(cx),
-                _ => {}
-            }
+            crate::workspace_actions::WorkspaceCommandHost::run_workspace_command(this, command.0, window, cx);
         }).detach();
         cx.subscribe_in(&entity, window, |this, source, request: &PaletteRequest, window, cx| {
             match request {
@@ -147,22 +137,32 @@ impl BrowserHost {
     }
 
 }
+impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
+    fn run_workspace_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        match command {
+            CommandId::CloseWorkspace => self.close_workspace(window, cx),
+            CommandId::NewWorkspace => self.add(window, cx),
+            CommandId::NewWorkspaceGroup => self.new_group(window, cx),
+            CommandId::ToggleSidebar => self.toggle_sidebar(window, cx),
+            CommandId::LastWorkspace => self.last_workspace(window, cx),
+            CommandId::NextWorkspace => self.cycle(1, window, cx),
+            CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
+            CommandId::UngroupWorkspaces => self.ungroup(cx),
+            _ => {}
+        }
+    }
+    fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = rmux_core::workspace_groups::numbered_target(&self.workspace_order(true), number) {
+            self.select(index, window, cx);
+        }
+    }
+}
 impl Render for BrowserHost {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let width = crate::sidebar_interaction::visible_width(self.sidebar_width, window);
         div().size_full().relative().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
             .child(crate::sidebar_interaction::drag_capture(cx))
-            .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| this.toggle_sidebar(window, cx)))
-            .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.new_group(window, cx)))
-            .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.add(window, cx)))
-            .on_action(cx.listener(|this, _: &LastWorkspace, window, cx| this.last_workspace(window, cx)))
-            .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
-            .on_action(cx.listener(|this, _: &PreviousWorkspace, window, cx| this.cycle(-1, window, cx)))
-            .on_action(cx.listener(|this, action: &SelectWorkspaceNumber, window, cx| {
-                if let Some(index) = rmux_core::workspace_groups::numbered_target(&this.workspace_order(true), action.number) {
-                    this.select(index, window, cx);
-                }
-            }))
+            .map(|root| crate::workspace_actions::bind(root, cx))
             .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(width)
                 .child(sidebar_presentation::header()
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child("Workspaces"))

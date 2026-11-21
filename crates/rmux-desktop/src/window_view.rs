@@ -4063,6 +4063,33 @@ impl WorkspaceWindow {
     }
 }
 
+impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
+    fn run_workspace_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        use rmux_core::commands::CommandId;
+        match command {
+            CommandId::CloseWorkspace => self.request_close_workspace(self.active, window, cx),
+            CommandId::NewWorkspace => self.start_workspace(None, window, cx),
+            CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
+            CommandId::UngroupWorkspaces => self.ungroup_active(cx),
+            CommandId::NextWorkspace => self.cycle(1, window, cx),
+            CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
+            CommandId::LastWorkspace => self.last_workspace(window, cx),
+            CommandId::ToggleSidebar => {
+                if self.rename.is_some() { self.select(self.active, window, cx); }
+                self.sidebar = !self.sidebar;
+                self.sidebar_drag = None;
+                cx.notify();
+            }
+            _ => {}
+        }
+    }
+    fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = workspace_groups::numbered_target(&self.workspace_order(true), number) {
+            self.select(index, window, cx);
+        }
+    }
+}
+
 impl Render for WorkspaceWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let background = cx.global::<Preferences>().window_background();
@@ -4131,7 +4158,6 @@ impl Render for WorkspaceWindow {
             .text_color(rgb(0xdcdfe6))
             .child(crate::sidebar_interaction::drag_capture(cx))
             .on_action(cx.listener(|this, _: &CloseWindow, window, cx| this.request_close_window(window, cx)))
-            .on_action(cx.listener(|this, _: &CloseWorkspace, window, cx| this.request_close_workspace(this.active, window, cx)))
             .on_action(cx.listener(|this, _: &ShowBufferPicker, window, cx| this.show_buffer_picker(command_palette::BufferMode::Paste, window, cx)))
             .on_action(cx.listener(|this, _: &ShowDeleteBufferPicker, window, cx| this.show_buffer_picker(command_palette::BufferMode::Delete, window, cx)))
             .on_action(cx.listener(|this, _: &ShowRenameBufferPicker, window, cx| this.show_buffer_picker(command_palette::BufferMode::Rename, window, cx)))
@@ -4324,7 +4350,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &EditWorkspaceIcon, window, cx| this.edit_metadata(MetadataField::Icon, window, cx)))
             .on_action(cx.listener(|this, _: &EditWorkspaceColor, window, cx| this.edit_metadata(MetadataField::Color, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))
-            .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.start_workspace(None, window, cx)))
             .on_action(cx.listener(|this, _: &RefreshTerminalMemory, window, cx| this.refresh_memory(window, cx)))
             .on_action(cx.listener(|this, _: &CycleTerminalMemorySort, _, cx| this.sort_memory(cx)))
             .on_action(cx.listener(|this, _: &ShowTerminalMemorySort, window, cx| this.show_memory_sort(window, cx)))
@@ -4333,13 +4358,11 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.create_group(true, window, cx)))
             .on_action(cx.listener(|this, _: &GroupCurrentWorkspace, window, cx| this.create_group(false, window, cx)))
             .on_action(cx.listener(|this, _: &GroupSelectedWorkspaces, window, cx| this.group_selected(window, cx)))
             .on_action(cx.listener(|this, _: &RenameWorkspaceGroup, window, cx| this.edit_metadata(MetadataField::GroupName, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
-            .on_action(cx.listener(|this, _: &UngroupWorkspaces, _, cx| this.ungroup_active(cx)))
             .on_action(cx.listener(|this, _: &CloseWorkspaceGroup, window, cx| this.request_close_group(window, cx)))
             .on_action(cx.listener(|this, _: &ToggleGroupPin, _, cx| this.toggle_group_pin(cx)))
             .on_action(cx.listener(|this, action: &MoveWorkspaceToGroup, _, cx| this.move_workspace_to_group(action.group, cx)))
@@ -4347,14 +4370,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))
             .on_action(cx.listener(|this, _: &SetGroupAnchor, _, cx| this.set_group_anchor(cx)))
-            .on_action(cx.listener(|this, action: &SelectWorkspaceNumber, window, cx| {
-                let order = this.workspace_order(true);
-                if let Some(index) = workspace_groups::numbered_target(&order, action.number) {
-                    this.select(index, window, cx);
-                }
-            }))
-            .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
-            .on_action(cx.listener(|this, _: &LastWorkspace, window, cx| this.last_workspace(window, cx)))
             .on_action(cx.listener(|this, _: &LastTerminal, window, cx| this.last_terminal(window, cx)))
             .on_action(cx.listener(|this, _: &FocusBack, window, cx| { this.navigate_focus(false, window, cx); }))
             .on_action(cx.listener(|this, _: &FocusForward, window, cx| { this.navigate_focus(true, window, cx); }))
@@ -4373,17 +4388,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &MarkAllRead, _, cx| this.mark_all_read(cx)))
             .on_action(cx.listener(|this, _: &MoveWorkspaceUp, _, cx| this.reorder(-1, cx)))
             .on_action(cx.listener(|this, _: &MoveWorkspaceDown, _, cx| this.reorder(1, cx)))
-            .on_action(
-                cx.listener(|this, _: &PreviousWorkspace, window, cx| this.cycle(-1, window, cx)),
-            )
-            .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| {
-                if this.rename.is_some() {
-                    this.select(this.active, window, cx);
-                }
-                this.sidebar = !this.sidebar;
-                this.sidebar_drag = None;
-                cx.notify();
-            }))
+            .map(|root| crate::workspace_actions::bind(root, cx))
             .when(self.sidebar, |div| {
                 div.child(
                     crate::sidebar_presentation::sidebar(sidebar_width)
