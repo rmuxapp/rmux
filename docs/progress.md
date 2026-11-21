@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Native plain-key dispatch no longer acquires the terminal parser lock. The PTY
+reader publishes negotiated report-all mode after each parsed output batch;
+ordinary text stays on native text/IME handling, while report-all keys queue
+committed text for encoding on the sole writer thread. If mode is disabled
+before encoding, queued committed text falls back to normal bytes rather than
+being discarded. Queue payloads remain bounded (128-byte key name/4 KiB text).
+Eight queued-path tests, eight keyboard protocol tests and the parser-contention
+fixture pass. A real PTY fixture verifies published mode, shifted A protocol
+bytes, and mode reset. Native desktop check passes. This proves the lock
+avoidance/protocol paths, not native visual IME acceptance or latency targets.
+Not released yet.
+
 Replaced the missing default workspace-group text glyph with an embedded folder
 SVG. Native and browser hosts share the icon slot and selection contrast; custom
 workspace/group symbols still use their existing text values. A fresh browser

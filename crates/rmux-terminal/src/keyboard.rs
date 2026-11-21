@@ -165,6 +165,15 @@ impl Terminal {
         self.encode_key_action_with_text(key, mods, action, None)
     }
 
+    /// Read negotiated report-all mode while the parser is exclusively owned.
+    pub(crate) fn reports_all_keys(&self) -> Result<bool> {
+        let mut flags: GhosttyKittyKeyFlags = 0;
+        // SAFETY: the documented query writes a uint8 flag value.
+        unsafe { check(ghostty_terminal_get(self.terminal,
+            GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS, out(&mut flags)))?; }
+        Ok(flags as u32 & GHOSTTY_KITTY_KEY_REPORT_ALL != 0)
+    }
+
     pub fn encode_key_action_with_text(
         &mut self,
         key: &str,
@@ -177,17 +186,7 @@ impl Terminal {
         };
         let text_key = key.chars().count() == 1 || key == "space";
         if text_key && !mods.control && !mods.alt && action != Action::Release {
-            let mut flags: GhosttyKittyKeyFlags = 0;
-            // SAFETY: this query writes the documented uint8 flag value while
-            // terminal access is exclusive.
-            unsafe {
-                check(ghostty_terminal_get(
-                    self.terminal,
-                    GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS,
-                    out(&mut flags),
-                ))?;
-            }
-            if flags as u32 & GHOSTTY_KITTY_KEY_REPORT_ALL == 0 {
+            if !self.reports_all_keys()? {
                 return Ok(None);
             }
         }

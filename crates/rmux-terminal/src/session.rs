@@ -25,6 +25,7 @@ pub struct Session {
     paste_pending: Arc<AtomicBool>,
     paste_generation: Arc<AtomicU64>,
     follow_output_pending: AtomicBool,
+    report_all_keys: Arc<AtomicBool>,
     shutdown: ShutdownHandle,
     pub updates: async_channel::Receiver<()>,
     size: (u16, u16),
@@ -63,7 +64,7 @@ impl Drop for PastePermit {
 
 enum InputPayload {
     Bytes(Vec<u8>),
-    KeyPress { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers, repeat: bool },
+    KeyPress { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers, repeat: bool, plain_text: Option<String> },
     KeyRelease { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers },
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
     Paste { text: String, bracketed: bool },
@@ -80,10 +81,14 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
-            Self::KeyPress { terminal, key, mods, repeat } => {
+            Self::KeyPress { terminal, key, mods, repeat, plain_text } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
-                Ok(terminal.encode_key(&key, mods, repeat)?.unwrap_or_default())
+                // If report-all was disabled after admission, deliver committed
+                // text normally instead of swallowing an already-handled key.
+                Ok(terminal.encode_key_action_with_text(&key, mods,
+                    if repeat { crate::keyboard::Action::Repeat } else { crate::keyboard::Action::Press },
+                    plain_text.as_deref())?.unwrap_or_else(|| plain_text.unwrap_or_default().into_bytes()))
             }
             Self::KeyRelease { terminal, key, mods } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
@@ -265,6 +270,8 @@ impl Session {
         let initial_directory = command.get_cwd().map(std::path::absolute).transpose()?;
         let mut engine = Terminal::new(columns, rows)?;
         engine.set_scrollback_limit(scrollback_bytes)?;
+        let report_all_keys = Arc::new(AtomicBool::new(engine.reports_all_keys()?));
+        let reader_report_all_keys = report_all_keys.clone();
         let terminal = Arc::new(Mutex::new(engine));
         let pair = native_pty_system().openpty(PtySize {
             rows,
@@ -329,6 +336,7 @@ impl Session {
             size: (columns, rows),
             exit,
             output_bytes,
+            report_all_keys,
         };
         let reaper = thread::Builder::new()
             .name("rmux-pty-reap".into())
@@ -364,6 +372,7 @@ impl Session {
                 Some("Shell startup failed".into());
             return Err(error.into());
         }
+        let mode_error = input_error.clone();
         thread::Builder::new()
             .name("rmux-pty-write".into())
             .spawn(move || {
@@ -384,6 +393,10 @@ impl Session {
                                 let mut terminal =
                                     read_terminal.lock().unwrap_or_else(|e| e.into_inner());
                                 terminal.write(&bytes[..count]);
+                                match terminal.reports_all_keys() {
+                                    Ok(enabled) => reader_report_all_keys.store(enabled, Ordering::Release),
+                                    Err(error) => { let _ = mode_error.try_send(format!("Keyboard mode query failed: {error}")); }
+                                }
                                 terminal.take_replies()
                             };
                             read_bytes.fetch_add(count as u64, Ordering::Relaxed);
@@ -662,38 +675,18 @@ impl Session {
     ) -> Result<bool> {
         if crate::keyboard::key_identity(key).is_none() { return Ok(false); }
         let native_text_key = (key.chars().count() == 1 || key == "space") && !mods.control && !mods.alt;
-        if !native_text_key {
-            anyhow::ensure!(self.exit_status().is_none(), "process has exited");
-            anyhow::ensure!(key.len() <= 128, "oversized key name");
-            self.writer.try_send(InputMessage {
-                payload: InputPayload::KeyPress { terminal: Arc::downgrade(&self.terminal), key: key.into(), mods, repeat },
-                _paste: None,
-            }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))?;
-            self.follow_output()?;
-            return Ok(true);
-        }
-        // Plain text still needs the negotiated report-all decision so native
-        // composition is neither swallowed nor delivered twice.
-        let bytes = self
-            .terminal
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .encode_key_action_with_text(
-                key,
-                mods,
-                if repeat {
-                    crate::keyboard::Action::Repeat
-                } else {
-                    crate::keyboard::Action::Press
-                },
-                text,
-            )?;
-        if let Some(bytes) = bytes {
-            self.input(&bytes)?;
-            Ok(true)
-        } else {
-            Ok(false)
-        }
+        // The PTY reader publishes this decision after every parsed output
+        // batch. Ordinary native text/IME must not wait behind a busy parser.
+        if native_text_key && !self.report_all_keys.load(Ordering::Acquire) { return Ok(false); }
+        anyhow::ensure!(self.exit_status().is_none(), "process has exited");
+        anyhow::ensure!(key.len() <= 128 && text.is_none_or(|text| text.len() <= 4096), "oversized key name or text");
+        let plain_text = native_text_key.then(|| text.unwrap_or(rmux_core::keyboard::key_text(key)).to_owned());
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::KeyPress { terminal: Arc::downgrade(&self.terminal), key: key.into(), mods, repeat, plain_text },
+            _paste: None,
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))?;
+        self.follow_output()?;
+        Ok(true)
     }
     pub fn paste(&self, text: &str) -> Result<()> {
         anyhow::ensure!(text.len() <= 1024 * 1024, "paste exceeds 1 MiB input limit");
@@ -1296,6 +1289,10 @@ mod tests {
         let paste_error = session.paste("must-not-be-queued").unwrap_err();
         assert!(paste_error.to_string().contains("No paste input was queued"));
         assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
+        assert!(!session.key_with_text("a", Default::default(), false, Some("a"))?, "ordinary text should remain native while parser is busy");
+        session.report_all_keys.store(true, Ordering::Release);
+        assert!(session.key_with_text("a", Default::default(), false, Some("A"))?, "report-all text should queue while parser is busy");
+        session.report_all_keys.store(false, Ordering::Release);
         // Ctrl+U clears the canonical fixture input before the payload below.
         assert!(session.key("u", crate::keyboard::Modifiers { control: true, ..Default::default() }, false)?);
         session.queue_key_release("up", Default::default())?;
@@ -1405,6 +1402,41 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn queued_plain_text_preserves_native_text_across_mode_changes() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
+        let mods = crate::keyboard::Modifiers { shift: true, ..Default::default() };
+        terminal.lock().unwrap().write(b"\x1b[>24u");
+        let payload = || InputPayload::KeyPress { terminal: Arc::downgrade(&terminal), key: "a".into(), mods, repeat: false, plain_text: Some("A".into()) };
+        assert_eq!(payload().encode()?, b"\x1b[97;2;65u");
+        let pending = payload();
+        terminal.lock().unwrap().write(b"\x1b[<u");
+        assert_eq!(pending.encode()?, b"A", "mode change must not drop committed text");
+        Ok(())
+    }
+    #[test]
+    fn queued_plain_text_uses_mode_published_by_pty_reader() -> Result<()> {
+        let expected = b"\x1b[97;2;65u";
+        let command = format!("stty raw -echo; printf '\\033[>24uready\\r\\n'; dd bs=1 count={} 2>/dev/null | od -An -tx1; printf '\\033[<u'", expected.len());
+        let mut builder = CommandBuilder::new("/bin/sh");
+        builder.args(["-c", &command]);
+        let session = Session::spawn(builder, 80, 8)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !session.report_all_keys.load(Ordering::Acquire) {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "keyboard mode was not published");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(session.key_with_text("a", crate::keyboard::Modifiers { shift: true, ..Default::default() }, false, Some("A"))?);
+        let expected_hex = expected.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>();
+        loop {
+            let frame = session.frame()?.text();
+            let received: Vec<_> = frame.split_whitespace().filter(|token| token.len() == 2 && token.bytes().all(|byte| byte.is_ascii_hexdigit())).collect();
+            if received == expected_hex && !session.report_all_keys.load(Ordering::Acquire) && session.exit_status().is_some() { break; }
+            anyhow::ensure!(std::time::Instant::now() < deadline, "queued text or mode reset missing: {frame:?}");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        Ok(())
+    }
+    #[test]
     fn queued_navigation_press_repeat_and_release_preserve_protocol_order() -> Result<()> {
         let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
         terminal.lock().unwrap().write(b"\x1b[>3u");
@@ -1412,7 +1444,7 @@ mod tests {
         let (sender, receiver) = mpsc::sync_channel(3);
         for repeat in [false, true] {
             sender.send(InputMessage { payload: InputPayload::KeyPress {
-                terminal: Arc::downgrade(&terminal), key: "up".into(), mods, repeat,
+                terminal: Arc::downgrade(&terminal), key: "up".into(), mods, repeat, plain_text: None,
             }, _paste: None })?;
         }
         sender.send(InputMessage { payload: InputPayload::KeyRelease {

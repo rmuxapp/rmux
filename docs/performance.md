@@ -561,3 +561,20 @@ than silently changing the meaning of prior measurements. These new timings end
 at queue admission: parser work and PTY delivery occur later. They exclude GPUI
 focus dispatch, other callbacks, frame presentation and actual terminal input
 response. This is one uncontrolled local run, not an end-to-end acceptance gate.
+
+## Plain-key dispatch without parser contention
+
+The PTY reader publishes the report-all keyboard flag after each completed
+output batch. `Session::key_with_text` reads that atomic flag instead of locking
+the parser to decide between native text composition and terminal key events.
+Report-all presses retain committed text in the bounded input queue and encode
+on the existing writer thread. Disabling report-all before a queued press is
+encoded falls back to its committed bytes, preserving the handled character.
+Native dead-key, Option-as-text and composition guards remain in the UI host.
+
+The contention fixture now exercises both ordinary text and report-all admission
+while another thread owns the parser. A real PTY fixture enables report-all,
+receives the shifted-A sequence and disables the mode again. These are functional
+and lock-avoidance checks; they do not measure end-to-end key-to-pixel latency.
+The reader adds one keyboard-mode query per parsed output batch; its throughput
+impact and native IME interaction still need measurement/acceptance.
