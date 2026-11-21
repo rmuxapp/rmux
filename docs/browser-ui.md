@@ -24,7 +24,7 @@ not two hosts that independently reproduce the same features. Current shared
 views and core policies are useful migration steps, not completion evidence.
 
 1. Consolidate workspace/pane/tab command handling and lifecycle state into the
-   shared application layer. Workspace create/close/group/navigation/sidebar actions now share their GPUI action factory and event binding, as do pane commands. Both hosts must dispatch the same commands; native
+   shared application layer. Workspace create/close/group/navigation/sidebar actions now share their GPUI action factory and event binding, as do pane commands and basic tab creation/navigation/movement/closure. Both hosts must dispatch the same commands; native
    process creation and browser sample sessions should return through the same
    session interface. Pane insertion, zoom/resize/equalize, swap/join targeting, join layout guards, cycling and focus-after-close now share command transitions.
    Workspace insertion/group inheritance/placement, selection/history/group reveal, removal, group-anchor promotion, successor selection, previous-workspace cleanup and ungrouping now run through shared lifecycle operations.

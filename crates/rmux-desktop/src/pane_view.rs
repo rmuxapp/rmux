@@ -1147,6 +1147,20 @@ impl PaneView {
     }
 }
 
+impl crate::tab_actions::TabCommandHost for PaneView {
+    fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        use rmux_core::commands::CommandId;
+        match command {
+            CommandId::NewTab => self.add(window, cx),
+            CommandId::NextTab => self.cycle(1, window, cx),
+            CommandId::PreviousTab => self.cycle(-1, window, cx),
+            CommandId::MoveTabLeft => self.reorder(-1, cx),
+            CommandId::MoveTabRight => self.reorder(1, cx),
+            CommandId::ClosePane => self.close(self.terminals.active_index(), window, cx),
+            _ => {}
+        }
+    }
+}
 impl Render for PaneView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let control_focus = self.terminals.active().map(|terminal| terminal.read(cx).focus.clone());
@@ -1160,14 +1174,12 @@ impl Render for PaneView {
         let focused = window.is_window_active() && self.is_focused(window, cx);
         let attention = self.needs_attention(cx);
         crate::pane_presentation::frame(self.benchmark, attention)
-            .on_action(cx.listener(|this, _: &NewTab, window, cx| this.add(window, cx)))
             .on_action(cx.listener(|this, _: &NewLocalTab, window, cx| this.add_terminal(false, window, cx)))
             .on_action(cx.listener(|this, _: &CloseOtherTabs, window, cx| this.close_tabs(TabCloseScope::Others, window, cx)))
             .on_action(cx.listener(|this, _: &CloseTabsToRight, window, cx| this.close_tabs(TabCloseScope::Right, window, cx)))
             .on_action(cx.listener(|this, _: &CloseFinishedTabs, window, cx| this.close_tabs(TabCloseScope::Finished, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewTab, _, cx| this.cancel_tab_launch(cx)))
             .on_action(cx.listener(|this, _: &RenameTab, window, cx| this.rename_tab(window, cx)))
-            .on_action(cx.listener(|this, _: &NextTab, window, cx| this.cycle(1, window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabPicker, window, cx| this.show_tab_picker(window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabMenu, window, cx| this.show_active_tab_menu(window, cx)))
             .on_action(cx.listener(|this, action: &SelectTabNumber, window, cx| {
@@ -1175,12 +1187,7 @@ impl Render for PaneView {
                     this.select(index, window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &PreviousTab, window, cx| this.cycle(-1, window, cx)))
-            .on_action(cx.listener(|this, _: &MoveTabLeft, _, cx| this.reorder(-1, cx)))
-            .on_action(cx.listener(|this, _: &MoveTabRight, _, cx| this.reorder(1, cx)))
-            .on_action(
-                cx.listener(|this, _: &ClosePane, window, cx| this.close(this.terminals.active_index(), window, cx)),
-            )
+            .map(|root| crate::tab_actions::bind(root, cx))
             .when(!self.benchmark, |root| {
                 root.child(
                     crate::tab_presentation::strip()

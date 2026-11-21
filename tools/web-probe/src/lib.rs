@@ -23,6 +23,8 @@ mod fonts;
 mod pane_actions;
 #[path = "../../../crates/rmux-desktop/src/workspace_actions.rs"]
 mod workspace_actions;
+#[path = "../../../crates/rmux-desktop/src/tab_actions.rs"]
+mod tab_actions;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
@@ -50,17 +52,6 @@ impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
 actions!(rmux, [CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
-fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
-    Some(match command {
-        CommandId::NewTab => Box::new(NewTab),
-        CommandId::NextTab => Box::new(NextTab),
-        CommandId::PreviousTab => Box::new(PreviousTab),
-        CommandId::MoveTabLeft => Box::new(MoveTabLeft),
-        CommandId::MoveTabRight => Box::new(MoveTabRight),
-        CommandId::ClosePane => Box::new(ClosePane),
-        _ => return None,
-    })
-}
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -225,7 +216,7 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            if let Some(action) = tab_action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)) { action } else { match command {
+            if let Some(action) = tab_actions::action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)) { action } else { match command {
                 CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
@@ -279,7 +270,7 @@ impl InputProbe {
         let was_dragging = self.split_drag.is_some();
         self.split_drag = None;
         self.feedback = None;
-        if let Some(action) = tab_action(command) {
+        if let Some(action) = tab_actions::action(command) {
             // Restore terminal focus before dispatching, just like the native
             // palette. Actions then use the same handlers as keyboard input.
             self.close_palette(window, cx);

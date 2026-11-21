@@ -65,6 +65,7 @@ mod cursor_view;
 mod pane_shortcuts;
 mod pane_actions;
 mod workspace_actions;
+mod tab_actions;
 mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;

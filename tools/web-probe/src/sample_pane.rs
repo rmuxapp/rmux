@@ -1,6 +1,6 @@
 //! Browser session host using native tab presentation and navigation definitions.
 use gpui::{prelude::*, *};
-use crate::{terminal_sample::TerminalSample, tab_presentation, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane};
+use crate::{terminal_sample::TerminalSample, tab_presentation};
 pub(crate) struct PaneEmpty;
 impl EventEmitter<PaneEmpty> for SamplePane {}
 pub(crate) struct SamplePane {
@@ -108,16 +108,25 @@ impl SamplePane {
         }
     }
 }
+impl crate::tab_actions::TabCommandHost for SamplePane {
+    fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        use rmux_core::commands::CommandId;
+        match command {
+            CommandId::NewTab => self.add(window, cx),
+            CommandId::NextTab => self.cycle(1, window, cx),
+            CommandId::PreviousTab => self.cycle(-1, window, cx),
+            CommandId::MoveTabLeft => self.reorder(-1, cx),
+            CommandId::MoveTabRight => self.reorder(1, cx),
+            CommandId::ClosePane => self.close(self.terminals.active_index(), window, cx),
+            _ => {}
+        }
+    }
+}
 impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.active().is_some_and(|terminal| terminal.read(cx).is_focused(window));
         crate::pane_presentation::frame(false, false)
-            .on_action(cx.listener(|this, _: &MoveTabLeft, _, cx| this.reorder(-1,cx)))
-            .on_action(cx.listener(|this, _: &MoveTabRight, _, cx| this.reorder(1,cx)))
-            .on_action(cx.listener(|this, _: &NewTab, window, cx| this.add(window,cx)))
-            .on_action(cx.listener(|this, _: &NextTab, window, cx| this.cycle(1,window,cx)))
-            .on_action(cx.listener(|this, _: &PreviousTab, window, cx| this.cycle(-1,window,cx)))
-            .on_action(cx.listener(|this, _: &ClosePane, window, cx| this.close(this.terminals.active_index(),window,cx)))
+            .map(|root| crate::tab_actions::bind(root, cx))
             .child(tab_presentation::strip()
                 .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
                     .children(self.terminals.iter().enumerate().map(|(index, terminal)|

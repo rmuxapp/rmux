@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Tab action routing now shares one GPUI module between native PaneView and browser
+SamplePane for New Tab, next/previous tab, move left/right and close active tab.
+Both palettes use the shared action factory; the browser retains its empty-layout
+New Tab path. Native startup and close confirmations remain in the session host.
+Desktop and WASM compilation pass. This routing refactor was not runtime-tested
+this cycle and is not deployed. Numbered-tab selection and advanced tab menu
+commands remain native-specific, and full application unification is unfinished.
+
 Workspace action routing now shares one GPUI module between WorkspaceWindow and
 BrowserHost: create/close workspace, create/ungroup group, next/previous/last
 workspace, toggle sidebar and numbered selection. Both palettes use its action
