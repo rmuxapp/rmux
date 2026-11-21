@@ -20,6 +20,14 @@ impl<T> Tabs<T> {
     pub fn cycle_target(&self, delta: isize) -> Option<usize> {
         crate::layout::cycle_index(self.active, self.items.len(), delta)
     }
+    /// Reordering stops at the edge; navigation wraps, movement does not.
+    pub fn move_active(&mut self, delta: isize) -> Option<(usize, usize)> {
+        let from = self.active;
+        let to = from.checked_add_signed(delta)?;
+        if to >= self.items.len() || to == from { return None; }
+        self.swap(from, to);
+        Some((from, to))
+    }
     pub fn push(&mut self, item: T) { self.items.push(item); }
     /// Keep the selected tab when inserting before it. The host may then select
     /// the inserted tab explicitly, after completing subscriptions and focus.
@@ -64,6 +72,18 @@ impl<T> IntoIterator for Tabs<T> {
 #[cfg(test)]
 mod tests {
     use super::Tabs;
+    #[test]
+    fn moving_keeps_the_same_tab_selected_without_wrapping() {
+        let mut tabs=Tabs::new(vec!["a","b","c"],0);
+        assert_eq!(tabs.move_active(-1),None);
+        assert_eq!(tabs.move_active(1),Some((0,1)));
+        assert_eq!(&*tabs,&["b","a","c"]);
+        assert_eq!(tabs.active(),Some(&"a"));
+        assert_eq!(tabs.move_active(1),Some((1,2)));
+        assert_eq!(tabs.move_active(1),None);
+        assert_eq!(tabs.move_active(isize::MIN),None);
+        assert_eq!(tabs.active(),Some(&"a"));
+    }
     #[test]
     fn removal_preserves_survivors_and_selects_neighbors() {
         let mut tabs=Tabs::new(vec!["a","b","c","d"],2);

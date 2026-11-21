@@ -922,13 +922,8 @@ impl PaneView {
     }
 
     fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
-        let next = self.terminals.active_index() as isize + delta;
-        if next < 0 || next >= self.terminals.len() as isize {
-            return;
-        }
-        let next = next as usize;
-        self.labels.swap(self.terminals.active_index(), next);
-        self.terminals.swap(self.terminals.active_index(), next);
+        let Some((from, next)) = self.terminals.move_active(delta) else { return; };
+        self.labels.swap(from, next);
         self.tab_scroll.scroll_to_item(next);
         cx.emit(PaneMetadataChanged);
         cx.notify();

@@ -4,6 +4,12 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Tab movement now uses `Tabs::move_active` in both hosts and shares
+Ctrl+Shift+PageUp/PageDown bindings. Both palettes expose Move Tab Left/Right.
+Browser tab titles stay attached to session identities across movement/removal,
+and the tab strip reveals selected/moved tabs. Browser checks cover shortcut and
+palette movement, preserved output/focus and stopping at the first position.
+
 Pane tab order and selection now belong to `rmux-core::tabs::Tabs<T>` in both
 hosts. The model owns its collection and selected index; read-only slice access
 cannot bypass reconciliation. Removal keeps a surviving selected tab, closing

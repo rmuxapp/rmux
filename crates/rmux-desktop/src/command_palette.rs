@@ -282,6 +282,8 @@ impl CommandPalette {
         }
         command!(NewWorkspace);
         command!(NewTab);
+        command!(MoveTabLeft);
+        command!(MoveTabRight);
         command!(Split);
         command!(SplitBelow);
         command!(TogglePaneZoom);

@@ -13,6 +13,12 @@ pub(crate) fn tabs() -> Vec<KeyBinding> {
          KeyBinding::new("cmd-shift-]", NextTab, Some("Terminal"))]
 }
 
+pub(crate) fn tab_reordering() -> Vec<KeyBinding> {
+    use crate::{MoveTabLeft, MoveTabRight};
+    vec![KeyBinding::new("ctrl-shift-pageup", MoveTabLeft, Some("Terminal")),
+         KeyBinding::new("ctrl-shift-pagedown", MoveTabRight, Some("Terminal"))]
+}
+
 pub(crate) fn directions(mac: bool) -> Vec<KeyBinding> {
     use crate::{FocusLeft, FocusRight, FocusUp, FocusDown};
     vec![

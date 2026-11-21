@@ -1,10 +1,13 @@
 //! Browser session host using native tab presentation and navigation definitions.
 use gpui::{prelude::*, *};
-use crate::{terminal_sample::TerminalSample, tab_presentation, NewTab, NextTab, PreviousTab, ClosePane};
+use crate::{terminal_sample::TerminalSample, tab_presentation, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane};
 pub(crate) struct PaneEmpty;
 impl EventEmitter<PaneEmpty> for SamplePane {}
 pub(crate) struct SamplePane {
     terminals: rmux_core::tabs::Tabs<Entity<TerminalSample>>,
+    labels: std::collections::HashMap<EntityId, String>,
+    next_number: usize,
+    tab_scroll: ScrollHandle,
 }
 impl SamplePane {
     pub fn scroll(&self, scroll: rmux_core::scroll::Scroll, cx: &mut App) {
@@ -20,15 +23,19 @@ impl SamplePane {
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() { return; }
         let replace_focus = self.terminals[index].read(cx).is_focused(window);
-        self.terminals.remove(index);
+        let removed = self.terminals.remove(index);
+        self.labels.remove(&removed.entity_id());
         if self.terminals.is_empty() { cx.emit(PaneEmpty); }
         else {
+            self.tab_scroll.scroll_to_item(self.terminals.active_index());
             if replace_focus { self.focus(window, cx); }
         }
         cx.notify();
     }
     pub fn new(cx: &mut Context<Self>) -> Self {
-        Self { terminals: rmux_core::tabs::Tabs::new(vec![cx.new(TerminalSample::new)], 0) }
+        let terminal = cx.new(TerminalSample::new);
+        let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
+        Self { terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
         if let Some(terminal) = self.terminals.active() {
@@ -41,13 +48,23 @@ impl SamplePane {
             self.terminals[self.terminals.active_index()].update(cx, |terminal, _| terminal.release_render_cache());
         }
         self.terminals.select(index);
+        self.tab_scroll.scroll_to_item(index);
         self.focus(window, cx);
         cx.notify();
     }
     fn add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminals.len() >= 16 { return; }
-        self.terminals.push(cx.new(TerminalSample::new));
+        let terminal = cx.new(TerminalSample::new);
+        self.labels.insert(terminal.entity_id(), format!("Terminal {}",self.next_number));
+        self.next_number += 1;
+        self.terminals.push(terminal);
         self.select(self.terminals.len()-1, window, cx);
+    }
+    pub fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
+        if let Some((_, next)) = self.terminals.move_active(delta) {
+            self.tab_scroll.scroll_to_item(next);
+            cx.notify();
+        }
     }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(next) = self.terminals.cycle_target(direction) {
@@ -59,15 +76,17 @@ impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.active().is_some_and(|terminal| terminal.read(cx).is_focused(window));
         crate::pane_presentation::frame(false, false)
+            .on_action(cx.listener(|this, _: &MoveTabLeft, _, cx| this.reorder(-1,cx)))
+            .on_action(cx.listener(|this, _: &MoveTabRight, _, cx| this.reorder(1,cx)))
             .on_action(cx.listener(|this, _: &NewTab, window, cx| this.add(window,cx)))
             .on_action(cx.listener(|this, _: &NextTab, window, cx| this.cycle(1,window,cx)))
             .on_action(cx.listener(|this, _: &PreviousTab, window, cx| this.cycle(-1,window,cx)))
             .on_action(cx.listener(|this, _: &ClosePane, window, cx| this.close(this.terminals.active_index(),window,cx)))
             .child(tab_presentation::strip()
-                .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll()
+                .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
                     .children(self.terminals.iter().enumerate().map(|(index, terminal)|
                         tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused)
-                            .child(format!("shell {}",index+1))
+                            .child(self.labels[&terminal.entity_id()].clone())
                             .child(div().id(("close-sample-tab",terminal.entity_id())).px_1().child("×")
                                 .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))

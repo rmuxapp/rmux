@@ -22,6 +22,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
+    CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::NewWorkspace, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
@@ -36,7 +37,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -146,6 +147,8 @@ impl InputProbe {
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
             match command {
+                CommandId::MoveTabLeft => Box::new(MoveTabLeft),
+                CommandId::MoveTabRight => Box::new(MoveTabRight),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
                 CommandId::NextWorkspace => Box::new(NextWorkspace),
@@ -199,6 +202,10 @@ impl InputProbe {
     fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
         match command {
+            CommandId::MoveTabLeft | CommandId::MoveTabRight => {
+                let delta = if command == CommandId::MoveTabLeft { -1 } else { 1 };
+                if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.reorder(delta,cx)); }
+            }
             CommandId::ScrollToTop | CommandId::ScrollToBottom => {
                 let scroll = if command == CommandId::ScrollToTop { rmux_core::scroll::Scroll::Top } else { rmux_core::scroll::Scroll::Bottom };
                 if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.scroll(scroll,cx)); }
@@ -334,6 +341,7 @@ pub fn start() {
         cx.bind_keys(workspace_shortcuts::bindings(mac));
         cx.bind_keys(pane_shortcuts::directions(mac));
         cx.bind_keys(pane_shortcuts::splits(mac));
+        cx.bind_keys(pane_shortcuts::tab_reordering());
         cx.bind_keys([
             KeyBinding::new(if mac { "cmd-c" } else { "ctrl-shift-c" }, CopySelection, Some("Terminal")),
             KeyBinding::new("ctrl-tab", NextPane, Some("Terminal")),

@@ -16,6 +16,8 @@ macro_rules! commands {
 commands! {
     NewWorkspace => "New Workspace",
     NewTab => "New Terminal Tab",
+    MoveTabLeft => "Move Tab Left",
+    MoveTabRight => "Move Tab Right",
     Split => "Split Right",
     SplitBelow => "Split Below",
     TogglePaneZoom => "Toggle Pane Zoom",

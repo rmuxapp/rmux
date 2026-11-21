@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Both hosts now consume shared tab-reorder transitions and keyboard bindings.
+Move Tab Left/Right are shared command identities and available in both palettes.
+Browser terminal titles are stable per session rather than position-derived;
+selection and reorder reveal the active tab in the strip. Three tab-model tests,
+native check and WASM build pass. Browser verified moving Terminal 3 from third
+to second by Ctrl+Shift+PageUp, then to first through the palette, preserving
+output/focus and refusing to wrap past the boundary. Evidence:
+target/shared-tab-reorder-wasm.jpg. The shared demo remains local.
+
 Extracted ordered pane tabs and selection into `rmux-core::tabs::Tabs<T>` and
 migrated native PaneView and browser SamplePane to it. Hosts no longer maintain
 independent active indices. The collection reconciles removal/insertion/reorder
