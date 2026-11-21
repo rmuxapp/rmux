@@ -64,6 +64,7 @@ mod status_view;
 #[cfg(all(target_os = "macos", feature = "browser"))]
 mod browser_window;
 mod text_field;
+mod text_layout;
 mod terminal_menu;
 use pane_view::{PaneEmpty, PaneView};
 mod split_view;

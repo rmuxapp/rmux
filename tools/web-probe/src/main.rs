@@ -13,6 +13,7 @@ mod composition;
 mod edit_history;
 #[path = "../../../crates/rmux-desktop/src/text_field.rs"]
 mod text_field;
+mod text_layout;
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll]);
 mod clipboard {

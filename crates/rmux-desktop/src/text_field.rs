@@ -157,21 +157,10 @@ impl TextField {
             bounds.end
         })
     }
-    fn line(&self, window: &Window) -> ShapedLine {
-        window.text_system().shape_line(
-            self.text.text.clone().into(),
-            px(14.),
-            &[TextRun {
-                len: self.text.text.len(),
-                font: font(FONT_FAMILY),
-                color: rgb(0xffffff).into(),
-                background_color: None,
-                underline: None,
-                strikethrough: None,
-            }],
-            None,
-        )
+    fn line(&self, window: &Window) -> text_layout::Line {
+        text_layout::shape(window, self.text.text.clone().into(), font(FONT_FAMILY), 0xffffff)
     }
+
 }
 
 impl Render for TextField {
@@ -189,7 +178,7 @@ impl Render for TextField {
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
-                    this.focus.focus(window);
+                    text_layout::focus(&this.focus, window, cx);
                     cx.stop_propagation();
                 }),
             )
@@ -259,7 +248,7 @@ impl Render for TextField {
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, event: &MouseDownEvent, window, cx| {
-                            this.focus.focus(window);
+                            text_layout::focus(&this.focus, window, cx);
                             if this.is_composing() {
                                 cx.stop_propagation();
                                 return;
@@ -324,7 +313,7 @@ impl Render for TextField {
                                     ElementInputHandler::new(bounds, paint.clone()),
                                     cx,
                                 );
-                                window.with_content_mask(Some(ContentMask { bounds }), |window| {
+                                window.with_content_mask(Some(text_layout::mask(bounds)), |window| {
                                     if focused && !selection.is_empty() {
                                         window.paint_quad(fill(
                                             Bounds::new(
@@ -336,11 +325,7 @@ impl Render for TextField {
                                     }
                                     let _ = line.paint(origin, px(24.), window, cx);
                                         if let Some(placeholder) = placeholder {
-                                            let hint = window.text_system().shape_line(placeholder.into(), px(14.), &[TextRun {
-                                                len: placeholder.len(), font: window.text_style().font(),
-                                                color: rgb(0x858585).into(), background_color: None,
-                                                underline: None, strikethrough: None,
-                                            }], None);
+                                            let hint = text_layout::shape(window, placeholder.into(), window.text_style().font(), 0x858585);
                                             let _ = hint.paint(origin + point(px(5.), px(0.)), px(24.), window, cx);
                                         }
                                     if focused {

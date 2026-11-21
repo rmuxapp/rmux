@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+The actual desktop text field now compiles under both native GPUI 0.2.2 and the
+isolated GPUI CE 0.3.0 WASM host. Added small host-specific text layout/focus/paint
+adapters while retaining one source for editing, selection, IME, undo and visuals.
+CE caret mapping uses backend byte-index hit testing and caret bounds. Native
+calls preserve the previous implementation. Both compile checks pass; browser
+rendering, font loading and interaction acceptance remain pending.
+
 Added an isolated `tools/web-probe` using pinned GPUI CE 0.3.0 and mise-managed
 WASM target. It imports the actual desktop text field, composition, undo and
 control tooltip sources. The backend dependencies compile for WASM; the shared
