@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Optimized artifact 44931038517 (source c83e72a) passed a browser smoke check:
+logs in the left split, help in the right, switch to website and run ls, return
+with both original pane outputs preserved, Cmd+P zoom search, execute zoom and
+restore splits with Cmd+Shift+Return. No stale workspace text or elongated cursor
+was observed in this check. Screenshot: target/shared-optimized-workspace-smoke.jpg.
+UI WASM is 20,413,507 bytes raw / 7,093,564 gzip / 5,021,623 Brotli. This checks
+optimized behavior, not input latency or runtime memory; it predates IME work.
+Latest IME layout artifact 44931530153 remains pending behind 44931419990.
+
 Shared IME layout now covers platform range bounds and pointer-to-UTF-16 hit
 testing as well as painting. Browser no longer returns a fixed cursor rectangle
 for every range or zero for every point. The terminal origin stays separate from

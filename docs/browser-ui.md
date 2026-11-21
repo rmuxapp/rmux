@@ -51,6 +51,10 @@ from successful rendering.
 
 ## Verification to date
 
+Optimized GitHub artifact 44931038517 (c83e72a) also passed workspace output
+isolation/restoration, splits, palette search and zoom/unzoom. This predates
+the IME changes and does not establish startup, latency or memory targets.
+
 Focused browser checks cover workspace restoration, groups, splits, resizing,
 zoom, palette search, tab creation/navigation/reordering/closing, empty-pane
 recovery, rapid ASCII text, single-line paste, scrollback, selection/copy and
