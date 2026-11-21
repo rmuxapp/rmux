@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser palette now includes dynamic Move Workspace to Group destinations using
+the desktop title format and group IDs. Both hosts route the parameterized move
+action through the shared workspace binder into shared `State::move_to_group`.
+Browser destination results refresh when opening the palette and do not inherit
+numbered-workspace shortcut hints. Native check and WASM build pass. Browser
+smoke verified moving the website workspace into an existing group while keeping
+its terminal selected and its output intact. Screenshot:
+target/shared-group-destination.jpg. This closes the previously noted browser
+group-destination UI gap; it does not complete application parity. Not deployed.
+
 Published successful GitHub run 44941953915 (source 482e836) to rmux.app,
 Cloudflare deployment 46da0198. Production now includes shared workspace
 ownership/navigation, group creation, current-workspace grouping, pin commands,

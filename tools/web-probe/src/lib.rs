@@ -60,6 +60,9 @@ actions!(rmux, [Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, E
 struct SelectWorkspaceNumber { number: usize }
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
+struct MoveWorkspaceToGroup { group: u64 }
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
 struct SelectTabNumber { number: usize }
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
@@ -75,6 +78,7 @@ struct InputProbe {
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
     workspace_results: Vec<(EntityId, String)>,
+    group_results: Vec<(u64, String)>,
     selected: usize,
     scroll: ListState,
     feedback: Option<String>,
@@ -103,7 +107,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -215,10 +219,12 @@ impl InputProbe {
         else { self.empty_focus.focus(window,cx); }
         cx.notify();
     }
-    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, cx: &mut Context<Self>) {
+    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, cx: &mut Context<Self>) {
         self.workspace_results = workspaces;
+        self.group_results = groups;
         self.search = palette_match::RankedSearch::new(COMMANDS.iter().map(|command| command.title().to_lowercase())
-            .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase())).collect());
+            .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase()))
+            .chain(self.group_results.iter().map(|(_, title)| title.to_lowercase())).collect());
         self.selected = 0;
         self.scroll.reset(self.search.matches.len());
         cx.notify();
@@ -236,6 +242,7 @@ impl InputProbe {
             } }
         } else {
             let position = index.checked_sub(COMMANDS.len())?;
+            if position >= self.workspace_results.len() { return None; }
             let number = if position < 8 { position + 1 }
                 else if position + 1 == self.workspace_results.len() { 9 }
                 else { return None; };
@@ -250,7 +257,8 @@ impl InputProbe {
     }
     fn result_title(&self, index: usize) -> &str {
         if let Some(command) = COMMANDS.get(index) { command.title() }
-        else { &self.workspace_results[index - COMMANDS.len()].1 }
+        else if index < COMMANDS.len() + self.workspace_results.len() { &self.workspace_results[index - COMMANDS.len()].1 }
+        else { &self.group_results[index - COMMANDS.len() - self.workspace_results.len()].1 }
     }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_origin = window.focused(cx);
@@ -262,6 +270,13 @@ impl InputProbe {
 
     fn choose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
+        if index >= COMMANDS.len() + self.workspace_results.len() {
+            let Some((group, _)) = self.group_results.get(index - COMMANDS.len() - self.workspace_results.len()) else { return; };
+            let action = MoveWorkspaceToGroup { group: *group };
+            self.close_palette(window, cx);
+            window.dispatch_action(Box::new(action), cx);
+            return;
+        }
         if index >= COMMANDS.len() {
             let Some((id, _)) = self.workspace_results.get(index - COMMANDS.len()) else { return; };
             let id = *id;

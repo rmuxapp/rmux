@@ -4024,6 +4024,7 @@ impl WorkspaceWindow {
 }
 
 impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
+    fn move_workspace_to_group(&mut self, group: u64, cx: &mut Context<Self>) { WorkspaceWindow::move_workspace_to_group(self, group, cx); }
     fn run_workspace_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
@@ -4328,7 +4329,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
             .on_action(cx.listener(|this, _: &CloseWorkspaceGroup, window, cx| this.request_close_group(window, cx)))
-            .on_action(cx.listener(|this, action: &MoveWorkspaceToGroup, _, cx| this.move_workspace_to_group(action.group, cx)))
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))
             .on_action(cx.listener(|this, _: &LastTerminal, window, cx| this.last_terminal(window, cx)))

@@ -29,7 +29,9 @@ impl BrowserHost {
                         let (name, entity) = &this.workspace_state.entries[index];
                         (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
                     }).collect();
-                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, cx));
+                    let groups = this.workspace_state.groups.entries().iter().map(|group|
+                        (group.id, format!("Move Workspace to Group: {} (#{})", group.name, group.id))).collect();
+                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, cx));
                 }
                 PaletteRequest::SelectWorkspace(id) => {
                     if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity)| entity.entity_id() == *id) {
@@ -125,6 +127,12 @@ impl BrowserHost {
 
 }
 impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
+    fn move_workspace_to_group(&mut self, group: u64, cx: &mut Context<Self>) {
+        if self.workspace_state.move_to_group(self.workspace_state.active, group, |(_, entity)| entity.entity_id()).is_ok() {
+            self.scroll_to_workspace();
+            cx.notify();
+        }
+    }
     fn run_workspace_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         match command {
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
