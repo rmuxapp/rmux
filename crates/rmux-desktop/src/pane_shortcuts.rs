@@ -37,3 +37,15 @@ pub(crate) fn splits(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new(if mac { "cmd-shift-enter" } else { "ctrl-shift-enter" }, TogglePaneZoom, None),
     ]
 }
+
+/// Direct tab positions use the same terminal context on each platform.
+pub(crate) fn tab_numbers(mac: bool) -> Vec<KeyBinding> {
+    let modifier = if mac { "cmd-shift" } else { "ctrl-shift" };
+    let mut bindings: Vec<_> = (1..=9).map(|number| KeyBinding::new(
+        &format!("{modifier}-{number}"), crate::SelectTabNumber { number }, Some("Terminal"),
+    )).collect();
+    // Web events may retain the shifted symbol; keep numeric bindings too.
+    bindings.extend(['!', '@', '#', '$', '%', '^', '&', '*', '('].into_iter().enumerate().map(|(index, symbol)|
+        KeyBinding::new(&format!("{modifier}-{symbol}"), crate::SelectTabNumber { number: index + 1 }, Some("Terminal"))));
+    bindings
+}

@@ -3684,18 +3684,7 @@ fn main() {
         ]);
         #[cfg(target_os = "macos")]
         cx.bind_keys(shortcuts::bracket_navigation());
-        cx.bind_keys((1..=9).map(|number| {
-            let modifier = if cfg!(target_os = "macos") {
-                "cmd-shift"
-            } else {
-                "ctrl-shift"
-            };
-            KeyBinding::new(
-                &format!("{modifier}-{number}"),
-                SelectTabNumber { number },
-                Some("Terminal"),
-            )
-        }));
+        cx.bind_keys(pane_shortcuts::tab_numbers(cfg!(target_os = "macos")));
         app_menu::initialize(cx);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-shift-c" } else { "ctrl-shift-c" }, CopySearchExcerpt, Some("CommandPalette"))]);
         cx.bind_keys([KeyBinding::new("ctrl-alt-w", TogglePreviewWrap, Some("TextPreview"))]);

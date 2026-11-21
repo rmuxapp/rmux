@@ -109,6 +109,9 @@ impl SamplePane {
     }
 }
 impl crate::tab_actions::TabCommandHost for SamplePane {
+    fn select_tab_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = number.checked_sub(1) { self.select(index, window, cx); }
+    }
     fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {

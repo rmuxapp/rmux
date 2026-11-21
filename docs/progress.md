@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Numbered-tab selection now shares bindings and action routing on desktop/browser:
+Cmd+Shift+1–9 on macOS and Ctrl+Shift+1–9 elsewhere select exact tab positions.
+Bindings retain numeric keys and add shifted-symbol aliases because browser GPUI
+reports US Shift+1 as ! (the first browser smoke exposed this mismatch). After
+the fix, browser smoke created three tabs and selected/typed independently in
+tabs 1 and 2 using the shortcuts. Screenshot: target/shared-tab-numbers.jpg.
+Desktop check and WASM build pass. Native runtime, non-US keyboard layouts and
+non-mac modifier shortcuts were not tested. Not deployed.
+
 Tab action routing now shares one GPUI module between native PaneView and browser
 SamplePane for New Tab, next/previous tab, move left/right and close active tab.
 Both palettes use the shared action factory; the browser retains its empty-layout

@@ -55,6 +55,9 @@ actions!(rmux, [CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct SelectTabNumber { number: usize }
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -462,6 +465,7 @@ pub fn start() {
         ]).expect("bundled UI and terminal fonts");
         let mac = terminal_engine::is_mac();
         cx.bind_keys(workspace_shortcuts::bindings(mac));
+        cx.bind_keys(pane_shortcuts::tab_numbers(mac));
         cx.bind_keys(pane_shortcuts::directions(mac));
         cx.bind_keys(pane_shortcuts::splits(mac));
         cx.bind_keys(pane_shortcuts::tab_reordering());

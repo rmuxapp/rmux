@@ -1148,6 +1148,9 @@ impl PaneView {
 }
 
 impl crate::tab_actions::TabCommandHost for PaneView {
+    fn select_tab_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(index) = number.checked_sub(1) { self.select(index, window, cx); }
+    }
     fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
@@ -1182,11 +1185,6 @@ impl Render for PaneView {
             .on_action(cx.listener(|this, _: &RenameTab, window, cx| this.rename_tab(window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabPicker, window, cx| this.show_tab_picker(window, cx)))
             .on_action(cx.listener(|this, _: &ShowTabMenu, window, cx| this.show_active_tab_menu(window, cx)))
-            .on_action(cx.listener(|this, action: &SelectTabNumber, window, cx| {
-                if let Some(index) = action.number.checked_sub(1) {
-                    this.select(index, window, cx);
-                }
-            }))
             .map(|root| crate::tab_actions::bind(root, cx))
             .when(!self.benchmark, |root| {
                 root.child(
