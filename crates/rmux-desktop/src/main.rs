@@ -67,6 +67,7 @@ mod pane_shortcuts;
 mod pane_actions;
 mod workspace_actions;
 mod tab_actions;
+mod terminal_actions;
 mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;
@@ -1902,6 +1903,11 @@ impl TerminalView {
         }
     }
 }
+impl terminal_actions::TerminalCommandHost for TerminalView {
+    fn copy_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.copy(&CopySelection, window, cx); }
+    fn select_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.select_all(&EditorSelectAll, window, cx); }
+    fn clear_terminal_history(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.clear_scrollback(&ClearScrollback, window, cx); }
+}
 impl Focusable for TerminalView {
     fn focus_handle(&self, _: &App) -> FocusHandle {
         self.focus.clone()
@@ -1912,7 +1918,7 @@ impl Render for TerminalView {
         let ended_ssh = self.session.remote_destination().is_some();
         let entity = cx.weak_entity();
         self.rendered_paste_pending = self.session.paste_pending();
-        div().id("terminal-interaction")
+        terminal_actions::bind(div(), cx).id("terminal-interaction")
             .relative()
             .size_full()
             .flex()
@@ -1951,13 +1957,10 @@ impl Render for TerminalView {
                 this.show_terminal_menu(this.last_bounds.origin + point(px(8.), px(8.)), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CancelQueuedPaste, _, cx| this.cancel_paste(cx)))
-            .on_action(cx.listener(Self::copy))
             .on_action(cx.listener(|this, _: &CopySelectionWithLineBreaks, _, cx| this.copy_selection(false, cx)))
-            .on_action(cx.listener(Self::select_all))
             .on_action(cx.listener(Self::copy_working_directory))
             .on_action(cx.listener(Self::reveal_working_directory))
             .on_action(cx.listener(|this, _: &RefreshGitContext, _, cx| this.refresh_git_context(cx)))
-            .on_action(cx.listener(Self::clear_scrollback))
             .on_action(
                 cx.listener(|this, _: &PreviousPrompt, _, cx| this.scroll(Scroll::Prompts(-1), cx)),
             )

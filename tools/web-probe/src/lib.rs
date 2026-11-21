@@ -30,6 +30,8 @@ mod pane_actions;
 mod workspace_actions;
 #[path = "../../../crates/rmux-desktop/src/tab_actions.rs"]
 mod tab_actions;
+#[path = "../../../crates/rmux-desktop/src/terminal_actions.rs"]
+mod terminal_actions;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
@@ -247,7 +249,7 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            if let Some(action) = tab_actions::action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)).or_else(|| find_presentation::action(*command)) { action } else { match command {
+            if let Some(action) = tab_actions::action(*command).or_else(|| terminal_actions::action(*command)).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)).or_else(|| find_presentation::action(*command)) { action } else { match command {
                 CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
@@ -310,7 +312,7 @@ impl InputProbe {
         let was_dragging = self.split_drag.is_some();
         self.split_drag = None;
         self.feedback = None;
-        if let Some(action) = tab_actions::action(command) {
+        if let Some(action) = tab_actions::action(command).or_else(|| terminal_actions::action(command)) {
             // Restore terminal focus before dispatching, just like the native
             // palette. Actions then use the same handlers as keyboard input.
             self.close_palette(window, cx);
@@ -322,11 +324,6 @@ impl InputProbe {
             return;
         }
         match command {
-            CommandId::EditorSelectAll | CommandId::ClearScrollback => {
-                self.focus_terminal(window, cx);
-                let action: Box<dyn Action> = if command == CommandId::EditorSelectAll { Box::new(EditorSelectAll) } else { Box::new(ClearScrollback) };
-                window.dispatch_action(action, cx);
-            }
             command @ (CommandId::BreakTabRight | CommandId::BreakTabBelow | CommandId::BreakTabLeft | CommandId::BreakTabAbove) => {
                 let axis = if matches!(command, CommandId::BreakTabRight | CommandId::BreakTabLeft) { Axis::Columns } else { Axis::Rows };
                 let before = matches!(command, CommandId::BreakTabLeft | CommandId::BreakTabAbove);

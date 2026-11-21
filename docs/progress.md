@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Copy, Select All and Clear Scrollback now bind through a shared terminal action
+host on desktop and browser. The browser palette also uses the shared action
+factory and resolves Select All's actual shortcut for its hint. Host services
+retain clipboard error reporting, native asynchronous/cancellation behavior and
+browser frame/search refresh. Native and WASM compile checks pass; existing
+browser history/clipboard interaction evidence predates this dispatch extraction.
+No presentation change or deployment.
+
 Browser terminal Select All and Clear Scrollback now use the pinned Ghostty
 engine APIs. Both are palette actions; Select All uses Cmd+A on macOS and
 Ctrl+Shift+A elsewhere while text fields retain their own binding. Clear history

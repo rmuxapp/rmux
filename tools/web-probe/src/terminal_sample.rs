@@ -218,7 +218,7 @@ impl Render for TerminalSample {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
         let input = entity.clone();
-        div().size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
+        crate::terminal_actions::bind(div(), cx).size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
             .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.open_find(window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindOlder, window, cx| this.navigate_find(true, window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindNewer, window, cx| this.navigate_find(false, window, cx)))
@@ -259,34 +259,6 @@ impl Render for TerminalSample {
             }))
             .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
-            .on_action(cx.listener(|this, _: &crate::CopySelection, _, cx| {
-                match this.engine.selected_text() {
-                    Ok(Some(text)) => {
-                        this.input_error = None;
-                        crate::clipboard::write(ClipboardItem::new_string(text), cx);
-                    }
-                    Ok(None) => {}
-                    Err(_) => this.input_error = Some("Could not copy selection. Try selecting less text (maximum 1 MiB).".into()),
-                }
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, _: &crate::EditorSelectAll, _, cx| {
-                this.selection_scroll = None;
-                this.selecting = false;
-                this.selection_pointer = None;
-                this.input_error = this.engine.select_all().err().map(|_| "Could not select terminal text.".into());
-                this.frame = this.engine.frame(Some(&this.frame));
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, _: &crate::ClearScrollback, _, cx| {
-                this.selection_scroll = None;
-                this.selecting = false;
-                this.selection_pointer = None;
-                this.input_error = this.engine.clear_scrollback().err().map(|_| "Could not clear scrollback.".into());
-                this.frame = this.engine.frame(Some(&this.frame));
-                cx.emit(SearchChanged);
-                cx.notify();
-            }))
             .on_key_down(cx.listener(Self::key))
             .on_key_up(cx.listener(Self::key_up))
             .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _, cx| {
@@ -422,5 +394,36 @@ impl EntityInputHandler for TerminalSample {
         let (_, cells) = self.selection_geometry?;
         crate::preedit_view::character_index_for_point(&self.composition, position, self.cursor_bounds.origin,
             cells, &"Fira Mono".into(), window)
+    }
+}
+
+impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
+    fn copy_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        match self.engine.selected_text() {
+            Ok(Some(text)) => {
+                self.input_error = None;
+                crate::clipboard::write(ClipboardItem::new_string(text), cx);
+            }
+            Ok(None) => {}
+            Err(_) => self.input_error = Some("Could not copy selection. Try selecting less text (maximum 1 MiB).".into()),
+        }
+        cx.notify();
+    }
+    fn select_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        self.selection_scroll = None;
+        self.selecting = false;
+        self.selection_pointer = None;
+        self.input_error = self.engine.select_all().err().map(|_| "Could not select terminal text.".into());
+        self.frame = self.engine.frame(Some(&self.frame));
+        cx.notify();
+    }
+    fn clear_terminal_history(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        self.selection_scroll = None;
+        self.selecting = false;
+        self.selection_pointer = None;
+        self.input_error = self.engine.clear_scrollback().err().map(|_| "Could not clear scrollback.".into());
+        self.frame = self.engine.frame(Some(&self.frame));
+        cx.emit(SearchChanged);
+        cx.notify();
     }
 }
