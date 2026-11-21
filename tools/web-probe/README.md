@@ -170,3 +170,9 @@ shared row-reveal helper. Page Up/Down uses the native viewport-based calculatio
 filtering resets list position. Six native navigation tests and WASM build pass.
 Browser checks with 10 workspaces cover wraparound to a previously off-screen
 result, Page Up and filtering after scrolling.
+
+Divider dragging now uses native split_interaction capture and weight updates.
+Double-click equalizes the neighboring pair; existing engines resize in place.
+Native compilation and WASM build pass. Browser verification covers a horizontal
+divider drag and equalization with terminal output retained. Nested and vertical
+drag interaction checks remain pending.

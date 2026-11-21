@@ -58,6 +58,7 @@ impl BrowserHost {
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.workspaces.len() { return; }
         self.workspaces[self.active].1.update(cx, |workspace,cx| {
+            workspace.split_drag = None;
             for pane in workspace.samples.values() {
                 pane.update(cx, |pane,cx| pane.release_render_caches(cx));
             }

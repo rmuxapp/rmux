@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Extracted native divider drag capture/state updates into split_interaction and
+consumed it from both hosts. Browser dividers measure their branch, update shared
+PaneTree weights with the native 48-pixel minimum policy, show resize cursors and
+equalize adjacent weights on double-click. Layout mutations/workspace switching
+clear pending browser drags. Native check and WASM build pass. Browser verified
+horizontal drag from equal widths to an unequal split and double-click restoration
+with both live sessions/output retained. Evidence: target/shared-divider-resize-wasm.png.
+Nested/vertical drag and native interaction regression remain unverified.
+
+
 Browser command results now use GPUI ListState/list virtualization, native
 list_navigation::reveal and shared viewport-based paged_result. Search/catalog
 updates reset selection and scrolling. Native palette uses the extracted paging

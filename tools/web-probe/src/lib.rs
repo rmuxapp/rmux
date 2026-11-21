@@ -50,6 +50,7 @@ struct InputProbe {
     focused: usize,
     next_pane: usize,
     zoomed: bool,
+    split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
@@ -69,7 +70,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -78,6 +79,7 @@ impl InputProbe {
     fn add_pane(&mut self, id: usize, window: &Window, cx: &mut Context<Self>) {
         let pane = cx.new(sample_pane::SamplePane::new);
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
+            this.split_drag = None;
             let old_index = this.tree.as_ref().and_then(|tree| tree.pane_index(&id)).unwrap_or(0);
             this.tree = this.tree.take().and_then(|tree| tree.remove(&id));
             this.samples.remove(&id);
@@ -147,6 +149,7 @@ impl InputProbe {
             cx.emit(PaletteRequest::SelectWorkspace(id));
             return;
         }
+        self.split_drag = None;
         match COMMANDS[index] {
             CommandId::Split | CommandId::SplitBelow => {
                 if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
@@ -168,7 +171,7 @@ impl InputProbe {
         }
         self.close_palette(window, cx);
     }
-    fn panes(&self, tree: &PaneTree<usize>, path: String, cx: &mut Context<Self>) -> AnyElement {
+    fn panes(&self, tree: &PaneTree<usize>, path: Vec<usize>, cx: &mut Context<Self>) -> AnyElement {
         match tree {
             PaneTree::Pane(id) => {
                 let id = *id;
@@ -180,12 +183,45 @@ impl InputProbe {
                     .into_any_element()
             }
             PaneTree::Split { axis, children, weights } => {
+                let axis = *axis;
+                let bounds = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
+                let measured = bounds.clone();
                 let mut elements = Vec::new();
                 for (index, child) in children.iter().enumerate() {
-                    if index > 0 { elements.push(split_presentation::divider(SharedString::from(format!("divider-{path}-{index}")), *axis, 5.).into_any_element()); }
-                    elements.push(split_presentation::weighted(weights[index]).child(self.panes(child, format!("{path}-{index}"), cx)).into_any_element());
+                    if index > 0 {
+                        let bounds = bounds.clone();
+                        let path = path.clone();
+                        let weights = weights.clone();
+                        let count = children.len();
+                        elements.push(split_presentation::divider(SharedString::from(format!("divider-{path:?}-{index}")), axis, 5.)
+                            .cursor(if axis == Axis::Columns { CursorStyle::ResizeLeftRight } else { CursorStyle::ResizeUpDown })
+                            .hover(|style| style.bg(rgb(0x40536b)))
+                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, event: &MouseDownEvent, _, cx| {
+                                let extent = if axis == Axis::Columns { bounds.get().size.width } else { bounds.get().size.height };
+                                let available = (f32::from(extent) - 5. * (count - 1) as f32).max(1.);
+                                if event.click_count == 2 {
+                                    if let Some(PaneTree::Split { weights, .. }) = this.tree.as_mut().and_then(|tree| tree.at_mut(&path)) {
+                                        let equal = (weights[index - 1] + weights[index]) / 2.;
+                                        weights[index - 1] = equal; weights[index] = equal;
+                                    }
+                                    this.split_drag = None;
+                                    cx.notify();
+                                } else {
+                                    this.split_drag = Some(split_interaction::SplitDrag {
+                                        path: path.clone(), boundary: index - 1, axis, origin: event.position,
+                                        units_per_pixel: weights.iter().sum::<f32>() / available,
+                                        left: weights[index - 1], right: weights[index],
+                                    });
+                                }
+                                cx.stop_propagation();
+                            })).into_any_element());
+                    }
+                    let mut child_path = path.clone(); child_path.push(index);
+                    elements.push(split_presentation::weighted(weights[index]).child(self.panes(child, child_path, cx)).into_any_element());
                 }
-                split_presentation::branch(*axis).children(elements).into_any_element()
+                split_presentation::branch(axis)
+                    .child(canvas(move |bounds, _, _| measured.set(bounds), |_, _, _, _| {}).absolute().size_full())
+                    .children(elements).into_any_element()
             }
         }
     }
@@ -195,7 +231,7 @@ impl Render for InputProbe {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let height = f32::from(window.viewport_size().height);
         let panes = if let Some(tree) = &self.tree {
-            if self.zoomed { self.panes(&PaneTree::Pane(self.focused), "root".into(), cx) } else { self.panes(tree, "root".into(), cx) }
+            if self.zoomed { self.panes(&PaneTree::Pane(self.focused), vec![], cx) } else { self.panes(tree, vec![], cx) }
         } else {
             div().size_full().flex().items_center().justify_center()
                 .child(div().id("restart-terminal").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
@@ -213,7 +249,7 @@ impl Render for InputProbe {
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);
                     }))))
-            .child(div().flex_1().min_h_0().child(panes))
+            .child(div().flex_1().min_h_0().relative().child(split_interaction::drag_capture(cx)).child(panes))
             .when(self.palette_open, |root| root.child(div().absolute().inset_0().bg(rgba(0x00000066))
                 .flex().items_start().justify_center().pt(px(palette_view::top_inset(height)))
                 .child(palette_view::panel(height)
@@ -309,3 +345,12 @@ mod workspace_shortcuts;
 
 #[path = "../../../crates/rmux-desktop/src/list_navigation.rs"]
 mod list_navigation;
+
+#[path = "../../../crates/rmux-desktop/src/split_interaction.rs"]
+mod split_interaction;
+impl split_interaction::SplitHost for InputProbe {
+    type Pane = usize;
+    fn split_state(&mut self) -> (&mut Option<PaneTree<usize>>, &mut Option<split_interaction::SplitDrag>) {
+        (&mut self.tree, &mut self.split_drag)
+    }
+}

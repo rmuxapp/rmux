@@ -1,79 +1,12 @@
 use super::*;
 use std::{cell::Cell, rc::Rc};
 
-pub(super) struct SplitDrag {
-    path: Vec<usize>,
-    boundary: usize,
-    axis: SplitAxis,
-    origin: Point<Pixels>,
-    units_per_pixel: f32,
-    left: f32,
-    right: f32,
-}
-
-impl Workspace {
-    fn drag_split(&mut self, event: &MouseMoveEvent, cx: &mut Context<Self>) {
-        if !event.dragging() {
-            self.split_drag = None;
-            return;
-        }
-        let Some(drag) = &self.split_drag else {
-            return;
-        };
-        let delta = match drag.axis {
-            SplitAxis::Columns => event.position.x - drag.origin.x,
-            SplitAxis::Rows => event.position.y - drag.origin.y,
-        };
-        let (left, right) = layout::resized_pair(
-            drag.left,
-            drag.right,
-            f32::from(delta) * drag.units_per_pixel,
-            48. * drag.units_per_pixel,
-        );
-        if let Some(PaneTree::Split { weights, .. }) = self
-            .layout
-            .as_mut()
-            .and_then(|tree| tree.at_mut(&drag.path))
-        {
-            if drag.boundary + 1 < weights.len()
-                && (weights[drag.boundary] != left || weights[drag.boundary + 1] != right)
-            {
-                weights[drag.boundary] = left;
-                weights[drag.boundary + 1] = right;
-                cx.notify();
-            }
-        }
-        cx.stop_propagation();
+pub(super) use crate::split_interaction::{SplitDrag, drag_capture};
+impl crate::split_interaction::SplitHost for Workspace {
+    type Pane = Entity<PaneView>;
+    fn split_state(&mut self) -> (&mut Option<PaneTree<Self::Pane>>, &mut Option<SplitDrag>) {
+        (&mut self.layout, &mut self.split_drag)
     }
-}
-
-/// Register drag capture before child terminal handlers. Drag state contains no
-/// terminal references and is discarded when the layout changes.
-pub(super) fn drag_capture(cx: &Context<Workspace>) -> impl IntoElement {
-    let entity = cx.weak_entity();
-    canvas(
-        |_, _, _| (),
-        move |_, _, window, _| {
-            let moving = entity.clone();
-            window.on_mouse_event(move |event: &MouseMoveEvent, phase, _, cx| {
-                if phase == DispatchPhase::Capture {
-                    let _ = moving.update(cx, |this, cx| this.drag_split(event, cx));
-                }
-            });
-            let released = entity.clone();
-            window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
-                if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
-                    let _ = released.update(cx, |this, cx| {
-                        if this.split_drag.take().is_some() {
-                            cx.stop_propagation();
-                        }
-                    });
-                }
-            });
-        },
-    )
-    .absolute()
-    .size_full()
 }
 
 pub(super) fn render_panes(

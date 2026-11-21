@@ -55,4 +55,3 @@ pub(crate) fn paged_result(selected: usize, count: usize, backwards: bool, viewp
     }
     Some(next)
 }
-
