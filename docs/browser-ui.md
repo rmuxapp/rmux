@@ -169,7 +169,10 @@ move consolidation are not in that artifact.
 1. Continue moving workspace orchestration into shared application state/views;
    keep browser sample services behind platform adapters. Tab and group models
    alone do not complete the Rustable-style architecture.
-2. Complete browser terminal input: verify IME preedit/events, Unicode font fallback and multiline paste,
+2. Complete browser terminal input: verify IME preedit/events and Unicode font fallback.
+   Sample-session multiline clipboard paste now passes a local browser check,
+   including final-draft retention across workspace switching; real-shell
+   bracketed paste and broader platform clipboard behavior remain unverified. Verify
    negotiated report-all printable-key routing and platform-reserved shortcut behavior. Validate held
    edge selection, Alt-drag and cancellation when focus leaves the browser.
 3. Close missing UI/service parity against [feature parity](feature-parity.md)
