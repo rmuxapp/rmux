@@ -1,5 +1,25 @@
 # rmux performance acceptance plan
 
+## v0.1.4 process-tree observation
+
+The optional `--process-tree` harness mode records PID/parent/start-time, RSS and
+CPU accounting for the app and its descendants, without capturing process
+arguments. It reports CPU deltas only for identities present at both samples and
+counts appeared/disappeared processes; CPU consumed by exited processes is unknown.
+RSS sums may double-count shared pages and exclude GPU allocations and services
+outside the process tree. These are not physical-memory totals.
+
+One GitHub-built v0.1.4 macOS ARM64 run with eight idle fixture shells, two-second
+settling and a two-second idle window recorded **114.27 MiB** summed RSS across
+nine processes, including **18.92 MiB** of child RSS. Quantized CPU accounting
+showed no increment in that brief window; this is not steady-state idle acceptance.
+After closing the measured workspace while retaining a fresh survivor workspace,
+the sample contained three processes and **99.97 MiB** summed RSS. **One original
+child was still alive** two seconds after close; none remained after normal app
+quit. Surface deregistration alone therefore did not establish prompt process
+teardown in this release. Investigate retention on current source before claiming
+this gate passes. [Raw process-tree sample](benchmarks/rpc-process-tree-release-v0.1.4-eight-panes.jsonl).
+
 ## v0.1.4 focused eight-pane idle observation
 
 A GitHub-built v0.1.4 macOS ARM64 binary, installed and verified through mise,

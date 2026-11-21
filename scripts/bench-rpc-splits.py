@@ -10,6 +10,7 @@ import statistics
 import subprocess
 import tempfile
 import time
+import bench_processes
 
 
 def cpu_seconds(pid):
@@ -22,7 +23,7 @@ def cpu_seconds(pid):
     return int(days) * 86400 + seconds
 
 
-def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, idle_seconds=0):
+def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, idle_seconds=0, process_tree=False):
     with tempfile.TemporaryDirectory(prefix="rmux-split-bench-") as directory:
         root = Path(directory)
         shell = root / "shell"
@@ -72,6 +73,9 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
                                          check=True, capture_output=True, text=True).stdout.strip())
                 result = {"panes": panes, "iteration": iteration, "split_ms": timings,
                           "split_total_ms": sum(timings), "app_rss_kib": rss}
+                before_tree = bench_processes.tree(app.pid) if process_tree else None
+                if before_tree is not None:
+                    result["process_tree"] = before_tree
                 if idle_seconds:
                     before_cpu = cpu_seconds(app.pid)
                     before_wall = time.monotonic()
@@ -81,6 +85,10 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
                     result["idle_wall_seconds"] = elapsed
                     result["idle_app_cpu_seconds"] = max(0, after_cpu - before_cpu)
                     result["idle_app_cpu_percent_one_core"] = 100 * result["idle_app_cpu_seconds"] / elapsed
+                    if process_tree:
+                        after_tree = bench_processes.tree(app.pid)
+                        result["idle_process_tree_end"] = after_tree
+                        result["idle_retained_process_cpu"] = bench_processes.retained_cpu(before_tree, after_tree)
                 if measure_close:
                     # Keep one fresh terminal alive so closing the measured workspace
                     # does not also close the last window/application.
@@ -100,9 +108,14 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
                         ["/bin/ps", "-o", "rss=", "-p", str(app.pid)],
                         check=True, capture_output=True, text=True).stdout.strip())
                     result["after_close_surfaces"] = len(remaining)
+                    if process_tree:
+                        result["after_close_process_tree"] = bench_processes.tree(app.pid)
+                        result["after_close_original_children_alive"] = bench_processes.survivors(before_tree)
                 call("system.quit")
                 app.wait(timeout=10)
                 assert app.returncode == 0
+                if process_tree:
+                    result["after_quit_original_children_alive"] = bench_processes.survivors(before_tree)
                 return result
             finally:
                 if app.poll() is None:
@@ -121,6 +134,7 @@ if __name__ == "__main__":
     parser.add_argument("--label", default="local-debug")
     parser.add_argument("--settle-seconds", type=float, default=0)
     parser.add_argument("--measure-close", action="store_true")
+    parser.add_argument("--process-tree", action="store_true", help="Include child process RSS and identity-aware CPU/teardown samples")
     parser.add_argument("--idle-seconds", type=float, default=0)
     parser.add_argument("--panes", type=int, nargs="+", default=[1, 8, 32])
     parser.add_argument("--iterations", type=int, default=3)
@@ -140,7 +154,7 @@ if __name__ == "__main__":
     revision = subprocess.run(["git", "rev-parse", "--short", "HEAD"], check=True,
                               capture_output=True, text=True).stdout.strip()
     for panes in args.panes:
-        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds) for iteration in range(args.iterations)]
+        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds, args.process_tree) for iteration in range(args.iterations)]
         timings = [value for row in samples for value in row["split_ms"]]
         print(json.dumps({"harness_revision": revision, "binary_label": args.label,
                           "binary_sha256": binary_sha256, "settle_seconds": args.settle_seconds,

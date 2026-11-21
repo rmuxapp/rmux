@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Added optional process-tree accounting to the native split benchmark. It records
+app/descendant RSS, identity-matched CPU deltas, appeared/disappeared processes,
+and original child survival after workspace close and app quit; no command-line
+arguments are collected. Two focused tests cover nested descendants, unrelated
+process exclusion, PID reuse and CPU parsing. One bounded eight-pane v0.1.4 run
+recorded 114.27 MiB summed RSS (18.92 MiB children), then 99.97 MiB after close.
+One original child survived the two-second post-close interval, none survived
+normal quit. This is a release observation, not current-source acceptance or a
+physical/GPU memory total. Raw evidence is in docs/benchmarks/rpc-process-tree-
+release-v0.1.4-eight-panes.jsonl; investigate current-source close retention next.
+
 Zoomed panes now show the desktop's shared 28px status/restore bar in the demo,
 including hidden-pane count, shortcut hint and restore action. Native's previous
 inline bar was replaced with the same presentation/control. Browser smoke exposed
