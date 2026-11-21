@@ -174,3 +174,17 @@ pass, including native process identity preservation and browser retained output
 5. Keep importing verified GitHub artifacts into the existing local Cloudflare
    site as parity improves. The first shared build is deployed. Keep native
    performance and release builds working; do not publish claims beyond evidence.
+
+## Browser CI tool preparation
+
+The mise action now runs in `tools/web-probe`, so browser-specific pins and the
+WASM Rust target are part of its installation/cache step; the separate second
+`mise install` was removed. GitHub `defaults.run.working-directory` does not set
+the working directory of a `uses` action. The pinned mise action declares the
+`working_directory` input in its action manifest.
+
+Baseline run 44941009912 (dae6f46) took 19 seconds for the root mise action plus
+12 seconds for browser tool preparation, 85 seconds for the optimized build,
+24 seconds restoring build dependencies and 39 seconds saving them. These are
+one-run observations. The revised tool-cache path needs a successful CI run;
+no measured speedup is claimed yet.
