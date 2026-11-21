@@ -156,6 +156,10 @@ restoration/metadata code retains field access during migration. This removes
 separate ownership models without claiming a shared top-level application yet.
 Native live-shell transfer/merge checks and browser create/switch/close checks
 pass, including native process identity preservation and browser retained output.
+Shared state/navigation and group editing are live from GitHub run 44941953915
+(source 482e836), Cloudflare deployment 46da0198. Production smoke verified group
+creation, member inheritance and anchor promotion. Later sidebar polish and group
+move consolidation are not in that artifact.
 
 ## Remaining work and deployment acceptance
 

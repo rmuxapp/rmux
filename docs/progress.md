@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Published successful GitHub run 44941953915 (source 482e836) to rmux.app,
+Cloudflare deployment 46da0198. Production now includes shared workspace
+ownership/navigation, group creation, current-workspace grouping, pin commands,
+anchor selection and member removal. Embedded production smoke verified sample
+input, grouping the current workspace, new-member inheritance and anchor
+promotion. Screenshot: target/live-demo-482e836.jpg. This artifact predates the
+shared pin/chevron presentation, latest move-to-group refactor and CI tool-cache
+change; those remain pending. Website source stays off GitHub; native downloads
+remain v0.1.4. Overall parity/performance work remains open.
+
 Workspace-to-group moves now run through shared `State::move_to_group`; native
 host retains availability checks and UI notice/focus handling. Consolidated
 anchor-slot capture/restoration into shared state for native group operations,
