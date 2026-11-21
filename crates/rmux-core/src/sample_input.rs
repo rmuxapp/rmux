@@ -2,7 +2,7 @@
 use crate::terminal_text::Grapheme;
 pub const MAX_INPUT_BYTES: usize = 4096;
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct SampleInput {
     text: String,
     graphemes: Vec<Grapheme>,

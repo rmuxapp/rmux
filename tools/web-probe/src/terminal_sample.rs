@@ -354,7 +354,19 @@ impl EntityInputHandler for TerminalSample {
     fn paste(&mut self, item: ClipboardItem, _: &mut Window, cx: &mut Context<Self>) {
         let Some(text) = item.text() else { return; };
         match self.engine.encode_paste(&text) {
-            Ok(encoded) => { self.input_error = None; self.accept(&encoded, cx); }
+            Ok(encoded) => match self.session.paste(&encoded, self.frame.columns, |text| crate::terminal_engine::graphemes(text).ok()) {
+                Ok(output) => {
+                    self.input_error = None;
+                    crate::fonts::ensure(&text, cx);
+                    if !output.is_empty() {
+                        self.engine.scroll("BOTTOM", 0);
+                        self.engine.write(&output);
+                        self.frame = self.engine.frame(Some(&self.frame));
+                        cx.emit(SearchChanged);
+                    }
+                }
+                Err(error) => self.input_error = Some(error.into()),
+            },
             Err(_) => { self.input_error = Some("Could not paste text. Maximum size is 1 MiB.".into()); }
         }
         cx.notify();

@@ -2,12 +2,34 @@
 //! or terminal parser; deliberately does not execute commands on the host.
 use crate::{sample_input::SampleInput, terminal_text::Grapheme};
 
-#[derive(Default)]
+#[derive(Clone, Default)]
 pub struct SampleSession {
     draft: SampleInput,
 }
 impl SampleSession {
     pub fn display(&self, columns: u16) -> String { self.draft.display(columns) }
+
+    /// Consume unbracketed terminal paste bytes transactionally. The sample
+    /// service has no bracketed-paste negotiation; real shell backends own that.
+    pub fn paste(&mut self, text: &str, columns: u16,
+        mut measure: impl FnMut(&str) -> Option<Vec<Grapheme>>) -> Result<String, &'static str> {
+        if text.len() > crate::sample_input::MAX_INPUT_BYTES {
+            return Err("Sample paste is limited to 4 KiB.");
+        }
+        if text.chars().any(|c| c.is_control() && c != '\r' && c != '\n') {
+            return Err("Sample paste contains unsupported control characters.");
+        }
+        let normalized = text.replace("\r\n", "\n").replace('\r', "\n");
+        let mut pending = self.clone();
+        let mut output = String::new();
+        for (index, line) in normalized.split('\n').enumerate() {
+            if index > 0 { output.push_str(&pending.input("\r", columns, &mut measure)?.unwrap()); }
+            if let Some(echo) = pending.input(line, columns, &mut measure)? { output.push_str(&echo); }
+            if output.len() > 1024 * 1024 { return Err("Sample paste produces too much output."); }
+        }
+        *self = pending;
+        Ok(output)
+    }
 
     /// None means an unsupported/empty input event; errors preserve the draft.
     pub fn input(&mut self, input: &str, columns: u16,
@@ -68,5 +90,17 @@ mod tests {
         send(&mut second, "logs");
         let logs = send(&mut second, "\r");
         assert_eq!(logs.matches("Sample log ").count(), 80);
+    }
+    #[test]
+    fn multiline_paste_normalizes_line_endings_and_keeps_final_draft() {
+        let mut session = SampleSession::default();
+        send(&mut session, "echo ");
+        let output = session.paste("one\r\necho two\recho three\necho draft", 80, |_| None).unwrap();
+        for line in ["one", "two", "three"] { assert!(output.contains(&format!("\r\n{line}\r\n"))); }
+        assert_eq!(session.display(80), "\r\x1b[2K$ echo draft");
+        assert!(session.paste("\x03", 80, |_| None).is_err());
+        assert!(session.paste(&"x".repeat(4097), 80, |_| None).is_err());
+        assert!(session.paste(&"logs\n".repeat(800), 80, |_| None).is_err());
+        assert_eq!(session.display(80), "\r\x1b[2K$ echo draft");
     }
 }

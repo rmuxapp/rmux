@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Fixed sample-session multiline paste being silently discarded after Ghostty
+encoding. The sample service now consumes CR/LF/CRLF-separated commands in order,
+preserves an unfinished final draft and commits only when the whole paste
+succeeds. Input is bounded to 4 KiB and generated output to 1 MiB; unsupported
+control characters produce a visible error. Three focused sample tests pass,
+including newline normalization and rollback after output overflow; WASM compile
+passes. Browser clipboard-event smoke and deployment remain pending. This is
+unbracketed sample-session behavior, not real-shell bracketed-paste support.
+
 Browser sample command interpretation now lives in a rendering-independent
 SampleSession service in rmux-core. The terminal view forwards input and renders
 returned output; it no longer implements command dispatch, echo, interrupt or
