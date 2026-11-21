@@ -90,6 +90,7 @@ impl TerminalSample {
         self.scroll_remainder = 0.;
         cx.notify();
     }
+    pub(crate) fn focus_handle(&self) -> &FocusHandle { &self.focus }
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
     pub fn release_render_cache(&mut self, cx: &mut Context<Self>) {
         self.selecting = false;

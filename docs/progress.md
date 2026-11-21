@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Tab menus now open through shared ShowTabMenu action routing on both hosts.
+The browser exposes Show Tab Actions in its palette and Shift+F10 from terminal
+focus, anchored below the tab strip. Menu shortcut hints are resolved once at
+opening against the originating terminal's actual keymap. Native compile and
+WASM build pass; browser smoke verified Shift+F10, palette invocation and the
+New Tab / Move Tab / Close Tab labels. Screenshot:
+target/browser-tab-menu-shortcuts.jpg. Not deployed.
+
 Browser tabs now have a context menu for new/rename, movement, close, close others
 and close right. It shares desktop menu frame/row presentation, prefix type-ahead
 and existing tab command routing. Right-click selects and captures the terminal

@@ -5,10 +5,15 @@ struct SampleTabMenu {
     position: Point<Pixels>,
     focus: FocusHandle,
     selected: usize,
+    hints: Vec<Option<String>>,
     scroll: ScrollHandle,
     typeahead: crate::menu_navigation::Typeahead,
 }
 const MENU_LABELS: &[&str] = &["New Tab", "Rename Tab…", "Move Tab Left", "Move Tab Right", "Close Tab", "Close Other Tabs", "Close Tabs to the Right"];
+const MENU_COMMANDS: &[rmux_core::commands::CommandId] = {
+    use rmux_core::commands::CommandId::*;
+    &[NewTab, RenameTab, MoveTabLeft, MoveTabRight, ClosePane, CloseOtherTabs, CloseTabsToRight]
+};
 impl SamplePane {
     fn menu_enabled(&self, target: EntityId) -> [bool; 7] {
         let Some(index) = self.terminals.iter().position(|tab| tab.entity_id() == target) else { return [false; 7]; };
@@ -37,7 +42,14 @@ impl SamplePane {
         }));
         focus.focus(window, cx);
         let selected = self.menu_enabled(target).iter().position(|enabled| *enabled).unwrap_or(0);
-        self.menu = Some(SampleTabMenu { target, position, focus, selected, scroll: ScrollHandle::new(), typeahead: Default::default() });
+        let hints = self.terminals[index].read(cx).focus_handle();
+        let hints = MENU_COMMANDS.iter().map(|command| {
+            let action = crate::tab_actions::action(*command)?;
+            window.highest_precedence_binding_for_action_in(action.as_ref(), hints).map(|binding|
+                binding.keystrokes().iter().map(|key| crate::shortcut_label::format_key_parts(
+                    key.key(), *key.modifiers(), crate::terminal_engine::is_mac())).collect::<Vec<_>>().join(" "))
+        }).collect();
+        self.menu = Some(SampleTabMenu { hints, target, position, focus, selected, scroll: ScrollHandle::new(), typeahead: Default::default() });
         cx.notify();
     }
     fn activate_menu(&mut self, item: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -46,9 +58,7 @@ impl SamplePane {
         self.dismiss_menu(window, cx);
         let Some(index) = self.terminals.iter().position(|tab| tab.entity_id() == menu.target) else { return; };
         self.select(index, window, cx);
-        use rmux_core::commands::CommandId::*;
-        let commands = [NewTab, RenameTab, MoveTabLeft, MoveTabRight, ClosePane, CloseOtherTabs, CloseTabsToRight];
-        crate::tab_actions::TabCommandHost::run_tab_command(self, commands[item], window, cx);
+        crate::tab_actions::TabCommandHost::run_tab_command(self, MENU_COMMANDS[item], window, cx);
     }
     fn menu_element(&self, menu: SampleTabMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let enabled = self.menu_enabled(menu.target);
@@ -98,7 +108,9 @@ impl SamplePane {
                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                 if event.standard_click() { this.activate_menu(index, window, cx); }
                                 cx.stop_propagation();
-                            })).child(*label)
+                            })).child(div().flex_1().min_w_0().truncate().child(*label))
+                            .when_some(menu.hints[index].clone(), |row, hint| row.child(
+                                div().max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(rgb(0xa0a0a0)).child(hint)))
                     })))
         )).priority(2).into_any_element()
     }

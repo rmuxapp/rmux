@@ -1133,6 +1133,7 @@ impl crate::tab_actions::TabCommandHost for PaneView {
     fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
+            CommandId::ShowTabMenu => self.show_active_tab_menu(window, cx),
             CommandId::NewTab => self.add(window, cx),
             CommandId::RenameTab => self.rename_tab(window, cx),
             CommandId::CloseOtherTabs => self.close_tabs(TabCloseScope::Others, window, cx),
@@ -1163,7 +1164,6 @@ impl Render for PaneView {
             .on_action(cx.listener(|this, _: &CloseFinishedTabs, window, cx| this.close_tabs(TabCloseScope::Finished, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewTab, _, cx| this.cancel_tab_launch(cx)))
             .on_action(cx.listener(|this, _: &ShowTabPicker, window, cx| this.show_tab_picker(window, cx)))
-            .on_action(cx.listener(|this, _: &ShowTabMenu, window, cx| this.show_active_tab_menu(window, cx)))
             .map(|root| crate::tab_actions::bind(root, cx))
             .when(!self.benchmark, |root| {
                 root.child(

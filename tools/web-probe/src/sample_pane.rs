@@ -153,6 +153,10 @@ impl crate::tab_actions::TabCommandHost for SamplePane {
     fn run_tab_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
+            CommandId::ShowTabMenu => {
+                let bounds = self.tab_scroll.bounds();
+                self.show_menu(self.terminals.active_index(), point(bounds.left(), bounds.bottom()), window, cx);
+            }
             CommandId::NewTab => self.add(window, cx),
             CommandId::RenameTab => self.rename_tab(window, cx),
             CommandId::CloseOtherTabs => self.close_tabs(rmux_core::tabs::CloseScope::Others, window, cx),
