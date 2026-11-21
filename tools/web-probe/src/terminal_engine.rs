@@ -19,7 +19,7 @@ extern "C" {
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
     fn free(id: u32);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = encode)]
-    fn encode(id: u32, key: &str, mods: u8, repeat: bool, text: &str) -> String;
+    fn encode(id: u32, key: &str, mods: u8, action: &str, text: &str) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = select)]
     fn select(id: u32, action: &str, x: f32, y: f32, cell_width: f32, cell_height: f32, columns: u16, rows: usize, rectangle: bool, clicks: usize) -> bool;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedText)]
@@ -59,9 +59,10 @@ impl TerminalEngine {
     pub fn select(&self, action: &str, x: f32, y: f32, cells: crate::cell_metrics::CellMetrics, frame: &Frame, rectangle: bool, clicks: usize) -> bool {
         select(self.0, action, x, y, cells.width, cells.height, frame.columns, frame.rows.len(), rectangle, clicks)
     }
-    pub fn encode(&self, key: rmux_core::keyboard::Key, mods: rmux_core::keyboard::Modifiers, repeat: bool, text: &str) -> String {
+    pub fn encode(&self, key: rmux_core::keyboard::Key, mods: rmux_core::keyboard::Modifiers, action: rmux_core::keyboard::Action, text: &str) -> String {
         let bits = u8::from(mods.shift) | (u8::from(mods.control)<<1) | (u8::from(mods.alt)<<2);
-        encode(self.0, &crate::key_adapter::name(key), bits, repeat, text)
+        let action = match action { rmux_core::keyboard::Action::Press => "PRESS", rmux_core::keyboard::Action::Repeat => "REPEAT", rmux_core::keyboard::Action::Release => "RELEASE" };
+        encode(self.0, &crate::key_adapter::name(key), bits, action, text)
     }
     pub fn resize(&self, columns: u16, rows: u16) { resize(self.0, columns, rows); }
     pub fn frame(&self, previous: Option<&Frame>) -> Frame {

@@ -623,7 +623,7 @@ struct TerminalView {
     scrollbar_drag: Option<scrollbar_view::Drag>,
     mouse_button: Option<MouseButton>,
     metrics: Option<diagnostics::Metrics>,
-    pressed_keys: std::collections::HashMap<rmux_terminal::keyboard::KeyIdentity, String>,
+    pressed_keys: rmux_core::keyboard::PressedKeys,
     input_focused: bool,
     _focus_subscriptions: Vec<Subscription>,
 }
@@ -1132,7 +1132,7 @@ impl TerminalView {
         cx.emit(TabMetadataChanged);
         if !focused {
             // Finish the old pane's presses before reporting focus loss.
-            for (_, key) in self.pressed_keys.drain() {
+            for key in self.pressed_keys.drain() {
                 if let Err(error) = self
                     .session
                     .key_release(&key, rmux_terminal::keyboard::Modifiers::default())
@@ -1534,11 +1534,7 @@ impl TerminalView {
             .key_with_text(&key.key, mods, event.is_held, key.key_char.as_deref())
         {
             Ok(true) => {
-                if let Some(identity) = rmux_terminal::keyboard::key_identity(&key.key) {
-                    self.pressed_keys
-                        .entry(identity)
-                        .or_insert_with(|| key.key.clone());
-                }
+                self.pressed_keys.press(&key.key);
                 if self.frame.scrollback_offset > 0 {
                     cx.notify();
                 }
@@ -1556,8 +1552,7 @@ impl TerminalView {
         let key = &event.keystroke;
         // Local shortcuts and native text/IME presses must not produce orphan
         // release reports. Only pair releases with presses sent to this pane.
-        let Some(pressed) = rmux_terminal::keyboard::key_identity(&key.key)
-            .and_then(|identity| self.pressed_keys.remove(&identity))
+        let Some(pressed) = self.pressed_keys.release(&key.key)
         else {
             return;
         };

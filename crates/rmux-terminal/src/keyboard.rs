@@ -191,13 +191,7 @@ impl Terminal {
                 return Ok(None);
             }
         }
-        let text = if key == "space" {
-            " "
-        } else if text_key {
-            key
-        } else {
-            ""
-        };
+        let text = rmux_core::keyboard::key_text(key);
         let unshifted = text
             .chars()
             .next()

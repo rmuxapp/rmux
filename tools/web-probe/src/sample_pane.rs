@@ -17,7 +17,7 @@ impl SamplePane {
     }
     pub fn release_render_caches(&mut self, cx: &mut Context<Self>) {
         for terminal in &self.terminals {
-            terminal.update(cx, |terminal,_| terminal.release_render_cache());
+            terminal.update(cx, |terminal,cx| terminal.release_render_cache(cx));
         }
     }
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
@@ -32,8 +32,8 @@ impl SamplePane {
         }
         cx.notify();
     }
-    pub fn new(cx: &mut Context<Self>) -> Self {
-        let terminal = cx.new(TerminalSample::new);
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let terminal = cx.new(|cx| TerminalSample::new(window,cx));
         let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
         Self { terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
@@ -45,7 +45,7 @@ impl SamplePane {
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() { return; }
         if self.terminals.active_index() != index {
-            self.terminals[self.terminals.active_index()].update(cx, |terminal, _| terminal.release_render_cache());
+            self.terminals[self.terminals.active_index()].update(cx, |terminal, cx| terminal.release_render_cache(cx));
         }
         self.terminals.select(index);
         self.tab_scroll.scroll_to_item(index);
@@ -54,7 +54,7 @@ impl SamplePane {
     }
     fn add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminals.len() >= 16 { return; }
-        let terminal = cx.new(TerminalSample::new);
+        let terminal = cx.new(|cx| TerminalSample::new(window,cx));
         self.labels.insert(terminal.entity_id(), format!("Terminal {}",self.next_number));
         self.next_number += 1;
         self.terminals.push(terminal);

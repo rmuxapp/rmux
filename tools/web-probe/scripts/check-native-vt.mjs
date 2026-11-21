@@ -1,8 +1,16 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
-import {loadNativeVt} from '../native-vt.js';
+import {loadNativeVt, createNativeHost} from '../native-vt.js';
 const bytes = await readFile(new URL('../../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm', import.meta.url));
 const host = await loadNativeVt(bytes);
+const bridge = createNativeHost(host,()=>true);
+const inputSession = bridge.create(20,4);
+try {
+  bridge.write(inputSession,'\x1b[>11u');
+  assert.equal(bridge.encode(inputSession,'A',0,'PRESS','a'),'\x1b[97u');
+  assert.equal(bridge.encode(inputSession,'A',0,'REPEAT','a'),'\x1b[97;1:2u');
+  assert.equal(bridge.encode(inputSession,'A',0,'RELEASE','a'),'\x1b[97;1:3u');
+} finally { bridge.free(inputSession); }
 assert.throws(()=>host.create(20,3,{foreground:-1}),RangeError);
 assert.throws(()=>host.create(20,3,{scrollback:2**32}),RangeError);
 const configured=host.create(20,3,{foreground:0xdcdfe6,background:0x12141a,scrollback:0});

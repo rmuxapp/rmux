@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Shared delivered-key tracking between desktop and browser, preserving original
+press spelling through shifted aliases/repeats and suppressing orphan releases.
+Browser encoded control/non-text keys now use explicit Press/Repeat/Release
+actions; focus loss and hidden-terminal cache release drain held keys. Terminal
+blur also cancels selection/scrollbar gestures. Core pairing tests and bridge
+Kitty press/repeat/release checks pass, as do native check and WASM build.
+Printable input still uses the composition handler; negotiated report-all
+printable routing and full IME behavior remain unfinished.
+
 Added the Shared WASM demo GitHub workflow and optimized `build-release` artifact
 path. Development stays on the quick unoptimized build; normal builds no longer
 install/copy the retired ghostty-web benchmark dependency. Release packaging

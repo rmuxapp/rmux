@@ -190,8 +190,8 @@ export function createNativeHost(engine, isMac) {
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },
     copySelection() { return focused===null ? null : sessions.get(focused)?.selectedText() ?? null; },
-    encode(id,key,mods,repeat,text) {
-      return new TextDecoder().decode(sessions.get(id).encode(key,{shift:!!(mods&1),control:!!(mods&2),alt:!!(mods&4),action:repeat?'REPEAT':'PRESS',text}));
+    encode(id,key,mods,action,text) {
+      return new TextDecoder().decode(sessions.get(id).encode(key,{shift:!!(mods&1),control:!!(mods&2),alt:!!(mods&4),action,text}));
     },
     free(id) { if (focused===id) focused=null; sessions.get(id)?.dispose(); sessions.delete(id); },
   };

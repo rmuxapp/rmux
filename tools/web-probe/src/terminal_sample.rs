@@ -10,6 +10,7 @@ pub(crate) struct TerminalSample {
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
     command: String,
+    pressed_keys: rmux_core::keyboard::PressedKeys,
     composition: crate::composition::Composition,
     cursor_bounds: Bounds<Pixels>,
     selection_geometry: Option<(Bounds<Pixels>, CellMetrics)>,
@@ -40,21 +41,31 @@ impl TerminalSample {
         cx.notify();
     }
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
-    pub fn release_render_cache(&mut self) {
+    pub fn release_render_cache(&mut self, cx: &mut Context<Self>) {
         self.selecting = false;
         self.selection_pointer = None;
         self.selection_scroll = None;
         self.scrollbar_drag = None;
         self.engine.focus(false);
+        self.release_pressed(cx);
         self.rows.release();
         self.cursor_cache = Default::default();
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) { self.focus.focus(window, cx); }
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let focus = cx.focus_handle();
+        cx.on_blur(&focus, window, |this, _, cx| {
+            this.release_pressed(cx);
+            this.selecting = false;
+            this.selection_pointer = None;
+            this.selection_scroll = None;
+            this.scrollbar_drag = None;
+            this.engine.focus(false);
+        }).detach();
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: String::new(), pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -94,7 +105,8 @@ impl TerminalSample {
             cx.stop_propagation();
         }
     }
-    fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
+    fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.focus.is_focused(window) || !self.composition.text.is_empty() { return; }
         let key = &event.keystroke;
         if key.modifiers.platform { return; }
         if key.modifiers.shift && !key.modifiers.control && !key.modifiers.alt {
@@ -108,9 +120,27 @@ impl TerminalSample {
         if !key.modifiers.control && !key.modifiers.alt && key.key_char.is_some() { return; }
         let Some(symbol) = rmux_core::keyboard::key(&key.key) else { return; };
         let mods = rmux_core::keyboard::Modifiers { shift:key.modifiers.shift, control:key.modifiers.control, alt:key.modifiers.alt };
-        let text = if mods.control || mods.alt { key.key.as_str() } else { key.key_char.as_deref().unwrap_or("") };
-        let encoded = self.engine.encode(symbol, mods, event.is_held, text);
+        let text = if mods.control || mods.alt { rmux_core::keyboard::key_text(&key.key) } else { key.key_char.as_deref().unwrap_or("") };
+        let action = if event.is_held { rmux_core::keyboard::Action::Repeat } else { rmux_core::keyboard::Action::Press };
+        let encoded = self.engine.encode(symbol, mods, action, text);
+        self.pressed_keys.press(&key.key);
         self.accept(&encoded, cx);
+        cx.stop_propagation();
+    }
+    fn release_pressed(&mut self, cx: &mut Context<Self>) {
+        let held: Vec<_> = self.pressed_keys.drain().collect();
+        for name in held { self.release_key(&name, Default::default(), cx); }
+    }
+    fn release_key(&mut self, name: &str, mods: rmux_core::keyboard::Modifiers, cx: &mut Context<Self>) {
+        if let Some(symbol) = rmux_core::keyboard::key(name) {
+            let encoded = self.engine.encode(symbol, mods, rmux_core::keyboard::Action::Release, rmux_core::keyboard::key_text(name));
+            if !encoded.is_empty() { self.accept(&encoded,cx); }
+        }
+    }
+    fn key_up(&mut self, event: &KeyUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        let key = &event.keystroke;
+        let Some(pressed) = self.pressed_keys.release(&key.key) else { return; };
+        self.release_key(&pressed, rmux_core::keyboard::Modifiers { shift:key.modifiers.shift, control:key.modifiers.control, alt:key.modifiers.alt },cx);
         cx.stop_propagation();
     }
     fn accept(&mut self, encoded: &str, cx: &mut Context<Self>) {
@@ -200,6 +230,7 @@ impl Render for TerminalSample {
                 }
             }))
             .on_key_down(cx.listener(Self::key))
+            .on_key_up(cx.listener(Self::key_up))
             .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _, cx| {
                 if let Some((_,cells)) = this.selection_geometry {
                     let lines = rmux_core::scroll::wheel_lines(&mut this.scroll_remainder,

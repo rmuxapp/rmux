@@ -26,6 +26,9 @@ platform services are still separate. Do not describe it as full parity yet.
   cursor geometry and draggable scrollback indicator.
 - **Input:** shared composition model, workspace/pane/tab shortcut definitions,
   tab action dispatch, fractional wheel accumulation and Shift+PageUp/Down/Home/End.
+  Delivered-key tracking is shared too: shifted aliases pair with their original
+  press, and repeats do not replace it. The browser routes release events for
+  encoded control/non-text keys and drains held keys on terminal focus loss.
 - **Terminal engine:** the same pinned libghostty-vt 1.0.1, compiled to WASM with
   its C API manifest. Sparse row patches preserve unchanged Rust row identities.
   Native key encoding, gesture selection, bounded text export and viewport APIs
@@ -80,7 +83,7 @@ is not part of the replacement runtime or optimized artifact.
    keep browser sample services behind platform adapters. Tab and group models
    alone do not complete the Rustable-style architecture.
 2. Complete browser terminal input: IME preedit, Unicode sample input/paste,
-   release-event routing and platform-reserved shortcut behavior. Validate held
+   negotiated report-all printable-key routing and platform-reserved shortcut behavior. Validate held
    edge selection, Alt-drag and cancellation when focus leaves the browser.
 3. Close missing UI/service parity against [feature parity](feature-parity.md)
    and [roadmap](roadmap.md), including settings and context menus. The static

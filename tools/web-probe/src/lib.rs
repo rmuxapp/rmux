@@ -97,8 +97,8 @@ impl InputProbe {
 
     }
 
-    fn add_pane(&mut self, id: usize, window: &Window, cx: &mut Context<Self>) {
-        let pane = cx.new(sample_pane::SamplePane::new);
+    fn add_pane(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let pane = cx.new(|cx| sample_pane::SamplePane::new(window,cx));
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
             this.split_drag = None;
             let old_index = this.tree.as_ref().and_then(|tree| tree.pane_index(&id)).unwrap_or(0);

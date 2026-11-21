@@ -20,6 +20,27 @@ pub enum Key {
     Letter(u8), Function(u8), Character(char),
 }
 
+/// Tracks only presses a host actually delivered to a terminal. Preserve the
+/// first spelling through repeats and shifted aliases for its release report.
+#[derive(Default)]
+pub struct PressedKeys(std::collections::HashMap<Key, String>);
+pub fn key_text(name: &str) -> &str {
+    if name == "space" { " " } else if name.chars().count() == 1 { name } else { "" }
+}
+impl PressedKeys {
+    pub fn press(&mut self, name: &str) {
+        if let Some(identity) = key(name) {
+            self.0.entry(identity).or_insert_with(|| name.to_owned());
+        }
+    }
+    pub fn release(&mut self, name: &str) -> Option<String> {
+        self.0.remove(&key(name)?)
+    }
+    pub fn drain(&mut self) -> impl Iterator<Item = String> + '_ {
+        self.0.drain().map(|(_, name)| name)
+    }
+}
+
 pub fn key(key: &str) -> Option<Key> {
     Some(match key {
         "enter" => Key::Enter,
@@ -84,6 +105,18 @@ pub fn key(key: &str) -> Option<Key> {
 #[cfg(test)]
 mod tests {
     use super::{key, Key};
+    #[test]
+    fn releases_pair_with_delivered_presses_and_drain_once() {
+        let mut held = super::PressedKeys::default();
+        assert_eq!(held.release("a"),None);
+        held.press("{"); held.press("[");
+        assert_eq!(held.release("["),Some("{".into()));
+        assert_eq!(held.release("{"),None);
+        held.press("é"); held.press("界"); held.press("unknown-key");
+        assert_eq!(held.release("é"),Some("é".into()));
+        assert_eq!(held.drain().collect::<Vec<_>>(),vec!["界"]);
+        assert_eq!(held.release("界"),None);
+    }
     #[test]
     fn aliases_preserve_identity_and_unicode() {
         for (base, shifted) in [("[","{"),("]","}"),("/","?"),("-","_"),("2","@"),("a","A"),("space"," ")] {
