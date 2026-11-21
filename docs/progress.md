@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser terminal tabs support pointer reordering within their pane. Dropping
+on another tab inserts before it; dropping in the strip's empty area appends.
+Native and browser hosts use the same rmux-core insertion rule. Stable entity
+IDs revalidate source/target and retain terminal contents, custom titles and
+input focus. Local browser gestures verified both directions and subsequent
+typing with prior output intact (`target/browser-tab-drop.jpg`). Browser build
+and the existing native insertion-direction test passed. Cross-pane pointer
+transfer in the browser is still pending; this change is not yet deployed.
+
 Deployed source cab241d from successful GitHub Shared WASM run 44956760426
 to Cloudflare deployment 1741f7d9. The live rmux.app page references this
 artifact; a live pointer gesture reordered website above rmux and retained

@@ -1,4 +1,9 @@
 //! Ordered pane tabs and selection, independent of UI entities or sessions.
+/// Resolve insertion before a target after removing the source. A target equal
+/// to the original length appends the tab to the strip.
+pub fn drop_index(from: usize, target: usize) -> usize {
+    target.saturating_sub(usize::from(from < target))
+}
 /// User tab titles share the same bounded normalization on every host.
 /// None restores the terminal's automatic title.
 pub fn custom_title(text: &str) -> Option<String> {

@@ -122,6 +122,8 @@ description, and organize related workspaces into groups.
 - **Resize a split:** drag its divider. Double-click to balance adjacent panes.
 - **Focus one pane:** use **Zoom Pane**, then toggle it again to return to the layout.
 - **Find a tab:** open **Choose Terminal Tab** and search its title or directory.
+- **Reorder tabs:** drag onto a tab to insert before it, or into empty tab-strip
+  space to move to the end. This also works within a browser demo pane.
 - **Move work:** use the palette’s move, detach, join, or merge actions.
 - **Resize the sidebar:** drag its right edge; double-click to restore its width.
 - **Arrange sidebar rows:** drag a workspace onto another row to reorder it,

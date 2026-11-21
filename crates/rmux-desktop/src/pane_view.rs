@@ -31,9 +31,7 @@ fn reveal_reordered_tab(scroll: &ListState, previous: &mut usize, row: usize) {
 
 use rmux_core::tabs::{CloseScope as TabCloseScope, close_indices as other_tab_close_indices};
 
-fn tab_drop_index(from: usize, target: usize) -> usize {
-    target.saturating_sub(usize::from(from < target))
-}
+use rmux_core::tabs::drop_index as tab_drop_index;
 
 #[cfg(test)]
 mod tab_order_tests {

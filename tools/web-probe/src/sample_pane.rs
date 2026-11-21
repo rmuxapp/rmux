@@ -144,6 +144,18 @@ impl SamplePane {
             cx.notify();
         }
     }
+    fn drop_tab(&mut self, item: &crate::drag_item::DragItem, target: Option<EntityId>, window: &mut Window, cx: &mut Context<Self>) {
+        if item.container != cx.entity_id() || Some(item.item) == target || self.rename.is_some() { return; }
+        let Some(from) = self.terminals.iter().position(|terminal| terminal.entity_id() == item.item) else { return; };
+        let target = match target {
+            Some(target) => { let Some(index) = self.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; }; index }
+            None => self.terminals.len(),
+        };
+        let to = rmux_core::tabs::drop_index(from, target);
+        let terminal = self.terminals.remove(from);
+        self.terminals.insert(to, terminal);
+        self.select(to, window, cx);
+    }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(next) = self.terminals.cycle_target(direction) {
             self.select(next, window, cx);
@@ -177,17 +189,25 @@ impl crate::tab_actions::TabCommandHost for SamplePane {
 impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.active().is_some_and(|terminal| terminal.read(cx).is_focused(window));
+        let container = cx.entity_id();
         crate::pane_presentation::frame(false, false)
             .map(|root| crate::tab_actions::bind(root, cx))
             .child(tab_presentation::strip()
                 .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
-                    .children(self.terminals.iter().enumerate().map(|(index, terminal)|
+                    .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container))
+                    .on_drop(cx.listener(|this, item, window, cx| this.drop_tab(item, None, window, cx)))
+                    .children(self.terminals.iter().enumerate().map(|(index, terminal)| {
+                        let target = terminal.entity_id();
+                        let container = cx.entity_id();
+                        let title: SharedString = terminal.read(cx).custom_title.clone()
+                            .unwrap_or_else(|| self.labels[&target].clone()).into();
                         tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused)
-                            .child({
-                                let title: SharedString = terminal.read(cx).custom_title.clone()
-                                    .unwrap_or_else(|| self.labels[&terminal.entity_id()].clone()).into();
-                                tab_presentation::title(("tab-title", terminal.entity_id()), title.clone(), title)
-                            })
+                            .when(self.rename.is_none(), |tab| tab
+                                .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: title.clone() }, |item, _, _, cx| cx.new(|_| item.clone()))
+                                .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && item.item != target))
+                                .drag_over(|style, _: &crate::drag_item::DragItem, _, _| style.bg(rgb(0x435a7b)))
+                                .on_drop(cx.listener(move |this, item, window, cx| this.drop_tab(item, Some(target), window, cx))))
+                            .child(tab_presentation::title(("tab-title", target), title.clone(), title))
                             .child(div().id(("close-sample-tab",terminal.entity_id())).px_1().child("×")
                                 .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))
@@ -199,7 +219,7 @@ impl Render for SamplePane {
                                 if !event.standard_click() { return; }
                                 this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_tab(window,cx); }
-                            })))))
+                            }))})))
                 .child(crate::pane_presentation::control_button("add-tab").child(crate::icons::icon("plus"))
                     .on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
                 .children([
