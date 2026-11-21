@@ -12,12 +12,24 @@ export function createRenderAdapter(api, manifest, terminal, {buffer, handle, ch
     iterator = handle(slot => api.ghostty_render_state_row_iterator_new(0, slot));
     cells = handle(slot => api.ghostty_render_state_row_cells_new(0, slot));
   } catch (error) { dispose(); throw error; }
-  const view = () => new DataView(api.memory.buffer);
+  let cachedView;
+  const view = () => {
+    if (!cachedView || cachedView.buffer !== api.memory.buffer) cachedView = new DataView(api.memory.buffer);
+    return cachedView;
+  };
   const offset = (type, field) => manifest.types[type].fields[field].offset;
   const u8 = p => view().getUint8(p), u16 = p => view().getUint16(p,true), u32 = p => view().getUint32(p,true);
   const put = (p, n) => view().setUint32(p,n,true);
   const rgb = p => [u8(p),u8(p+1),u8(p+2)];
   const decoder = new TextDecoder();
+  const bits=manifest.types.GhosttyCell.bits;
+  const wideShift=bits.wide.lsb-32, wideMask=(1<<bits.wide.width)-1;
+  const contentShift=bits.content.lsb, contentTagMask=(1<<bits.content_tag.width)-1;
+  const codepointMask=(1<<bits.content.arms.CODEPOINT.bits.codepoint.width)-1;
+  const contentKinds=manifest.types.GhosttyCellContentTag.values;
+  const wideKinds=manifest.types.GhosttyCellWide.values;
+  const styleShift=bits.style_id.lsb, styleLowBits=32-styleShift;
+  const styleHighMask=(1<<(bits.style_id.width-styleLowBits))-1;
   return {
     dispose,
     snapshot() {
@@ -45,37 +57,53 @@ export function createRenderAdapter(api, manifest, terminal, {buffer, handle, ch
         put(slot,iterator); get('ROW_ITERATOR',slot);
         while (api.ghostty_render_state_row_iterator_next_dirty(iterator,ySlot)) {
           const y=u16(ySlot), row=[];
+          // Style IDs are page-local. Reuse only consecutive styles in this row,
+          // excluding packed background-only cells whose color lives in content.
+          let lastStyleId=-1, lastStyle;
           put(selection,manifest.types.GhosttyRenderStateRowSelection.size);
           const selected=api.ghostty_render_state_row_get(iterator,value('GhosttyRenderStateRowData','SELECTION'),selection);
           if (selected !== value('GhosttyResult','NO_VALUE')) check(selected);
           selections.push([y,selected===0 ? [u16(selection+offset('GhosttyRenderStateRowSelection','start_x')),u16(selection+offset('GhosttyRenderStateRowSelection','end_x'))] : null]);
           put(slot,cells); check(api.ghostty_render_state_row_get(iterator,value('GhosttyRenderStateRowData','CELLS'),slot));
           while (api.ghostty_render_state_row_cells_next(cells)) {
-            cellGet('RAW',raw); cellGet('STYLE',style);
-            const wideField=manifest.types.GhosttyCell.bits.wide;
-            const wide=Number((view().getBigUint64(raw,true)>>BigInt(wideField.lsb)) & ((1n<<BigInt(wideField.width))-1n));
-            const width=wide===value('GhosttyCellWide','WIDE') ? 2 : wide===value('GhosttyCellWide','NARROW') ? 1 : 0;
+            cellGet('RAW',raw);
+            const low=u32(raw), high=u32(raw+4);
+            const wide=(high>>>wideShift)&wideMask;
+            const width=wide===wideKinds.WIDE ? 2 : wide===wideKinds.NARROW ? 1 : 0;
             const setGlyph = (p,capacity) => {
               put(glyph+offset('GhosttyBuffer','ptr'),p); put(glyph+offset('GhosttyBuffer','cap'),capacity); put(glyph+offset('GhosttyBuffer','len'),0);
               return api.ghostty_render_state_row_cells_get(cells,value('GhosttyRenderStateRowCellsData','GRAPHEMES_UTF8'),glyph);
             };
             const decode = p => decoder.decode(new Uint8Array(api.memory.buffer,p,u32(glyph+offset('GhosttyBuffer','len'))));
-            const result=setGlyph(text,1024);
             let label;
-            if (result===value('GhosttyResult','OUT_OF_SPACE')) {
-              const required=u32(glyph+offset('GhosttyBuffer','len'));
-              label=buffer(required,p => { check(setGlyph(p,required)); return decode(p); });
-            } else { check(result); label=decode(text); }
-            const flags=u16(style+offset('GhosttyStyle','flags'));
-            let fg=resolve(style+offset('GhosttyStyle','fg_color'),foreground);
-            let bg=resolve(style+offset('GhosttyStyle','bg_color'),background);
-            if (flags & 16) [fg,bg]=[bg,fg];
-            let underline=resolve(style+offset('GhosttyStyle','underline_color'),fg);
-            const dim=c => c.map((v,i)=>Math.floor((v+bg[i])/2));
-            if (flags & 4) { fg=dim(fg); underline=dim(underline); }
-            if (flags & 32) { fg=bg; underline=bg; }
-            const wireFlags=(flags&3) | ((flags&0x700)?4:0) | ((flags&64)?8:0) | (flags&32);
-            row.push([label,width,fg,bg,wireFlags,underline,((flags>>8)&7)===value('GhosttySgrUnderline','CURLY'),!!(flags&128)]);
+            if ((low&contentTagMask)===contentKinds.CODEPOINT_GRAPHEME) {
+              const result=setGlyph(text,1024);
+              if (result===value('GhosttyResult','OUT_OF_SPACE')) {
+                const required=u32(glyph+offset('GhosttyBuffer','len'));
+                label=buffer(required,p => { check(setGlyph(p,required)); return decode(p); });
+              } else { check(result); label=decode(text); }
+            } else {
+              const codepoint=(low&contentTagMask)===contentKinds.CODEPOINT ? (low>>>contentShift)&codepointMask : 0;
+              label=codepoint ? String.fromCodePoint(codepoint) : '';
+            }
+            const tag=low&contentTagMask;
+            const styleId=(tag===contentKinds.CODEPOINT || tag===contentKinds.CODEPOINT_GRAPHEME)
+              ? (low>>>styleShift)|((high&styleHighMask)<<styleLowBits) : -1;
+            if (styleId===-1 || styleId!==lastStyleId) {
+              cellGet('STYLE',style);
+              const flags=u16(style+offset('GhosttyStyle','flags'));
+              let fg=resolve(style+offset('GhosttyStyle','fg_color'),foreground);
+              let bg=resolve(style+offset('GhosttyStyle','bg_color'),background);
+              if (flags & 16) [fg,bg]=[bg,fg];
+              let underline=resolve(style+offset('GhosttyStyle','underline_color'),fg);
+              const dim=c => c.map((v,i)=>Math.floor((v+bg[i])/2));
+              if (flags & 4) { fg=dim(fg); underline=dim(underline); }
+              if (flags & 32) { fg=bg; underline=bg; }
+              const wireFlags=(flags&3) | ((flags&0x700)?4:0) | ((flags&64)?8:0) | (flags&32);
+              lastStyle=[fg,bg,wireFlags,underline,((flags>>8)&7)===value('GhosttySgrUnderline','CURLY'),!!(flags&128)];
+              lastStyleId=styleId;
+            }
+            row.push([label,width,...lastStyle]);
           }
           rows.push([y,row]);
         }

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Measured and optimized the current direct browser-engine adapter, rather than
+reusing timings from ghostty-web. In the 80×24 synthetic benchmark, dense updates
+across 16 panes fell from 24.418 to 5.650 ms median (26.689 to 6.594 ms p95);
+single-row updates fell from 1.057 to 0.296 ms median. Cached memory views,
+packed single-codepoint reads and consecutive per-row style reuse remove repeated
+allocation/decoding while retaining the full-grapheme path. Payload size and dirty
+row counts are unchanged. Engine checks and WASM build pass. Raw measurements and
+scope: docs/benchmarks/native-vt.md. This excludes Rust decode, shaping, GPU and
+presentation latency; browser/per-pane memory and end-to-end latency still need
+measurement before performance parity claims.
+
 Browser wheel scrolling now calls the native Ghostty viewport API. Desktop and
 browser share fractional wheel accumulation and the existing 32-line dispatch
 bound through rmux-core::scroll. Typing returns to the bottom; the bundled logs

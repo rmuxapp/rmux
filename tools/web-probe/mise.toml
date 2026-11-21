@@ -23,6 +23,10 @@ run = "RMUX_GHOSTTY_TARGET=wasm32-freestanding mise exec -- sh scripts/build-gho
 description = "Check the direct desktop-engine WASM adapter (build-native-vt first)"
 run = "node scripts/check-native-vt.mjs"
 
+[tasks.bench-native-vt]
+description = "Measure the current direct engine adapter across 1/4/16 panes"
+run = "node scripts/bench-native-vt.mjs"
+
 [tasks.bench-browser-engine]
 description = "Measure the Ghostty WASM/JSON boundary at 1, 4 and 16 panes (build first)"
 run = "node scripts/bench-browser-engine.mjs"

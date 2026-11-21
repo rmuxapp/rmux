@@ -1,5 +1,10 @@
 # Shared rmux web compatibility probe
 
+`mise run bench-native-vt` measures the current engine/JSON adapter at 1/4/16
+panes. See ../../docs/benchmarks/native-vt.md for baseline/optimized results and
+scope. It excludes Rust decoding and rendering. `bench-browser-engine` remains
+the historical ghostty-web baseline, not a measure of the current demo.
+
 Run `logs` for 80 bundled sample lines. Wheel scrolling uses the native viewport
 API and the same fractional wheel accumulation as desktop. Historical selection
 and copying work; typing returns to the live prompt. Browser checks cover these
