@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Copy with Line Breaks is now available in the browser palette through shared
+terminal action routing. Normal copy still unwraps soft wraps; the explicit
+action preserves visual row breaks, both with the existing 1 MiB copy limit.
+Native configured copy policy remains unchanged. Native compile, WASM build and
+real-engine adapter tests pass. Browser clipboard comparison produced six logical
+lines versus ten wrapped lines with identical content after removing newlines.
+Screenshot: target/browser-copy-line-breaks.jpg. Not deployed.
+
 Copy, Select All and Clear Scrollback now bind through a shared terminal action
 host on desktop and browser. The browser palette also uses the shared action
 factory and resolves Select All's actual shortcut for its hint. Host services

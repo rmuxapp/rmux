@@ -1904,6 +1904,7 @@ impl TerminalView {
     }
 }
 impl terminal_actions::TerminalCommandHost for TerminalView {
+    fn copy_terminal_with_line_breaks(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(false, cx); }
     fn copy_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.copy(&CopySelection, window, cx); }
     fn select_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.select_all(&EditorSelectAll, window, cx); }
     fn clear_terminal_history(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.clear_scrollback(&ClearScrollback, window, cx); }
@@ -1957,7 +1958,6 @@ impl Render for TerminalView {
                 this.show_terminal_menu(this.last_bounds.origin + point(px(8.), px(8.)), window, cx);
             }))
             .on_action(cx.listener(|this, _: &CancelQueuedPaste, _, cx| this.cancel_paste(cx)))
-            .on_action(cx.listener(|this, _: &CopySelectionWithLineBreaks, _, cx| this.copy_selection(false, cx)))
             .on_action(cx.listener(Self::copy_working_directory))
             .on_action(cx.listener(Self::reveal_working_directory))
             .on_action(cx.listener(|this, _: &RefreshGitContext, _, cx| this.refresh_git_context(cx)))

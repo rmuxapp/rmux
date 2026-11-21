@@ -398,17 +398,8 @@ impl EntityInputHandler for TerminalSample {
 }
 
 impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
-    fn copy_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) {
-        match self.engine.selected_text() {
-            Ok(Some(text)) => {
-                self.input_error = None;
-                crate::clipboard::write(ClipboardItem::new_string(text), cx);
-            }
-            Ok(None) => {}
-            Err(_) => self.input_error = Some("Could not copy selection. Try selecting less text (maximum 1 MiB).".into()),
-        }
-        cx.notify();
-    }
+    fn copy_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(true, cx); }
+    fn copy_terminal_with_line_breaks(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(false, cx); }
     fn select_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         self.selection_scroll = None;
         self.selecting = false;
@@ -424,6 +415,20 @@ impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
         self.input_error = self.engine.clear_scrollback().err().map(|_| "Could not clear scrollback.".into());
         self.frame = self.engine.frame(Some(&self.frame));
         cx.emit(SearchChanged);
+        cx.notify();
+    }
+}
+
+impl TerminalSample {
+    fn copy_selection(&mut self, unwrap: bool, cx: &mut Context<Self>) {
+        match if unwrap { self.engine.selected_text() } else { self.engine.selected_text_with_wraps() } {
+            Ok(Some(text)) => {
+                self.input_error = None;
+                crate::clipboard::write(ClipboardItem::new_string(text), cx);
+            }
+            Ok(None) => {}
+            Err(_) => self.input_error = Some("Could not copy selection. Try selecting less text (maximum 1 MiB).".into()),
+        }
         cx.notify();
     }
 }

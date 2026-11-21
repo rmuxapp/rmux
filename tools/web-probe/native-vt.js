@@ -299,7 +299,7 @@ export function createNativeHost(engine, isMac) {
     searchNavigate(id,older) { return JSON.stringify(sessions.get(id).searchNavigate(older)); },
     searchClose(id) { sessions.get(id).searchClose(); },
     select(id,...args) { return sessions.get(id).select(...args); },
-    selectedText(id) { return sessions.get(id).selectedText(); },
+    selectedText(id, unwrap = true) { return sessions.get(id).selectedText(1024 * 1024, unwrap); },
     selectAll(id) { sessions.get(id).selectAll(); },
     clearScrollback(id) { sessions.get(id).clearScrollback(); },
     selectedSearchQuery(id) { return sessions.get(id).selectedSearchQuery(); },

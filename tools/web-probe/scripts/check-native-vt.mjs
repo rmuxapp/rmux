@@ -26,6 +26,13 @@ assert.throws(()=>bridge.graphemes('a\nb'),RangeError);
 assert.throws(()=>bridge.graphemes('\ud800'),RangeError);
 assert.throws(()=>bridge.graphemes('é'.repeat(524289)),RangeError);
 const inputSession = bridge.create(20,4);
+const wrappedSession = bridge.create(5, 3);
+try {
+  bridge.write(wrappedSession, 'abcdefghij\r\nnext');
+  bridge.selectAll(wrappedSession);
+  assert.equal(bridge.selectedText(wrappedSession), 'abcdefghij\nnext');
+  assert.equal(bridge.selectedText(wrappedSession, false), 'abcde\nfghij\nnext');
+} finally { bridge.free(wrappedSession); }
 try {
   bridge.write(inputSession,'\x1b[>11u');
   assert.equal(bridge.encode(inputSession,'A',0,'PRESS','a'),'\x1b[97u');
