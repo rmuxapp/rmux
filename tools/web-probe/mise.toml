@@ -6,7 +6,7 @@ rust = { version = "1.99.1", targets = ["wasm32-unknown-unknown"] }
 
 [tasks.build]
 depends = ["build-native-vt"]
-run = ["cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html boot.js engine.js fonts.js native-vt.js native-vt-render.js native-vt-selection.js dist/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist/libghostty-vt-LICENSE", "mkdir -p dist/fonts", "cp assets/NotoSansCJKjp-Regular.otf assets/NotoSansCJK-OFL.txt assets/NotoSansCJK-README.md assets/NotoEmoji.ttf assets/NotoEmoji-OFL.txt assets/NotoEmoji-README.md dist/fonts/"]
+run = ["cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html boot.js engine.js fonts.js native-vt.js native-vt-render.js native-vt-selection.js native-vt-search.js dist/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist/libghostty-vt-LICENSE", "mkdir -p dist/fonts", "cp assets/NotoSansCJKjp-Regular.otf assets/NotoSansCJK-OFL.txt assets/NotoSansCJK-README.md assets/NotoEmoji.ttf assets/NotoEmoji-OFL.txt assets/NotoEmoji-README.md dist/fonts/"]
 
 [tasks.serve]
 run = "python -m http.server 4319 --bind 127.0.0.1 --directory dist"
@@ -35,7 +35,7 @@ run = "node scripts/bench-browser-engine.mjs"
 [tasks.build-release]
 description = "Build the optimized shared UI artifact for static hosting"
 depends = ["build-native-vt"]
-run = ["cargo build --locked --release --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist-release target/wasm32-unknown-unknown/release/rmux_web_probe.wasm", "cp index.html boot.js engine.js fonts.js native-vt.js native-vt-render.js native-vt-selection.js dist-release/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist-release/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist-release/libghostty-vt-LICENSE", "cp ../../LICENSE dist-release/rmux-LICENSE", "cp assets/FiraMono-LICENSE assets/Inter-OFL.txt dist-release/", "RMUX_RELEASE_TARGET=wasm32-unknown-unknown python ../../scripts/release-notices.py dist-release/THIRD_PARTY_NOTICES.txt", "mkdir -p dist-release/fonts", "cp assets/NotoSansCJKjp-Regular.otf assets/NotoSansCJK-OFL.txt assets/NotoSansCJK-README.md assets/NotoEmoji.ttf assets/NotoEmoji-OFL.txt assets/NotoEmoji-README.md dist-release/fonts/", "node scripts/report-release.mjs"]
+run = ["cargo build --locked --release --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist-release target/wasm32-unknown-unknown/release/rmux_web_probe.wasm", "cp index.html boot.js engine.js fonts.js native-vt.js native-vt-render.js native-vt-selection.js native-vt-search.js dist-release/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist-release/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist-release/libghostty-vt-LICENSE", "cp ../../LICENSE dist-release/rmux-LICENSE", "cp assets/FiraMono-LICENSE assets/Inter-OFL.txt dist-release/", "RMUX_RELEASE_TARGET=wasm32-unknown-unknown python ../../scripts/release-notices.py dist-release/THIRD_PARTY_NOTICES.txt", "mkdir -p dist-release/fonts", "cp assets/NotoSansCJKjp-Regular.otf assets/NotoSansCJK-OFL.txt assets/NotoSansCJK-README.md assets/NotoEmoji.ttf assets/NotoEmoji-OFL.txt assets/NotoEmoji-README.md dist-release/fonts/", "node scripts/report-release.mjs"]
 
 [tasks.prepare-legacy-benchmark]
 description = "Prepare historical ghostty-web benchmark dependencies only"
@@ -52,3 +52,7 @@ run = "node scripts/bench-memory.mjs"
 [tasks.check-fonts]
 description = "Verify the optional font assets and bounded loader"
 run = "node scripts/check-fonts.mjs"
+
+[tasks.check-search]
+description = "Verify incremental search through the desktop Ghostty WASM API"
+run = "node scripts/check-search.mjs"

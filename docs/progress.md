@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Added lazy Ghostty search operations to the direct browser engine adapter:
+query, bounded feed/tick step, explicit output/resize refresh, older/newer selection
+and close. It uses the pinned ABI manifest and the same search/selection APIs as
+desktop, enforces 4096 UTF-8 bytes before replacing a query, and frees search
+references before terminal disposal. No idle search timer or eager handle exists.
+Focused real-WASM checks pass for matching, Japanese text, navigation/selected
+text, output refresh, rejected queries preserving prior results, reopen and
+repeated disposal; the existing engine adapter checks pass too. Build packaging
+includes the new module and GitHub CI runs the search check. Find-bar UI and the
+Rust browser session interface are still pending; search is not user-accessible
+or deployed yet.
+
 Published successful GitHub demo run 44939199824 (source a18ec98) to rmux.app,
 Cloudflare deployment b6c3a2a9. The live demo now includes shared workspace
 insertion/selection/removal/ungrouping, workspace/tab action routing, numbered

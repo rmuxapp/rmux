@@ -1,3 +1,4 @@
+import {createSearchAdapter} from './native-vt-search.js';
 // Direct adapter for the same pinned libghostty-vt C API used by rmux desktop.
 import {createRenderAdapter} from './native-vt-render.js';
 import {createSelectionAdapter} from './native-vt-selection.js';
@@ -71,9 +72,18 @@ export async function loadNativeVt(bytes) {
           });
         }
       } catch (error) { api.ghostty_terminal_free(terminal); throw error; }
-      let encoder = 0, event = 0, renderer, selection;
+      let encoder = 0, event = 0, renderer, selection, search;
       const alive = () => { if (!terminal) throw new Error('Terminal disposed'); };
       return {
+        searchQuery(text) {
+          alive();
+          search ??= createSearchAdapter(api,manifest,terminal,{buffer,handle,check,value});
+          return search.query(text);
+        },
+        searchStep() { alive(); return search?.step() ?? {matches:0,selected:null,pending:false}; },
+        searchRefresh() { alive(); return search?.refresh() ?? {matches:0,selected:null,pending:false}; },
+        searchNavigate(older) { alive(); return search?.navigate(older) ?? {matches:0,selected:null,pending:false}; },
+        searchClose() { alive(); search?.dispose(); search = undefined; },
         scroll(kind,delta=0) {
           alive();
           const tag=value('GhosttyTerminalScrollViewportTag',kind);
@@ -209,6 +219,7 @@ export async function loadNativeVt(bytes) {
           });
         },
         dispose() {
+          search?.dispose(); search = undefined;
           selection?.dispose(); selection = undefined;
           renderer?.dispose(); renderer = undefined;
           if (event) { api.ghostty_key_event_free(event); event = 0; }
@@ -234,6 +245,11 @@ export function createNativeHost(engine, isMac) {
     write(id,text) { sessions.get(id).write(text); },
     resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
+    searchQuery(id,text) { return JSON.stringify(sessions.get(id).searchQuery(text)); },
+    searchStep(id) { return JSON.stringify(sessions.get(id).searchStep()); },
+    searchRefresh(id) { return JSON.stringify(sessions.get(id).searchRefresh()); },
+    searchNavigate(id,older) { return JSON.stringify(sessions.get(id).searchNavigate(older)); },
+    searchClose(id) { sessions.get(id).searchClose(); },
     select(id,...args) { return sessions.get(id).select(...args); },
     selectedText(id) { return sessions.get(id).selectedText(); },
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
