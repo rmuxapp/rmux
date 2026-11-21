@@ -11,6 +11,21 @@ impl<T, Z> Default for State<T, Z> {
     fn default() -> Self { Self { layout: None, zoomed: None } }
 }
 impl<T: Clone + PartialEq, Z> State<T, Z> {
+    /// Accept layout ownership before a host registers the new session/view.
+    /// Failed insertions preserve both the existing tree and zoom target.
+    pub fn insert(&mut self, target: Option<&T>, pane: T, axis: crate::layout::Axis, before: bool) -> Option<usize> {
+        let ordinal = insert(&mut self.layout, target, pane, axis, before)?;
+        self.zoomed = None;
+        Some(ordinal)
+    }
+    /// Release a pane without touching process lifetime or input focus.
+    /// A stale identity leaves the layout (including zoom) unchanged.
+    pub fn remove(&mut self, pane: &T) -> Option<usize> {
+        let ordinal = self.layout.as_ref()?.pane_index(pane)?;
+        self.layout = self.layout.take().and_then(|tree| tree.remove(pane));
+        self.zoomed = None;
+        Some(ordinal)
+    }
     pub fn resize(&mut self, focused: &T, direction: Direction) -> bool {
         resize(&mut self.layout, focused, direction, self.zoomed.is_some())
     }
@@ -130,6 +145,30 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn pane_ownership_rejects_stale_requests_without_disturbing_zoom() {
+        let mut state = State::<i32, i32>::default();
+        assert_eq!(state.insert(None, 1, Axis::Columns, false), Some(0));
+        assert_eq!(state.insert(Some(&1), 2, Axis::Columns, false), Some(1));
+        state.toggle_zoom(Some(2));
+        assert_eq!(state.insert(Some(&99), 3, Axis::Rows, false), None);
+        assert_eq!(state.insert(Some(&1), 2, Axis::Rows, false), None);
+        assert_eq!(state.remove(&99), None);
+        assert_eq!(state.zoomed, Some(2));
+        assert_eq!(state.layout.as_ref().unwrap().pane_count(), 2);
+        assert_eq!(state.insert(Some(&2), 3, Axis::Rows, true), Some(1));
+        assert_eq!(state.zoomed, None);
+        assert_eq!(state.layout.as_ref().unwrap().pane_at(2), Some(&2));
+        state.toggle_zoom(Some(3));
+        assert_eq!(state.remove(&3), Some(1));
+        assert_eq!(state.zoomed, None);
+        assert_eq!(state.layout.as_ref().unwrap().pane_at(1), Some(&2));
+        state.remove(&1);
+        state.remove(&2);
+        assert!(state.layout.is_none());
+        assert_eq!(state.insert(None, 4, Axis::Columns, false), Some(0));
+    }
 
     #[test]
     fn owned_layout_keeps_zoom_focus_and_resize_policy_together() {

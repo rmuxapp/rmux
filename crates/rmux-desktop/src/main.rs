@@ -2728,8 +2728,8 @@ impl Workspace {
         let target = cx.new(|cx| PaneView::from_transfer(tab, workspace, cx));
         // Remove the original tab only after the tree accepts its destination.
         // Both handles refer to the existing terminal; no PTY is created.
-        let Some(inserted) = rmux_core::pane_commands::insert(
-            &mut self.pane_state.layout, Some(&source), target.clone(), axis, before,
+        let Some(inserted) = self.pane_state.insert(
+            Some(&source), target.clone(), axis, before,
         ) else { return; };
         self.error = None;
         source.update(cx, |pane, cx| pane.take_tab(id, cx));
@@ -2959,8 +2959,7 @@ impl Workspace {
         self.split_drag = None;
         let removed = self.panes.remove(index);
         self.pane_subscriptions.remove(&removed.entity_id());
-        self.pane_state.zoomed = None;
-        self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&removed));
+        self.pane_state.remove(&removed);
         if self.panes.is_empty() {
             cx.emit(WorkspaceEmpty);
         }
@@ -3137,8 +3136,8 @@ impl Workspace {
                     });
                 } else {
                     let anchor = self.panes.get(focused);
-                    let Some(inserted) = rmux_core::pane_commands::insert(
-                        &mut self.pane_state.layout, anchor, view.clone(), axis, before,
+                    let Some(inserted) = self.pane_state.insert(
+                        anchor, view.clone(), axis, before,
                     ) else {
                         self.error = Some("Cannot insert terminal into the current layout".into());
                         cx.notify();

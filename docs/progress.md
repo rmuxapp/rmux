@@ -2,6 +2,19 @@
 
 ## Current implementation focus
 
+Pane State now commits insertion/removal for both native and browser hosts,
+revealing the layout on success and preserving zoom/tree for rejected or stale
+requests. Native split creation/tab-to-pane transfer and ownership removal use
+these methods; browser split, tab-break, join and empty-pane callbacks do too.
+The browser tab-break rollback restores its previous zoom target if transfer
+cannot complete. Nine focused pane tests pass, including nested visual ordinals,
+duplicate/stale insertion, stale removal, last-pane removal and reinsertion.
+Native check and WASM build pass. Browser smoke passed zoomed nested-pane closure,
+last-terminal closure, Cmd+T recovery and sample input. Screenshot:
+target/shared-pane-ownership.jpg. Not deployed; the previous native live-session
+smoke predates this transition change and was not repeated. Shared app/session
+entry-point consolidation and platform/performance acceptance remain open.
+
 Desktop Workspace and browser now own the same pane layout State: split tree,
 explicit zoom target, zoom/focus transition, resize guard and equalization. Browser
 zoom was previously a boolean coupled to its separate focused field; it now tracks

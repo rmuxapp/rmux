@@ -124,10 +124,9 @@ impl InputProbe {
             this.split_drag = None;
             let next = this.pane_state.layout.as_ref().and_then(|tree|
                 rmux_core::pane_commands::focus_after_close(tree, &id, Some(&this.focused)));
-            this.pane_state.layout = this.pane_state.layout.take().and_then(|tree| tree.remove(&id));
+            this.pane_state.remove(&id);
             this.samples.remove(&id);
             if this.pane_state.layout.is_none() { this.empty_focus.focus(window,cx); }
-            this.pane_state.zoomed = None;
             if let Some(next) = next.filter(|next| *next != this.focused) {
                 this.focused = next;
                 this.samples[&next].update(cx, |pane, cx| pane.focus(window, cx));
@@ -157,14 +156,16 @@ impl InputProbe {
             cx.notify(); return;
         }
         let id = self.next_pane;
-        if rmux_core::pane_commands::insert(&mut self.pane_state.layout, Some(&self.focused), id, axis, before).is_none() {
+        let previous_zoom = self.pane_state.zoomed;
+        if self.pane_state.insert( Some(&self.focused), id, axis, before).is_none() {
             self.feedback = Some("Cannot add another split at this nesting depth.".into());
             cx.notify(); return;
         }
         // The destination is accepted before releasing the source's ownership.
         // No terminal is spawned and no event-loop yield occurs during transfer.
         let Some(transfer) = source.update(cx, |pane, cx| pane.take_active_for_split(cx)) else {
-            self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&id));
+            self.pane_state.remove(&id);
+            self.pane_state.zoomed = previous_zoom;
             return;
         };
         let pane = cx.new(|_| sample_pane::SamplePane::from_transfer(transfer));
@@ -193,7 +194,7 @@ impl InputProbe {
         // terminal entities/labels alive and focus the source's active tab once.
         let tabs = source.update(cx, |pane, cx| pane.take_all_tabs(cx));
         destination.update(cx, |pane, cx| pane.append_tabs(tabs, window, cx));
-        self.pane_state.layout = self.pane_state.layout.take().and_then(|tree| tree.remove(&self.focused));
+        self.pane_state.remove(&self.focused);
         self.samples.remove(&self.focused);
         self.focused = target;
         self.pane_state.focus_changed(target);
@@ -343,7 +344,7 @@ impl InputProbe {
                 let axis = if matches!(command, CommandId::Split | CommandId::SplitLeft) { Axis::Columns } else { Axis::Rows };
                 let before = matches!(command, CommandId::SplitLeft | CommandId::SplitAbove);
                 if self.pane_state.layout.is_none() { self.start_terminal(window, cx); return; }
-                if rmux_core::pane_commands::insert(&mut self.pane_state.layout, Some(&self.focused), self.next_pane, axis, before).is_some() {
+                if self.pane_state.insert( Some(&self.focused), self.next_pane, axis, before).is_some() {
                     self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.pane_state.zoomed = None;
                 }
