@@ -1,6 +1,15 @@
 //! Find controls shared by desktop and browser session adapters.
 use gpui::{prelude::*, *};
 use crate::text_field::TextField;
+pub(crate) fn action(command: rmux_core::commands::CommandId) -> Option<Box<dyn Action>> {
+    use rmux_core::commands::CommandId;
+    match command {
+        CommandId::Find => Some(Box::new(crate::Find)),
+        CommandId::FindOlder => Some(Box::new(crate::FindOlder)),
+        CommandId::FindNewer => Some(Box::new(crate::FindNewer)),
+        _ => None,
+    }
+}
 pub(crate) trait FindHost: Sized + 'static {
     fn find_input(&self) -> Entity<TextField>;
     fn find_history(&mut self) -> &mut rmux_core::search_state::QueryHistory;

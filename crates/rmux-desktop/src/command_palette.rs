@@ -277,6 +277,7 @@ impl CommandPalette {
                     target: PaletteEvent::Run(crate::pane_actions::action(rmux_core::commands::CommandId::$action)
                         .or_else(|| crate::workspace_actions::action(rmux_core::commands::CommandId::$action))
                         .or_else(|| crate::tab_actions::action(rmux_core::commands::CommandId::$action))
+                        .or_else(|| crate::find_presentation::action(rmux_core::commands::CommandId::$action))
                         .unwrap_or_else(|| Box::new($action))),
                     shortcut: None,
                 subtitle: None,

@@ -35,6 +35,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
     CommandId::NewWorkspace, CommandId::NewTab, CommandId::ToggleSidebar,
+    CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,
     CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::GroupCurrentWorkspace, CommandId::ToggleGroupPin, CommandId::RemoveWorkspaceFromGroup, CommandId::SetGroupAnchor, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
@@ -231,7 +232,7 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            if let Some(action) = tab_actions::action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)) { action } else { match command {
+            if let Some(action) = tab_actions::action(*command).or_else(|| pane_actions::action(*command)).or_else(|| workspace_actions::action(*command)).or_else(|| find_presentation::action(*command)) { action } else { match command {
                 CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
@@ -285,7 +286,7 @@ impl InputProbe {
             return;
         }
         let command = COMMANDS[index];
-        if let Some(action) = pane_actions::action(command).or_else(|| workspace_actions::action(command)) {
+        if let Some(action) = pane_actions::action(command).or_else(|| workspace_actions::action(command)).or_else(|| find_presentation::action(command)) {
             self.close_palette(window, cx);
             window.dispatch_action(action, cx);
         } else { self.execute(command, window, cx); }

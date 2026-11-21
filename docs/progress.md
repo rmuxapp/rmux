@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added the browser palette's missing Find in Terminal / Find Older Match / Find
+Newer Match entries. Native and browser palettes use the same find action factory;
+browser entries display shortcuts from current bindings and dispatch after focus
+restoration. Native check and browser build pass. Browser smoke verified the Cmd+F
+hint, palette-to-find focus handoff and matching text selection. Screenshot:
+target/palette-terminal-find.jpg. Not deployed. CI run 44942264961 completed its
+revised mise setup in 23 seconds (previous observed two-step setup totaled 31s),
+but the build was still running at inspection; no full-run speedup claim yet.
+
 Browser palette now includes dynamic Move Workspace to Group destinations using
 the desktop title format and group IDs. Both hosts route the parameterized move
 action through the shared workspace binder into shared `State::move_to_group`.
