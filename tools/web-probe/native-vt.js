@@ -5,6 +5,39 @@ import {createSelectionAdapter} from './native-vt-selection.js';
 export async function loadNativeVt(bytes) {
   const {instance} = await WebAssembly.instantiate(bytes, {});
   const api = instance.exports;
+  // A typed WASM import/export trampoline lets Ghostty call a JS writer through
+  // its C function table. One slot per engine instance, reused synchronously.
+  let writerSlot, writeChunk;
+  function streamPrefix(formatter, limit) {
+    if (writerSlot === undefined) {
+      const trampoline = new WebAssembly.Instance(new WebAssembly.Module(new Uint8Array([
+        0,97,115,109,1,0,0,0,
+        1,8,1,96,3,127,127,127,1,127, // (i32,i32,i32) -> i32
+        2,7,1,1,101,1,119,0,0, // import e.w
+        7,5,1,1,119,0,0, // export w
+      ])), {e:{w:(_user,ptr,len)=>writeChunk(ptr,len)}});
+      writerSlot = api.__indirect_function_table.grow(1);
+      api.__indirect_function_table.set(writerSlot,trampoline.exports.w);
+    }
+    if (writeChunk) throw new Error('Reentrant selection formatter');
+    const output = new Uint8Array(limit);
+    let length = 0, truncated = false;
+    writeChunk = (ptr,len) => {
+      if (len > limit-length) { truncated = true; return 0; }
+      output.set(memory().subarray(ptr,ptr+len),length); length += len; return 1;
+    };
+    try {
+      return buffer(manifest.types.GhosttyWriter.size, writer => {
+        const view = new DataView(api.memory.buffer);
+        view.setUint32(writer+manifest.types.GhosttyWriter.fields.write.offset,writerSlot,true);
+        view.setUint32(writer+manifest.types.GhosttyWriter.fields.userdata.offset,0,true);
+        const result = api.ghostty_formatter_format(formatter,writer);
+        if (truncated && result === value('GhosttyResult','IO_ERROR')) return null;
+        check(result);
+        return decoder.decode(output.subarray(0,length));
+      });
+    } finally { writeChunk = undefined; }
+  }
   const decoder = new TextDecoder();
   const memory = () => new Uint8Array(api.memory.buffer);
   const manifestPtr = api.ghostty_type_json();
@@ -196,7 +229,11 @@ export async function loadNativeVt(bytes) {
           alive();
           check(api.ghostty_terminal_set(terminal, value('GhosttyTerminalOption','SELECTION'), 0));
         },
-        selectedText(limit = 1024 * 1024, unwrap = true) {
+        selectedSearchQuery() {
+          const text = this.selectedText(4096, true, true);
+          return text && !/[\u0000-\u001f\u007f-\u009f]/u.test(text) ? text : null;
+        },
+        selectedText(limit = 1024 * 1024, unwrap = true, streaming = false) {
           alive();
           if (!Number.isSafeInteger(limit) || limit < 1 || limit > 16 * 1024 * 1024) throw new RangeError('Invalid copy limit');
           return buffer(manifest.types.GhosttySelection.size, selection => {
@@ -209,6 +246,7 @@ export async function loadNativeVt(bytes) {
               return buffer(1, flag => {
                 memory()[flag] = Number(unwrap);
                 check(api.ghostty_formatter_set(formatter, value('GhosttyFormatterOption','UNWRAP'), flag));
+                if (streaming) return streamPrefix(formatter,limit);
                 return buffer(4, written => buffer(limit, output => {
                   check(api.ghostty_formatter_format_buf(formatter, output, limit, written));
                   const length = new DataView(api.memory.buffer).getUint32(written, true);
@@ -252,6 +290,7 @@ export function createNativeHost(engine, isMac) {
     searchClose(id) { sessions.get(id).searchClose(); },
     select(id,...args) { return sessions.get(id).select(...args); },
     selectedText(id) { return sessions.get(id).selectedText(); },
+    selectedSearchQuery(id) { return sessions.get(id).selectedSearchQuery(); },
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },
     copySelection() { return focused===null ? null : sessions.get(focused)?.selectedText() ?? null; },

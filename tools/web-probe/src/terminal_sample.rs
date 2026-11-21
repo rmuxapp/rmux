@@ -33,14 +33,18 @@ impl TerminalSample {
         cx.notify();
     }
     fn open_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.open_find_with_query(None, window, cx);
+    }
+    fn open_find_with_query(&mut self, initial: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(find) = &self.find {
             find.update(cx, |find, cx| find.focus_query(window, cx));
             return;
         }
         let parent = cx.entity();
         let history = self.find_history.clone();
-        let progress = self.engine.search_query(&self.last_find_query);
-        let find = cx.new(|cx| crate::browser_find::FindBar::new(parent, history, &self.last_find_query, progress, window, cx));
+        let query = initial.or_else(|| self.engine.selected_search_query()).unwrap_or_else(|| self.last_find_query.clone());
+        let progress = self.engine.search_query(&query);
+        let find = cx.new(|cx| crate::browser_find::FindBar::new(parent, history, &query, progress, window, cx));
         cx.subscribe_in(&find, window, |this, find, _: &crate::browser_find::Closed, window, cx| {
             this.find_history = find.read(cx).saved_history(cx);
             this.last_find_query = find.read(cx).query(cx).to_owned();
@@ -54,7 +58,10 @@ impl TerminalSample {
     }
 
     fn navigate_find(&mut self, older: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.find.is_none() { self.open_find(window, cx); }
+        if self.find.is_none() {
+            let remembered = (!self.last_find_query.is_empty()).then(|| self.last_find_query.clone());
+            self.open_find_with_query(remembered, window, cx);
+        }
         if let Some(find) = self.find.clone() {
             // Navigation updates the terminal selection, after this entity borrow ends.
             cx.defer(move |cx| find.update(cx, |find, cx| {

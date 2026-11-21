@@ -20,6 +20,8 @@ try {
   assert.equal(finish().matches,1);
   terminal.searchNavigate(true);
   assert.equal(terminal.selectedText(),'日本語');
+  assert.equal(terminal.selectedSearchQuery(),'日本語');
+  terminal.selectAll(); assert.equal(terminal.selectedSearchQuery(),null); // Newlines cannot seed a query.
   terminal.searchQuery('absent');
   assert.equal(finish().matches,0);
   terminal.write('absent\r\n'); terminal.searchRefresh();
@@ -32,4 +34,14 @@ try {
   terminal.searchQuery('needle'); assert.equal(finish().matches,2);
 } finally { terminal.dispose(); terminal.dispose(); }
 assert.throws(()=>terminal.searchStep(),/disposed/);
+const selection = host.create(80,24);
+try {
+  assert.equal(selection.selectedSearchQuery(), null);
+  selection.write('x'.repeat(4096)); selection.selectAll();
+  assert.equal(selection.selectedSearchQuery(), 'x'.repeat(4096));
+  selection.write('x'.repeat(100000)); selection.selectAll();
+  assert.equal(selection.selectedSearchQuery(), null);
+  selection.clearSelection();
+  assert.equal(selection.selectedSearchQuery(), null);
+} finally { selection.dispose(); }
 console.log('Incremental Ghostty search, navigation, Unicode, refresh and disposal passed');

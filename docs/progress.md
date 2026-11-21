@@ -2,6 +2,19 @@
 
 ## Current implementation focus
 
+Browser Find now seeds from selected terminal text when it is nonempty, at most
+4096 UTF-8 bytes and contains no control characters; otherwise it uses the last
+query. Older/newer navigation keeps preferring the remembered query. The adapter
+uses Ghostty's streaming formatter with a reusable typed WASM writer callback,
+rejecting overflow without the format_buf full-selection size-probing retry.
+One function-table slot is allocated lazily per engine instance; each seed uses
+a 4 KiB buffer and releases synchronous callback state in finally. No upstream
+Ghostty modification or extra tool installation is needed.
+Real-WASM checks pass for Unicode, exact-limit output, oversized/multiline rejection,
+empty selection and disposal; the WASM build passes. Browser smoke verified double-
+clicking Ghostty then Cmd+F/Enter seeds/selects it. Screenshot:
+target/selection-seeded-find.jpg. Not deployed; broader application parity remains open.
+
 Browser terminals retain their last find query and reopen search for older/newer
 match actions when the bar is closed, matching desktop's remembered-query flow.
 Initial queries initialize Ghostty search before constructing the bar; bounded
