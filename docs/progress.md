@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Published the optimized GitHub artifact from run 44947179213 (376e37b) to
+Cloudflare deployment f2dcd3d8 at rmux.app. Build, font/startup/engine/search
+checks passed. Production embedded-demo clipboard smoke verified a complete
+pasted command executes and an unfinished second command stays editable.
+The artifact includes shared pane ownership and recent tab rename/bulk-close/title
+polish as well as sample-session extraction and multiline paste. Website source
+remains local/off GitHub; native downloads remain v0.1.4.
+
 Fixed sample-session multiline paste being silently discarded after Ghostty
 encoding. The sample service now consumes CR/LF/CRLF-separated commands in order,
 preserves an unfinished final draft and commits only when the whole paste

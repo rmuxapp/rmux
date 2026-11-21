@@ -8,10 +8,11 @@ the architectural target.
 ## Published versus shared build
 
 The Cloudflare site embeds the optimized shared Rust/GPUI demo from GitHub
-run 44944665222, source 246240b (Cloudflare deployment c3c998c4). Production
-multi-selection, Cmd+P from sidebar focus, the corrected grouping shortcut hint,
-palette grouping and terminal search were verified at rmux.app. This includes
-the recent shared ownership, search, copy handling and workspace improvements.
+run 44947179213, source 376e37b (Cloudflare deployment f2dcd3d8). Production
+clipboard smoke verified multiline sample commands execute and retain the final
+unfinished draft. This artifact also includes shared pane layout ownership,
+tab rename and bounded titles, bulk tab-close commands, and the separated sample
+session service. Those UI changes passed local checks before publication.
 The old JavaScript/ghostty-web layout imitation is no longer published. The
 marketing site remains local and off GitHub; native downloads remain v0.1.4.
 
