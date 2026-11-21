@@ -144,6 +144,16 @@ Alt+Up/Down recall, unfinished draft restoration, and retention across find-bar
 close/reopen. Focused history tests and browser recall checks pass. This does not
 complete the shared application/session architecture. Production deployment is pending.
 
+## Shared workspace ownership
+
+Native and browser hosts now own the same generic `workspace_lifecycle::State`
+containing entries, selection, groups and previous selection. Core lifecycle
+methods operate on this state. Entries still contain platform-specific views;
+restoration/metadata code retains field access during migration. This removes
+separate ownership models without claiming a shared top-level application yet.
+Native live-shell transfer/merge checks and browser create/switch/close checks
+pass, including native process identity preservation and browser retained output.
+
 ## Remaining work and deployment acceptance
 
 1. Continue moving workspace orchestration into shared application state/views;

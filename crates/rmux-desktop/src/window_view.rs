@@ -10,7 +10,7 @@ pub(super) fn focus_native_notification(terminal: &WeakEntity<TerminalView>, rev
         let Some(handle) = handle.downcast::<WorkspaceWindow>() else { continue; };
         let focused = handle.update(cx, |root, window, cx| {
             if root.automation_available(cx).is_err() { return false; }
-            let workspace = root.entries.iter().find(|entry| entry.workspace.read(cx).panes.iter().any(|pane| {
+            let workspace = root.workspace_state.entries.iter().find(|entry| entry.workspace.read(cx).panes.iter().any(|pane| {
                 pane.read(cx).terminals.iter().any(|terminal| terminal.entity_id() == target)
             })).map(|entry| entry.workspace.entity_id());
             let Some(workspace) = workspace else { return false; };
@@ -30,7 +30,7 @@ pub(super) fn terminal_is_visible(terminal: EntityId, cx: &mut App) -> bool {
         let Some(handle) = handle.downcast::<WorkspaceWindow>() else { return false; };
         handle.update(cx, |root, window, cx| {
             if !window.is_window_active() { return false; }
-            let Some(entry) = root.entries.get(root.active) else { return false; };
+            let Some(entry) = root.workspace_state.entries.get(root.workspace_state.active) else { return false; };
             let workspace = entry.workspace.read(cx);
             workspace.panes.iter().any(|pane| {
                 workspace.zoomed.is_none_or(|zoomed| zoomed == pane.entity_id())
@@ -143,14 +143,11 @@ pub(super) struct WorkspaceWindow {
     memory_canceled: Option<Arc<AtomicBool>>,
     process_sampler: Arc<std::sync::Mutex<process_metrics::Sampler>>,
     rename: Option<(EntityId, Entity<text_field::TextField>, MetadataField)>,
-    entries: Vec<Entry>,
-    groups: workspace_groups::Groups<EntityId>,
+    workspace_state: rmux_core::workspace_lifecycle::State<Entry, EntityId>,
     sidebar_selection: Vec<EntityId>,
     sidebar_selection_anchor: Option<EntityId>,
-    active: usize,
     rendered_workspace: Option<WeakEntity<Workspace>>,
     rendered_background: Option<WindowBackgroundAppearance>,
-    previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     close_prompt: Option<EntityId>,
     window_close_prompt: bool,
     close_handler_installed: bool,
@@ -185,7 +182,7 @@ impl WorkspaceWindow {
 
     fn show_workspace_menu(&mut self, target: EntityId, group: Option<u64>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(index) = self.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
+        let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
         self.sidebar_selection.clear();
         self.sidebar_selection_anchor = Some(target);
         self.select(index, window, cx);
@@ -207,10 +204,10 @@ impl WorkspaceWindow {
     fn activate_workspace_menu(&mut self, item: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some((target, group)) = self.workspace_menu.as_ref().map(|menu| (menu.target, menu.group)) else { return; };
         self.dismiss_workspace_menu(window, cx);
-        let Some(index) = self.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
+        let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
         // Never apply a captured group command to a new group after a move.
         if let Some(group) = group {
-            if !self.groups.containing(target).is_some_and(|current| current.id == group) { return; }
+            if !self.workspace_state.groups.containing(target).is_some_and(|current| current.id == group) { return; }
         }
         self.select(index, window, cx);
         if group.is_some() {
@@ -237,9 +234,9 @@ impl WorkspaceWindow {
     }
 
     fn workspace_menu_element(&self, menu: WorkspaceMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
-        let pinned = self.entries.iter().find(|entry| entry.workspace.entity_id() == menu.target).is_some_and(|entry| entry.pinned);
+        let pinned = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == menu.target).is_some_and(|entry| entry.pinned);
         let labels = if let Some(id) = menu.group {
-            let pinned = self.groups.entries().iter().any(|group| group.id == id && group.pinned);
+            let pinned = self.workspace_state.groups.entries().iter().any(|group| group.id == id && group.pinned);
             ["Rename Group", "Change Group Color", "Change Group Icon", if pinned { "Unpin Group" } else { "Pin Group" }, "Ungroup Workspaces", "Close Group…"]
         } else {
             ["Rename Workspace", "Edit Description", "Change Color", "Change Icon", if pinned { "Unpin Workspace" } else { "Pin Workspace" }, "Close Workspace…"]
@@ -378,7 +375,7 @@ impl WorkspaceWindow {
         self.memory_generation = self.memory_generation.wrapping_add(1);
         if self.memory_focus.as_ref().is_some_and(|focus| focus.is_focused(window)) {
             if let Some(focus) = self.memory_previous_focus.take() { focus.focus(window); }
-            else { self.select(self.active, window, cx); }
+            else { self.select(self.workspace_state.active, window, cx); }
         }
         self.memory_previous_focus = None;
         cx.notify();
@@ -391,7 +388,7 @@ impl WorkspaceWindow {
         if self.memory_loading { return; }
         let mut jobs = Vec::new();
         'workspaces: for index in self.workspace_order(true) {
-            let entry = &self.entries[index];
+            let entry = &self.workspace_state.entries[index];
             for pane in &entry.workspace.read(cx).panes {
                 let pane = pane.read(cx);
                 for (tab, terminal) in pane.terminals.iter().enumerate() {
@@ -438,7 +435,7 @@ impl WorkspaceWindow {
                 let mut retained = std::collections::HashSet::new();
                 let mut retained_shells = std::collections::HashSet::new();
                 if !expected.is_empty() || !shells.is_empty() {
-                    for entry in &this.entries {
+                    for entry in &this.workspace_state.entries {
                         for pane in &entry.workspace.read(cx).panes {
                             for terminal in &pane.read(cx).terminals {
                                 if let Some(pid) = shells.get(&terminal.entity_id()) {
@@ -472,11 +469,11 @@ impl WorkspaceWindow {
     }
 
     fn group_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let members: Vec<_> = self.workspace_order(true).into_iter().map(|index| self.entries[index].workspace.entity_id())
+        let members: Vec<_> = self.workspace_order(true).into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id())
             .filter(|id| self.sidebar_selection.contains(id)).map(|id| id.to_string()).collect();
         if members.len() < 2 { cx.propagate(); return; }
         let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.groups.entries().iter().any(|group| &group.name == name)).unwrap();
+            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
         let create = automation::GroupCreate { cwd: None, window_id: cx.entity_id().to_string(), name, workspace_ids: Some(members), external_id: None };
         match self.automation_group_create(&create, window, cx) {
             Ok(_) => { self.sidebar_selection.clear(); self.sidebar_selection_anchor = None; }
@@ -486,10 +483,10 @@ impl WorkspaceWindow {
     }
 
     fn extend_sidebar_selection(&mut self, target: EntityId, range: bool, cx: &mut Context<Self>) {
-        let active = self.entries.get(self.active).map(|entry| entry.workspace.entity_id());
+        let active = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id());
         let anchor = self.sidebar_selection_anchor.or(active).unwrap_or(target);
         if range {
-            let visible: Vec<_> = self.sidebar_order().into_iter().map(|index| self.entries[index].workspace.entity_id()).collect();
+            let visible: Vec<_> = self.sidebar_order().into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id()).collect();
             let start = visible.iter().position(|id| *id == anchor);
             let end = visible.iter().position(|id| *id == target);
             if let (Some(start), Some(end)) = (start, end) {
@@ -507,7 +504,7 @@ impl WorkspaceWindow {
     pub(super) fn automation_group_create(&mut self, create: &automation::GroupCreate, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
         if let Some(external) = &create.external_id {
-            if let Some(group) = self.groups.entries().iter().find(|group| group.external_id.as_ref() == Some(external)) {
+            if let Some(group) = self.workspace_state.groups.entries().iter().find(|group| group.external_id.as_ref() == Some(external)) {
                 let id = format!("workspace_group:{}", group.id);
                 return Ok(self.automation_snapshot(create.window_id.clone(), false, cx)["groups"].as_array().unwrap().iter().find(|group| group["id"] == id).unwrap().clone());
             }
@@ -516,43 +513,43 @@ impl WorkspaceWindow {
         let mut members = Vec::new();
         if let Some(ids) = &create.workspace_ids {
             for id in ids {
-                members.push(self.entries.iter().find(|entry| entry.workspace.entity_id().to_string() == *id)
+                members.push(self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id().to_string() == *id)
                     .map(|entry| entry.workspace.entity_id()).ok_or(automation::Failure { code: -32004, message: "Workspace not found in window" })?);
             }
-        } else if self.entries.len() >= 64 {
+        } else if self.workspace_state.entries.len() >= 64 {
             return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" });
         }
-        let selected = self.entries.get(self.active).map(|entry| entry.workspace.entity_id());
+        let selected = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id());
         let slots: Vec<_> = members.iter().filter_map(|member| self.group_anchor_slot(*member)).collect();
         if generated {
-            let previous = self.previous_workspace;
+            let previous = self.workspace_state.previous;
             let next_number = self.next_number;
             self.add_with_directory(1, false, Some(workspace_groups::Placement::End), create.cwd.clone(), window, cx);
-            let index = self.entries.len() - 1;
-            if self.entries[index].workspace.read(cx).panes.is_empty() {
+            let index = self.workspace_state.entries.len() - 1;
+            if self.workspace_state.entries[index].workspace.read(cx).panes.is_empty() {
                 // No shell or pane was created, so no focus changed. Discard
                 // only the empty entry; normal close would select/acknowledge a
                 // neighboring terminal and could expand a collapsed group.
-                self.entries.pop();
-                self.active = selected.and_then(|id| self.entries.iter().position(|entry| entry.workspace.entity_id() == id)).unwrap_or(0);
-                self.previous_workspace = previous;
+                self.workspace_state.entries.pop();
+                self.workspace_state.active = selected.and_then(|id| self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)).unwrap_or(0);
+                self.workspace_state.previous = previous;
                 self.next_number = next_number;
-                if let Some(entry) = self.entries.get(self.active) { window.set_window_title(&format!("{} — rmux", entry.name)); }
-                self.scroll_to_workspace(self.active);
+                if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) { window.set_window_title(&format!("{} — rmux", entry.name)); }
+                self.scroll_to_workspace(self.workspace_state.active);
                 cx.notify();
                 return Err(automation::Failure { code: -32005, message: "Could not start group anchor shell" });
             }
-            members.push(self.entries[index].workspace.entity_id());
+            members.push(self.workspace_state.entries[index].workspace.entity_id());
         }
-        let id = match self.groups.create(create.name.clone(), members, generated) {
+        let id = match self.workspace_state.groups.create(create.name.clone(), members, generated) {
             Ok(id) => id,
             Err(_) => {
-                if generated { self.close_workspace(self.entries.len() - 1, window, cx); }
+                if generated { self.close_workspace(self.workspace_state.entries.len() - 1, window, cx); }
                 return Err(automation::Failure { code: -32005, message: "Could not create group" });
             }
         };
-        self.groups.get_mut(id).unwrap().external_id = create.external_id.clone();
-        self.groups.get_mut(id).unwrap().cwd = create.cwd.clone();
+        self.workspace_state.groups.get_mut(id).unwrap().external_id = create.external_id.clone();
+        self.workspace_state.groups.get_mut(id).unwrap().cwd = create.cwd.clone();
         // A source group may contribute several members; preserve its slot once.
         let mut preserved = Vec::new();
         for slot in slots {
@@ -562,7 +559,7 @@ impl WorkspaceWindow {
             }
         }
         self.sidebar = true;
-        self.scroll_to_workspace(self.active);
+        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
         let id = format!("workspace_group:{id}");
         Ok(self.automation_snapshot(create.window_id.clone(), false, cx)["groups"].as_array().unwrap().iter().find(|group| group["id"] == id).unwrap().clone())
@@ -570,28 +567,28 @@ impl WorkspaceWindow {
 
     pub(super) fn automation_close_workspace(&mut self, target: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let index = self.entries.iter().position(|entry| entry.workspace.entity_id() == target)
+        let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target)
             .ok_or(automation::Failure { code: -32004, message: "Workspace not found" })?;
-        let workspace = self.entries[index].workspace.read(cx);
+        let workspace = self.workspace_state.entries[index].workspace.read(cx);
         let has_terminals = workspace.panes.iter().any(|pane| !pane.read(cx).terminals.is_empty());
         if cx.global::<ClosePolicy>().confirms(has_terminals, || workspace.panes.iter().any(|pane| pane.read(cx).terminals.iter().any(|terminal| terminal.read(cx).has_active_work()))) {
             return Err(automation::Failure { code: -32003, message: "Workspace requires close confirmation; close it in the UI" });
         }
-        let closes_window = self.entries.len() == 1;
+        let closes_window = self.workspace_state.entries.len() == 1;
         self.close_workspace(index, window, cx);
         Ok(serde_json::json!({"workspace_id":target.to_string(),"closed":true,"window_closed":closes_window}))
     }
 
     pub(super) fn automation_prepare_workspace(&mut self, create: &automation::WorkspaceCreate, cx: &mut Context<Self>) -> Result<Box<dyn FnOnce() -> Result<PreparedTerminal> + Send>, automation::Failure> {
         self.automation_available(cx)?;
-        if self.command_launching || self.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Command startup busy or workspace limit reached" }); }
+        if self.command_launching || self.workspace_state.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Command startup busy or workspace limit reached" }); }
         let destination = create.ssh_destination.clone();
         if let Some(destination) = &destination {
             ssh::command(destination).map_err(|message| automation::Failure { code: -32602, message })?;
         }
         let directory = create.cwd.clone().or_else(|| {
             if destination.is_some() { return None; }
-            self.entries.get(self.active).and_then(|entry| {
+            self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
                 let workspace = entry.workspace.read(cx);
                 workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane)
                     .or_else(|| workspace.panes.first()).and_then(|pane| pane.read(cx).cached_directory(cx))
@@ -615,21 +612,21 @@ impl WorkspaceWindow {
     }
     fn automation_publish_workspace(&mut self, create: &automation::WorkspaceCreate, prepared: (TerminalSeed, Option<String>), window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        if self.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" }); }
+        if self.workspace_state.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" }); }
         let next_number = self.next_number;
         let index = self.add_configured(1, false, None, create.cwd.clone(), false, Some(prepared), window, cx)
             .ok_or(automation::Failure { code: -32005, message: "Window is shutting down" })?;
-        if self.entries[index].workspace.read(cx).panes.is_empty() {
-            self.entries.remove(index);
-            if index < self.active { self.active -= 1; }
+        if self.workspace_state.entries[index].workspace.read(cx).panes.is_empty() {
+            self.workspace_state.entries.remove(index);
+            if index < self.workspace_state.active { self.workspace_state.active -= 1; }
             self.next_number = next_number;
             cx.notify();
             return Err(automation::Failure { code: -32005, message: "Could not start workspace shell" });
         }
-        if let Some(name) = &create.name { self.entries[index].name = name.clone(); }
-        else if let Some(destination) = &create.ssh_destination { self.entries[index].name = format!("SSH · {destination}"); }
-        if let Some(description) = &create.description { self.entries[index].description = description.clone(); }
-        let id = self.entries[index].workspace.entity_id().to_string();
+        if let Some(name) = &create.name { self.workspace_state.entries[index].name = name.clone(); }
+        else if let Some(destination) = &create.ssh_destination { self.workspace_state.entries[index].name = format!("SSH · {destination}"); }
+        if let Some(description) = &create.description { self.workspace_state.entries[index].description = description.clone(); }
+        let id = self.workspace_state.entries[index].workspace.entity_id().to_string();
         if create.focus || create.activate { self.select(index, window, cx); }
         if create.activate { window.activate_window(); }
         cx.notify();
@@ -640,28 +637,28 @@ impl WorkspaceWindow {
         self.automation_available(cx)?;
         let id = change.group_id.strip_prefix("workspace_group:").and_then(|id| id.parse::<u64>().ok())
             .ok_or(automation::Failure { code: -32602, message: "Invalid group ID" })?;
-        let group = self.groups.get_mut(id).ok_or(automation::Failure { code: -32004, message: "Group not found in window" })?;
+        let group = self.workspace_state.groups.get_mut(id).ok_or(automation::Failure { code: -32004, message: "Group not found in window" })?;
         if method == "workspace.group.new_workspace" {
             let anchor = group.members[0];
-            if self.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" }); }
-            let index = self.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)
+            if self.workspace_state.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Window workspace limit reached" }); }
+            let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)
                 .ok_or(automation::Failure { code: -32004, message: "Group anchor not found" })?;
             self.select(index, window, cx);
             self.add_with_placement(1, true, change.placement, window, cx);
-            let index = self.active;
-            if self.entries[index].workspace.read(cx).panes.is_empty() {
+            let index = self.workspace_state.active;
+            if self.workspace_state.entries[index].workspace.read(cx).panes.is_empty() {
                 self.close_workspace(index, window, cx);
                 return Err(automation::Failure { code: -32005, message: "Could not start group member shell" });
             }
-            let workspace_id = self.entries[index].workspace.entity_id().to_string();
+            let workspace_id = self.workspace_state.entries[index].workspace.entity_id().to_string();
             return Ok(serde_json::json!({"window_id":change.window_id,"group_id":change.group_id,"workspace_id":workspace_id}));
         }
         if method == "workspace.group.ungroup" {
             if change.remove_generated_anchor == Some(true) {
                 let anchor = group.removable_generated_anchor().copied().ok_or(automation::Failure { code: -32005, message: "Cleanup requires a sole generated anchor" })?;
-                let index = self.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)
+                let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)
                     .ok_or(automation::Failure { code: -32004, message: "Group anchor not found" })?;
-                let workspace = self.entries[index].workspace.read(cx);
+                let workspace = self.workspace_state.entries[index].workspace.read(cx);
                 let has_terminals = workspace.panes.iter().any(|pane| !pane.read(cx).terminals.is_empty());
                 if cx.global::<ClosePolicy>().confirms(has_terminals, || workspace.panes.iter().any(|pane| pane.read(cx).terminals.iter().any(|terminal| terminal.read(cx).has_active_work()))) {
                     return Err(automation::Failure { code: -32003, message: "Anchor cleanup requires confirmation; close it in the UI" });
@@ -675,22 +672,22 @@ impl WorkspaceWindow {
             return Ok(serde_json::json!({"group_id":change.group_id,"window_id":change.window_id,"workspace_ids":members,"ungrouped":true}));
         }
         if let Some(workspace_id) = &change.workspace_id {
-            let member = self.entries.iter().find(|entry| entry.workspace.entity_id().to_string() == *workspace_id)
+            let member = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id().to_string() == *workspace_id)
                 .map(|entry| entry.workspace.entity_id()).ok_or(automation::Failure { code: -32004, message: "Workspace not found in window" })?;
             if method != "workspace.group.add" && !group.members.contains(&member) {
                 return Err(automation::Failure { code: -32004, message: "Workspace is not a member of this group" });
             }
             let slot = self.group_anchor_slot(member);
-            let selected = self.entries.get(self.active).map(|entry| entry.workspace.entity_id());
+            let selected = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id());
             let result = match method {
-                "workspace.group.add" => self.groups.add(id, member, None),
-                "workspace.group.remove" => { self.groups.remove(member); Ok(()) },
-                "workspace.group.set_anchor" => self.groups.set_anchor(id, member),
+                "workspace.group.add" => self.workspace_state.groups.add(id, member, None),
+                "workspace.group.remove" => { self.workspace_state.groups.remove(member); Ok(()) },
+                "workspace.group.set_anchor" => self.workspace_state.groups.set_anchor(id, member),
                 _ => unreachable!("validated membership method"),
             };
             result.map_err(|_| automation::Failure { code: -32004, message: "Group membership target no longer exists" })?;
             self.preserve_group_slot(slot, selected);
-            self.scroll_to_workspace(self.active);
+            self.scroll_to_workspace(self.workspace_state.active);
             cx.notify();
             let snapshot = self.automation_snapshot(change.window_id.clone(), false, cx);
             let group = snapshot["groups"].as_array().unwrap().iter().find(|group| group["id"] == change.group_id).cloned();
@@ -701,15 +698,15 @@ impl WorkspaceWindow {
         if let Some(name) = &change.name { group.name = name.clone(); }
         if let Some(collapsed) = change.collapsed { group.collapsed = collapsed; }
         if let Some(pinned) = change.pinned { group.pinned = pinned; }
-        self.scroll_to_workspace(self.active);
+        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
         let result = self.automation_snapshot(change.window_id.clone(), false, cx);
         Ok(result["groups"].as_array().unwrap().iter().find(|group| group["id"] == change.group_id).unwrap().clone())
     }
 
     fn set_group_directory(&mut self, reset: bool, window: &Window, cx: &mut Context<Self>) {
-        let Some(entry) = self.entries.get(self.active) else { return; };
-        let Some(id) = self.groups.containing(entry.workspace.entity_id()).map(|group| group.id) else {
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let Some(id) = self.workspace_state.groups.containing(entry.workspace.entity_id()).map(|group| group.id) else {
             self.notice = Some("Select a workspace in a group first.".into()); cx.notify(); return;
         };
         let directory = if reset { None } else {
@@ -721,52 +718,51 @@ impl WorkspaceWindow {
             Some(directory)
         };
         self.notice = Some(directory.as_ref().map_or_else(|| "New group workspaces will follow the anchor directory.".into(), |path| format!("New group workspaces will start in {}", path.display())));
-        self.groups.get_mut(id).unwrap().cwd = directory;
+        self.workspace_state.groups.get_mut(id).unwrap().cwd = directory;
         cx.notify();
     }
 
     fn group_anchor_slot(&self, member: EntityId) -> Option<(u64, EntityId, usize)> {
-        let group = self.groups.containing(member)?;
+        let group = self.workspace_state.groups.containing(member)?;
         let anchor = *group.members.first()?;
-        let index = self.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)?;
+        let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)?;
         Some((group.id, anchor, index))
     }
 
     fn preserve_group_slot(&mut self, slot: Option<(u64, EntityId, usize)>, selected: Option<EntityId>) {
         if let Some((id, previous, index)) = slot {
-            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == id).and_then(|group| group.members.first()).copied() {
-                workspace_groups::preserve_anchor_slot(&mut self.entries, |entry| entry.workspace.entity_id(), previous, index, anchor);
+            if let Some(anchor) = self.workspace_state.groups.entries().iter().find(|group| group.id == id).and_then(|group| group.members.first()).copied() {
+                workspace_groups::preserve_anchor_slot(&mut self.workspace_state.entries, |entry| entry.workspace.entity_id(), previous, index, anchor);
             }
         }
-        if let Some(index) = selected.and_then(|id| self.entries.iter().position(|entry| entry.workspace.entity_id() == id)) {
-            self.active = index;
+        if let Some(index) = selected.and_then(|id| self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)) {
+            self.workspace_state.active = index;
         }
     }
 
     fn top_level_pinned(&self, index: usize) -> bool {
-        let entry = &self.entries[index];
-        self.groups.containing(entry.workspace.entity_id()).map(|group| group.pinned).unwrap_or(entry.pinned)
+        let entry = &self.workspace_state.entries[index];
+        self.workspace_state.groups.containing(entry.workspace.entity_id()).map(|group| group.pinned).unwrap_or(entry.pinned)
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
-        let workspaces: Vec<_> = self.entries.iter().map(|entry| (entry.workspace.entity_id(), entry.pinned)).collect();
-        self.groups.ordered_indices(&workspaces, include_collapsed)
+        let workspaces: Vec<_> = self.workspace_state.entries.iter().map(|entry| (entry.workspace.entity_id(), entry.pinned)).collect();
+        self.workspace_state.groups.ordered_indices(&workspaces, include_collapsed)
     }
 
     fn ungroup_preserving_order(&mut self, id: u64) {
-        if !rmux_core::workspace_lifecycle::ungroup(
-            &mut self.entries, &mut self.active, &mut self.groups, id,
+        if !self.workspace_state.ungroup(id,
             |entry| (entry.workspace.entity_id(), entry.pinned),
         ) { return; }
-        self.scroll_to_workspace(self.active);
+        self.scroll_to_workspace(self.workspace_state.active);
     }
 
     fn sidebar_order(&self) -> Vec<usize> { self.workspace_order(false) }
 
     fn scroll_to_workspace(&self, index: usize) {
-        let Some(entry) = self.entries.get(index) else { return; };
-        let visible = self.groups.visible_workspace(entry.workspace.entity_id());
+        let Some(entry) = self.workspace_state.entries.get(index) else { return; };
+        let visible = self.workspace_state.groups.visible_workspace(entry.workspace.entity_id());
         if let Some(row) = self.sidebar_order().iter().position(|candidate|
-            self.entries[*candidate].workspace.entity_id() == visible) {
+            self.workspace_state.entries[*candidate].workspace.entity_id() == visible) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
@@ -774,13 +770,13 @@ impl WorkspaceWindow {
     fn create_group(&mut self, empty: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
         if empty { self.add_with_group(1, false, window, cx); }
-        let Some(entry) = self.entries.get(self.active) else { return; };
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.groups.entries().iter().any(|group| &group.name == name)).unwrap();
+            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
         let selected = entry.workspace.entity_id();
         let slot = self.group_anchor_slot(selected);
-        match self.groups.create(name, vec![selected], empty) {
-            Ok(_) => { self.preserve_group_slot(slot, Some(selected)); self.sidebar = true; self.scroll_to_workspace(self.active); }
+        match self.workspace_state.groups.create(name, vec![selected], empty) {
+            Ok(_) => { self.preserve_group_slot(slot, Some(selected)); self.sidebar = true; self.scroll_to_workspace(self.workspace_state.active); }
             Err(error) => self.notice = Some(format!("Create group: {error}")),
         }
         cx.notify();
@@ -788,7 +784,7 @@ impl WorkspaceWindow {
 
     fn ungroup_active(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        if let Some(id) = self.entries.get(self.active).and_then(|entry| self.groups.containing(entry.workspace.entity_id())).map(|group| group.id) {
+        if let Some(id) = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| self.workspace_state.groups.containing(entry.workspace.entity_id())).map(|group| group.id) {
             self.ungroup_preserving_order(id);
             cx.notify();
         }
@@ -796,9 +792,9 @@ impl WorkspaceWindow {
 
     fn request_close_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(group) = self.entries.get(self.active).and_then(|entry| self.groups.containing(entry.workspace.entity_id())) else { return; };
+        let Some(group) = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| self.workspace_state.groups.containing(entry.workspace.entity_id())) else { return; };
         if group.members.len() == 1 {
-            self.request_close_workspace(self.active, window, cx);
+            self.request_close_workspace(self.workspace_state.active, window, cx);
             return;
         }
         let id = group.id;
@@ -821,8 +817,8 @@ impl WorkspaceWindow {
                         // Close only the members named by the original prompt
                         // which still belong to this group. Anchor goes last.
                         for member in members.into_iter().rev() {
-                            if !this.groups.containing(member).is_some_and(|group| group.id == id) { continue; }
-                            if let Some(index) = this.entries.iter().position(|entry| entry.workspace.entity_id() == member) {
+                            if !this.workspace_state.groups.containing(member).is_some_and(|group| group.id == id) { continue; }
+                            if let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == member) {
                                 this.close_workspace(index, window, cx);
                             }
                         }
@@ -835,10 +831,10 @@ impl WorkspaceWindow {
 
     fn toggle_group_pin(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        if let Some(id) = self.entries.get(self.active).and_then(|entry| self.groups.containing(entry.workspace.entity_id())).map(|group| group.id) {
-            let group = self.groups.get_mut(id).unwrap();
+        if let Some(id) = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| self.workspace_state.groups.containing(entry.workspace.entity_id())).map(|group| group.id) {
+            let group = self.workspace_state.groups.get_mut(id).unwrap();
             group.pinned = !group.pinned;
-            self.scroll_to_workspace(self.active);
+            self.scroll_to_workspace(self.workspace_state.active);
             cx.notify();
         }
     }
@@ -850,14 +846,14 @@ impl WorkspaceWindow {
 
     fn move_workspace_to_group(&mut self, group: u64, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(entry) = self.entries.get(self.active) else { return; };
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let selected = entry.workspace.entity_id();
         let slot = self.group_anchor_slot(selected);
-        match self.groups.add(group, selected, None) {
+        match self.workspace_state.groups.add(group, selected, None) {
             Ok(()) => {
                 self.preserve_group_slot(slot, Some(selected));
-                self.groups.get_mut(group).unwrap().collapsed = false;
-                self.scroll_to_workspace(self.active);
+                self.workspace_state.groups.get_mut(group).unwrap().collapsed = false;
+                self.scroll_to_workspace(self.workspace_state.active);
             }
             Err(error) => self.notice = Some(format!("Move workspace to group: {error}")),
         }
@@ -866,26 +862,26 @@ impl WorkspaceWindow {
 
     fn remove_workspace_from_group(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        if let Some(entry) = self.entries.get(self.active) {
+        if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
             let selected = entry.workspace.entity_id();
             let slot = self.group_anchor_slot(selected);
-            self.groups.remove(selected);
+            self.workspace_state.groups.remove(selected);
             self.preserve_group_slot(slot, Some(selected));
-            self.scroll_to_workspace(self.active);
+            self.scroll_to_workspace(self.workspace_state.active);
             cx.notify();
         }
     }
 
     fn set_group_anchor(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(member) = self.entries.get(self.active).map(|entry| entry.workspace.entity_id()) else { return; };
-        let Some(group) = self.groups.containing(member).map(|group| group.id) else { return; };
+        let Some(member) = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id()) else { return; };
+        let Some(group) = self.workspace_state.groups.containing(member).map(|group| group.id) else { return; };
         let slot = self.group_anchor_slot(member);
-        if let Err(error) = self.groups.set_anchor(group, member) {
+        if let Err(error) = self.workspace_state.groups.set_anchor(group, member) {
             self.notice = Some(format!("Set group anchor: {error}"));
         }
         self.preserve_group_slot(slot, Some(member));
-        self.scroll_to_workspace(self.active);
+        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
     }
     fn metadata_presets(input: &Entity<text_field::TextField>, field: MetadataField, cx: &App) -> AnyElement {
@@ -919,19 +915,19 @@ impl WorkspaceWindow {
             })).into_any_element()
     }
     pub(super) fn automation_text_export(&self, target: EntityId, max_bytes: usize, selected: bool, preserve_wraps: bool, lines: Option<usize>, cx: &App) -> Option<rmux_terminal::session::HistoryExport> {
-        self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target)
                 .map(|terminal| if selected { terminal.read(cx).session.selection_export(max_bytes, !preserve_wraps) } else if let Some(lines) = lines { terminal.read(cx).session.history_tail_export(lines, max_bytes) } else { terminal.read(cx).session.history_export(max_bytes) })
         }))
     }
     pub(super) fn automation_memory_sample(&self, target: EntityId, cx: &App) -> Option<rmux_terminal::session::MemorySample> {
-        self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target)
                 .map(|terminal| terminal.read(cx).session.memory_sample())
         }))
     }
     pub(super) fn automation_read_text(&self, read: &automation::SurfaceRead, target: EntityId, cx: &App) -> Result<serde_json::Value, automation::Failure> {
-        let terminal = self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        let terminal = self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target).cloned()
         })).ok_or(automation::Failure { code: -32004, message: "Surface not found" })?;
         let frame = terminal.read(cx).session.try_frame()
@@ -943,7 +939,7 @@ impl WorkspaceWindow {
         Ok(result)
     }
     pub(super) fn automation_notification(&mut self, change: &automation::NotificationChange, target: EntityId, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
-        let terminal = self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        let terminal = self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target).cloned()
         })).ok_or(automation::Failure { code: -32004, message: "Surface not found" })?;
         if let Some(revision) = change.revision {
@@ -966,7 +962,7 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_send_key(&self, input: &automation::SurfaceKey, target: EntityId, cx: &App) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let terminal = self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        let terminal = self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target).cloned()
         })).ok_or(automation::Failure { code: -32004, message: "Surface not found" })?;
         let mods = rmux_terminal::keyboard::Modifiers { control: input.control, alt: input.alt, shift: input.shift };
@@ -977,7 +973,7 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_send_text(&self, input: &automation::SurfaceText, target: EntityId, cx: &App) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let terminal = self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
+        let terminal = self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane| {
             pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == target).cloned()
         })).ok_or(automation::Failure { code: -32004, message: "Surface not found" })?;
         let session = &terminal.read(cx).session;
@@ -993,23 +989,23 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_rename(&mut self, rename: &automation::WorkspaceRename, target: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let Some(index) = self.entries.iter().position(|entry| entry.workspace.entity_id() == target) else {
+        let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else {
             return Err(automation::Failure { code: -32004, message: "Workspace not found" });
         };
-        if self.entries[index].name != rename.name {
-            self.entries[index].name.clone_from(&rename.name);
-            if index == self.active { window.set_window_title(&format!("{} — rmux", rename.name)); }
+        if self.workspace_state.entries[index].name != rename.name {
+            self.workspace_state.entries[index].name.clone_from(&rename.name);
+            if index == self.workspace_state.active { window.set_window_title(&format!("{} — rmux", rename.name)); }
             cx.notify();
         }
-        Ok(serde_json::json!({"workspace_id":rename.workspace_id,"name":self.entries[index].name}))
+        Ok(serde_json::json!({"workspace_id":rename.workspace_id,"name":self.workspace_state.entries[index].name}))
     }
     pub(super) fn automation_pane_target(&self, id: EntityId, cx: &App) -> Option<(Entity<Workspace>, Entity<PaneView>)> {
-        self.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter()
+        self.workspace_state.entries.iter().find_map(|entry| entry.workspace.read(cx).panes.iter()
             .find(|pane| pane.entity_id() == id).map(|pane| (entry.workspace.clone(), pane.clone())))
     }
     pub(super) fn automation_equalize_workspace(&mut self, target: EntityId, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let workspace = self.entries.iter().find(|entry| entry.workspace.entity_id() == target)
+        let workspace = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == target)
             .map(|entry| entry.workspace.clone())
             .ok_or(automation::Failure { code: -32004, message: "Workspace not found" })?;
         let changed = workspace.update(cx, |workspace, cx| {
@@ -1131,7 +1127,7 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_children(&self, window_id: String, surfaces: bool, workspace_filter: Option<&str>, history: bool, cx: &App) -> Vec<serde_json::Value> {
         let mut items = Vec::new();
-        for entry in &self.entries {
+        for entry in &self.workspace_state.entries {
             let workspace_id = entry.workspace.entity_id().to_string();
             if workspace_filter.is_some_and(|id| id != workspace_id) { continue; }
             let workspace = entry.workspace.read(cx);
@@ -1153,10 +1149,10 @@ impl WorkspaceWindow {
         items
     }
     pub(super) fn automation_contains_workspace(&self, id: EntityId) -> bool {
-        self.entries.iter().any(|entry| entry.workspace.entity_id() == id)
+        self.workspace_state.entries.iter().any(|entry| entry.workspace.entity_id() == id)
     }
     pub(super) fn automation_surface_target(&self, id: EntityId, cx: &App) -> Option<(EntityId, EntityId)> {
-        self.entries.iter().find_map(|entry| {
+        self.workspace_state.entries.iter().find_map(|entry| {
             entry.workspace.read(cx).panes.iter().find_map(|pane| {
                 pane.read(cx).terminals.iter().find(|terminal| terminal.entity_id() == id)
                     .map(|terminal| (entry.workspace.entity_id(), terminal.entity_id()))
@@ -1177,7 +1173,7 @@ impl WorkspaceWindow {
             || self.close_prompt.is_some() || self.rename.is_some() || self.palette.is_some() || self.workspace_menu.is_some()
             || cx.global::<Shutdowns>().quitting || cx.global::<Shutdowns>().quit_prompt
             || cx.global::<PromptGate>().is_active()
-            || self.entries.iter().any(|entry| entry.workspace.read(cx).panes.iter().any(|pane| pane.read(cx).automation_busy(cx))) {
+            || self.workspace_state.entries.iter().any(|entry| entry.workspace.read(cx).panes.iter().any(|pane| pane.read(cx).automation_busy(cx))) {
             return Err(automation::Failure { code: -32003, message: "Window is busy; retry after the current interaction" });
         }
         Ok(())
@@ -1191,7 +1187,7 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_select(&mut self, selection: &automation::Selection, target: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
-        let Some(index) = self.entries.iter().position(|entry| entry.workspace.entity_id() == target) else {
+        let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else {
             return Err(automation::Failure { code: -32004, message: "Workspace not found" });
         };
         self.select(index, window, cx);
@@ -1201,8 +1197,8 @@ impl WorkspaceWindow {
     pub(super) fn automation_snapshot(&self, window_id: String, include_workspaces: bool, cx: &App) -> serde_json::Value {
         let order = self.workspace_order(true);
         let workspaces: Vec<_> = order.iter().enumerate().filter(|_| include_workspaces).map(|(position, index)| {
-            let entry = &self.entries[*index];
-            let group = self.groups.containing(entry.workspace.entity_id());
+            let entry = &self.workspace_state.entries[*index];
+            let group = self.workspace_state.groups.containing(entry.workspace.entity_id());
             let workspace = entry.workspace.read(cx);
             let mut result = serde_json::json!({
                 "id":entry.workspace.entity_id().to_string(), "window_id":window_id,
@@ -1210,7 +1206,7 @@ impl WorkspaceWindow {
                 "group_id":group.map(|group| format!("workspace_group:{}", group.id)),
                 "group_anchor":group.is_some_and(|group| group.members.first() == Some(&entry.workspace.entity_id())),
                 "icon":entry.icon, "color":entry.color.map(|color| format!("#{color:06x}")),
-                "pinned":entry.pinned, "selected":*index == self.active,
+                "pinned":entry.pinned, "selected":*index == self.workspace_state.active,
                 "pane_count":workspace.panes.len(),
                 "zoomed_pane_id":workspace.zoomed.map(|id| id.to_string()),
                 "terminal_count":workspace.panes.iter().map(|pane| pane.read(cx).terminals.len()).sum::<usize>(),
@@ -1219,8 +1215,8 @@ impl WorkspaceWindow {
             result
         }).collect();
         let groups: Vec<_> = order.iter().filter_map(|index| {
-            let id = self.entries[*index].workspace.entity_id();
-            self.groups.containing(id).filter(|group| group.members.first() == Some(&id))
+            let id = self.workspace_state.entries[*index].workspace.entity_id();
+            self.workspace_state.groups.containing(id).filter(|group| group.members.first() == Some(&id))
         }).map(|group| serde_json::json!({
             "id":format!("workspace_group:{}", group.id), "window_id":window_id,
             "name":group.name, "color":group.color.map(|color| format!("#{color:06x}")),
@@ -1232,8 +1228,8 @@ impl WorkspaceWindow {
             "workspace_ids":group.members.iter().map(|id| id.to_string()).collect::<Vec<_>>(),
         })).collect();
         let mut result = serde_json::json!({
-            "id":window_id, "workspace_count":self.entries.len(),
-            "selected_workspace_id":self.entries.get(self.active).map(|entry| entry.workspace.entity_id().to_string()),
+            "id":window_id, "workspace_count":self.workspace_state.entries.len(),
+            "selected_workspace_id":self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id().to_string()),
             "groups":groups,
         });
         result["workspaces"] = serde_json::Value::Array(workspaces);
@@ -1247,8 +1243,8 @@ impl WorkspaceWindow {
     }
     fn launch_command(&mut self, command: preferences::CustomCommand, remote: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         if self.command_launching { self.notice = Some("A command is already starting in this window".into()); cx.notify(); return; }
-        if self.automation_available(cx).is_err() || self.entries.len() >= 64 { self.notice = Some("Window is busy or has reached its workspace limit".into()); cx.notify(); return; }
-        let directory = command.cwd.clone().or_else(|| self.entries.get(self.active).and_then(|entry| {
+        if self.automation_available(cx).is_err() || self.workspace_state.entries.len() >= 64 { self.notice = Some("Window is busy or has reached its workspace limit".into()); cx.notify(); return; }
+        let directory = command.cwd.clone().or_else(|| self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
             let workspace = entry.workspace.read(cx);
             workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane).or_else(|| workspace.panes.first())
                 .and_then(|pane| pane.read(cx).cached_directory(cx))
@@ -1283,11 +1279,11 @@ impl WorkspaceWindow {
             let _ = cx.update(|window, cx| entity.update(cx, |this, cx| {
                 this.command_launching = false;
                 match result {
-                    Ok(prepared) if this.automation_available(cx).is_ok() && this.entries.len() < 64 => {
+                    Ok(prepared) if this.automation_available(cx).is_ok() && this.workspace_state.entries.len() < 64 => {
                         let settings = cx.global::<Preferences>();
                         let seed = TerminalSeed::Ready(prepared, CellMetrics::new(settings.font_size), settings.font_family.clone().into());
                         let Some(index) = this.add_configured(1, false, None, None, false, Some((seed, Some(name.clone()))), window, cx) else { return; };
-                        this.entries[index].name = name;
+                        this.workspace_state.entries[index].name = name;
                         this.select(index, window, cx);
                         this.notice = None;
                     }
@@ -1302,7 +1298,7 @@ impl WorkspaceWindow {
     fn toggle_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(state) = self.settings_state.take() {
             if state.focus.is_focused(window) {
-                if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.active, window, cx); }
+                if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.workspace_state.active, window, cx); }
             }
         } else {
             if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
@@ -1501,7 +1497,7 @@ impl WorkspaceWindow {
         .detach();
     }
     pub(super) fn should_confirm_close(&self, cx: &App) -> bool {
-        let has_terminals = self.entries.iter().any(|entry| {
+        let has_terminals = self.workspace_state.entries.iter().any(|entry| {
             entry
                 .workspace
                 .read(cx)
@@ -1513,7 +1509,7 @@ impl WorkspaceWindow {
             .confirms(has_terminals, || self.has_active_work(cx))
     }
     pub(super) fn has_active_work(&self, cx: &App) -> bool {
-        self.entries.iter().any(|entry| {
+        self.workspace_state.entries.iter().any(|entry| {
             entry.workspace.read(cx).panes.iter().any(|pane| {
                 pane.read(cx)
                     .terminals
@@ -1524,7 +1520,7 @@ impl WorkspaceWindow {
     }
     fn request_process_close(&self, cx: &App) {
         if let Some(cancel) = &self.workspace_launch_cancel { cancel.0.store(true, Ordering::Release); }
-        for entry in &self.entries { entry.workspace.read(cx).request_process_close(cx); }
+        for entry in &self.workspace_state.entries { entry.workspace.read(cx).request_process_close(cx); }
     }
 
     fn request_close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1574,7 +1570,7 @@ impl WorkspaceWindow {
     }
 
     fn record_terminal_focus(&mut self, window: &Window, cx: &App) {
-        let Some(entry) = self.entries.get(self.active) else {
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else {
             return;
         };
         let workspace = entry.workspace.read(cx);
@@ -1602,7 +1598,7 @@ impl WorkspaceWindow {
     fn navigate_focus(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) -> Option<EntityId> {
         self.record_terminal_focus(window, cx);
         let mut live = Vec::new();
-        for (index, entry) in self.entries.iter().enumerate() {
+        for (index, entry) in self.workspace_state.entries.iter().enumerate() {
             for pane in &entry.workspace.read(cx).panes {
                 for (tab, terminal) in pane.read(cx).terminals.iter().enumerate() {
                     live.push((terminal.entity_id(), index, pane.clone(), tab));
@@ -1612,8 +1608,8 @@ impl WorkspaceWindow {
         let Some(target) = self.focus_trail.step(forward, |id| live.iter().any(|(candidate, ..)| *candidate == id)) else { return None; };
         let Some((_, index, pane, tab)) = live.into_iter().find(|(id, ..)| *id == target) else { return None; };
         self.remember_focus(window, cx);
-        self.entries[index].last_pane = Some(pane.entity_id());
-        self.entries[index].workspace.update(cx, |workspace, cx| {
+        self.workspace_state.entries[index].last_pane = Some(pane.entity_id());
+        self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
             workspace.zoomed = None;
             cx.notify();
         });
@@ -1627,7 +1623,7 @@ impl WorkspaceWindow {
         self.record_terminal_focus(window, cx);
         let current = self.focus_history.last().copied();
         let mut live = Vec::new();
-        for (index, entry) in self.entries.iter().enumerate() {
+        for (index, entry) in self.workspace_state.entries.iter().enumerate() {
             for pane in &entry.workspace.read(cx).panes {
                 for (tab, terminal) in pane.read(cx).terminals.iter().enumerate() {
                     live.push((terminal.entity_id(), index, pane.clone(), tab));
@@ -1645,8 +1641,8 @@ impl WorkspaceWindow {
             .cloned();
         if let Some((_, index, pane, tab)) = target {
             self.remember_focus(window, cx);
-            self.entries[index].last_pane = Some(pane.entity_id());
-            self.entries[index].workspace.update(cx, |workspace, cx| {
+            self.workspace_state.entries[index].last_pane = Some(pane.entity_id());
+            self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
                 workspace.zoomed = None;
                 cx.notify();
             });
@@ -1658,7 +1654,7 @@ impl WorkspaceWindow {
         }
     }
     fn move_workspace_to_next_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.entries.is_empty() || cx.global::<Shutdowns>().quitting {
+        if self.workspace_state.entries.is_empty() || cx.global::<Shutdowns>().quitting {
             return;
         }
         let current = window.window_handle();
@@ -1676,7 +1672,7 @@ impl WorkspaceWindow {
             cx.notify();
             return;
         };
-        let source = self.entries[self.active].workspace.entity_id();
+        let source = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
         self.move_workspace_to_window(source, target.into(), window, cx);
     }
     fn move_workspace_to_window(
@@ -1693,12 +1689,12 @@ impl WorkspaceWindow {
     }
     pub(super) fn try_move_workspace_to_window(&mut self, source: EntityId, target: AnyWindowHandle, activate: bool, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         self.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-        let index = self.entries.iter().position(|entry| entry.workspace.entity_id() == source)
+        let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == source)
             .ok_or_else(|| anyhow::anyhow!("workspace not found"))?;
         if target == window.window_handle() { return Ok(()); }
         let target = target.downcast::<Self>().ok_or_else(|| anyhow::anyhow!("invalid destination window"))?;
         self.remember_focus(window, cx);
-        let entry = &self.entries[index];
+        let entry = &self.workspace_state.entries[index];
         let workspace = entry.workspace.clone();
         let name = entry.name.clone();
         let description = entry.description.clone();
@@ -1712,13 +1708,13 @@ impl WorkspaceWindow {
             workspace.update(cx, |workspace, cx| workspace.rebind_window(window, cx));
             let closed = Self::observe_workspace(&workspace, window, cx);
             let metadata = Self::observe_metadata(&workspace, window, cx);
-            let index = destination.entries.len();
-            destination.entries.insert(index, Entry {
+            let index = destination.workspace_state.entries.len();
+            destination.workspace_state.entries.insert(index, Entry {
                 workspace, name, description, color, icon, pinned, last_pane,
                 _closed: closed, _metadata: metadata,
             });
             // Keep the previous active entry's identity until select records it.
-            if destination.active >= index { destination.active += 1; }
+            if destination.workspace_state.active >= index { destination.workspace_state.active += 1; }
             destination.select(index, window, cx);
             Ok(())
         });
@@ -1728,11 +1724,11 @@ impl WorkspaceWindow {
         Ok(())
     }
     fn detach_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.entries.is_empty() || cx.global::<Shutdowns>().quitting {
+        if self.workspace_state.entries.is_empty() || cx.global::<Shutdowns>().quitting {
             return;
         }
         self.remember_focus(window, cx);
-        let entry = &self.entries[self.active];
+        let entry = &self.workspace_state.entries[self.workspace_state.active];
         let workspace = entry.workspace.clone();
         let rollback = workspace.clone();
         let name = entry.name.clone();
@@ -1757,7 +1753,7 @@ impl WorkspaceWindow {
                     let mut this = Self::empty(None, cx);
                     this.sidebar_width = sidebar_width;
                     this.next_number = 2;
-                    this.entries.push(Entry {
+                    this.workspace_state.entries.push(Entry {
                         workspace,
                         name,
                         description,
@@ -1775,12 +1771,12 @@ impl WorkspaceWindow {
         );
         match result {
             Ok(_) => {
-                self.remove_workspace_entry(self.active, window, cx);
+                self.remove_workspace_entry(self.workspace_state.active, window, cx);
                 cx.activate(true);
             }
             Err(error) => {
                 rollback.update(cx, |workspace, cx| workspace.rebind_window(window, cx));
-                self.select(self.active, window, cx);
+                self.select(self.workspace_state.active, window, cx);
                 self.notice = Some(format!("Move workspace: {error}"));
                 cx.notify();
             }
@@ -1790,7 +1786,7 @@ impl WorkspaceWindow {
         if cx.global::<Shutdowns>().quitting {
             return;
         }
-        let workspace = self.entries[self.active].workspace.clone();
+        let workspace = self.workspace_state.entries[self.workspace_state.active].workspace.clone();
         let Some(index) = workspace.read(cx).focused_index(window, cx) else {
             return;
         };
@@ -1799,7 +1795,7 @@ impl WorkspaceWindow {
             return;
         };
         let terminal = tab.terminal.clone();
-        let name = self.entries[self.active].name.clone();
+        let name = self.workspace_state.entries[self.workspace_state.active].name.clone();
         let bounds = Bounds::centered(None, size(px(1000.), px(680.)), cx);
         let result = cx.open_window(
             WindowOptions {
@@ -1856,7 +1852,7 @@ impl WorkspaceWindow {
         let closed = Self::observe_workspace(&workspace, window, cx);
         let metadata = Self::observe_metadata(&workspace, window, cx);
         let last_pane = Some(workspace.read(cx).panes[0].entity_id());
-        this.entries.push(Entry {
+        this.workspace_state.entries.push(Entry {
             workspace,
             name: name.clone(),
             description: String::new(),
@@ -1878,7 +1874,7 @@ impl WorkspaceWindow {
         {
             return;
         }
-        if let Some(entry) = self.entries.get_mut(self.active) {
+        if let Some(entry) = self.workspace_state.entries.get_mut(self.workspace_state.active) {
             entry.icon = icon;
             cx.notify();
         }
@@ -1887,17 +1883,17 @@ impl WorkspaceWindow {
         if color.is_some_and(|color| color > 0xffffff) {
             return;
         }
-        if let Some(entry) = self.entries.get_mut(self.active) {
+        if let Some(entry) = self.workspace_state.entries.get_mut(self.workspace_state.active) {
             entry.color = color;
             cx.notify();
         }
     }
     fn toggle_workspace_pin(&mut self, cx: &mut Context<Self>) {
-        if self.entries.is_empty() {
+        if self.workspace_state.entries.is_empty() {
             return;
         }
-        self.entries[self.active].pinned = !self.entries[self.active].pinned;
-        self.scroll_to_workspace(self.active);
+        self.workspace_state.entries[self.workspace_state.active].pinned = !self.workspace_state.entries[self.workspace_state.active].pinned;
+        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
     }
     fn dismiss_notification(&mut self, id: EntityId, revision: u64, cx: &mut Context<Self>) {
@@ -1912,7 +1908,7 @@ impl WorkspaceWindow {
             let index = targets.iter().position(|row| Some((row.1, row.2)) == state.selected).unwrap_or(0);
             targets.get(index).filter(|row| (row.1, row.2) == (id, revision)).map(|_| index)
         });
-        let target = self.entries.iter().find_map(|entry| {
+        let target = self.workspace_state.entries.iter().find_map(|entry| {
             entry.workspace.read(cx).panes.iter().find_map(|pane| {
                 pane.read(cx)
                     .terminals
@@ -1946,13 +1942,13 @@ impl WorkspaceWindow {
         cx: &mut Context<Self>,
     ) {
         let Some(index) = self
-            .entries
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == workspace)
         else {
             return;
         };
-        let target = self.entries[index]
+        let target = self.workspace_state.entries[index]
             .workspace
             .read(cx)
             .panes
@@ -1971,10 +1967,10 @@ impl WorkspaceWindow {
         self.remember_focus(window, cx);
         self.activate_workspace(index);
         self.rename = None;
-        self.entries[index].last_pane = Some(pane.entity_id());
+        self.workspace_state.entries[index].last_pane = Some(pane.entity_id());
         self.scroll_to_workspace(index);
-        window.set_window_title(&format!("{} — rmux", self.entries[index].name));
-        self.entries[index].workspace.update(cx, |workspace, cx| {
+        window.set_window_title(&format!("{} — rmux", self.workspace_state.entries[index].name));
+        self.workspace_state.entries[index].workspace.update(cx, |workspace, cx| {
             if workspace.zoomed.is_some() {
                 workspace.zoomed = Some(pane.entity_id());
             }
@@ -1986,7 +1982,7 @@ impl WorkspaceWindow {
     }
     fn mark_all_read(&mut self, cx: &mut Context<Self>) {
         // Cached UI state only: no parser locks, input, focus changes or pane reveals.
-        let terminals: Vec<_> = self.entries.iter().flat_map(|entry| {
+        let terminals: Vec<_> = self.workspace_state.entries.iter().flat_map(|entry| {
             entry.workspace.read(cx).panes.iter().flat_map(|pane| {
                 pane.read(cx).terminals.iter().filter(|terminal| terminal.read(cx).attention.any()).cloned()
             })
@@ -1999,7 +1995,7 @@ impl WorkspaceWindow {
 
     fn dismiss_all_notifications(&mut self, cx: &mut Context<Self>) {
         let mut pending = Vec::new();
-        for entry in &self.entries {
+        for entry in &self.workspace_state.entries {
             for pane in &entry.workspace.read(cx).panes {
                 for terminal in &pane.read(cx).terminals {
                     let view = terminal.read(cx);
@@ -2022,7 +2018,7 @@ impl WorkspaceWindow {
         let mut targets = Vec::new();
         let unread_only = self.notification_navigation.as_ref().is_some_and(|state| state.unread_only);
         for index in self.workspace_order(true) {
-            let entry = &self.entries[index];
+            let entry = &self.workspace_state.entries[index];
             for pane in &entry.workspace.read(cx).panes {
                 for terminal in &pane.read(cx).terminals {
                     let view = terminal.read(cx);
@@ -2038,7 +2034,7 @@ impl WorkspaceWindow {
     fn toggle_notifications(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(state) = self.notification_navigation.take() {
             if state.focus.is_focused(window) {
-                if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.active, window, cx); }
+                if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.workspace_state.active, window, cx); }
             }
         } else {
             if self.settings_state.is_some() { self.toggle_settings(window, cx); }
@@ -2114,7 +2110,7 @@ impl WorkspaceWindow {
         let targets = self.notification_targets(cx);
         let Some((_, terminal, revision)) = targets.iter()
             .find(|row| Some((row.1, row.2)) == state.selected).or_else(|| targets.first()) else { return; };
-        let message = self.entries.iter().flat_map(|entry| &entry.workspace.read(cx).panes)
+        let message = self.workspace_state.entries.iter().flat_map(|entry| &entry.workspace.read(cx).panes)
             .flat_map(|pane| &pane.read(cx).terminals)
             .find(|view| view.entity_id() == *terminal)
             .and_then(|view| view.read(cx).notifications.iter().find(|record| record.message.revision == *revision))
@@ -2126,12 +2122,12 @@ impl WorkspaceWindow {
 
     fn notification_panel(&self, cx: &mut Context<Self>) -> AnyElement {
         let navigation = self.notification_navigation.as_ref().expect("open notification panel").clone();
-        let has_unread = self.entries.iter().any(|entry| entry.workspace.read(cx).needs_attention(cx));
+        let has_unread = self.workspace_state.entries.iter().any(|entry| entry.workspace.read(cx).needs_attention(cx));
         let mut messages = Vec::new();
         let mut total_count = 0;
         let mut unread_count = 0;
         for index in self.workspace_order(true) {
-            let entry = &self.entries[index];
+            let entry = &self.workspace_state.entries[index];
             for pane in &entry.workspace.read(cx).panes {
                 for (tab, terminal) in pane.read(cx).terminals.iter().enumerate() {
                     let view = terminal.read(cx);
@@ -2340,17 +2336,15 @@ impl WorkspaceWindow {
             .into_any_element()
     }
     fn activate_workspace(&mut self, index: usize) {
-        rmux_core::workspace_lifecycle::select(
-            &self.entries, &mut self.active, &mut self.groups, &mut self.previous_workspace,
-            index, |entry| entry.workspace.entity_id(),
+        self.workspace_state.select(index, |entry| entry.workspace.entity_id(),
         );
     }
 
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(index) = self
-            .entries
+            .workspace_state.entries
             .iter()
-            .position(|entry| Some(entry.workspace.entity_id()) == self.previous_workspace.target())
+            .position(|entry| Some(entry.workspace.entity_id()) == self.workspace_state.previous.target())
         {
             self.select(index, window, cx);
         }
@@ -2361,7 +2355,7 @@ impl WorkspaceWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        let Some(entry) = self.entries.get(index) else {
+        let Some(entry) = self.workspace_state.entries.get(index) else {
             return;
         };
         let active_work = || {
@@ -2407,7 +2401,7 @@ impl WorkspaceWindow {
                     this.close_prompt = None;
                     if confirmed {
                         if let Some(index) = this
-                            .entries
+                            .workspace_state.entries
                             .iter()
                             .position(|entry| entry.workspace.entity_id() == id)
                         {
@@ -2420,27 +2414,25 @@ impl WorkspaceWindow {
         .detach();
     }
     fn close_workspace(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(entry) = self.entries.get(index) else { return; };
+        let Some(entry) = self.workspace_state.entries.get(index) else { return; };
         entry.workspace.read(cx).request_process_close(cx);
         self.remove_workspace_entry(index, window, cx);
     }
 
     /// Remove window ownership only: move/detach keeps the same live workspace.
     fn remove_workspace_entry(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(closed) = rmux_core::workspace_lifecycle::close(
-            &mut self.entries, &mut self.active, &mut self.groups, &mut self.previous_workspace,
-            index, |entry| (entry.workspace.entity_id(), entry.pinned),
+        let Some(closed) = self.workspace_state.close(index, |entry| (entry.workspace.entity_id(), entry.pinned),
         ) else { return; };
         self.rename = None;
         let removed = closed.removed;
         self.sidebar_selection.retain(|id| *id != removed.workspace.entity_id());
         if self.sidebar_selection_anchor == Some(removed.workspace.entity_id()) { self.sidebar_selection_anchor = None; }
-        if self.entries.is_empty() {
+        if self.workspace_state.entries.is_empty() {
             window.remove_window();
             return;
         }
         if closed.was_active {
-            self.select(self.active, window, cx);
+            self.select(self.workspace_state.active, window, cx);
         } else {
             cx.notify();
         }
@@ -2465,7 +2457,7 @@ impl WorkspaceWindow {
             if let Some(focus) = focus {
                 focus.focus(window);
             } else {
-                self.select(self.active, window, cx);
+                self.select(self.workspace_state.active, window, cx);
             }
             cx.notify();
         }
@@ -2478,10 +2470,10 @@ impl WorkspaceWindow {
         let focus = window.focused(cx);
         let workspaces = self.workspace_order(true)
             .into_iter()
-            .map(|index| { let entry = &self.entries[index]; (entry.workspace.entity_id(), entry.name.clone()) })
+            .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone()) })
             .collect();
-        let active_workspace = self.entries[self.active].workspace.entity_id();
-        let workspace = self.entries[self.active].workspace.read(cx);
+        let active_workspace = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
+        let workspace = self.workspace_state.entries[self.workspace_state.active].workspace.read(cx);
         let (tab, paste) = workspace.focused_index(window, cx)
             .map(|index| workspace.panes[index].read(cx).pending_palette_operations(cx))
             .unwrap_or_default();
@@ -2490,7 +2482,7 @@ impl WorkspaceWindow {
             split: workspace.spawning_split.is_some(), tab, paste,
         };
         let mut terminals = Vec::new();
-        for entry in &self.entries {
+        for entry in &self.workspace_state.entries {
             for (pane_index, pane) in entry.workspace.read(cx).panes.iter().enumerate() {
                 let pane = pane.read(cx);
                 for (tab, terminal) in pane.terminals.iter().enumerate() {
@@ -2516,7 +2508,7 @@ impl WorkspaceWindow {
             if handle == current_window { return None; }
             let root = handle.downcast::<Self>()?.read(cx).ok()?;
             if root.benchmark { return None; }
-            for entry in &root.entries {
+            for entry in &root.workspace_state.entries {
                 external_workspaces.push((handle, entry.workspace.entity_id(), format!("Window {} / Workspace: {}", index + 1, entry.name)));
                 for (pane_index, pane) in entry.workspace.read(cx).panes.iter().enumerate() {
                     let pane = pane.read(cx);
@@ -2527,7 +2519,7 @@ impl WorkspaceWindow {
                     }
                 }
             }
-            let name = &root.entries.get(root.active)?.name;
+            let name = &root.workspace_state.entries.get(root.workspace_state.active)?.name;
             Some((handle, format!("Window {} — {name}", index + 1)))
         }).collect();
         let palette = cx.new(|cx| {
@@ -2536,7 +2528,7 @@ impl WorkspaceWindow {
                 terminals,
                 windows,
                 external_workspaces,
-                self.groups.entries().iter().filter(|group| !group.members.contains(&active_workspace))
+                self.workspace_state.groups.entries().iter().filter(|group| !group.members.contains(&active_workspace))
                     .map(|group| (group.id, group.name.clone())).collect(),
                 active_workspace,
                 pending,
@@ -2548,11 +2540,11 @@ impl WorkspaceWindow {
     }
     fn show_workspace_merge_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(source) = self.entries.get(self.active).map(|entry| entry.workspace.entity_id()) else { return; };
+        let Some(source) = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id()) else { return; };
         let focus = window.focused(cx);
         let current = window.window_handle();
         let mut entries: Vec<_> = self.workspace_order(true).into_iter().filter_map(|index| {
-            let entry = &self.entries[index];
+            let entry = &self.workspace_state.entries[index];
             (entry.workspace.entity_id() != source).then(|| (current, entry.workspace.entity_id(), format!("This window / {}", entry.name)))
         }).collect();
         for (number, handle) in cx.windows().into_iter().enumerate() {
@@ -2561,7 +2553,7 @@ impl WorkspaceWindow {
             let Ok(root) = handle.read(cx) else { continue; };
             if root.benchmark { continue; }
             for index in root.workspace_order(true) {
-                let entry = &root.entries[index];
+                let entry = &root.workspace_state.entries[index];
                 entries.push((handle.into(), entry.workspace.entity_id(), format!("Window {} / {}", number + 1, entry.name)));
             }
         }
@@ -2575,18 +2567,18 @@ impl WorkspaceWindow {
             return Ok(());
         }
         self.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-        let source_index = self.entries.iter().position(|entry| entry.workspace.entity_id() == source_id)
+        let source_index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == source_id)
             .ok_or_else(|| anyhow::anyhow!("Source workspace closed"))?;
-        let source = self.entries[source_index].workspace.clone();
+        let source = self.workspace_state.entries[source_index].workspace.clone();
         let target = target.downcast::<Self>().ok_or_else(|| anyhow::anyhow!("Invalid destination window"))?;
         target.update(cx, |destination, window, cx| -> Result<()> {
             destination.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-            let index = destination.entries.iter().position(|entry| entry.workspace.entity_id() == destination_id)
+            let index = destination.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == destination_id)
                 .ok_or_else(|| anyhow::anyhow!("Destination workspace closed"))?;
             let count_tabs = |workspace: &Entity<Workspace>| workspace.read(cx).panes.iter().map(|pane| pane.read(cx).terminals.len()).sum::<usize>();
-            let tabs = count_tabs(&source) + destination.entries.iter().map(|entry| count_tabs(&entry.workspace)).sum::<usize>();
+            let tabs = count_tabs(&source) + destination.workspace_state.entries.iter().map(|entry| count_tabs(&entry.workspace)).sum::<usize>();
             anyhow::ensure!(tabs <= 256, "Destination window would exceed 256 terminals");
-            let workspace = destination.entries[index].workspace.clone();
+            let workspace = destination.workspace_state.entries[index].workspace.clone();
             workspace.update(cx, |workspace, cx| workspace.absorb_workspace(&source, true, window, cx))?;
             destination.select(index, window, cx);
             if activate { window.activate_window(); }
@@ -2600,10 +2592,10 @@ impl WorkspaceWindow {
     pub(super) fn merge_workspaces(&mut self, source: EntityId, destination: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         self.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
         anyhow::ensure!(source != destination, "Choose another workspace");
-        let source_index = self.entries.iter().position(|entry| entry.workspace.entity_id() == source).ok_or_else(|| anyhow::anyhow!("Source workspace closed"))?;
-        let destination_index = self.entries.iter().position(|entry| entry.workspace.entity_id() == destination).ok_or_else(|| anyhow::anyhow!("Destination workspace closed"))?;
-        let source = self.entries[source_index].workspace.clone();
-        let destination = self.entries[destination_index].workspace.clone();
+        let source_index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == source).ok_or_else(|| anyhow::anyhow!("Source workspace closed"))?;
+        let destination_index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == destination).ok_or_else(|| anyhow::anyhow!("Destination workspace closed"))?;
+        let source = self.workspace_state.entries[source_index].workspace.clone();
+        let destination = self.workspace_state.entries[destination_index].workspace.clone();
         destination.update(cx, |workspace, cx| workspace.absorb_workspace(&source, false, window, cx))?;
         self.select(destination_index, window, cx);
         self.close_workspace(source_index, window, cx);
@@ -2611,15 +2603,15 @@ impl WorkspaceWindow {
     }
     fn show_workspace_window_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(source) = self.entries.get(self.active).map(|entry| entry.workspace.entity_id()) else { return; };
+        let Some(source) = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id()) else { return; };
         let current = window.window_handle();
         let focus = window.focused(cx);
         let entries = cx.windows().into_iter().enumerate().filter_map(|(index, handle)| {
             if handle == current { return None; }
             let root = handle.downcast::<Self>()?.read(cx).ok()?;
             if root.benchmark { return None; }
-            let active = root.entries.get(root.active)?;
-            let count = root.entries.len();
+            let active = root.workspace_state.entries.get(root.workspace_state.active)?;
+            let count = root.workspace_state.entries.len();
             let subtitle = if root.automation_available(cx).is_err() {
                 format!("{count} workspaces · Destination is busy")
             } else {
@@ -2632,7 +2624,7 @@ impl WorkspaceWindow {
     }
     fn show_buffer_picker(&mut self, mode: command_palette::BufferMode, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let surface = self.entries.get(self.active).and_then(|entry| {
+        let surface = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
             let workspace = entry.workspace.read(cx);
             let index = workspace.focused_index(window, cx)?;
             workspace.panes[index].read(cx).active_terminal_id()
@@ -2736,7 +2728,7 @@ impl WorkspaceWindow {
                     let mut targets = Vec::new();
                     let mut inspected = 0;
                     let mut truncated = false;
-                    'workspaces: for entry in &this.entries {
+                    'workspaces: for entry in &this.workspace_state.entries {
                         for pane in &entry.workspace.read(cx).panes {
                             for terminal in &pane.read(cx).terminals {
                                 if inspected == 256 { truncated = true; break 'workspaces; }
@@ -2761,7 +2753,7 @@ impl WorkspaceWindow {
     }
     fn focus_search_result(&mut self, workspace: EntityId, terminal: EntityId, query: &str, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         self.automation_available(cx).map_err(|error| anyhow::anyhow!(error.message))?;
-        let target = self.entries.iter().find(|entry| entry.workspace.entity_id() == workspace)
+        let target = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == workspace)
             .and_then(|entry| entry.workspace.read(cx).panes.iter().find_map(|pane|
                 pane.read(cx).terminals.iter().find(|entity| entity.entity_id() == terminal).cloned()))
             .ok_or_else(|| anyhow::anyhow!("Terminal moved or closed; search again"))?;
@@ -2780,7 +2772,7 @@ impl WorkspaceWindow {
     }
     fn collect_terminal_search_jobs(&self, target: Option<AnyWindowHandle>, label: &str, jobs: &mut Vec<terminal_search::Job>, extra: &mut usize, cx: &App) {
         for index in self.workspace_order(true) {
-            let entry = &self.entries[index];
+            let entry = &self.workspace_state.entries[index];
             for pane in &entry.workspace.read(cx).panes {
                 for (tab, terminal) in pane.read(cx).terminals.iter().enumerate() {
                     if jobs.len() == terminal_search::MAX_TERMINALS { *extra += 1; continue; }
@@ -2998,7 +2990,7 @@ impl WorkspaceWindow {
                     }
                     command_palette::PaletteEvent::SelectWorkspace(id) => {
                         if let Some(index) = this
-                            .entries
+                            .workspace_state.entries
                             .iter()
                             .position(|entry| entry.workspace.entity_id() == *id)
                         {
@@ -3051,7 +3043,7 @@ impl WorkspaceWindow {
                         let result = target.downcast::<Self>().ok_or_else(|| anyhow::anyhow!("window unavailable"))
                             .and_then(|target| target.update(cx, |destination, window, cx| -> Result<()> {
                                 destination.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-                                let index = destination.entries.iter().position(|entry| entry.workspace.entity_id() == *workspace)
+                                let index = destination.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == *workspace)
                                     .ok_or_else(|| anyhow::anyhow!("workspace moved or closed"))?;
                                 destination.select(index, window, cx);
                                 window.activate_window();
@@ -3068,14 +3060,14 @@ impl WorkspaceWindow {
         cx.notify();
     }
     fn move_tab_to_window_workspace(&mut self, target: AnyWindowHandle, destination_id: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
-        let workspace = self.entries.get(self.active).ok_or_else(|| anyhow::anyhow!("source workspace closed"))?.workspace.clone();
+        let workspace = self.workspace_state.entries.get(self.workspace_state.active).ok_or_else(|| anyhow::anyhow!("source workspace closed"))?.workspace.clone();
         let index = workspace.read(cx).focused_index(window, cx).ok_or_else(|| anyhow::anyhow!("no focused pane"))?;
         let id = workspace.read(cx).panes[index].read(cx).active_terminal_id().ok_or_else(|| anyhow::anyhow!("source tab closed"))?;
         self.move_surface_to_workspace(id, target, destination_id, true, window, cx)
     }
     pub(super) fn move_surface_to_workspace(&mut self, id: EntityId, target: AnyWindowHandle, destination_id: EntityId, activate: bool, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         self.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-        let (workspace, source) = self.entries.iter().find_map(|entry| {
+        let (workspace, source) = self.workspace_state.entries.iter().find_map(|entry| {
             entry.workspace.read(cx).panes.iter().find(|pane| pane.read(cx).terminals.iter().any(|terminal| terminal.entity_id() == id))
                 .map(|pane| (entry.workspace.clone(), pane.clone()))
         }).ok_or_else(|| anyhow::anyhow!("source tab closed"))?;
@@ -3091,9 +3083,9 @@ impl WorkspaceWindow {
         // GPUI updates are synchronous; no other command can interleave here.
         target.update(cx, move |destination, window, cx| -> Result<()> {
             destination.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-            let index = destination.entries.iter().position(|entry| entry.workspace.entity_id() == destination_id)
+            let index = destination.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == destination_id)
                 .ok_or_else(|| anyhow::anyhow!("destination workspace closed"))?;
-            let entry = &destination.entries[index];
+            let entry = &destination.workspace_state.entries[index];
             let workspace = entry.workspace.clone();
             let pane = workspace.read(cx).panes.iter()
                 .find(|pane| Some(pane.entity_id()) == entry.last_pane)
@@ -3106,9 +3098,9 @@ impl WorkspaceWindow {
                 cx.notify();
             });
             destination.activate_workspace(index);
-            destination.entries[index].last_pane = Some(pane.entity_id());
+            destination.workspace_state.entries[index].last_pane = Some(pane.entity_id());
             destination.scroll_to_workspace(index);
-            window.set_window_title(&format!("{} — rmux", destination.entries[index].name));
+            window.set_window_title(&format!("{} — rmux", destination.workspace_state.entries[index].name));
             pane.update(cx, |pane, cx| pane.append_tabs(vec![tab], 0, window, cx));
             cx.notify();
             Ok(())
@@ -3116,7 +3108,7 @@ impl WorkspaceWindow {
         source.update(cx, |pane, cx| pane.take_tab(id, cx));
         if source.read(cx).terminals.is_empty() {
             workspace.update(cx, |workspace, cx| workspace.remove_pane(&source, cx));
-        } else if self.entries.get(self.active).is_some_and(|entry| entry.workspace == workspace) {
+        } else if self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| entry.workspace == workspace) {
             source.read(cx).focus(window, cx);
         }
         if activate { let _ = target.update(cx, |_, window, _| window.activate_window()); }
@@ -3124,16 +3116,16 @@ impl WorkspaceWindow {
         Ok(())
     }
     fn move_tab_next_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.entries.len() < 2 {
+        if self.workspace_state.entries.len() < 2 {
             return;
         }
         let order = self.workspace_order(true);
-        let Some(position) = order.iter().position(|index| *index == self.active) else { return; };
+        let Some(position) = order.iter().position(|index| *index == self.workspace_state.active) else { return; };
         let destination = order[(position + 1) % order.len()];
-        self.move_tab_to_workspace(self.entries[destination].workspace.entity_id(), window, cx);
+        self.move_tab_to_workspace(self.workspace_state.entries[destination].workspace.entity_id(), window, cx);
     }
     fn move_tab_to_workspace(&mut self, id: EntityId, window: &mut Window, cx: &mut Context<Self>) {
-        let source_workspace = self.entries[self.active].workspace.clone();
+        let source_workspace = self.workspace_state.entries[self.workspace_state.active].workspace.clone();
         let Some(source_index) = source_workspace.read(cx).focused_index(window, cx) else {
             return;
         };
@@ -3159,18 +3151,18 @@ impl WorkspaceWindow {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if self.entries.len() < 2 || cx.global::<Shutdowns>().quitting {
+        if self.workspace_state.entries.len() < 2 || cx.global::<Shutdowns>().quitting {
             return;
         }
         let Some(destination) = self
-            .entries
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == destination_id)
         else {
             return;
         };
         let Some(origin) = self
-            .entries
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == workspace_id)
         else {
@@ -3179,7 +3171,7 @@ impl WorkspaceWindow {
         if destination == origin {
             return;
         }
-        let source_workspace = self.entries[origin].workspace.clone();
+        let source_workspace = self.workspace_state.entries[origin].workspace.clone();
         let Some(source) = source_workspace
             .read(cx)
             .panes
@@ -3189,7 +3181,7 @@ impl WorkspaceWindow {
         else {
             return;
         };
-        let entry = &self.entries[destination];
+        let entry = &self.workspace_state.entries[destination];
         let destination_workspace = entry.workspace.clone();
         let Some(target) = destination_workspace
             .read(cx)
@@ -3208,7 +3200,7 @@ impl WorkspaceWindow {
             cx.notify();
             return;
         }
-        self.entries[origin].last_pane = Some(source.entity_id());
+        self.workspace_state.entries[origin].last_pane = Some(source.entity_id());
         let Some(tab) = source.update(cx, |pane, cx| pane.take_tab(terminal, cx)) else {
             return;
         };
@@ -3225,27 +3217,27 @@ impl WorkspaceWindow {
         // briefly focusing (and acknowledging) the destination's old active tab.
         self.rename = None;
         self.activate_workspace(destination);
-        self.entries[destination].last_pane = Some(target.entity_id());
+        self.workspace_state.entries[destination].last_pane = Some(target.entity_id());
         self.scroll_to_workspace(destination);
-        window.set_window_title(&format!("{} — rmux", self.entries[destination].name));
+        window.set_window_title(&format!("{} — rmux", self.workspace_state.entries[destination].name));
         target.update(cx, |pane, cx| pane.append_tabs(vec![tab], 0, window, cx));
         cx.notify();
     }
 
     fn next_unread(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let order = self.workspace_order(true);
-        let start = order.iter().position(|index| *index == self.active).unwrap_or(0);
+        let start = order.iter().position(|index| *index == self.workspace_state.active).unwrap_or(0);
         let target = order.iter().cycle().skip(start).take(order.len()).find_map(|index| {
-            let workspace = self.entries[*index].workspace.read(cx);
+            let workspace = self.workspace_state.entries[*index].workspace.read(cx);
             workspace.panes.iter().find_map(|pane| {
                 pane.read(cx).terminals.iter()
                     .find(|terminal| terminal.read(cx).attention.any())
-                    .map(|terminal| (self.entries[*index].workspace.entity_id(), terminal.entity_id()))
+                    .map(|terminal| (self.workspace_state.entries[*index].workspace.entity_id(), terminal.entity_id()))
             })
         });
         let Some((workspace, terminal)) = target else { return; };
-        if let Some(id) = self.groups.containing(workspace).map(|group| group.id) {
-            self.groups.get_mut(id).unwrap().collapsed = false;
+        if let Some(id) = self.workspace_state.groups.containing(workspace).map(|group| group.id) {
+            self.workspace_state.groups.get_mut(id).unwrap().collapsed = false;
         }
         // Shared direct focus avoids acknowledging a previously active tab,
         // reveals the target pane under zoom and remembers the destination.
@@ -3288,14 +3280,11 @@ impl WorkspaceWindow {
             workspace_menu: None,
             workspace_menu_blur: None,
             rename: None,
-            entries: Vec::new(),
-            active: snapshot.active_workspace,
-            groups: workspace_groups::Groups::default(),
+            workspace_state: rmux_core::workspace_lifecycle::State { active: snapshot.active_workspace, ..Default::default() },
             sidebar_selection: Vec::new(),
             sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
-            previous_workspace: Default::default(),
             close_prompt: None,
             window_close_prompt: false,
             close_handler_installed: false,
@@ -3332,7 +3321,7 @@ impl WorkspaceWindow {
             let last_pane = Some(workspace.read(cx).panes[saved.zoomed_pane.unwrap_or(saved.active_pane)].entity_id());
             let closed = Self::observe_workspace(&workspace, window, cx);
             let metadata = Self::observe_metadata(&workspace, window, cx);
-            this.entries.push(Entry {
+            this.workspace_state.entries.push(Entry {
                 workspace,
                 name: saved.name,
                 description: saved.description,
@@ -3346,13 +3335,13 @@ impl WorkspaceWindow {
         }
         // Resolve persisted indices to live workspace identities.
         let groups = snapshot.groups.iter().map(|group| group.map_members(|index| {
-            Ok(this.entries[*index].workspace.entity_id())
+            Ok(this.workspace_state.entries[*index].workspace.entity_id())
         })).collect::<Result<Vec<_>>>().expect("validated group indices");
-        this.groups = workspace_groups::Groups::from_entries(groups, |_| true).expect("validated groups");
+        this.workspace_state.groups = workspace_groups::Groups::from_entries(groups, |_| true).expect("validated groups");
         // Saved entry order is authoritative; sidebar pin tiers are a projection.
         // Terminal constructors may focus the final prepared tab. Establish the
         // saved focus before select() records the current workspace's focus.
-        let entry = &this.entries[this.active];
+        let entry = &this.workspace_state.entries[this.workspace_state.active];
         let workspace = entry.workspace.read(cx);
         if let Some(pane) = workspace
             .panes
@@ -3361,13 +3350,13 @@ impl WorkspaceWindow {
         {
             pane.read(cx).focus(window, cx);
         }
-        this.select(this.active, window, cx);
+        this.select(this.workspace_state.active, window, cx);
         // Selecting a hidden member normally expands its group. Startup instead
         // preserves the saved collapsed state while keeping that terminal active.
         for saved in &snapshot.groups {
-            if let Some(group) = this.groups.get_mut(saved.id) { group.collapsed = saved.collapsed; }
+            if let Some(group) = this.workspace_state.groups.get_mut(saved.id) { group.collapsed = saved.collapsed; }
         }
-        this.scroll_to_workspace(this.active);
+        this.scroll_to_workspace(this.workspace_state.active);
         this
     }
 
@@ -3503,14 +3492,11 @@ impl WorkspaceWindow {
             workspace_menu: None,
             workspace_menu_blur: None,
             rename: None,
-            entries: Vec::new(),
-            active: 0,
-            groups: workspace_groups::Groups::default(),
+            workspace_state: Default::default(),
             sidebar_selection: Vec::new(),
             sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
-            previous_workspace: Default::default(),
             close_prompt: None,
             window_close_prompt: false,
             close_handler_installed: false,
@@ -3529,7 +3515,7 @@ impl WorkspaceWindow {
     }
 
     fn remember_focus(&mut self, window: &Window, cx: &App) {
-        if let Some(entry) = self.entries.get_mut(self.active) {
+        if let Some(entry) = self.workspace_state.entries.get_mut(self.workspace_state.active) {
             let workspace = entry.workspace.read(cx);
             if let Some(index) = workspace.focused_index(window, cx) {
                 entry.last_pane = Some(workspace.panes[index].entity_id());
@@ -3540,17 +3526,17 @@ impl WorkspaceWindow {
     pub(super) fn layout_snapshot(&mut self, window: &Window, cx: &App) -> Result<snapshot::WindowSnapshot> {
         self.remember_focus(window, cx);
         Ok(snapshot::WindowSnapshot {
-                groups: self.groups.entries().iter().map(|group| group.map_members(|id| {
-                    self.entries.iter().position(|entry| entry.workspace.entity_id() == *id)
+                groups: self.workspace_state.groups.entries().iter().map(|group| group.map_members(|id| {
+                    self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == *id)
                         .ok_or_else(|| anyhow::anyhow!("group references a missing workspace"))
                 })).collect::<Result<_>>()?,
                 geometry: Some(window_geometry::Geometry::capture(window)),
                 version: 1,
                 sidebar: self.sidebar,
                 sidebar_width: self.sidebar_width,
-                active_workspace: self.active,
+                active_workspace: self.workspace_state.active,
                 workspaces: self
-                    .entries
+                    .workspace_state.entries
                     .iter()
                     .map(|entry| {
                         let workspace = entry.workspace.read(cx);
@@ -3657,7 +3643,7 @@ impl WorkspaceWindow {
     }
 
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.entries.len() {
+        if index >= self.workspace_state.entries.len() {
             return;
         }
         self.record_terminal_focus(window, cx);
@@ -3665,7 +3651,7 @@ impl WorkspaceWindow {
         self.remember_focus(window, cx);
         self.activate_workspace(index);
         self.scroll_to_workspace(index);
-        let entry = &self.entries[index];
+        let entry = &self.workspace_state.entries[index];
         window.set_window_title(&format!("{} — rmux", entry.name));
         let workspace = entry.workspace.read(cx);
         if let Some(pane) = workspace
@@ -3702,15 +3688,15 @@ impl WorkspaceWindow {
     }
 
     fn start_workspace(&mut self, directory: Option<std::path::PathBuf>, window: &mut Window, cx: &mut Context<Self>) {
-        if self.command_launching || self.automation_available(cx).is_err() || self.entries.len() >= 64 { return; }
-        let Some(entry) = self.entries.get(self.active) else { return; };
+        if self.command_launching || self.automation_available(cx).is_err() || self.workspace_state.entries.len() >= 64 { return; }
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let origin = entry.workspace.entity_id();
-        let group = self.groups.containing(origin);
+        let group = self.workspace_state.groups.containing(origin);
         let group_id = group.map(|group| group.id);
         let placement = if group.is_some() { cx.global::<Preferences>().group_new_workspace_placement }
             else { cx.global::<Preferences>().new_workspace_placement };
         let directory_entry = group.and_then(|group| group.members.first())
-            .and_then(|id| self.entries.iter().find(|entry| entry.workspace.entity_id() == *id)).unwrap_or(entry);
+            .and_then(|id| self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == *id)).unwrap_or(entry);
         let directory = directory.or_else(|| group.and_then(|group| group.cwd.clone())).or_else(|| {
             let workspace = directory_entry.workspace.read(cx);
             workspace.panes.iter().find(|pane| Some(pane.entity_id()) == directory_entry.last_pane)
@@ -3754,9 +3740,9 @@ impl WorkspaceWindow {
                 if matches!(this.notice.as_deref(), Some("Starting workspace…" | "Canceling workspace startup…")) { this.notice = None; }
                 if was_canceled { cx.notify(); return; }
                 match result {
-                    Ok(prepared) if this.automation_available(cx).is_ok() && this.entries.len() < 64
-                        && this.entries.iter().any(|entry| entry.workspace.entity_id() == origin)
-                        && this.groups.containing(origin).map(|group| group.id) == group_id => {
+                    Ok(prepared) if this.automation_available(cx).is_ok() && this.workspace_state.entries.len() < 64
+                        && this.workspace_state.entries.iter().any(|entry| entry.workspace.entity_id() == origin)
+                        && this.workspace_state.groups.containing(origin).map(|group| group.id) == group_id => {
                         let focus = focus.as_ref().is_some_and(|focus| focus.is_focused(window));
                         let settings = cx.global::<Preferences>();
                         let seed = TerminalSeed::Ready(prepared, CellMetrics::new(settings.font_size), settings.font_family.clone().into());
@@ -3782,20 +3768,20 @@ impl WorkspaceWindow {
             return None;
         }
         let origin_index = match origin {
-            Some(id) => self.entries.iter().position(|entry| entry.workspace.entity_id() == id)?,
-            None => self.active,
+            Some(id) => self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)?,
+            None => self.workspace_state.active,
         };
         if focus { self.remember_focus(window, cx); }
-        let parent_group = self.entries.get(origin_index).filter(|_| inherit_group).and_then(|entry| {
+        let parent_group = self.workspace_state.entries.get(origin_index).filter(|_| inherit_group).and_then(|entry| {
             let member = entry.workspace.entity_id();
-            self.groups.containing(member).map(|group| (group.id, member))
+            self.workspace_state.groups.containing(member).map(|group| (group.id, member))
         });
         let directory_entry = parent_group
-            .and_then(|(_, member)| self.groups.containing(member))
+            .and_then(|(_, member)| self.workspace_state.groups.containing(member))
             .and_then(|group| group.members.first())
-            .and_then(|anchor| self.entries.iter().find(|entry| entry.workspace.entity_id() == *anchor))
-            .or_else(|| self.entries.get(origin_index));
-        let directory = directory_override.or_else(|| parent_group.and_then(|(_, member)| self.groups.containing(member)).and_then(|group| group.cwd.clone())).or_else(|| directory_entry.and_then(|entry| {
+            .and_then(|anchor| self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == *anchor))
+            .or_else(|| self.workspace_state.entries.get(origin_index));
+        let directory = directory_override.or_else(|| parent_group.and_then(|(_, member)| self.workspace_state.groups.containing(member)).and_then(|group| group.cwd.clone())).or_else(|| directory_entry.and_then(|entry| {
             let workspace = entry.workspace.read(cx);
             workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane)
                 .or_else(|| workspace.panes.first())
@@ -3822,7 +3808,7 @@ impl WorkspaceWindow {
         let closed = Self::observe_workspace(&workspace, window, cx);
         let metadata = Self::observe_metadata(&workspace, window, cx);
         let last_pane = workspace.read(cx).panes.last().map(Entity::entity_id);
-        let origin = self.entries.get(origin_index).map(|entry| entry.workspace.entity_id());
+        let origin = self.workspace_state.entries.get(origin_index).map(|entry| entry.workspace.entity_id());
         let placement = placement.unwrap_or(if parent_group.is_some() {
             cx.global::<Preferences>().group_new_workspace_placement
         } else { cx.global::<Preferences>().new_workspace_placement });
@@ -3837,8 +3823,7 @@ impl WorkspaceWindow {
             _closed: closed,
             _metadata: metadata,
         };
-        let index = match rmux_core::workspace_lifecycle::insert(
-            &mut self.entries, &mut self.active, &mut self.groups, entry,
+        let index = match self.workspace_state.insert(entry,
             rmux_core::workspace_lifecycle::Insertion { origin, inherit_group, placement },
             |entry| (entry.workspace.entity_id(), entry.pinned),
         ) {
@@ -3848,8 +3833,8 @@ impl WorkspaceWindow {
         self.next_number += 1;
         if focus {
         self.activate_workspace(index);
-        self.scroll_to_workspace(self.active);
-        window.set_window_title(&format!("{} — rmux", self.entries[self.active].name));
+        self.scroll_to_workspace(self.workspace_state.active);
+        window.set_window_title(&format!("{} — rmux", self.workspace_state.entries[self.workspace_state.active].name));
         }
         cx.notify();
         Some(index)
@@ -3865,7 +3850,7 @@ impl WorkspaceWindow {
             window,
             |this, workspace, _: &WorkspaceEmpty, window, cx| {
                 if let Some(index) = this
-                    .entries
+                    .workspace_state.entries
                     .iter()
                     .position(|entry| &entry.workspace == workspace)
                 {
@@ -3876,7 +3861,7 @@ impl WorkspaceWindow {
     }
 
     fn edit_metadata(&mut self, field: MetadataField, window: &mut Window, cx: &mut Context<Self>) {
-        let Some(entry) = self.entries.get(self.active) else {
+        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else {
             return;
         };
         if let Some((_, input, _)) = &self.rename {
@@ -3886,15 +3871,15 @@ impl WorkspaceWindow {
         let id = entry.workspace.entity_id();
         let name = match field {
             MetadataField::GroupColor => {
-                let Some(group) = self.groups.containing(id) else { return; };
+                let Some(group) = self.workspace_state.groups.containing(id) else { return; };
                 group.color.map(|color| format!("#{color:06X}")).unwrap_or_default()
             }
             MetadataField::GroupIcon => {
-                let Some(group) = self.groups.containing(id) else { return; };
+                let Some(group) = self.workspace_state.groups.containing(id) else { return; };
                 group.icon.clone().unwrap_or_default()
             }
             MetadataField::GroupName => {
-                let Some(group) = self.groups.containing(id) else { return; };
+                let Some(group) = self.workspace_state.groups.containing(id) else { return; };
                 group.name.clone()
             }
             MetadataField::Name => entry.name.clone(),
@@ -3926,8 +3911,8 @@ impl WorkspaceWindow {
                             }
                         } else { None };
                         if matches!(field, MetadataField::GroupName | MetadataField::GroupColor | MetadataField::GroupIcon) {
-                            if let Some(group_id) = this.groups.containing(id).map(|group| group.id) {
-                                let group = this.groups.get_mut(group_id).unwrap();
+                            if let Some(group_id) = this.workspace_state.groups.containing(id).map(|group| group.id) {
+                                let group = this.workspace_state.groups.get_mut(group_id).unwrap();
                                 match field {
                                     MetadataField::GroupName => if let Some(name) = normalized_workspace_name(text) { group.name = name; },
                                     MetadataField::GroupColor => group.color = color,
@@ -3936,7 +3921,7 @@ impl WorkspaceWindow {
                                 }
                             }
                         }
-                        if let Some(entry) = this.entries.iter_mut().find(|entry| entry.workspace.entity_id() == id) {
+                        if let Some(entry) = this.workspace_state.entries.iter_mut().find(|entry| entry.workspace.entity_id() == id) {
                             match field {
                                 MetadataField::GroupName | MetadataField::GroupColor | MetadataField::GroupIcon => {}
                                 MetadataField::Icon => entry.icon = (!text.is_empty()).then(|| text.to_owned()),
@@ -3953,7 +3938,7 @@ impl WorkspaceWindow {
                     text_field::EditEvent::Changed(_) => { cx.notify(); return; },
                 }
                 this.rename = None;
-                this.select(this.active, window, cx);
+                this.select(this.workspace_state.active, window, cx);
             },
         )
         .detach();
@@ -3964,44 +3949,44 @@ impl WorkspaceWindow {
     }
 
     fn cycle(&mut self, delta: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.entries.is_empty() {
+        if self.workspace_state.entries.is_empty() {
             return;
         }
         let order = self.workspace_order(true);
-        if let Some(next) = workspace_groups::cycle_target(&order, self.active, delta) {
+        if let Some(next) = workspace_groups::cycle_target(&order, self.workspace_state.active, delta) {
             self.select(next, window, cx);
         }
     }
 
     fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
-        if let Some(entry) = self.entries.get(self.active) {
+        if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
             let id = entry.workspace.entity_id();
-            if self.groups.containing(id).is_some_and(|group| group.members.first() != Some(&id)) {
-                if self.groups.reorder_member(id, delta) {
-                    self.scroll_to_workspace(self.active);
+            if self.workspace_state.groups.containing(id).is_some_and(|group| group.members.first() != Some(&id)) {
+                if self.workspace_state.groups.reorder_member(id, delta) {
+                    self.scroll_to_workspace(self.workspace_state.active);
                     cx.notify();
                 }
                 return;
             }
         }
         let top: Vec<_> = self.sidebar_order().into_iter().filter(|index| {
-            let id = self.entries[*index].workspace.entity_id();
-            self.groups.containing(id).is_none_or(|group| group.members.first() == Some(&id))
+            let id = self.workspace_state.entries[*index].workspace.entity_id();
+            self.workspace_state.groups.containing(id).is_none_or(|group| group.members.first() == Some(&id))
         }).collect();
-        let Some(position) = top.iter().position(|index| *index == self.active) else { return; };
+        let Some(position) = top.iter().position(|index| *index == self.workspace_state.active) else { return; };
         let next = position as isize + delta;
         if next < 0 || next >= top.len() as isize { return; }
         let next = top[next as usize];
-        if self.top_level_pinned(next) != self.top_level_pinned(self.active) { return; }
-        self.entries.swap(self.active, next);
-        self.active = next;
+        if self.top_level_pinned(next) != self.top_level_pinned(self.workspace_state.active) { return; }
+        self.workspace_state.entries.swap(self.workspace_state.active, next);
+        self.workspace_state.active = next;
         self.scroll_to_workspace(next);
         cx.notify();
     }
 
     fn accepts_tab_drop(&self, item: &drag_item::DragItem, target: EntityId, cx: &App) -> bool {
         item.scope != target
-            && self.entries.iter().any(|entry| {
+            && self.workspace_state.entries.iter().any(|entry| {
                 entry.workspace.entity_id() == item.scope
                     && entry.workspace.read(cx).panes.iter().any(|pane| {
                         pane.entity_id() == item.container
@@ -4027,22 +4012,22 @@ impl WorkspaceWindow {
             return;
         }
         let Some(from) = self
-            .entries
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == item.item)
         else {
             return;
         };
         let Some(to) = self
-            .entries
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == target)
         else {
             return;
         };
-        let source_is_anchor = self.groups.containing(item.item).is_some_and(|group| group.members.first() == Some(&item.item));
-        if self.groups.containing(target).is_some() && !source_is_anchor {
-            match self.groups.place_member_after(item.item, target) {
+        let source_is_anchor = self.workspace_state.groups.containing(item.item).is_some_and(|group| group.members.first() == Some(&item.item));
+        if self.workspace_state.groups.containing(target).is_some() && !source_is_anchor {
+            match self.workspace_state.groups.place_member_after(item.item, target) {
                 Ok(()) => self.select(from, window, cx),
                 Err(error) => { self.notice = Some(format!("Move group member: {error}")); cx.notify(); }
             }
@@ -4050,12 +4035,12 @@ impl WorkspaceWindow {
         }
         // A child dropped onto a standalone workspace leaves its group. Header
         // drags keep their group intact and continue through top-level ordering.
-        if self.groups.containing(item.item).is_some_and(|group| group.members.first() != Some(&item.item)) {
-            if self.entries[from].pinned != self.top_level_pinned(to) { return; }
-            self.groups.remove(item.item);
+        if self.workspace_state.groups.containing(item.item).is_some_and(|group| group.members.first() != Some(&item.item)) {
+            if self.workspace_state.entries[from].pinned != self.top_level_pinned(to) { return; }
+            self.workspace_state.groups.remove(item.item);
         }
-        let to = self.groups.containing(target).and_then(|group| group.members.first())
-            .and_then(|anchor| self.entries.iter().position(|entry| entry.workspace.entity_id() == *anchor))
+        let to = self.workspace_state.groups.containing(target).and_then(|group| group.members.first())
+            .and_then(|anchor| self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == *anchor))
             .unwrap_or(to);
         if self.top_level_pinned(from) != self.top_level_pinned(to) {
             cx.notify();
@@ -4063,13 +4048,13 @@ impl WorkspaceWindow {
         }
         self.remember_focus(window, cx);
         // Preserve the old active index until select() records/restores focus.
-        let active = self.entries[self.active].workspace.entity_id();
+        let active = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
         if from != to {
-            let entry = self.entries.remove(from);
-            self.entries.insert(to, entry);
+            let entry = self.workspace_state.entries.remove(from);
+            self.workspace_state.entries.insert(to, entry);
         }
-        self.active = self
-            .entries
+        self.workspace_state.active = self
+            .workspace_state.entries
             .iter()
             .position(|entry| entry.workspace.entity_id() == active)
             .unwrap_or(to);
@@ -4081,7 +4066,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
     fn run_workspace_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
-            CommandId::CloseWorkspace => self.request_close_workspace(self.active, window, cx),
+            CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::UngroupWorkspaces => self.ungroup_active(cx),
@@ -4089,7 +4074,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
             CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
             CommandId::LastWorkspace => self.last_workspace(window, cx),
             CommandId::ToggleSidebar => {
-                if self.rename.is_some() { self.select(self.active, window, cx); }
+                if self.rename.is_some() { self.select(self.workspace_state.active, window, cx); }
                 self.sidebar = !self.sidebar;
                 self.sidebar_drag = None;
                 cx.notify();
@@ -4114,12 +4099,12 @@ impl Render for WorkspaceWindow {
         let navigation_order = self.workspace_order(true);
         // Read cached notification state once per workspace, including hidden
         // members. This neither touches terminal parser locks nor acknowledges it.
-        let unread_workspaces: std::collections::HashSet<_> = self.entries.iter()
+        let unread_workspaces: std::collections::HashSet<_> = self.workspace_state.entries.iter()
             .filter(|entry| entry.workspace.read(cx).needs_attention(cx))
             .map(|entry| entry.workspace.entity_id()).collect();
         let mut notification_previews = std::collections::HashMap::new();
         if self.sidebar {
-            for entry in &self.entries {
+            for entry in &self.workspace_state.entries {
                 let preview = entry.workspace.read(cx).panes.iter().flat_map(|pane| {
                     pane.read(cx).terminals.iter().filter_map(|terminal| {
                         terminal.read(cx).notifications.unread_preview()
@@ -4130,8 +4115,8 @@ impl Render for WorkspaceWindow {
             }
         }
         let current = self
-            .entries
-            .get(self.active)
+            .workspace_state.entries
+            .get(self.workspace_state.active)
             .map(|entry| entry.workspace.clone());
         if let Some(previous) = self
             .rendered_workspace
@@ -4207,7 +4192,7 @@ impl Render for WorkspaceWindow {
                 cx.notify();
             }))
             .on_action(cx.listener(|this, _: &BrowseTerminalFiles, window, cx| {
-                let directory = this.entries.get(this.active).and_then(|entry| {
+                let directory = this.workspace_state.entries.get(this.workspace_state.active).and_then(|entry| {
                     let workspace = entry.workspace.read(cx);
                     workspace.focused_index(window, cx).and_then(|index| workspace.panes.get(index))
                         .and_then(|pane| pane.read(cx).cached_directory(cx))
@@ -4218,7 +4203,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, action: &BrowseDirectory, window, cx| this.browse_directory(action.path.clone(), window, cx)))
             .on_action(cx.listener(|this, action: &NewWorkspaceInDirectory, window, cx| {
                 if this.automation_available(cx).is_err() { return; }
-                if this.entries.len() >= 64 {
+                if this.workspace_state.entries.len() >= 64 {
                     this.notice = Some("Window workspace limit reached".into()); cx.notify(); return;
                 }
                 this.start_workspace(Some(action.path.clone()), window, cx);
@@ -4237,7 +4222,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ShowSshConnection, window, cx| {
                 if this.automation_available(cx).is_err() || this.command_launching { return; }
                 let focus = window.focused(cx);
-                let destination = this.entries.get(this.active).and_then(|entry| {
+                let destination = this.workspace_state.entries.get(this.workspace_state.active).and_then(|entry| {
                     let workspace = entry.workspace.read(cx);
                     let pane = workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane)
                         .or_else(|| workspace.panes.first())?.read(cx);
@@ -4355,7 +4340,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
             .on_action(cx.listener(|this, _: &RenameWorkspace, window, cx| this.edit_metadata(MetadataField::Name, window, cx)))
             .on_action(cx.listener(|this, _: &ShowWorkspaceMenu, window, cx| {
-                if let Some(entry) = this.entries.get(this.active) {
+                if let Some(entry) = this.workspace_state.entries.get(this.workspace_state.active) {
                     let target = entry.workspace.entity_id();
                     let bounds = this.workspace_scroll.bounds();
                     this.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
@@ -4435,8 +4420,8 @@ impl Render for WorkspaceWindow {
                                 .track_scroll(&self.workspace_scroll)
                                 .children(self.sidebar_order().into_iter().map(|index| {
                                     let position = navigation_order.iter().position(|candidate| *candidate == index).unwrap_or(index);
-                                    let entry = &self.entries[index];
-                                    let group = self.groups.containing(entry.workspace.entity_id());
+                                    let entry = &self.workspace_state.entries[index];
+                                    let group = self.workspace_state.groups.containing(entry.workspace.entity_id());
                                     let header = group.filter(|group| group.members.first() == Some(&entry.workspace.entity_id()));
                                     let unread_count = header.map(|group| group.members.iter().filter(|id| unread_workspaces.contains(id)).count())
                                         .unwrap_or_else(|| usize::from(unread_workspaces.contains(&entry.workspace.entity_id())));
@@ -4455,7 +4440,7 @@ impl Render for WorkspaceWindow {
                                     let container = cx.entity_id();
                                     let target = entry.workspace.entity_id();
                                     let menu_group = header.map(|group| group.id);
-                                    let selected = self.sidebar_selection.contains(&target) || index == self.active || header.is_some_and(|group| group.collapsed && self.entries.get(self.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
+                                    let selected = self.sidebar_selection.contains(&target) || index == self.workspace_state.active || header.is_some_and(|group| group.collapsed && self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
                                     let title_hint: SharedString = display_name.clone().into();
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
@@ -4474,7 +4459,7 @@ impl Render for WorkspaceWindow {
                                         }))
                                         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                             if !event.standard_click() { return; }
-                                            let Some(index) = this.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
+                                            let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
                                             if this.rename.is_none() {
                                                 if let ClickEvent::Mouse(mouse) = event {
                                                     let modifiers = mouse.down.modifiers;
@@ -4488,7 +4473,7 @@ impl Render for WorkspaceWindow {
                                                 this.sidebar_selection_anchor = Some(target);
                                             }
                                             if let Some((id, input, _)) = &this.rename
-                                                && this.entries.get(index).is_some_and(|entry| {
+                                                && this.workspace_state.entries.get(index).is_some_and(|entry| {
                                                     entry.workspace.entity_id() == *id
                                                 })
                                             {
@@ -4496,7 +4481,7 @@ impl Render for WorkspaceWindow {
                                             } else {
                                                 this.select(index, window, cx);
                                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) {
-                                                    let field = if this.groups.containing(target).is_some_and(|group| group.members.first() == Some(&target)) { MetadataField::GroupName } else { MetadataField::Name };
+                                                    let field = if this.workspace_state.groups.containing(target).is_some_and(|group| group.members.first() == Some(&target)) { MetadataField::GroupName } else { MetadataField::Name };
                                                     this.edit_metadata(field, window, cx);
                                                 }
                                             }
@@ -4531,7 +4516,7 @@ impl Render for WorkspaceWindow {
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                                 if !event.standard_click() { return; }
                                                                 cx.stop_propagation();
-                                                                if let Some(group) = this.groups.get_mut(id) { group.collapsed = !group.collapsed; }
+                                                                if let Some(group) = this.workspace_state.groups.get_mut(id) { group.collapsed = !group.collapsed; }
                                                                 cx.notify();
                                                             })))
                                                     })
@@ -4579,13 +4564,13 @@ impl Render for WorkspaceWindow {
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                                                 if !event.standard_click() || this.automation_available(cx).is_err() { return; }
                                                                 cx.stop_propagation();
-                                                                if let Some(index) = this.entries.iter().position(|entry| entry.workspace.entity_id() == target) {
+                                                                if let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) {
                                                                     this.select(index, window, cx);
                                                                     this.start_workspace(None, window, cx);
                                                                 }
                                                             }))
                                                     ))
-                                                    .when(position < 8 || position + 1 == self.entries.len(), |row| {
+                                                    .when(position < 8 || position + 1 == self.workspace_state.entries.len(), |row| {
                                                         let number = if position < 8 { position + 1 } else { 9 };
                                                         let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl+Alt+" };
                                                         row.child(gpui::div().flex_shrink_0().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0x969696 })).child(format!("{modifier}{number}")))
@@ -4603,7 +4588,7 @@ impl Render for WorkspaceWindow {
                     .min_w_0()
                     .h_full()
                     .flex().flex_col()
-                    .when_some(self.entries.get(self.active), |div, entry| {
+                    .when_some(self.workspace_state.entries.get(self.workspace_state.active), |div, entry| {
                         div.child(
                             crate::workspace_presentation::toolbar()
                                 .when(cfg!(target_os = "macos") && !self.sidebar, |header| header.pl(px(80.)))

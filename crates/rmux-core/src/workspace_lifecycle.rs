@@ -1,6 +1,35 @@
 //! Workspace ownership transitions, shared by native and browser applications.
 use crate::{focus_trail::PreviousSelection, workspace_groups::{self, Groups}};
 
+/// Application workspace ownership shared by native and browser hosts.
+/// Entries contain platform views; selection and group state belong to this model.
+/// Fields remain accessible for restoration and metadata operations during migration.
+pub struct State<T, W> {
+    pub entries: Vec<T>,
+    pub active: usize,
+    pub groups: Groups<W>,
+    pub previous: PreviousSelection<W>,
+}
+impl<T, W> Default for State<T, W> {
+    fn default() -> Self {
+        Self { entries: Vec::new(), active: 0, groups: Groups::default(), previous: PreviousSelection::default() }
+    }
+}
+impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
+    pub fn select(&mut self, index: usize, key: impl Fn(&T) -> W) -> bool {
+        select(&self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, key)
+    }
+    pub fn insert(&mut self, entry: T, request: Insertion<W>, metadata: impl Fn(&T) -> (W, bool)) -> anyhow::Result<usize> {
+        insert(&mut self.entries, &mut self.active, &mut self.groups, entry, request, metadata)
+    }
+    pub fn close(&mut self, index: usize, metadata: impl Fn(&T) -> (W, bool)) -> Option<ClosedWorkspace<T>> {
+        close(&mut self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, metadata)
+    }
+    pub fn ungroup(&mut self, id: u64, metadata: impl Fn(&T) -> (W, bool)) -> bool {
+        ungroup(&mut self.entries, &mut self.active, &mut self.groups, id, metadata)
+    }
+}
+
 /// Commit selection without focusing a terminal. Hosts can restore a remembered
 /// pane or transfer a tab afterward without briefly activating the wrong session.
 /// Re-selecting preserves MRU history but still reveals a collapsed group.

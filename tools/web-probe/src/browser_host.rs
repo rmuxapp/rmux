@@ -2,21 +2,18 @@
 use gpui::{prelude::*, *};
 use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
 pub(crate) struct BrowserHost {
-    workspaces: Vec<(String, Entity<InputProbe>)>,
-    active: usize,
+    workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>), EntityId>,
     sidebar: bool,
     sidebar_width: f32,
     sidebar_drag: Option<(Pixels, f32)>,
-    previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     empty_focus: FocusHandle,
     workspace_scroll: ScrollHandle,
-    groups: rmux_core::workspace_groups::Groups<EntityId>,
 }
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
+        let mut host = Self { workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
     }
@@ -29,13 +26,13 @@ impl BrowserHost {
             match request {
                 PaletteRequest::Open => {
                     let workspaces = this.workspace_order(true).into_iter().enumerate().map(|(position, index)| {
-                        let (name, entity) = &this.workspaces[index];
+                        let (name, entity) = &this.workspace_state.entries[index];
                         (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
                     }).collect();
                     source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, cx));
                 }
                 PaletteRequest::SelectWorkspace(id) => {
-                    if let Some(index) = this.workspaces.iter().position(|(_, entity)| entity.entity_id() == *id) {
+                    if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity)| entity.entity_id() == *id) {
                         this.select(index, window, cx);
                     }
                 }
@@ -44,68 +41,63 @@ impl BrowserHost {
         entity
     }
     fn close_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        let index = self.active;
-        let Some(_closed) = rmux_core::workspace_lifecycle::close(
-            &mut self.workspaces, &mut self.active, &mut self.groups, &mut self.previous_workspace,
-            index, |(_, entity)| (entity.entity_id(), false),
+        let index = self.workspace_state.active;
+        let Some(_closed) = self.workspace_state.close(index, |(_, entity)| (entity.entity_id(), false),
         ) else { return; };
-        if self.workspaces.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
-        else { self.select(self.active, window, cx); }
+        if self.workspace_state.entries.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
+        else { self.select(self.workspace_state.active, window, cx); }
     }
     fn ungroup(&mut self, cx: &mut Context<Self>) {
-        let Some((_, selected)) = self.workspaces.get(self.active) else { return; };
-        let Some(group) = self.groups.containing(selected.entity_id()).map(|group| group.id) else { return; };
-        if !rmux_core::workspace_lifecycle::ungroup(
-            &mut self.workspaces, &mut self.active, &mut self.groups, group,
+        let Some((_, selected)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let Some(group) = self.workspace_state.groups.containing(selected.entity_id()).map(|group| group.id) else { return; };
+        if !self.workspace_state.ungroup(group,
             |(_, entity)| (entity.entity_id(), false),
         ) { return; }
         self.scroll_to_workspace();
         cx.notify();
     }
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if index >= self.workspaces.len() { return; }
-        self.workspaces[self.active].1.update(cx, |workspace,cx| {
+        if index >= self.workspace_state.entries.len() { return; }
+        self.workspace_state.entries[self.workspace_state.active].1.update(cx, |workspace,cx| {
             workspace.split_drag = None;
             for pane in workspace.samples.values() {
                 pane.update(cx, |pane,cx| pane.release_render_caches(cx));
             }
         });
-        rmux_core::workspace_lifecycle::select(
-            &self.workspaces, &mut self.active, &mut self.groups, &mut self.previous_workspace,
-            index, |(_, entity)| entity.entity_id(),
+        self.workspace_state.select(index, |(_, entity)| entity.entity_id(),
         );
         self.scroll_to_workspace();
-        self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
+        self.workspace_state.entries[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
     }
     fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar = !self.sidebar;
         self.sidebar_drag = None;
-        if let Some((_, workspace)) = self.workspaces.get(self.active) {
+        if let Some((_, workspace)) = self.workspace_state.entries.get(self.workspace_state.active) {
             workspace.update(cx, |workspace, cx| workspace.close_palette(window, cx));
         } else { self.empty_focus.focus(window, cx); }
         cx.notify();
     }
     fn last_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = self.workspaces.iter().position(|(_, entity)|
-            Some(entity.entity_id()) == self.previous_workspace.target()) {
+        if let Some(index) = self.workspace_state.entries.iter().position(|(_, entity)|
+            Some(entity.entity_id()) == self.workspace_state.previous.target()) {
             self.select(index, window, cx);
         }
     }
     fn scroll_to_workspace(&self) {
-        let Some((_, entity)) = self.workspaces.get(self.active) else { return; };
-        let visible = self.groups.visible_workspace(entity.entity_id());
+        let Some((_, entity)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let visible = self.workspace_state.groups.visible_workspace(entity.entity_id());
         if let Some(row) = self.workspace_order(false).iter().position(|index|
-            self.workspaces[*index].1.entity_id() == visible) {
+            self.workspace_state.entries[*index].1.entity_id() == visible) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
-        let entries: Vec<_> = self.workspaces.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
-        self.groups.ordered_indices(&entries, include_collapsed)
+        let entries: Vec<_> = self.workspace_state.entries.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
+        self.workspace_state.groups.ordered_indices(&entries, include_collapsed)
     }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(index) = rmux_core::workspace_groups::cycle_target(&self.workspace_order(true), self.active, direction) {
+        if let Some(index) = rmux_core::workspace_groups::cycle_target(&self.workspace_order(true), self.workspace_state.active, direction) {
             self.select(index, window, cx);
         }
     }
@@ -113,13 +105,12 @@ impl BrowserHost {
         self.add_workspace(true, window, cx);
     }
     fn add_workspace(&mut self, inherit_group: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
-        if self.workspaces.len() >= 16 { return false; }
-        let current = self.workspaces.get(self.active).map(|(_, entity)| entity.entity_id());
+        if self.workspace_state.entries.len() >= 16 { return false; }
+        let current = self.workspace_state.entries.get(self.workspace_state.active).map(|(_, entity)| entity.entity_id());
         let name = (1..).map(|number| format!("Workspace {number}"))
-            .find(|name| !self.workspaces.iter().any(|(existing, _)| existing == name)).unwrap();
+            .find(|name| !self.workspace_state.entries.iter().any(|(existing, _)| existing == name)).unwrap();
         let entity = Self::new_workspace_view(name.clone(), window, cx);
-        let Ok(index) = rmux_core::workspace_lifecycle::insert(
-            &mut self.workspaces, &mut self.active, &mut self.groups, (name, entity),
+        let Ok(index) = self.workspace_state.insert((name, entity),
             rmux_core::workspace_lifecycle::Insertion {
                 origin: current, inherit_group, placement: Default::default(),
             }, |(_, entity)| (entity.entity_id(), false),
@@ -130,8 +121,8 @@ impl BrowserHost {
     fn new_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.add_workspace(false, window, cx) { return; }
         let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.groups.entries().iter().any(|group| &group.name == name)).unwrap();
-        self.groups.create(name, vec![self.workspaces[self.active].1.entity_id()], true)
+            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
+        self.workspace_state.groups.create(name, vec![self.workspace_state.entries[self.workspace_state.active].1.entity_id()], true)
             .expect("new workspace is a valid group anchor");
         cx.notify();
     }
@@ -170,11 +161,11 @@ impl Render for BrowserHost {
                         .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
                 .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
                     .children(self.workspace_order(false).into_iter().map(|index| {
-                        let (name, entity) = &self.workspaces[index];
-                        let group = self.groups.containing(entity.entity_id());
+                        let (name, entity) = &self.workspace_state.entries[index];
+                        let group = self.workspace_state.groups.containing(entity.entity_id());
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
-                        let selected = index == self.active || self.groups.visible_workspace(
-                            self.workspaces[self.active].1.entity_id()) == entity.entity_id();
+                        let selected = index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
+                            self.workspace_state.entries[self.workspace_state.active].1.entity_id()) == entity.entity_id();
                         sidebar_presentation::row(("workspace",entity.entity_id()),selected)
                             .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                             .child(div().flex().items_center().gap_2()
@@ -186,7 +177,7 @@ impl Render for BrowserHost {
                                         .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                         .on_click(cx.listener(move |this,_,_,cx| {
                                             cx.stop_propagation();
-                                            if let Some(group) = this.groups.get_mut(id) { group.collapsed = !group.collapsed; }
+                                            if let Some(group) = this.workspace_state.groups.get_mut(id) { group.collapsed = !group.collapsed; }
                                             cx.notify();
                                         })))
                                 })
@@ -195,7 +186,7 @@ impl Render for BrowserHost {
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
              .child(div().flex_1().min_w_0().h_full().child(
-                if let Some((_, workspace)) = self.workspaces.get(self.active) {
+                if let Some((_, workspace)) = self.workspace_state.entries.get(self.workspace_state.active) {
                     workspace.clone().into_any_element()
                 } else {
                     div().size_full().bg(rgb(0x151517)).flex().flex_col().items_center().justify_center().gap_3()

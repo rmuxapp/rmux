@@ -2,6 +2,20 @@
 
 ## Current implementation focus
 
+Both native `WorkspaceWindow` and browser `BrowserHost` now own
+`rmux_core::workspace_lifecycle::State`: workspace entries, active index, groups,
+and previous selection. Their select/insert/close/ungroup paths call state methods
+instead of passing independently owned fields into free functions. Native restore,
+RPC, move/merge, notifications and sidebar accesses now use the shared ownership
+model. Platform view entries, process services and focus remain host-specific;
+fields remain accessible during migration, so orchestration is not yet fully
+encapsulated or a single application entry point.
+Native build and browser build pass, along with five focused lifecycle tests.
+The live-shell RPC smoke passes restoration, switching, cross-window moves/merges,
+PID/variable preservation and fixture shutdown. Browser smoke passes creation,
+switching with retained output and closing to the neighboring workspace.
+Screenshot: target/shared-workspace-state.jpg. Not yet deployed.
+
 Consolidated find-bar Alt+Up/Down handling into the shared presentation module,
 including modifier filtering, composition guard, draft replacement/selection and
 propagation control. Native and browser status now use one core formatter for
