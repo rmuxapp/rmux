@@ -12,7 +12,12 @@ pub(super) struct DragItem {
 }
 impl Render for DragItem {
     fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div()
+        let preview = div();
+        // Drag previews render outside the host's inherited text style.
+        // The browser has bundled Inter, but no native system font.
+        #[cfg(target_arch = "wasm32")]
+        let preview = preview.font(crate::fonts::fallback(font("Inter")));
+        preview
             .px_3()
             .py_1()
             .max_w(px(240.))

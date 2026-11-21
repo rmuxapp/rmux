@@ -347,8 +347,19 @@ impl Render for BrowserHost {
                         let selected = self.workspace_state.sidebar_selection.contains(&entity.entity_id()) || index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
                             self.workspace_state.entries[self.workspace_state.active].1.entity_id()) == entity.entity_id();
                         let target = entity.entity_id();
+                        let container = cx.entity_id();
                         let menu_group = header.map(|group| group.id);
                         sidebar_presentation::row(("workspace",target),selected)
+                            .when(self.rename.is_none(), |row| row
+                                .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: header.map_or_else(|| name.clone(), |group| group.name.clone()).into() }, |item, _, _, cx| cx.new(|_| item.clone()))
+                                .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && item.item != target))
+                                .drag_over(move |style, item: &crate::drag_item::DragItem, _, _| if item.container == container && item.item != target { style.bg(rgb(0x435a7b)) } else { style })
+                                .on_drop(cx.listener(move |this, item: &crate::drag_item::DragItem, window, cx| {
+                                    if item.container != cx.entity_id() { return; }
+                                    if let Ok(Some(index)) = this.workspace_state.drop_workspace(item.item, target, |entry| (entry.1.entity_id(), entry.2)) {
+                                        this.select(index, window, cx);
+                                    }
+                                })))
                             .on_mouse_down(MouseButton::Right, cx.listener(move |this,event: &MouseDownEvent,window,cx| {
                                 cx.stop_propagation();
                                 this.show_workspace_menu(target, menu_group, event.position, window, cx);

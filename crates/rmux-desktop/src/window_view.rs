@@ -679,10 +679,6 @@ impl WorkspaceWindow {
         self.workspace_state.preserve_group_slot(slot, selected, |entry| entry.workspace.entity_id());
     }
 
-    fn top_level_pinned(&self, index: usize) -> bool {
-        let entry = &self.workspace_state.entries[index];
-        self.workspace_state.groups.containing(entry.workspace.entity_id()).map(|group| group.pinned).unwrap_or(entry.pinned)
-    }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
         self.workspace_state.order(include_collapsed, |entry| (entry.workspace.entity_id(), entry.pinned))
     }
@@ -3865,54 +3861,12 @@ impl WorkspaceWindow {
             }
             return;
         }
-        let Some(from) = self
-            .workspace_state.entries
-            .iter()
-            .position(|entry| entry.workspace.entity_id() == item.item)
-        else {
-            return;
-        };
-        let Some(to) = self
-            .workspace_state.entries
-            .iter()
-            .position(|entry| entry.workspace.entity_id() == target)
-        else {
-            return;
-        };
-        let source_is_anchor = self.workspace_state.groups.containing(item.item).is_some_and(|group| group.members.first() == Some(&item.item));
-        if self.workspace_state.groups.containing(target).is_some() && !source_is_anchor {
-            match self.workspace_state.groups.place_member_after(item.item, target) {
-                Ok(()) => self.select(from, window, cx),
-                Err(error) => { self.notice = Some(format!("Move group member: {error}")); cx.notify(); }
-            }
-            return;
-        }
-        // A child dropped onto a standalone workspace leaves its group. Header
-        // drags keep their group intact and continue through top-level ordering.
-        if self.workspace_state.groups.containing(item.item).is_some_and(|group| group.members.first() != Some(&item.item)) {
-            if self.workspace_state.entries[from].pinned != self.top_level_pinned(to) { return; }
-            self.workspace_state.groups.remove(item.item);
-        }
-        let to = self.workspace_state.groups.containing(target).and_then(|group| group.members.first())
-            .and_then(|anchor| self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == *anchor))
-            .unwrap_or(to);
-        if self.top_level_pinned(from) != self.top_level_pinned(to) {
-            cx.notify();
-            return;
-        }
         self.remember_focus(window, cx);
-        // Preserve the old active index until select() records/restores focus.
-        let active = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
-        if from != to {
-            let entry = self.workspace_state.entries.remove(from);
-            self.workspace_state.entries.insert(to, entry);
+        match self.workspace_state.drop_workspace(item.item, target, |entry| (entry.workspace.entity_id(), entry.pinned)) {
+            Ok(Some(index)) => self.select(index, window, cx),
+            Ok(None) => {},
+            Err(error) => { self.notice = Some(format!("Move workspace: {error}")); cx.notify(); }
         }
-        self.workspace_state.active = self
-            .workspace_state.entries
-            .iter()
-            .position(|entry| entry.workspace.entity_id() == active)
-            .unwrap_or(to);
-        self.select(to, window, cx);
     }
 }
 

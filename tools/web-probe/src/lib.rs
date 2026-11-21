@@ -596,6 +596,8 @@ mod sidebar_presentation;
 mod metadata_presets;
 #[path = "../../../crates/rmux-desktop/src/workspace_menu_view.rs"]
 mod workspace_menu_view;
+#[path = "../../../crates/rmux-desktop/src/drag_item.rs"]
+mod drag_item;
 #[path = "../../../crates/rmux-desktop/src/sidebar_interaction.rs"]
 mod sidebar_interaction;
 #[path = "../../../crates/rmux-desktop/src/workspace_presentation.rs"]

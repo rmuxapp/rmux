@@ -124,6 +124,9 @@ description, and organize related workspaces into groups.
 - **Find a tab:** open **Choose Terminal Tab** and search its title or directory.
 - **Move work:** use the palette’s move, detach, join, or merge actions.
 - **Resize the sidebar:** drag its right edge; double-click to restore its width.
+- **Arrange sidebar rows:** drag a workspace onto another row to reorder it,
+  or onto a group to join it. Drag a group header to move the group together.
+  The browser demo uses these same interactions; its layout resets on reload.
 
 Moving a live tab or workspace preserves its processes. Restoring a saved layout
 starts new ones. Close confirmations depend on your configured close policy.

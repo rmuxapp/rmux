@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Browser workspace rows now share desktop's sidebar drop model: reorder rows,
+move members into/out of groups, and move group anchors with membership intact.
+Rejected top-level pin-tier changes leave membership unchanged. Extracted the
+model into rmux-core and retained native cross-window tab-transfer handling.
+Fixed the browser drag-preview panic caused by its detached view inheriting an
+unavailable system font; it now uses bundled Inter and optional font fallbacks.
+Focused group/pin/identity test, browser build and native cargo check passed.
+Local browser gestures verified reorder, joining a group and leaving it again;
+the palette remained usable after dragging. Screenshot:
+`target/browser-workspace-drop.jpg`. Not yet deployed; cross-platform native
+drag acceptance remains pending.
+
 Deployed GitHub Shared WASM run 44955219219, source 5483941, to rmux.app
 (Cloudflare 0bb664a7). This adds the shared workspace/group context menus,
 palette access and embedded group icon to the previously deployed metadata

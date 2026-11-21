@@ -109,6 +109,33 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         self.active = next;
         true
     }
+    /// Apply a sidebar drop while retaining the previous active identity until
+    /// the host selects the returned destination and restores its focus.
+    pub fn drop_workspace(&mut self, source: W, target: W, metadata: impl Fn(&T) -> (W, bool)) -> anyhow::Result<Option<usize>> {
+        let Some(from) = self.entries.iter().position(|entry| metadata(entry).0 == source) else { return Ok(None); };
+        let Some(to) = self.entries.iter().position(|entry| metadata(entry).0 == target) else { return Ok(None); };
+        if source == target { return Ok(None); }
+        let anchor = self.groups.containing(source).is_some_and(|group| group.members.first() == Some(&source));
+        if self.groups.containing(target).is_some() && !anchor {
+            self.groups.place_member_after(source, target)?;
+            return Ok(Some(from));
+        }
+        let pinned = |state: &Self, index: usize| {
+            let (id, pinned) = metadata(&state.entries[index]);
+            state.groups.containing(id).map_or(pinned, |group| group.pinned)
+        };
+        if self.groups.containing(source).is_some_and(|group| group.members.first() != Some(&source)) {
+            if metadata(&self.entries[from]).1 != pinned(self, to) { return Ok(None); }
+            self.groups.remove(source);
+        }
+        let to = self.groups.containing(target).and_then(|group| group.members.first())
+            .and_then(|anchor| self.entries.iter().position(|entry| metadata(entry).0 == *anchor)).unwrap_or(to);
+        if pinned(self, from) != pinned(self, to) { return Ok(None); }
+        let active = metadata(&self.entries[self.active]).0;
+        if from != to { let entry = self.entries.remove(from); self.entries.insert(to, entry); }
+        self.active = self.entries.iter().position(|entry| metadata(entry).0 == active).unwrap_or(to);
+        Ok(Some(to))
+    }
     /// Resolve a captured member immediately before closing it. Membership may
     /// change while a native confirmation prompt is open.
     pub fn group_close_index(&self, group: u64, member: W, key: impl Fn(&T) -> W) -> Option<usize> {
@@ -376,6 +403,28 @@ mod tests {
         assert!(state.sidebar_selection.contains(&4));
     }
 
+    #[test]
+    fn sidebar_drops_preserve_groups_pin_tiers_and_active_identity() {
+        let mut state = State { entries: vec![(1, false), (2, false), (3, false), (4, true), (5, false)], active: 1, ..Default::default() };
+        let group = state.groups.create("group".into(), vec![1, 2], false).unwrap();
+        assert_eq!(state.drop_workspace(3, 2, |entry| *entry).unwrap(), Some(2));
+        assert_eq!(state.groups.get_mut(group).unwrap().members, vec![1, 2, 3]);
+        assert_eq!(state.drop_workspace(2, 4, |entry| *entry).unwrap(), None);
+        assert!(state.groups.containing(2).is_some()); // Rejected move cannot ungroup.
+        let destination = state.drop_workspace(2, 5, |entry| *entry).unwrap().unwrap();
+        assert_eq!(state.entries[destination].0, 2);
+        assert_eq!(state.entries[state.active].0, 2);
+        assert!(state.groups.containing(2).is_none());
+        let destination = state.drop_workspace(1, 5, |entry| *entry).unwrap().unwrap();
+        assert_eq!(state.entries[destination].0, 1);
+        assert_eq!(state.entries[state.active].0, 2);
+        assert_eq!(state.groups.get_mut(group).unwrap().members, vec![1, 3]);
+        let entries = state.entries.clone();
+        assert_eq!(state.drop_workspace(1, 4, |entry| *entry).unwrap(), None);
+        assert_eq!(state.drop_workspace(1, 1, |entry| *entry).unwrap(), None);
+        assert_eq!(state.drop_workspace(99, 1, |entry| *entry).unwrap(), None);
+        assert_eq!(state.entries, entries);
+    }
     #[test]
     fn reorder_keeps_pin_tiers_group_anchor_and_selected_identity() {
         let mut state = State { entries: vec![(1, true), (2, false), (3, false), (4, false), (5, false)], active: 1, ..Default::default() };
