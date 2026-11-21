@@ -8,20 +8,40 @@ struct TerminalMenu {
     scroll: ScrollHandle,
     typeahead: crate::menu_navigation::Typeahead,
 }
-const MENU_LABELS: &[&str] = &["Copy", "Copy with Line Breaks", "Select All", "Find…", "Clear Scrollback"];
+const MENU_LABELS: &[&str] = &["Copy", "Copy with Line Breaks", "Paste", "Select All", "Find…", "Clear Scrollback"];
 fn menu_action(index: usize) -> Box<dyn Action> {
     match index {
         0 => Box::new(crate::CopySelection),
         1 => Box::new(crate::CopySelectionWithLineBreaks),
-        2 => Box::new(crate::EditorSelectAll),
-        3 => Box::new(crate::Find),
+        2 => Box::new(crate::Paste),
+        3 => Box::new(crate::EditorSelectAll),
+        4 => Box::new(crate::Find),
         _ => Box::new(crate::ClearScrollback),
     }
 }
 impl TerminalSample {
-    fn menu_enabled(&self) -> [bool; 5] {
+    fn paste_from_clipboard(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.clipboard_read.is_some() { return; }
+        // Begin synchronously while the click/keypress still grants activation.
+        let read = cx.read_from_clipboard_async();
+        self.clipboard_read = Some(cx.spawn_in(window, async move |entity, cx| {
+            let result = read.await;
+            let _ = entity.update_in(cx, |this, window, cx| {
+                this.clipboard_read = None;
+                match result {
+                    Ok(Some(item)) => EntityInputHandler::paste(this, item, window, cx),
+                    Ok(None) => this.input_error = Some("The clipboard has no text to paste.".into()),
+                    Err(_) => this.input_error = Some("Clipboard access was unavailable. Use your keyboard paste shortcut.".into()),
+                }
+                cx.notify();
+            });
+        }));
+        cx.notify();
+    }
+
+    fn menu_enabled(&self) -> [bool; 6] {
         let selected = self.frame.selections.iter().any(Option::is_some);
-        [selected, selected, true, true, true]
+        [selected, selected, self.clipboard_read.is_none(), true, true, true]
     }
     fn dismiss_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let focused = self.menu.as_ref().is_some_and(|menu| menu.focus.is_focused(window));
@@ -93,7 +113,7 @@ impl TerminalSample {
                 .child(div().id("sample-terminal-menu-scroll").max_h((window.viewport_size().height - px(26.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(MENU_LABELS.iter().enumerate().map(|(index, label)| {
-                        crate::tab_presentation::menu_row(index, matches!(index, 2 | 4))
+                        crate::tab_presentation::menu_row(index, matches!(index, 3 | 5))
                             .when(enabled[index], |row| row.cursor_pointer()
                                 .when(index == menu.selected, |row| row.bg(rgb(0x354969)))
                                 .on_mouse_move(cx.listener(move |this, _, _, cx| {

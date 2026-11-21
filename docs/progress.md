@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser terminal menus now include Paste via GPUI's asynchronous clipboard API.
+The read begins during user activation, stays bound to the originating terminal,
+and permits one pending read per terminal. Results use the existing Ghostty
+encoding and transactional bounded sample-paste handler; unavailable clipboard
+access produces a keyboard-paste fallback message. The task is owned by the
+terminal entity. WASM build passes. Browser smoke verified menu type-ahead/Enter
+pasted two lines, executed the complete command, and retained the final draft
+across workspace switching for later Enter. Screenshot: target/browser-menu-paste.jpg.
+Permission-denial and terminal-close-during-prompt UI cases remain unverified.
+Not deployed.
+
 Browser terminals now expose a right-click menu and Terminal Actions palette
 entry for Copy, Copy with Line Breaks, Select All, Find and Clear Scrollback.
 The menu shares desktop spacing/presentation and navigation/type-ahead, resolves
