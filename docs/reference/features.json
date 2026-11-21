@@ -176,7 +176,7 @@
       "acceptance": "User labels persist; automatic metadata never silently replaces a manual name.",
       "rmux_status": "in_progress",
       "implementation": "Manual names/descriptions, preset and custom glyph icons/hex colors, sidebar metadata display, and saved layout persistence with backward-compatible defaults. Browser metadata editing now shares command routing, validation, text editor and preset picker sources; browser UI checks cover save/cancel/clear, invalid inputs, Unicode icons and revealing collapsed targets. Browser metadata is intentionally session-local.",
-      "remaining": "Native acceptance of the new graphical preset icon/color pickers and metadata editing, automatic persistence, and layout acceptance. Preset buttons stage changes in the existing editor with Enter to save and Escape to cancel; custom glyph/hex entry remains supported.",
+      "remaining": "Native acceptance of the new graphical preset icon/color pickers and metadata editing, and visual layout acceptance. Metadata automatic capture and forced-stop restoration have native smoke evidence in docs/benchmarks/session-restore-smoke.md. Preset buttons stage changes in the existing editor with Enter to save and Escape to cancel; custom glyph/hex entry remains supported.",
       "implementation_sources": [
         "crates/rmux-desktop/src/window_view.rs"
       ],
@@ -1483,10 +1483,12 @@
       "acceptance": "Restore windows, splits, selection and cwd; corrupted state cannot prevent app launch.",
       "rmux_status": "in_progress",
       "implementation": "Versioned single-window layout save/open and multi-window Save Session / --session restore with bounded atomic files, shared 256-tab budget, metadata, selection, proportions and directories. Native multi-window startup, all-window directory preflight and shell cleanup smoke passed.",
-      "remaining": "Opt-in session_file startup recovery and normal-quit checkpointing now pass native smoke. Change-triggered/crash checkpoints, corrupt-state fallback runtime coverage, native Save Session dialogs, OS quit/confirmation, partial-spawn rollback, geometry and actual focus/visual acceptance across platforms remain pending.",
+      "remaining": "Native smoke covers opt-in startup recovery, normal quit, change-triggered checkpoints, forced-stop/relaunch from completed checkpoints and corrupt-state fallback preserving the original file. Background write failures now surface a deduplicated window notice; focused tests cover retry after a failed write. Native notice and Save Session dialog acceptance, OS quit/confirmation, partial-spawn rollback, interruption during replacement, exact geometry and focus/visual acceptance across platforms remain pending.",
       "implementation_sources": [
         "crates/rmux-desktop/src/snapshot.rs",
-        "crates/rmux-desktop/src/restore.rs"
+        "crates/rmux-desktop/src/restore.rs",
+        "crates/rmux-desktop/src/recovery.rs",
+        "docs/benchmarks/session-restore-smoke.md"
       ],
       "progress_record": "docs/progress.md"
     },

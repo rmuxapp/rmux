@@ -102,6 +102,7 @@ pub(super) fn install(lease: Option<Arc<Lease>>, cx: &mut App) {
     observe::<Workspace>(cx);
     observe::<PaneView>(cx);
     cx.spawn(async move |cx| {
+        let mut reported_error = None;
         while receiver.recv().await.is_ok() {
             cx.background_executor().timer(Duration::from_millis(750)).await;
             while receiver.try_recv().is_ok() {}
@@ -109,7 +110,26 @@ pub(super) fn install(lease: Option<Arc<Lease>>, cx: &mut App) {
                 if cx.global::<Shutdowns>().quitting { None } else { checkpoint(cx) }
             }).ok().flatten();
             if let Some(job) = job {
-                if let Err(error) = job.await { eprintln!("rmux: save checkpoint: {error:#}"); }
+                match job.await {
+                    Ok(()) => reported_error = None,
+                    Err(error) => {
+                        let error = format!("{error:#}");
+                        // Showing a notice notifies WorkspaceWindow, which also
+                        // schedules a checkpoint. Suppress identical failures
+                        // so that notification cannot create an idle retry loop.
+                        if reported_error.as_ref() == Some(&error) { continue; }
+                        eprintln!("rmux: save checkpoint: {error}");
+                        let notice = format!("Could not save session recovery: {error}. Your latest changes may not survive a restart. Check the session_file location or use Save Session to save elsewhere.");
+                        reported_error = Some(error);
+                        let _ = cx.update(|cx| {
+                            let target = cx.active_window().and_then(|handle| handle.downcast::<window_view::WorkspaceWindow>())
+                                .or_else(|| cx.windows().into_iter().find_map(|handle| handle.downcast::<window_view::WorkspaceWindow>()));
+                            if let Some(target) = target {
+                                let _ = target.update(cx, |view, _, cx| view.show_startup_notice(notice, cx));
+                            }
+                        });
+                    }
+                }
             }
         }
     }).detach();
@@ -164,6 +184,24 @@ mod tests {
         writer.save(&path, 1, older)?;
         assert_eq!(std::fs::read(path)?, bytes);
         assert_eq!(writer.generation, 2);
+        Ok(())
+    }
+
+    #[test]
+    fn failed_checkpoint_does_not_suppress_a_later_retry() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let obstruction = directory.path().join("blocked");
+        std::fs::write(&obstruction, b"keep")?;
+        let path = obstruction.join("session.json");
+        let snapshot = || snapshot::SessionSnapshot { version: 1, active_window: None, windows: vec![] };
+        let mut writer = Writer::default();
+        assert!(writer.save(&path, 1, snapshot()).is_err());
+        assert!(writer.previous.is_none());
+        assert_eq!(std::fs::read(&obstruction)?, b"keep");
+        std::fs::remove_file(&obstruction)?;
+        std::fs::create_dir(&obstruction)?;
+        writer.save(&path, 2, snapshot())?;
+        assert_eq!(std::fs::read(path)?, snapshot().encode()?);
         Ok(())
     }
 }

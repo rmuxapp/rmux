@@ -110,7 +110,9 @@ the new session separately. Lock failures also produce a recovery notice. Explic
 `--layout`, `--session`, directory/command launches and benchmarks neither restore
 nor overwrite the configured recovery file. This setting is frozen at startup;
 reload takes effect on the next launch. Saves can be skipped during an active
-editing/restore/close interaction; failures are logged. OS-originated quit has
+editing/restore/close interaction. Background save failures appear in the window
+and are logged; identical repeated failures do not keep reopening the notice.
+The next workspace change retries saving. OS-originated quit has
 GPUI's shorter best-effort deadline. Window/workspace/pane changes also schedule
 a checkpoint after 750 ms, coalescing notifications in a one-slot queue. There is
 no idle polling or terminal-frame observer. Writes are serialized, unchanged

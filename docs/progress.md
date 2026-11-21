@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Automatic session checkpoint failures now show a window notice explaining the
+recovery risk and how to save elsewhere. Identical errors are suppressed until
+a successful write, preventing the notice's own notification from creating an
+idle retry loop. Disk work remains on the existing background writer. Four
+focused recovery tests pass, including a failed-write/repaired-location retry
+that verifies existing data is preserved. Native notice visuals remain pending.
+Reconciled W07/S01 ledger gaps with the existing native smoke record: automatic
+metadata capture, forced-stop restoration and corrupt-state fallback already
+have runtime evidence; cross-platform visual acceptance is still open.
+
 Native pointer selection, Select All, Clear Scrollback and viewport scrolling now
 share a bounded ordered interaction queue. Busy parser admission is nonblocking;
 frames and selection exports apply pending interactions before reading, so an
