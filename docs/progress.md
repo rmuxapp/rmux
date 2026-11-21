@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Extracted native terminal IME overlay into shared preedit_view: underlined text,
+selected-range background and composition caret placement now serve both hosts.
+Platform shaping stays in text_layout adapters, including native input bounds.
+Browser commit/unmark always invalidates the view so rejected sample input cannot
+leave the old composition overlay visible. Native and WASM checks pass. Actual
+IME event/visual verification remains pending; the sample interpreter still
+rejects non-ASCII committed text, so this is not full Unicode input support.
+
 Last Workspace now uses shared PreviousSelection state in desktop and browser.
 The browser palette exposes the command; selecting the current workspace keeps
 the previous destination, switching back toggles it, and closing the remembered

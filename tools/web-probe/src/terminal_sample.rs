@@ -259,18 +259,27 @@ impl Render for TerminalSample {
                 let (cursor_x, cursor_y) = this.frame.cursor.unwrap_or_default();
                 this.cursor_bounds = Bounds::new(content.origin + point(px(f32::from(cursor_x)*cells.width), px(f32::from(cursor_y)*cells.height)), size(px(cells.width), px(cells.height)));
                 let rows = this.rows.update(&this.frame, cells, &family, window, None);
+                let mut preedit = None;
                 let cursor = this.frame.cursor.and_then(|(x,y)| {
                     let cell = this.frame.rows.get(usize::from(y))?.get(usize::from(x))?;
-                    let shape = if this.focus.is_focused(window) { this.frame.cursor_shape } else { rmux_core::terminal_frame::CursorShape::Hollow };
-                    let origin = content.origin + point(px(f32::from(x) * cells.width), px(f32::from(y) * cells.height));
+                    let composing = this.focus.is_focused(window) && !this.composition.text.is_empty();
+                    let shape = if composing { rmux_core::terminal_frame::CursorShape::Bar } else if this.focus.is_focused(window) { this.frame.cursor_shape } else { rmux_core::terminal_frame::CursorShape::Hollow };
+                    let mut origin = content.origin + point(px(f32::from(x) * cells.width), px(f32::from(y) * cells.height));
+                    if composing {
+                        let overlay = crate::preedit_view::Preedit::new(&this.composition, origin, cells,
+                            &family, row_host::color(this.frame.background), window);
+                        origin = overlay.cursor;
+                        this.cursor_bounds.origin = origin;
+                        preedit = Some(overlay);
+                    }
                     let quads = crate::cursor_view::quads(shape, origin, f32::from(cell.width.max(1))*cells.width, cells.height, row_host::color(this.frame.cursor_color));
                     let glyph = (shape == rmux_core::terminal_frame::CursorShape::Block && !cell.hidden && !cell.text.is_empty())
                         .then(|| this.cursor_cache.shape(cell, cell.background, cells, &family, window, None));
                     Some((quads, glyph, origin))
                 });
                 let scrollbar = crate::scrollbar_view::indicator(content, &this.frame);
-                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor, this.frame.selections.clone(), scrollbar)
-            }), move |_, (rows, cells, background, bounds, content, cursor, selections, scrollbar), window, cx| {
+                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor, this.frame.selections.clone(), scrollbar, preedit)
+            }), move |_, (rows, cells, background, bounds, content, cursor, selections, scrollbar, mut preedit), window, cx| {
                 window.handle_input(&input.read(cx).focus, ElementInputHandler::new(bounds, input.clone()), cx);
                 input.read(cx).engine.focus(input.read(cx).focus.is_focused(window));
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
@@ -278,6 +287,7 @@ impl Render for TerminalSample {
                     for (y, row) in rows.iter().enumerate() {
                         row_cache::paint_row(row, content.origin + point(px(0.), px(y as f32 * cells.height)), selections.get(y).copied().flatten(), None, cells, window, cx);
                     }
+                    if let Some(preedit) = &mut preedit { preedit.paint(window, cx); }
                     if let Some((quads, glyph, origin)) = cursor {
                         for quad in quads { window.paint_quad(quad); }
                         if let Some(glyph) = glyph { glyph.paint(origin, px(cells.height), window, cx); }
@@ -303,10 +313,12 @@ impl EntityInputHandler for TerminalSample {
     fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
         let text = self.composition.take();
         if !text.is_empty() { self.accept(&text, cx); }
+        cx.notify();
     }
     fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, _: &mut Window, cx: &mut Context<Self>) {
         let text = self.composition.commit(range, text);
         self.accept(&text, cx);
+        cx.notify();
     }
     fn replace_and_mark_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, selected: Option<Range<usize>>, _: &mut Window, cx: &mut Context<Self>) {
         self.composition.update(range, text, selected);

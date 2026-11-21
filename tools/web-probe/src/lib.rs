@@ -11,6 +11,8 @@ mod pane_view { pub(crate) use crate::control_hint::ControlHint; }
 
 #[path = "../../../crates/rmux-desktop/src/composition.rs"]
 mod composition;
+#[path = "../../../crates/rmux-desktop/src/preedit_view.rs"]
+mod preedit_view;
 #[path = "../../../crates/rmux-desktop/src/edit_history.rs"]
 mod edit_history;
 #[path = "../../../crates/rmux-desktop/src/text_field.rs"]

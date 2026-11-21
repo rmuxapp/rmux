@@ -2,6 +2,7 @@
 use gpui::*;
 pub struct Line(ShapedLine);
 impl Line {
+    pub fn width(&self) -> Pixels { self.0.width }
     pub fn x_for_index(&self, index: usize) -> Pixels { self.0.x_for_index(index) }
     pub fn closest_index_for_x(&self, x: Pixels) -> usize { self.0.closest_index_for_x(x) }
     pub fn paint(&self, origin: Point<Pixels>, height: Pixels, window: &mut Window, cx: &mut App) {
@@ -15,3 +16,12 @@ pub fn shape(window: &Window, text: SharedString, font: Font, color: u32) -> Lin
 }
 pub fn focus(handle: &FocusHandle, window: &mut Window, _: &mut App) { handle.focus(window); }
 pub fn mask(bounds: Bounds<Pixels>) -> ContentMask<Pixels> { ContentMask { bounds } }
+
+pub fn preedit(window: &Window, text: SharedString, family: &SharedString, font_size: f32) -> Line {
+    let run = TextRun { len: text.len(), font: font(family.clone()),
+        color: rgb(0xffffff).into(),
+        background_color: None,
+        underline: Some(UnderlineStyle { thickness: px(1.), color: None, wavy: false }),
+        strikethrough: None };
+    Line(window.text_system().shape_line(text, px(font_size), &[run], None))
+}

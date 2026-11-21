@@ -32,6 +32,7 @@ use close_policy::{ClosePolicy, PromptGate};
 mod command_palette;
 mod palette_view;
 mod composition;
+mod preedit_view;
 mod control_hint;
 mod scrollbar_view;
 mod diagnostics;
@@ -2290,27 +2291,8 @@ impl EntityInputHandler for TerminalView {
     }
 }
 
-fn shape_preedit(
-    text: &str,
-    cells: CellMetrics,
-    family: &SharedString,
-    window: &Window,
-) -> ShapedLine {
-    let run = TextRun {
-        len: text.len(),
-        font: font(family.clone()),
-        color: rgb(0xffffff).into(),
-        background_color: None,
-        underline: Some(UnderlineStyle {
-            thickness: px(1.),
-            color: None,
-            wavy: false,
-        }),
-        strikethrough: None,
-    };
-    window
-        .text_system()
-        .shape_line(text.to_owned().into(), px(cells.font_size), &[run], None)
+fn shape_preedit(text: &str, cells: CellMetrics, family: &SharedString, window: &Window) -> text_layout::Line {
+    text_layout::preedit(window, text.to_owned().into(), family, cells.font_size)
 }
 
 struct TerminalElement {
@@ -2326,8 +2308,7 @@ struct TerminalPaint {
     scrollbar: Option<PaintQuad>,
     rows: Arc<Vec<Arc<row_cache::ShapedRow>>>,
     backgrounds: Vec<PaintQuad>,
-    preedit_backgrounds: Vec<PaintQuad>,
-    lines: Vec<PaintedText>,
+    preedit: Option<preedit_view::Preedit>,
     cursor: Vec<PaintQuad>,
     cursor_text: Option<PaintedText>,
 }
@@ -2427,8 +2408,7 @@ impl Element for TerminalElement {
         let mut background = color(frame.background);
         background.a = f32::from(cx.global::<Preferences>().background_opacity) / 100.;
         let backgrounds = vec![fill(outer_bounds, background)];
-        let mut lines = Vec::new();
-        let mut preedit_backgrounds = Vec::new();
+        let mut preedit = None;
         let selection_foreground = cx.global::<Preferences>().selection_foreground();
         let shaped_rows = self.view.update(cx, |view, _| {
             let rows = view.row_cache.update(&frame, cells, &family, window, view.metrics.as_mut());
@@ -2448,26 +2428,10 @@ impl Element for TerminalElement {
                 let mut origin =
                     bounds.origin + point(px(x as f32 * cells.width), px(y as f32 * cells.height));
                 if focused && !marked.is_empty() {
-                    let line = shape_preedit(&marked, cells, &family, window);
-                    let composition = &self.view.read(cx).composition;
-                    let selection = composition.byte_range(composition.selected.clone());
-                    let start = line.x_for_index(selection.start);
-                    let offset = line.x_for_index(selection.end);
-                    preedit_backgrounds.push(fill(
-                        Bounds::new(origin, size(line.width + px(2.), px(cells.height))),
-                        color(frame.background),
-                    ));
-                    if !selection.is_empty() {
-                        preedit_backgrounds.push(fill(
-                            Bounds::new(
-                                origin + point(start.min(offset), px(0.)),
-                                size((offset - start).abs(), px(cells.height)),
-                            ),
-                            rgb(0x344b70),
-                        ));
-                    }
-                    lines.push(PaintedText { line, origin });
-                    origin.x += offset;
+                    let overlay = preedit_view::Preedit::new(&self.view.read(cx).composition,
+                        origin, cells, &family, color(frame.background), window);
+                    origin = overlay.cursor;
+                    preedit = Some(overlay);
                 }
                 let cell = frame
                     .rows
@@ -2495,8 +2459,7 @@ impl Element for TerminalElement {
             scrollbar: scrollbar_view::indicator(bounds, &frame),
             rows: shaped_rows,
             backgrounds,
-            preedit_backgrounds,
-            lines,
+            preedit,
             cursor,
             cursor_text,
         };
@@ -2550,12 +2513,7 @@ impl Element for TerminalElement {
                     cx,
                 );
             }
-            for quad in state.preedit_backgrounds.drain(..) {
-                window.paint_quad(quad);
-            }
-            for text in &state.lines {
-                let _ = text.line.paint(text.origin, px(cells.height), window, cx);
-            }
+            if let Some(preedit) = &mut state.preedit { preedit.paint(window, cx); }
             for cursor in state.cursor.drain(..) {
                 window.paint_quad(cursor);
             }

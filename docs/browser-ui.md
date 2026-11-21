@@ -24,7 +24,7 @@ platform services are still separate. Do not describe it as full parity yet.
   command identities, palette matching, terminal frames and style runs.
 - **Views:** native palette and text field, sidebar/tab/pane presentation,
   recursive split layout and interaction, icons, row cache/painter, cell metrics,
-  cursor geometry and draggable scrollback indicator.
+  cursor geometry, IME preedit overlay and draggable scrollback indicator.
 - **Input:** shared composition model, workspace/pane/tab shortcut definitions,
   tab action dispatch, fractional wheel accumulation and Shift+PageUp/Down/Home/End.
   Delivered-key tracking is shared too: shifted aliases pair with their original
@@ -83,7 +83,7 @@ is not part of the replacement runtime or optimized artifact.
 1. Continue moving workspace orchestration into shared application state/views;
    keep browser sample services behind platform adapters. Tab and group models
    alone do not complete the Rustable-style architecture.
-2. Complete browser terminal input: IME preedit, Unicode sample input/paste,
+2. Complete browser terminal input: verify IME preedit/events, Unicode sample input/paste,
    negotiated report-all printable-key routing and platform-reserved shortcut behavior. Validate held
    edge selection, Alt-drag and cancellation when focus leaves the browser.
 3. Close missing UI/service parity against [feature parity](feature-parity.md)
