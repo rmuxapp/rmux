@@ -3781,13 +3781,17 @@ impl WorkspaceWindow {
     }
 
     fn edit_metadata(&mut self, field: MetadataField, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((id, input, _)) = self.rename.clone() {
+            self.workspace_state.groups.reveal(id);
+            self.sidebar = true;
+            self.scroll_to_workspace(self.workspace_state.active);
+            input.read(cx).focus.focus(window);
+            cx.notify();
+            return;
+        }
         let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else {
             return;
         };
-        if let Some((_, input, _)) = &self.rename {
-            input.read(cx).focus.focus(window);
-            return;
-        }
         let id = entry.workspace.entity_id();
         let name = match field {
             MetadataField::GroupColor => {
@@ -3864,7 +3868,9 @@ impl WorkspaceWindow {
         .detach();
         input.read(cx).focus.focus(window);
         self.rename = Some((id, input, field));
+        self.workspace_state.groups.reveal(id);
         self.sidebar = true;
+        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
     }
 

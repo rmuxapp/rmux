@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Native and browser metadata editors now reveal their target when its group is
+collapsed and scroll the active workspace into view. Reopening an existing
+editor also restores its visibility without replacing the draft. Browser UI
+verification: create group and child, collapse with child active, invoke Edit
+Workspace Description, observe expanded group and focused editor, save and
+observe description on the child. Screenshot: `target/browser-metadata-reveal.jpg`.
+WASM build and native desktop check pass; native visual verification remains
+outstanding. Shared WASM run 44953302434 for the preceding description change
+was still in progress at observation; neither change is deployed yet.
+
 Browser workspace descriptions now use the shared desktop command action,
 TextField editor and description normalization (trimmed, control-free, 256
 characters). The sidebar uses native selected/unselected description colors.

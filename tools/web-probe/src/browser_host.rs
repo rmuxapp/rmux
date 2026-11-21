@@ -46,7 +46,14 @@ impl BrowserHost {
         entity
     }
     fn rename_workspace(&mut self, field: WorkspaceField, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some((_, input)) = &self.rename { input.read(cx).focus.clone().focus(window, cx); return; }
+        if let Some((target, input)) = self.rename.clone() {
+            self.workspace_state.groups.reveal(target);
+            self.sidebar = true;
+            self.scroll_to_workspace();
+            input.read(cx).focus.clone().focus(window, cx);
+            cx.notify();
+            return;
+        }
         let Some((name, workspace, _, description)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let group = if matches!(field, WorkspaceField::GroupName) {
             let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
@@ -78,6 +85,7 @@ impl BrowserHost {
             this.rename = None;
             this.select(this.workspace_state.active, window, cx);
         }).detach();
+        self.workspace_state.groups.reveal(target);
         self.sidebar = true;
         self.scroll_to_workspace();
         input.read(cx).focus.clone().focus(window, cx);
