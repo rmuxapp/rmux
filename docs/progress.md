@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Published GitHub artifact 44934228048 / e52115e to rmux.app through Cloudflare
+deployment 3783d1ac. This brings sidebar resizing, parallel startup, native paste
+encoding, on-demand memory diagnostics and shared zoom/resize/equalize policy to
+production. Browser inspection confirmed the versioned iframe URL, terminal help
+input and splitting. Screenshot: target/live-demo-e52115e.jpg. Website source
+stayed off GitHub. More recent pane cycling/close/insertion/swap changes are not
+included; their optimized GitHub builds were still pending/in progress.
+
 Browser palette now includes all five desktop pane-swap commands: next, left,
 right, up and down. Both hosts share target selection, including directional
 swap restrictions while zoomed. Swaps keep the existing pane/session identity;
