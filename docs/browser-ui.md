@@ -28,3 +28,13 @@ These are candidates, not validated dependencies. Do not claim native performanc
 ## Acceptance
 
 The browser must use the same workspace/tab/pane state, command definitions, palette, shortcuts and view layout as native, with explicit platform exceptions for reserved browser shortcuts and OS-only services. Switching workspaces must retain session state; resize and zoom must not mix terminal contents. Measure startup, idle work, input latency and memory at representative pane counts. Keep native desktop performance and release builds working throughout.
+
+## Terminal rendering adapter
+
+The owned frame contract and style-run grouping now live in rmux-core and are
+used by the native renderer. Keep row Arc identity and style-run batching when
+connecting the web host. GPUI 0.2.2 shapes with an explicit cell-width argument;
+GPUI CE 0.3.0's shape_line signature does not accept that argument. Verify fixed
+column placement with a bundled monospace font, wide/combining cells and styled
+ASCII runs before calling the renderer compatible. Do not silently replace the
+native cache or advertise a plain text widget as the terminal renderer.

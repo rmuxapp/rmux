@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Moved the native renderer's terminal style-run grouping into
+rmux-core::terminal_runs and routed row_cache through it. This preserves exact
+column/style boundaries, hidden-text suppression, wide/non-ASCII isolation,
+selection-from-background splits, decorated blanks and one-allocation ASCII
+runs. All eight focused row-cache tests pass, including engine-backed fixtures;
+core compiles for WASM. Browser glyph shaping still needs an adapter: GPUI CE's
+shape_line lacks the old fixed-cell-width argument, so column alignment must be
+verified explicitly rather than dropping that constraint silently.
+
 Moved terminal Cell/Color/CursorShape/Frame/FrameStorage and bounded text export
 unchanged into rmux-core::terminal_frame. The native engine re-exports these types
 and retains the Ghostty FFI color conversion; desktop row_cache now consumes the
