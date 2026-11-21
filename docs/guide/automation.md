@@ -228,6 +228,10 @@ rmux command forms, not a claim of complete cmux CLI compatibility.
 
 ## Focus history (next release)
 
+Use `rmuxctl focus-back --window ID` or `rmuxctl focus-forward --window ID`.
+Both support `--activate` and offline shell completion. Obtain the window ID
+from `rmuxctl list-windows`; neither command assumes a currently focused window.
+
 `window.focus_history` takes an explicit `window_id`, a `direction` of `back`
 or `forward`, and optional `activate: true`. It navigates the same per-window
 terminal history as the menu actions, skipping closed terminals. Example:

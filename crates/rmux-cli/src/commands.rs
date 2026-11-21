@@ -19,6 +19,8 @@ pub const HELP: &str = "Commands (JSON output except pipe-pane; explicit opaque 
   select-workspace --workspace ID [--activate]
   rename-workspace --workspace ID NAME
   focus-panel --panel ID [--activate]
+  focus-back --window ID [--activate]
+  focus-forward --window ID [--activate]
   move-panel --panel ID --workspace ID [--activate]
   merge-workspace --workspace ID --target-workspace ID [--activate]
   move-workspace --workspace ID --window ID [--activate]
@@ -56,6 +58,7 @@ pub fn help(command: &str) -> Result<String, String> {
         "list-panes" | "list-panels" => ("[--window ID] [--workspace ID]", "List panes or terminal surfaces, optionally limited to a window or workspace."),
         "select-workspace" => ("--workspace ID [--activate]", "Select a workspace; --activate also activates its window."),
         "rename-workspace" => ("--workspace ID NAME", "Set the workspace's manual name. Quote names containing spaces."),
+        "focus-back" | "focus-forward" => ("--window ID [--activate]", "Navigate terminal focus history in one window. At the boundary this is a no-op. OS activation requires --activate."),
         "focus-panel" => ("--panel ID [--activate]", "Focus an existing terminal surface; --activate also activates its window."),
         "send-key" => ("--surface ID KEY", "Send one key tap, such as Enter, Up, Ctrl-c, Alt-Left or Shift-Tab."),
         "send" => ("--surface ID [--paste] TEXT", "Send literal text. --paste applies terminal paste encoding. Use -- before text starting with a dash."),
@@ -128,6 +131,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             Some(("--workspace", "workspace_id")),
             Some("name"),
         ),
+        "focus-back" | "focus-forward" => ("window.focus_history", Some(("--window", "window_id")), None),
         "focus-panel" => ("surface.focus", Some(("--panel", "surface_id")), None),
         "send-key" => (
             "surface.send_key",
@@ -304,7 +308,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
                 ("paste-buffer", "--bracketed") => ("bracketed", Value::Bool(true)),
                 ("send", "--paste") => ("paste", Value::Bool(true)),
                 (
-                    "select-workspace" | "focus-panel" | "new-window" | "new-workspace" | "move-panel" | "move-workspace" | "merge-workspace" | "split-pane",
+                    "select-workspace" | "focus-panel" | "focus-back" | "focus-forward" | "new-window" | "new-workspace" | "move-panel" | "move-workspace" | "merge-workspace" | "split-pane",
                     "--activate",
                 ) => ("activate", Value::Bool(true)),
                 ("read-screen" | "capture-pane", "--scrollback") => ("scope", Value::String("history".into())),
@@ -326,6 +330,9 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
         if !params.contains_key(key) {
             return Err(format!("{command} requires {flag} ID"));
         }
+    }
+    if matches!(command, "focus-back" | "focus-forward") {
+        params.insert("direction".into(), Value::String(if command == "focus-back" { "back" } else { "forward" }.into()));
     }
     if command == "capture-pane" {
         params.insert("max_bytes".into(), Value::from(1024 * 1024));
@@ -395,6 +402,18 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn focus_history_commands_require_a_window_and_preserve_activation() {
+        for (command, direction) in [("focus-back", "back"), ("focus-forward", "forward")] {
+            let (method, params) = super::expand(command, args(&["--window", "4294967297", "--activate"])).unwrap();
+            assert_eq!(method, "window.focus_history");
+            assert_eq!(params, serde_json::json!({"window_id":"4294967297","direction":direction,"activate":true}));
+            assert!(super::expand(command, args(&[])).is_err());
+            assert!(super::expand(command, args(&["--window", "4294967297", "--direction", "back"])).is_err());
+            let (_, params) = super::expand(command, args(&["--window", "4294967297"])).unwrap();
+            assert!(params.get("activate").is_none());
+        }
+    }
     use super::*;
     #[test]
     fn rename_buffer_requires_one_destination_and_preserves_unicode() {

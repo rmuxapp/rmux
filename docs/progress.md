@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Added `rmuxctl focus-back --window ID` and `focus-forward --window ID` with
+optional `--activate`, command help and offline shell completion. They map to
+the existing focus-history RPC and require explicit window ownership. A focused
+CLI test verifies both directions, activation opt-in, required selector and
+unknown-flag rejection. This is unreleased; v0.1.3 remains the published build.
+
 Live focus-history RPC smoke exposed dropped rapid focus visits when relying
 only on deferred metadata notifications. Explicit terminal/workspace selections
 now record visits immediately; native focus notifications remain supported.
