@@ -35,7 +35,7 @@ run = "node scripts/bench-browser-engine.mjs"
 [tasks.build-release]
 description = "Build the optimized shared UI artifact for static hosting"
 depends = ["build-native-vt"]
-run = ["cargo build --locked --release --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist-release target/wasm32-unknown-unknown/release/rmux_web_probe.wasm", "cp index.html engine.js native-vt.js native-vt-render.js native-vt-selection.js dist-release/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist-release/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist-release/libghostty-vt-LICENSE", "cp ../../LICENSE dist-release/rmux-LICENSE", "node scripts/report-release.mjs"]
+run = ["cargo build --locked --release --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist-release target/wasm32-unknown-unknown/release/rmux_web_probe.wasm", "cp index.html engine.js native-vt.js native-vt-render.js native-vt-selection.js dist-release/", "cp ../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm dist-release/native-ghostty-vt.wasm", "cp ../../.deps/libghostty-vt-1.0.1/LICENSE dist-release/libghostty-vt-LICENSE", "cp ../../LICENSE dist-release/rmux-LICENSE", "cp assets/FiraMono-LICENSE assets/Inter-OFL.txt dist-release/", "RMUX_RELEASE_TARGET=wasm32-unknown-unknown python ../../scripts/release-notices.py dist-release/THIRD_PARTY_NOTICES.txt", "node scripts/report-release.mjs"]
 
 [tasks.prepare-legacy-benchmark]
 description = "Prepare historical ghostty-web benchmark dependencies only"

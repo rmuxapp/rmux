@@ -8,6 +8,8 @@ on:
       - crates/rmux-core/**
       - crates/rmux-desktop/src/**
       - scripts/build-ghostty-source.sh
+      - scripts/release-notices.py
+      - release/ghostty-notices.txt
       - mise.toml
       - .github/workflows/shared-demo.yml
 permissions:

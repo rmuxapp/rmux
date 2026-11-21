@@ -1,159 +1,93 @@
 # Shared native and browser UI
 
-The browser demo must converge on the actual rmux application, not a separately maintained JavaScript imitation. Sample sessions replace local processes; they should not replace workspace behavior or UI code.
+The browser demo must run rmux's application behavior and UI. Bundled sample
+sessions replace local processes; they must not replace workspace behavior with
+a separately maintained imitation. Rustable's shared application crate remains
+the architectural target.
 
-## Current state
+## Published versus shared build
 
-Browser terminal creation now receives rmux's shared Rust foreground/background
-defaults and 4 MiB scrollback limit, matching desktop initialization instead of
-Ghostty's raw defaults. The direct adapter validates options and frees a newly
-created terminal if configuration fails. Engine checks cover configured colors,
-OSC override/reset and disabled-history behavior. The history bound is not a
-total engine or browser memory limit.
+The published Cloudflare demo still uses JavaScript and ghostty-web 0.4.0. It is
+a layout showcase, not the shared Rust application. The marketing site remains
+local and off GitHub.
 
-The browser palette now includes New Terminal Tab, Next/Previous Tab and Close
-Terminal Tab with native command identities and binding hints. All six tab
-commands (including movement) restore terminal focus and dispatch the existing
-keyboard actions. Empty panes receive a dedicated focus target so Cmd+P and
-Cmd+T remain usable after the last terminal closes. Browser checks verify
-creation, selection, closing and empty-pane recovery; the WASM build passes.
+`tools/web-probe` contains the replacement under development. It uses GPUI CE
+0.3.0 for browser rendering while desktop remains on GPUI 0.2.2. The browser
+build shares substantial application code, but its workspace orchestration and
+platform services are still separate. Do not describe it as full parity yet.
 
-Tab movement now uses `Tabs::move_active` in both hosts and shares
-Ctrl+Shift+PageUp/PageDown bindings. Both palettes expose Move Tab Left/Right.
-Browser tab titles stay attached to session identities across movement/removal,
-and the tab strip reveals selected/moved tabs. Browser checks cover shortcut and
-palette movement, preserved output/focus and stopping at the first position.
+## Shared implementation
 
-Pane tab order and selection now belong to `rmux-core::tabs::Tabs<T>` in both
-hosts. The model owns its collection and selected index; read-only slice access
-cannot bypass reconciliation. Removal keeps a surviving selected tab, closing
-the active tab chooses its right neighbor or the last tab, insertion and swaps
-preserve selected identity, and restore clamps invalid indices. Native transfer,
-batch-close and persistence paths consume this model too. This removes duplicate
-tab state ownership; platform focus, process launch and view orchestration remain
-separate.
+- **Application state:** pane trees, directional focus, resizing/equalization,
+  workspace groups and logical ordering, tab ownership/selection/reordering,
+  command identities, palette matching, terminal frames and style runs.
+- **Views:** native palette and text field, sidebar/tab/pane presentation,
+  recursive split layout and interaction, icons, row cache/painter, cell metrics,
+  cursor geometry and draggable scrollback indicator.
+- **Input:** shared composition model, workspace/pane/tab shortcut definitions,
+  tab action dispatch, fractional wheel accumulation and Shift+PageUp/Down/Home/End.
+- **Terminal engine:** the same pinned libghostty-vt 1.0.1, compiled to WASM with
+  its C API manifest. Sparse row patches preserve unchanged Rust row identities.
+  Native key encoding, gesture selection, bounded text export and viewport APIs
+  drive browser behavior. The historical ghostty-web adapter is benchmark-only.
+- **Defaults:** Rust supplies desktop foreground/background and a 4 MiB history
+  limit. This is a history limit, not a bound on total browser memory.
 
-Selection edge autoscroll is now wired into the browser host. The adapter returns
-the native gesture's continuation request, checking 64-bit scrollbar bounds;
-the host schedules one cancellable tick at the shared desktop 30 ms interval.
-Release, re-entry, scrollbar dragging and hidden-terminal cache release cancel
-the task. Engine tests cover both directions, history selection and stopping.
-Native check and WASM build pass; held-pointer browser timing is not yet verified.
+Browser tabs retain independent engine/session state. Hidden workspaces/tabs
+release shaped-row caches. Tab titles remain attached to session identity.
+Closing the last terminal focuses the empty workspace, allowing keyboard or
+palette creation of a replacement terminal.
 
-The shared scrollback indicator now accepts dragging on both hosts, preserving
-the grab point and issuing absolute native viewport row commands. Core geometry
-and engine checks cover clamping and repeated absolute targets. Browser drag
-interaction is verified. No continuous repaint loop or cache bypass was added.
+The browser font adapter uses bundled Fira Mono. Desktop uses platform fonts.
+GPUI CE lacks the native fixed-cell-width shaping argument, so the adapter uses
+batched ASCII runs only when every caret boundary matches the terminal grid;
+otherwise it falls back to explicit placement. Do not infer native performance
+from successful rendering.
 
-The scrollback position indicator is now shared native source, including geometry,
-color and visibility. Browser top/middle/bottom behavior is verified. It is a
-position indicator; neither host currently implements dragging it.
+## Verification to date
 
-Scroll command types and Shift+PageUp/Down/Home/End navigation are now shared
-with desktop. Native command identities also expose top/bottom in the browser
-palette. Browser checks verify top, one-row page overlap and returning to bottom.
+Focused browser checks cover workspace restoration, groups, splits, resizing,
+zoom, palette search, tab creation/navigation/reordering/closing, empty-pane
+recovery, rapid ASCII text, single-line paste, scrollback, selection/copy and
+scrollbar dragging. See [progress](progress.md) for individual evidence and limits.
 
-Wheel scrollback now uses the native viewport API and shared Rust wheel
-accumulation. The browser check covers historical selection/copy and returning
-to the prompt on input. Scrollbar controls, keyboard scroll navigation and
-selection edge autoscroll remain unfinished.
+Direct engine tests cover Unicode/wide/combining cells, styled sparse snapshots,
+keyboard modes and Kitty action encoding, selection gestures and copy limits,
+absolute history targets, edge-scroll continuation, configured colors and OSC
+reset behavior. These tests do not establish browser event or IME parity.
 
-Mouse selection and copying now use native Ghostty gestures and selection export.
-The shared painter highlights the resulting ranges. Browser checks cover drag,
-word/line clicks, Cmd+C clipboard text and palette clipboard isolation. Browser
-copy events supplement GPUI keybindings because OS menu copying may not emit a
-keydown. Edge autoscroll and context menus remain incomplete.
+Selection edge scrolling uses the native continuation request and a cancellable
+30 ms timer shared with desktop. Held-pointer browser timing remains unverified.
 
-The local browser runtime now uses the same pinned libghostty-vt 1.0.1 as desktop,
-through a direct WASM C API adapter. Sparse row/selection decoding and native key
-encoding are connected to the shared Rust painter/input host. Focused engine and
-browser interaction checks pass. Scrollback, selection edge autoscroll and other
-platform services remain unfinished; the published website still has the old demo.
+The [engine benchmark](benchmarks/native-vt.md) measures write, cell extraction
+and JSON serialization at 1/4/16 panes. It excludes Rust decoding, shaping, GPU,
+presentation latency and browser memory. Broader performance claims remain open.
 
-The local shared browser build now also uses native pane framing, control sizes
-and SVG icons. Tooltips select the host font explicitly, avoiding the unavailable
-macOS font in the browser overlay. Split buttons and zoom/unzoom are verified;
-rapid text-event delivery is now handled by a registered platform input handler
-using the native Composition model. Rapid ASCII typing and single-line paste are
-verified; IME preedit rendering and broader input remain incomplete. This build
-is not deployed.
+## Build and artifact path
 
-Desktop uses GPUI 0.2.2 and libghostty-vt. The local-only Cloudflare site uses JavaScript and ghostty-web 0.4.0. It shares neither the Rust application UI nor workspace state. It is a layout showcase, not a browser build of rmux. Keep that distinction visible until the shared build works.
+Use `mise run build` inside `tools/web-probe` for fast development output in
+`dist`. `mise run build-release` produces optimized output in `dist-release`.
+The **Shared WASM demo** GitHub workflow builds the release artifact, checks the
+engine adapter and uploads `rmux-shared-demo`. It does not publish the site.
 
-Rustable demonstrates the intended architecture: its browser host imports the same application crate and mounts its egui UI with WebRunner. Its demo services differ from native services, while its UI remains shared.
+`build-sizes.json` records raw/gzip/Brotli WASM payload sizes and SHA-256 hashes.
+The retired ghostty-web npm package is prepared only for legacy benchmarks; it
+is not part of the replacement runtime or optimized artifact.
 
-## Implementation path
+## Remaining work and deployment acceptance
 
-1. Share existing application behavior without rewriting it. The terminal snapshot contract (`Cell`, `Frame`, cursor/colors and bounded text export) is now in core as well; native engine types are re-exports. `rmux-core` now owns the existing pane tree, directional navigation and bounded focus history; desktop consumes that crate. Preserve current behavior and tests.
-2. Run a bounded compatibility probe using an actual rmux GPUI view on a web-capable GPUI distribution. Check native API compatibility before changing the production dependency. Do not replace GPUI with a second UI framework merely for the demo.
-3. Extract shared views and application state from the desktop entry point. Introduce platform services for terminal sessions, files, persistence, notifications and window control. Native hosts keep real PTYs; browser hosts receive bundled sample sessions and no server access.
-4. Adapt the same terminal grid renderer to a browser terminal engine interface. A WASM VT parser alone does not provide shared UI. Verify cell snapshots, input, selection, resize and focus with the shared view.
-5. Build and test the browser host, then embed its output in the existing local-only Cloudflare site. Keep the marketing site off GitHub. Replace the JavaScript showcase only after the real UI renders and responds correctly.
-
-## Candidate browser backends
-
-The pinned GPUI 0.2.2 has native macOS, Linux/FreeBSD and Windows backends, with no web backend. Newer forks provide a route worth probing:
-
-- [GPUI CE web guide](https://docs.rs/gpui-ce/latest/gpui/_documentation/guides/web/index.html): one canvas, WebGPU with WebGL2 fallback, bundled fonts, optional workers with cross-origin isolation.
-- [GPUI Kit WebAssembly guide](https://gpui-kit.com/docs/webassembly/): shared Rust views through gpui-pre-web; explicitly describes browser support as a showcase path requiring product-specific validation.
-
-These are candidates, not validated dependencies. Do not claim native performance or full parity from their examples. Avoid a production renderer migration until a probe establishes the required behavior.
-
-## Acceptance
-
-The browser must use the same workspace/tab/pane state, command definitions, palette, shortcuts and view layout as native, with explicit platform exceptions for reserved browser shortcuts and OS-only services. Switching workspaces must retain session state; resize and zoom must not mix terminal contents. Measure startup, idle work, input latency and memory at representative pane counts. Keep native desktop performance and release builds working throughout.
-
-## Terminal rendering adapter
-
-### Converging on the desktop engine version
-
-The pinned libghostty-vt 1.0.1 distribution supports wasm32-freestanding, including
-the C selection APIs used by native rmux. `mise run build-native-vt` in
-tools/web-probe builds it to the isolated .deps/ghostty-vt-wasm32-freestanding
-prefix; `mise run check-native-vt` tests a direct adapter. Its ABI manifest drives
-enum values and selection sizes, with version/pointer-width checks. Selection,
-Unicode copy, soft wraps, bounded output and session isolation pass in Node's
-WASM runtime. This is migration groundwork, not browser selection completion:
-the UI still uses ghostty-web until render snapshots, keyboard and selection
-gestures are connected to the direct engine adapter.
-
-The direct adapter also encodes keys through native set_from_terminal, sharing
-negotiated modes rather than mirroring only two DEC flags. Runtime tests cover
-application arrows, control/Alt keys, Kitty press/repeat/release, Unicode text and
-mode isolation. Browser event routing has not switched to this adapter yet.
-
-The owned frame contract and style-run grouping now live in rmux-core and are
-used by the native renderer. Keep row Arc identity and style-run batching when
-connecting the web host. GPUI 0.2.2 shapes with an explicit cell-width argument;
-GPUI CE 0.3.0's shape_line signature does not accept that argument. Verify fixed
-column placement with a bundled monospace font, wide/combining cells and styled
-ASCII runs before calling the renderer compatible. Do not silently replace the
-native cache or advertise a plain text widget as the terminal renderer.
-
-The isolated host now compiles that same row_cache.rs and cell_metrics.rs with
-host-specific shaping/paint API adapters. A captured native Ghostty fixture
-renders through paint_row in split panes with a bundled monospace font. ASCII
-columns are explicitly placed because CE lacks fixed-width shaping; this is
-correctness-first and has not passed performance acceptance. The fixture does
-not substitute for browser VT parsing, live input, cursor/selection interaction
-or wide/combining-character acceptance.
-
-The host now also connects live ghostty-web 0.4.0 instances to that painter. Each
-pane owns an engine; sparse JSON patches replace dirty rows while preserving
-unchanged Rust Arc identities. Sample commands exercise basic ASCII input and
-independent state. Native input/IME, cursor painting, selection, resize and
-workspace integration remain acceptance work. Browser engine cell exports also
-lack native custom underline decoration and overline details.
-
-The browser host now retains independent workspace entities with live pane/tab
-state. Native sidebar presentation and workspace shortcut defaults are shared
-source modules. Switching releases hidden rendering caches without dropping
-terminal engines. Browser checks cover restoring split layouts/tabs/output and
-keyboard workspace creation, numbered selection and wraparound. The host still
-owns a separate workspace service model; this is progress toward shared UI, not
-completion of the Rustable-style single application model.
-
-Workspace group ownership and ordering now live in rmux-core, extracted from the
-native model with its existing tests and restore validation. Both hosts consume
-that model and shared numbered/cyclic selection rules. Browser group controls
-are not connected yet; having the model does not establish group UI parity.
+1. Continue moving workspace orchestration into shared application state/views;
+   keep browser sample services behind platform adapters. Tab and group models
+   alone do not complete the Rustable-style architecture.
+2. Complete browser terminal input: IME preedit, Unicode sample input/paste,
+   release-event routing and platform-reserved shortcut behavior. Validate held
+   edge selection, Alt-drag and cancellation when focus leaves the browser.
+3. Close missing UI/service parity against [feature parity](feature-parity.md)
+   and [roadmap](roadmap.md), including settings and context menus. The static
+   demo has no real shell, filesystem or SSH access by design.
+4. Measure optimized startup, idle work, input latency and memory at representative
+   pane counts. Verify resize, workspace switching, zoom, Unicode and retained
+   output using the optimized browser artifact.
+5. Embed the verified shared build in the existing local Cloudflare site and
+   replace the published imitation. Keep native performance and release builds
+   working throughout; do not publish parity or performance claims beyond evidence.

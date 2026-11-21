@@ -20,5 +20,6 @@ for package in sorted(metadata['packages'], key=lambda p: (p['name'], p['version
     for path in sorted(files):
         if path.is_file():
             parts.append('\n' + path.name + '\n' + path.read_text(encoding='utf-8', errors='replace') + '\n')
-parts.append('\nGhostty notices\n' + Path('release/ghostty-notices.txt').read_text(encoding='utf-8'))
+repo = Path(__file__).resolve().parent.parent
+parts.append('\nGhostty notices\n' + (repo / 'release/ghostty-notices.txt').read_text(encoding='utf-8'))
 Path(sys.argv[1]).write_text(''.join(parts), encoding='utf-8')
