@@ -472,8 +472,7 @@ impl WorkspaceWindow {
         let members: Vec<_> = self.workspace_order(true).into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id())
             .filter(|id| self.sidebar_selection.contains(id)).map(|id| id.to_string()).collect();
         if members.len() < 2 { cx.propagate(); return; }
-        let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
+        let name = self.workspace_state.next_group_name();
         let create = automation::GroupCreate { cwd: None, window_id: cx.entity_id().to_string(), name, workspace_ids: Some(members), external_id: None };
         match self.automation_group_create(&create, window, cx) {
             Ok(_) => { self.sidebar_selection.clear(); self.sidebar_selection_anchor = None; }
@@ -766,13 +765,9 @@ impl WorkspaceWindow {
     fn create_group(&mut self, empty: bool, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
         if empty { self.add_with_group(1, false, window, cx); }
-        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
-        let selected = entry.workspace.entity_id();
-        let slot = self.group_anchor_slot(selected);
-        match self.workspace_state.groups.create(name, vec![selected], empty) {
-            Ok(_) => { self.preserve_group_slot(slot, Some(selected)); self.sidebar = true; self.scroll_to_workspace(self.workspace_state.active); }
+        if self.workspace_state.entries.get(self.workspace_state.active).is_none() { return; }
+        match self.workspace_state.create_group(self.workspace_state.active, empty, |entry| entry.workspace.entity_id()) {
+            Ok(_) => { self.sidebar = true; self.scroll_to_workspace(self.workspace_state.active); }
             Err(error) => self.notice = Some(format!("Create group: {error}")),
         }
         cx.notify();

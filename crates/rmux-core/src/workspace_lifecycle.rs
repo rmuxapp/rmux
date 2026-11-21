@@ -38,6 +38,32 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         let visible = self.groups.visible_workspace(metadata(self.entries.get(index)?).0);
         self.order(false, &metadata).iter().position(|index| metadata(&self.entries[*index]).0 == visible)
     }
+    pub fn next_group_name(&self) -> String {
+        (1..).map(|number| format!("Group {number}"))
+            .find(|name| !self.groups.entries().iter().any(|group| &group.name == name)).unwrap()
+    }
+    /// Extract one workspace into a new group without moving the old group's
+    /// promoted anchor in the sidebar or changing the selected workspace identity.
+    pub fn create_group(&mut self, index: usize, generated: bool, key: impl Fn(&T) -> W) -> anyhow::Result<u64> {
+        let member = self.entries.get(index).map(&key).ok_or_else(|| anyhow::anyhow!("workspace no longer exists"))?;
+        let selected = self.entries.get(self.active).map(&key);
+        let slot = self.groups.containing(member).and_then(|group| {
+            let anchor = *group.members.first()?;
+            let index = self.entries.iter().position(|entry| key(entry) == anchor)?;
+            Some((group.id, anchor, index))
+        });
+        let id = self.groups.create(self.next_group_name(), vec![member], generated)?;
+        if let Some((old_group, previous, position)) = slot {
+            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == old_group)
+                .and_then(|group| group.members.first()).copied() {
+                workspace_groups::preserve_anchor_slot(&mut self.entries, &key, previous, position, anchor);
+            }
+        }
+        if let Some(index) = selected.and_then(|selected| self.entries.iter().position(|entry| key(entry) == selected)) {
+            self.active = index;
+        }
+        Ok(id)
+    }
     pub fn select(&mut self, index: usize, key: impl Fn(&T) -> W) -> bool {
         select(&self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, key)
     }
@@ -171,6 +197,26 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn extracting_group_anchor_preserves_old_slot_selection_and_unique_names() {
+        let mut state = State { entries: vec![1, 2, 3, 4], active: 0, ..Default::default() };
+        let old = state.groups.create("Group 1".into(), vec![1, 4], false).unwrap();
+        let new = state.create_group(0, false, |id| *id).unwrap();
+        assert_eq!(state.entries, vec![4, 2, 3, 1]);
+        assert_eq!(state.entries[state.active], 1);
+        assert_eq!(state.groups.containing(4).unwrap().id, old);
+        let group = state.groups.containing(1).unwrap();
+        assert_eq!(group.id, new);
+        assert_eq!(group.name, "Group 2");
+        assert!(!group.generated_anchor);
+        assert_eq!(state.next_group_name(), "Group 3");
+        assert!(state.create_group(99, true, |id| *id).is_err());
+        assert_eq!(state.next_group_name(), "Group 3");
+        state.create_group(1, true, |id| *id).unwrap();
+        assert!(state.groups.containing(2).unwrap().generated_anchor);
+        assert_eq!(state.entries[state.active], 1);
+    }
 
     #[test]
     fn state_navigation_tracks_group_order_visibility_and_closed_history() {

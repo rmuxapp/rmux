@@ -115,9 +115,7 @@ impl BrowserHost {
     }
     fn new_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.add_workspace(false, window, cx) { return; }
-        let name = (1..).map(|number| format!("Group {number}"))
-            .find(|name| !self.workspace_state.groups.entries().iter().any(|group| &group.name == name)).unwrap();
-        self.workspace_state.groups.create(name, vec![self.workspace_state.entries[self.workspace_state.active].1.entity_id()], true)
+        self.workspace_state.create_group(self.workspace_state.active, true, |(_, entity)| entity.entity_id())
             .expect("new workspace is a valid group anchor");
         cx.notify();
     }

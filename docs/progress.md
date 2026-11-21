@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Single-workspace group creation and automatic group naming now live in shared
+workspace `State`, used by native and browser hosts. Moving an existing anchor
+into a new group preserves the old group's promoted-anchor sidebar slot and the
+selected workspace identity; generated-anchor provenance remains explicit. Native
+multi-selection group creation also uses the shared name allocator while retaining
+its existing automation transaction. Seven focused lifecycle tests pass, including
+anchor extraction, unique names, invalid-index nonmutation and generated provenance.
+Native and WASM checks pass. Full shared application/session integration remains
+open; this change has not been deployed.
+
 Published successful GitHub Shared WASM demo run 44941009912, source dae6f46,
 to rmux.app via Cloudflare deployment eae8c1f4. Production now includes the shared
 find controls, bounded incremental Ghostty search, query history and unified
