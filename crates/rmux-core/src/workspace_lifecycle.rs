@@ -1,6 +1,12 @@
 //! Workspace ownership transitions, shared by native and browser applications.
 use crate::{focus_trail::PreviousSelection, workspace_groups::{self, Groups}};
 
+pub fn normalized_name(text: &str) -> Option<String> {
+    let name: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
+    let name = name.trim().to_owned();
+    (!name.is_empty()).then_some(name)
+}
+
 /// Application workspace ownership shared by native and browser hosts.
 /// Entries contain platform views; selection and group state belong to this model.
 /// Fields remain accessible for restoration and metadata operations during migration.

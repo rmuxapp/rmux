@@ -53,7 +53,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
     CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
-    CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
+    CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
     CommandId::ScrollToTop, CommandId::ScrollToBottom,
 ];
 struct WorkspaceCommand(CommandId);
@@ -62,7 +62,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -540,6 +540,7 @@ pub fn start() {
         cx.bind_keys([
             KeyBinding::new(if mac { "cmd-p" } else { "ctrl-shift-p" }, CommandPalette, None),
             KeyBinding::new(if mac { "cmd-a" } else { "ctrl-shift-a" }, EditorSelectAll, Some("Terminal")),
+            KeyBinding::new(if mac { "cmd-shift-r" } else { "ctrl-shift-r" }, RenameWorkspace, None),
             KeyBinding::new("shift-f10", ShowTabMenu, Some("Terminal")),
             KeyBinding::new(if mac { "cmd-t" } else { "ctrl-shift-t" }, NewTab, Some("Terminal")),
             KeyBinding::new(if mac { "cmd-w" } else { "ctrl-shift-w" }, ClosePane, Some("Terminal")),

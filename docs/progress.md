@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser workspaces can now be renamed through the palette, Cmd+Shift+R
+(Ctrl+Shift+R elsewhere), or sidebar double-click. The inline editor uses the
+shared TextField; both hosts share RenameWorkspace routing and bounded name
+normalization. Commit resolves the captured workspace identity and updates the
+sidebar and workspace header without replacing pane/terminal entities. Escape
+or switching workspaces cancels editing. Native compile and WASM build pass.
+Browser smoke verified shortcut save, double-click/Escape cancellation and
+retained terminal output after switching away and back. Screenshot:
+target/browser-workspace-rename.jpg. Browser reload persistence remains absent.
+Not deployed.
+
 Published GitHub demo run 44949065490 (11fe7bc) to rmux.app, Cloudflare deployment
 93090bbf. Optimized build and all font/startup/clipboard/engine/search checks passed.
 Production embedded-demo smoke verified palette terminal-menu access, text-only

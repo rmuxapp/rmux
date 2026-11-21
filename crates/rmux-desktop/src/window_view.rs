@@ -52,9 +52,7 @@ struct NotificationNavigation {
 }
 
 pub(super) fn normalized_workspace_name(text: &str) -> Option<String> {
-    let name: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
-    let name = name.trim().to_owned();
-    (!name.is_empty()).then_some(name)
+    rmux_core::workspace_lifecycle::normalized_name(text)
 }
 
 #[derive(Clone, Copy, PartialEq)]
@@ -3968,6 +3966,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
+            CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
@@ -4246,7 +4245,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
             .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
             .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
-            .on_action(cx.listener(|this, _: &RenameWorkspace, window, cx| this.edit_metadata(MetadataField::Name, window, cx)))
             .on_action(cx.listener(|this, _: &ShowWorkspaceMenu, window, cx| {
                 if let Some(entry) = this.workspace_state.entries.get(this.workspace_state.active) {
                     let target = entry.workspace.entity_id();

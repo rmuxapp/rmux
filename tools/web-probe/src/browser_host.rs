@@ -2,6 +2,7 @@
 use gpui::{prelude::*, *};
 use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
 pub(crate) struct BrowserHost {
+    rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
     workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>), EntityId>,
     sidebar: bool,
     sidebar_width: f32,
@@ -13,7 +14,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx))).collect();
-        let mut host = Self { workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
+        let mut host = Self { rename: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
     }
@@ -42,7 +43,35 @@ impl BrowserHost {
         }).detach();
         entity
     }
+    fn rename_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((_, input)) = &self.rename { input.read(cx).focus.clone().focus(window, cx); return; }
+        let Some((name, workspace)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let target = workspace.entity_id();
+        let input = cx.new(|cx| crate::text_field::TextField::new(name, cx));
+        cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
+            match event {
+                crate::text_field::EditEvent::Submitted { text, .. } => {
+                    if let Some(name) = rmux_core::workspace_lifecycle::normalized_name(text) {
+                        if let Some((label, workspace)) = this.workspace_state.entries.iter_mut().find(|(_, workspace)| workspace.entity_id() == target) {
+                            *label = name.clone();
+                            workspace.update(cx, |workspace, cx| { workspace.name = name; cx.notify(); });
+                        }
+                    }
+                }
+                crate::text_field::EditEvent::Cancelled => {},
+                crate::text_field::EditEvent::Changed(_) => return,
+            }
+            this.rename = None;
+            this.select(this.workspace_state.active, window, cx);
+        }).detach();
+        self.sidebar = true;
+        self.scroll_to_workspace();
+        input.read(cx).focus.clone().focus(window, cx);
+        self.rename = Some((target, input));
+        cx.notify();
+    }
     fn close_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.rename = None;
         let index = self.workspace_state.active;
         let Some(_closed) = self.workspace_state.close(index, |(_, entity)| (entity.entity_id(), false),
         ) else { return; };
@@ -60,6 +89,7 @@ impl BrowserHost {
     }
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.workspace_state.entries.len() { return; }
+        self.rename = None;
         self.workspace_state.entries[self.workspace_state.active].1.update(cx, |workspace,cx| {
             workspace.split_drag = None;
             for pane in workspace.samples.values() {
@@ -136,6 +166,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
     fn run_workspace_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         match command {
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
+            CommandId::RenameWorkspace => self.rename_workspace(window, cx),
             CommandId::NewWorkspace => self.add(window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
@@ -225,10 +256,14 @@ impl Render for BrowserHost {
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.is_some_and(|group| group.pinned), |row| row.child(
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, true))))
+                            .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
+                                div().flex().flex_col().gap_1().child(input.clone())
+                                    .child(div().text_xs().child("Enter to save · Esc to cancel"))))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
                                 let Some((_, entity)) = this.workspace_state.entries.get(index) else { return; };
                                 let target = entity.entity_id();
+                                if this.rename.as_ref().is_some_and(|(id, _)| *id == target) { return; }
                                 if let ClickEvent::Mouse(mouse) = event {
                                     let modifiers = mouse.down.modifiers;
                                     let toggle = if crate::terminal_engine::is_mac() { modifiers.platform } else { modifiers.control };
@@ -241,6 +276,7 @@ impl Render for BrowserHost {
                                 this.workspace_state.sidebar_selection.clear();
                                 this.workspace_state.sidebar_selection_anchor = Some(target);
                                 this.select(index,window,cx);
+                                if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_workspace(window, cx); }
                             }))
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
