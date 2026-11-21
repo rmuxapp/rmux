@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser terminal now registers ElementInputHandler during paint, matching the
+desktop committed-text boundary and reusing its Composition model. Printable
+text goes through platform text commits; symbolic/control keys remain Ghostty
+encoded. This fixes the dropped rapid typeText characters observed in the prior
+pane-control check and enables single-line ASCII paste. WASM build passes;
+browser verifies rapid help, pasted ls and split → draft → Ctrl+U → ls with no
+console errors. Evidence: target/shared-terminal-text-input-wasm.png. The sample
+interpreter still limits commands to 48 ASCII bytes; multiline paste, Unicode
+commands and rendered IME preedit remain unfinished.
+
 Browser panes now use shared native framing, 28px control hit areas and bundled
 SVG icons for new tab, split right/below and zoom. Removed the extra diagnostic
 pane header and duplicate focus border. Shared tooltips explicitly select the

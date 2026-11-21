@@ -1,5 +1,6 @@
 //! Sample shell output parsed by browser Ghostty and drawn by the native painter.
 use gpui::{prelude::*, *};
+use std::ops::Range;
 use rmux_core::terminal_frame::Frame;
 use crate::{cell_metrics::CellMetrics, row_cache, row_host, terminal_engine::TerminalEngine};
 pub(crate) struct TerminalSample {
@@ -9,6 +10,8 @@ pub(crate) struct TerminalSample {
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
     command: String,
+    composition: crate::composition::Composition,
+    cursor_bounds: Bounds<Pixels>,
 }
 impl TerminalSample {
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
@@ -21,16 +24,22 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new() }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default() }
     }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
         if key.modifiers.platform { return; }
+        // Printable text is committed by the platform input handler, as on desktop.
+        if !key.modifiers.control && !key.modifiers.alt && key.key_char.is_some() { return; }
         let Some(symbol) = rmux_core::keyboard::key(&key.key) else { return; };
         let mods = rmux_core::keyboard::Modifiers { shift:key.modifiers.shift, control:key.modifiers.control, alt:key.modifiers.alt };
         let text = if mods.control || mods.alt { key.key.as_str() } else { key.key_char.as_deref().unwrap_or("") };
         let encoded = self.engine.encode(symbol, mods, event.is_held, text);
-        match encoded.as_str() {
+        self.accept(&encoded, cx);
+        cx.stop_propagation();
+    }
+    fn accept(&mut self, encoded: &str, cx: &mut Context<Self>) {
+        match encoded {
             "\r" => {
                 self.engine.write("\r\n");
                 let response = match self.command.trim() {
@@ -60,12 +69,13 @@ impl TerminalSample {
             }
         }
         self.frame = self.engine.frame(Some(&self.frame));
-        cx.notify(); cx.stop_propagation();
+        cx.notify();
     }
 }
 impl Render for TerminalSample {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
+        let input = entity.clone();
         div().size_full().key_context("Terminal").track_focus(&self.focus)
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.focus.focus(window, cx)))
             .on_key_down(cx.listener(Self::key))
@@ -81,6 +91,8 @@ impl Render for TerminalSample {
                     this.engine.resize(columns, height);
                     this.frame = this.engine.frame(Some(&this.frame));
                 }
+                let (cursor_x, cursor_y) = this.frame.cursor.unwrap_or_default();
+                this.cursor_bounds = Bounds::new(content.origin + point(px(f32::from(cursor_x)*cells.width), px(f32::from(cursor_y)*cells.height)), size(px(cells.width), px(cells.height)));
                 let rows = this.rows.update(&this.frame, cells, &family, window, None);
                 let cursor = this.frame.cursor.and_then(|(x,y)| {
                     let cell = this.frame.rows.get(usize::from(y))?.get(usize::from(x))?;
@@ -93,6 +105,7 @@ impl Render for TerminalSample {
                 });
                 (rows, cells, row_host::color(this.frame.background), bounds, content, cursor)
             }), move |_, (rows, cells, background, bounds, content, cursor), window, cx| {
+                window.handle_input(&input.read(cx).focus, ElementInputHandler::new(bounds, input.clone()), cx);
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
                     window.paint_quad(fill(bounds, background));
                     for (y, row) in rows.iter().enumerate() {
@@ -105,4 +118,32 @@ impl Render for TerminalSample {
                 });
             }).size_full())
     }
+}
+
+// The same committed-text/composition boundary as the desktop terminal. Keydown
+// handles encoded control keys; platform text events own printable input.
+impl EntityInputHandler for TerminalSample {
+    fn text_for_range(&mut self, range: Range<usize>, actual: &mut Option<Range<usize>>, _: &mut Window, _: &mut Context<Self>) -> Option<String> {
+        let (text, adjusted) = self.composition.substring(range);
+        *actual = Some(adjusted);
+        Some(text)
+    }
+    fn selected_text_range(&mut self, _: bool, _: &mut Window, _: &mut Context<Self>) -> Option<UTF16Selection> {
+        Some(UTF16Selection { range: self.composition.selected.clone(), reversed: false })
+    }
+    fn marked_text_range(&self, _: &mut Window, _: &mut Context<Self>) -> Option<Range<usize>> { self.composition.marked.clone() }
+    fn unmark_text(&mut self, _: &mut Window, cx: &mut Context<Self>) {
+        let text = self.composition.take();
+        if !text.is_empty() { self.accept(&text, cx); }
+    }
+    fn replace_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, _: &mut Window, cx: &mut Context<Self>) {
+        let text = self.composition.commit(range, text);
+        self.accept(&text, cx);
+    }
+    fn replace_and_mark_text_in_range(&mut self, range: Option<Range<usize>>, text: &str, selected: Option<Range<usize>>, _: &mut Window, cx: &mut Context<Self>) {
+        self.composition.update(range, text, selected);
+        cx.notify();
+    }
+    fn bounds_for_range(&mut self, _: Range<usize>, _: Bounds<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<Bounds<Pixels>> { Some(self.cursor_bounds) }
+    fn character_index_for_point(&mut self, _: Point<Pixels>, _: &mut Window, _: &mut Context<Self>) -> Option<usize> { Some(0) }
 }

@@ -2,9 +2,11 @@
 
 Latest pane chrome shares native framing, control sizes and SVG icons. Split
 Right/Below and Zoom buttons work with shared tooltips using the host font.
-Native check/WASM build and browser button/tooltip checks pass. Rapid browser
-text delivery dropped a character during checking; individual keypress commands
-work. Resolve input ordering before replacing the public demo.
+Native check/WASM build and browser button/tooltip checks pass. Terminal text now
+uses a registered platform input handler and native Composition model. Rapid
+ASCII typing and single-line paste pass browser checks, including typing after
+split and Ctrl+U. Multiline paste, Unicode sample commands and rendered IME
+preedit remain incomplete.
 
 This isolated host runs actual desktop sources against GPUI CE 0.3.0 without
 changing the production GPUI 0.2.2 dependency. Shared sources include the text
