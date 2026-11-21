@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Published successful GitHub demo run 44951581189 (fab099c) to rmux.app,
+Cloudflare deployment 8f4bd996. Hidden workspace/tab/zoom snapshot reclamation is
+now live. Embedded production smoke verified both split outputs survive zoom,
+workspace round-trip and layout restoration. Screenshot:
+target/live-demo-reclamation-fab099c.jpg. Added the focused queued-input and
+parser-contention tests to the existing native browser CI job; local results
+were recorded in the preceding implementation cycles. Desktop downloads remain
+v0.1.4; native focus queue changes are not released.
+
 Added a queued-focus release benchmark alongside the retained synchronous mode.
 At 1/4/8/16 output-flooding panes, focus-in admission p99 measured
 2.875/4.875/7.666/6.792 µs; all admissions succeeded and fixture cleanup completed.

@@ -56,6 +56,10 @@ jobs:
             browser-macos-
       - name: Prepare pinned Ghostty dependency
         run: mise run bootstrap
+      - name: Test nonblocking focus input
+        run: |
+          mise exec -- cargo test --locked -p rmux-terminal queued_
+          mise exec -- cargo test --locked -p rmux-terminal opportunistic_snapshot_and_targeted_input_do_not_wait_for_parser_lock
       - name: Test browser policy and state transitions
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser browser_
       - name: Test renderer reclamation and diagnostics
