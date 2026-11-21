@@ -2,10 +2,13 @@
 use gpui::{prelude::*, *};
 use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
 #[derive(Clone, Copy)]
-enum WorkspaceField { Name, GroupName, Description }
+enum WorkspaceField { Name, GroupName, Description, Color, GroupColor }
+#[derive(Default)]
+struct WorkspaceMetadata { description: String, color: Option<u32> }
 pub(crate) struct BrowserHost {
     rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
-    workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, String), EntityId>,
+    workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, WorkspaceMetadata), EntityId>,
+    editor_hint: String,
     sidebar: bool,
     sidebar_width: f32,
     sidebar_drag: Option<(Pixels, f32)>,
@@ -15,8 +18,8 @@ pub(crate) struct BrowserHost {
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
-            (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, String::new())).collect();
-        let mut host = Self { rename: None, workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
+            (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, WorkspaceMetadata::default())).collect();
+        let mut host = Self { rename: None, editor_hint: String::new(), workspace_state: rmux_core::workspace_lifecycle::State { entries: workspaces, ..Default::default() }, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new() };
         host.select(0,window,cx);
         host
     }
@@ -54,21 +57,33 @@ impl BrowserHost {
             cx.notify();
             return;
         }
-        let Some((name, workspace, _, description)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let group = if matches!(field, WorkspaceField::GroupName) {
+        let Some((name, workspace, _, metadata)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let group = if matches!(field, WorkspaceField::GroupName | WorkspaceField::GroupColor) {
             let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
             Some(group)
         } else { None };
         let target = group.map_or(workspace.entity_id(), |group| group.members[0]);
-        let name = if matches!(field, WorkspaceField::Description) { description } else { group.map_or(name, |group| &group.name) };
+        let name = match field {
+            WorkspaceField::Description => metadata.description.clone(),
+            WorkspaceField::Color | WorkspaceField::GroupColor => group.map_or(metadata.color, |group| group.color).map(|color| format!("#{color:06X}")).unwrap_or_default(),
+            _ => group.map_or(name, |group| &group.name).clone(),
+        };
         let group_id = group.map(|group| group.id);
-        let input = cx.new(|cx| crate::text_field::TextField::new(name, cx));
+        let input = cx.new(|cx| crate::text_field::TextField::new(&name, cx));
         cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
             match event {
                 crate::text_field::EditEvent::Submitted { text, .. } => {
-                    if matches!(field, WorkspaceField::Description) {
+                    if matches!(field, WorkspaceField::Color | WorkspaceField::GroupColor) {
+                        let color = match rmux_core::workspace_lifecycle::parse_workspace_color(text) {
+                            Ok(color) => color,
+                            Err(error) => { this.editor_hint = error.into(); cx.notify(); return; }
+                        };
+                        if let Some(id) = group_id {
+                            if let Some(group) = this.workspace_state.groups.get_mut(id) { group.color = color; }
+                        } else if let Some(entry) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _, _)| workspace.entity_id() == target) { entry.3.color = color; }
+                    } else if matches!(field, WorkspaceField::Description) {
                         if let Some(entry) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _, _)| workspace.entity_id() == target) {
-                            entry.3 = rmux_core::workspace_lifecycle::normalized_description(text);
+                            entry.3.description = rmux_core::workspace_lifecycle::normalized_description(text);
                         }
                     } else if let Some(name) = rmux_core::workspace_lifecycle::normalized_name(text) {
                         if let Some(id) = group_id {
@@ -89,6 +104,10 @@ impl BrowserHost {
         self.sidebar = true;
         self.scroll_to_workspace();
         input.read(cx).focus.clone().focus(window, cx);
+        self.editor_hint = match field {
+            WorkspaceField::Color | WorkspaceField::GroupColor => "Color: #RRGGBB; empty clears",
+            _ => "Enter to save · Esc to cancel",
+        }.into();
         self.rename = Some((target, input));
         cx.notify();
     }
@@ -175,7 +194,7 @@ impl BrowserHost {
         let name = (1..).map(|number| format!("Workspace {number}"))
             .find(|name| !self.workspace_state.entries.iter().any(|(existing, _, _, _)| existing == name)).unwrap();
         let entity = Self::new_workspace_view(name.clone(), window, cx);
-        let Ok(index) = self.workspace_state.insert((name, entity, false, String::new()),
+        let Ok(index) = self.workspace_state.insert((name, entity, false, WorkspaceMetadata::default()),
             rmux_core::workspace_lifecycle::Insertion {
                 origin: current, inherit_group, placement: Default::default(),
             }, |(_, entity, pinned, _)| (entity.entity_id(), *pinned),
@@ -212,6 +231,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
                     cx.notify();
                 }
             }
+            CommandId::EditWorkspaceColor => self.rename_workspace(WorkspaceField::Color, window, cx),
+            CommandId::EditGroupColor => self.rename_workspace(WorkspaceField::GroupColor, window, cx),
             CommandId::EditWorkspaceDescription => self.rename_workspace(WorkspaceField::Description, window, cx),
             CommandId::RenameWorkspace => self.rename_workspace(WorkspaceField::Name, window, cx),
             CommandId::RenameWorkspaceGroup => self.rename_workspace(WorkspaceField::GroupName, window, cx),
@@ -282,7 +303,7 @@ impl Render for BrowserHost {
                         .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
                 .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
                     .children(self.workspace_order(false).into_iter().map(|index| {
-                        let (name, entity, pinned, description) = &self.workspace_state.entries[index];
+                        let (name, entity, pinned, metadata) = &self.workspace_state.entries[index];
                         let group = self.workspace_state.groups.containing(entity.entity_id());
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
                         let selected = self.workspace_state.sidebar_selection.contains(&entity.entity_id()) || index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
@@ -300,14 +321,15 @@ impl Render for BrowserHost {
                                             cx.notify();
                                         })))
                                 })
+                                .when_some(header.map_or(metadata.color, |group| group.color), |row, color| row.child(div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                 .child(div().min_w_0().flex_1().truncate().font_weight(FontWeight::SEMIBOLD)
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some()))))
-                            .when(!description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(description.clone())))
+                            .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 div().flex().flex_col().gap_1().child(input.clone())
-                                    .child(div().text_xs().child("Enter to save · Esc to cancel"))))
+                                    .child(div().text_xs().child(self.editor_hint.clone()))))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
                                 let Some((_, entity, _, _)) = this.workspace_state.entries.get(index) else { return; };

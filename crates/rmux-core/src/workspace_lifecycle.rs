@@ -1,6 +1,18 @@
 //! Workspace ownership transitions, shared by native and browser applications.
 use crate::{focus_trail::PreviousSelection, workspace_groups::{self, Groups}};
 
+pub fn parse_workspace_color(text: &str) -> Result<Option<u32>, &'static str> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let hex = text.strip_prefix('#').unwrap_or(text);
+    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
+        return Err("Enter a six-digit color such as #7AA2F7, or leave it empty to clear.");
+    }
+    Ok(Some(u32::from_str_radix(hex, 16).unwrap()))
+}
+
 pub fn normalized_description(text: &str) -> String {
     text.trim().chars().filter(|c| !c.is_control()).take(256).collect()
 }

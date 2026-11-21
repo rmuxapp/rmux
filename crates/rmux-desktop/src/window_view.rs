@@ -76,17 +76,7 @@ impl MetadataField {
         }
     }
 }
-fn parse_workspace_color(text: &str) -> Result<Option<u32>, &'static str> {
-    let text = text.trim();
-    if text.is_empty() {
-        return Ok(None);
-    }
-    let hex = text.strip_prefix('#').unwrap_or(text);
-    if hex.len() != 6 || !hex.bytes().all(|b| b.is_ascii_hexdigit()) {
-        return Err("Enter a six-digit color such as #7AA2F7, or leave it empty to clear.");
-    }
-    Ok(Some(u32::from_str_radix(hex, 16).unwrap()))
-}
+use rmux_core::workspace_lifecycle::parse_workspace_color;
 
 struct Entry {
     workspace: Entity<Workspace>,
@@ -3971,6 +3961,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
+            CommandId::EditWorkspaceColor => self.edit_metadata(MetadataField::Color, window, cx),
+            CommandId::EditGroupColor => self.edit_metadata(MetadataField::GroupColor, window, cx),
             CommandId::EditWorkspaceDescription => self.edit_metadata(MetadataField::Description, window, cx),
             CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
             CommandId::CloseWorkspaceGroup => self.request_close_group(window, cx),
@@ -4262,7 +4254,6 @@ impl Render for WorkspaceWindow {
                 }
             }))
             .on_action(cx.listener(|this, _: &EditWorkspaceIcon, window, cx| this.edit_metadata(MetadataField::Icon, window, cx)))
-            .on_action(cx.listener(|this, _: &EditWorkspaceColor, window, cx| this.edit_metadata(MetadataField::Color, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))
             .on_action(cx.listener(|this, _: &RefreshTerminalMemory, window, cx| this.refresh_memory(window, cx)))
             .on_action(cx.listener(|this, _: &CycleTerminalMemorySort, _, cx| this.sort_memory(cx)))
@@ -4272,7 +4263,6 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))

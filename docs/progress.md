@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser workspace/group colors now route through the shared desktop actions
+and use the same six-digit hex parser. Sidebar markers match native geometry;
+empty input clears the color, invalid input retains the draft with guidance.
+Browser metadata now has named description/color fields rather than another
+tuple slot. UI checks cover invalid input, correction, workspace clearing,
+group color and independent workspace color. Screenshot:
+`target/browser-workspace-colors.jpg`. WASM build and native desktop check pass.
+This browser parity increment is not deployed yet; native color behavior is
+unchanged apart from shared routing/validation.
+
 Native and browser metadata editors now reveal their target when its group is
 collapsed and scroll the active workspace into view. Reopening an existing
 editor also restores its visibility without replacing the draft. Browser UI
