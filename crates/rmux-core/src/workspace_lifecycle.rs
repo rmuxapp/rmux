@@ -9,10 +9,12 @@ pub struct State<T, W> {
     pub active: usize,
     pub groups: Groups<W>,
     pub previous: PreviousSelection<W>,
+    pub sidebar_selection: Vec<W>,
+    pub sidebar_selection_anchor: Option<W>,
 }
 impl<T, W> Default for State<T, W> {
     fn default() -> Self {
-        Self { entries: Vec::new(), active: 0, groups: Groups::default(), previous: PreviousSelection::default() }
+        Self { entries: Vec::new(), active: 0, groups: Groups::default(), previous: PreviousSelection::default(), sidebar_selection: Vec::new(), sidebar_selection_anchor: None }
     }
 }
 /// Resolve a destination without changing focus or selection.
@@ -23,6 +25,28 @@ pub enum Navigation { Cycle(isize), Number(usize), Previous }
 pub enum GroupEdit { Remove, SetAnchor, TogglePin }
 
 impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
+    /// Extend sidebar selection without changing the active terminal or MRU.
+    /// Ranges follow visible rows, excluding children of collapsed groups.
+    pub fn extend_sidebar_selection(&mut self, target: W, range: bool, metadata: impl Fn(&T) -> (W, bool)) -> bool {
+        if !self.entries.iter().any(|entry| metadata(entry).0 == target) { return false; }
+        let active = self.entries.get(self.active).map(|entry| metadata(entry).0);
+        let anchor = self.sidebar_selection_anchor.or(active).unwrap_or(target);
+        if range {
+            let visible: Vec<_> = self.order(false, &metadata).into_iter()
+                .map(|index| metadata(&self.entries[index]).0).collect();
+            let start = visible.iter().position(|id| *id == anchor);
+            let end = visible.iter().position(|id| *id == target);
+            self.sidebar_selection = if let (Some(start), Some(end)) = (start, end) {
+                visible[start.min(end)..=start.max(end)].to_vec()
+            } else { vec![target] };
+        } else {
+            if self.sidebar_selection.is_empty() { self.sidebar_selection.extend(active); }
+            if self.sidebar_selection.contains(&target) { self.sidebar_selection.retain(|id| *id != target); }
+            else { self.sidebar_selection.push(target); }
+        }
+        self.sidebar_selection_anchor = Some(anchor);
+        true
+    }
     pub fn order(&self, include_collapsed: bool, metadata: impl Fn(&T) -> (W, bool)) -> Vec<usize> {
         let identities: Vec<_> = self.entries.iter().map(metadata).collect();
         self.groups.ordered_indices(&identities, include_collapsed)
@@ -127,7 +151,11 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         insert(&mut self.entries, &mut self.active, &mut self.groups, entry, request, metadata)
     }
     pub fn close(&mut self, index: usize, metadata: impl Fn(&T) -> (W, bool)) -> Option<ClosedWorkspace<T>> {
-        close(&mut self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, metadata)
+        let removed = metadata(self.entries.get(index)?).0;
+        let closed = close(&mut self.entries, &mut self.active, &mut self.groups, &mut self.previous, index, metadata)?;
+        self.sidebar_selection.retain(|id| *id != removed);
+        if self.sidebar_selection_anchor == Some(removed) { self.sidebar_selection_anchor = None; }
+        Some(closed)
     }
     pub fn ungroup(&mut self, id: u64, metadata: impl Fn(&T) -> (W, bool)) -> bool {
         ungroup(&mut self.entries, &mut self.active, &mut self.groups, id, metadata)
@@ -253,6 +281,28 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sidebar_selection_follows_visible_order_and_survives_ownership_changes() {
+        let mut state = State { entries: vec![(1, false), (2, true), (3, false), (4, false)], active: 1, ..Default::default() };
+        let group = state.groups.create("group".into(), vec![1, 3], false).unwrap();
+        state.groups.get_mut(group).unwrap().collapsed = true;
+        assert!(state.extend_sidebar_selection(4, true, |entry| *entry));
+        assert_eq!(state.sidebar_selection, vec![2, 1, 4]); // Pinned first; hidden member omitted.
+        assert_eq!(state.active, 1); // Range selection never changes the active shell.
+        assert_eq!(state.previous.target(), None);
+        state.extend_sidebar_selection(1, false, |entry| *entry);
+        assert_eq!(state.sidebar_selection, vec![2, 4]);
+        assert!(!state.extend_sidebar_selection(99, true, |entry| *entry));
+        assert_eq!(state.sidebar_selection, vec![2, 4]);
+        state.close(1, |entry| *entry).unwrap(); // Also applies to detach/move ownership.
+        assert_eq!(state.sidebar_selection, vec![4]);
+        assert_eq!(state.sidebar_selection_anchor, None);
+        state.sidebar_selection.clear();
+        state.extend_sidebar_selection(4, false, |entry| *entry);
+        assert!(state.sidebar_selection.contains(&state.entries[state.active].0));
+        assert!(state.sidebar_selection.contains(&4));
+    }
 
     #[test]
     fn reorder_keeps_pin_tiers_group_anchor_and_selected_identity() {

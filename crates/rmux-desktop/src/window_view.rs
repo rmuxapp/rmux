@@ -144,8 +144,6 @@ pub(super) struct WorkspaceWindow {
     process_sampler: Arc<std::sync::Mutex<process_metrics::Sampler>>,
     rename: Option<(EntityId, Entity<text_field::TextField>, MetadataField)>,
     workspace_state: rmux_core::workspace_lifecycle::State<Entry, EntityId>,
-    sidebar_selection: Vec<EntityId>,
-    sidebar_selection_anchor: Option<EntityId>,
     rendered_workspace: Option<WeakEntity<Workspace>>,
     rendered_background: Option<WindowBackgroundAppearance>,
     close_prompt: Option<EntityId>,
@@ -183,8 +181,8 @@ impl WorkspaceWindow {
     fn show_workspace_menu(&mut self, target: EntityId, group: Option<u64>, position: Point<Pixels>, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
         let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == target) else { return; };
-        self.sidebar_selection.clear();
-        self.sidebar_selection_anchor = Some(target);
+        self.workspace_state.sidebar_selection.clear();
+        self.workspace_state.sidebar_selection_anchor = Some(target);
         self.select(index, window, cx);
         let return_focus = window.focused(cx);
         let focus = cx.focus_handle();
@@ -470,33 +468,19 @@ impl WorkspaceWindow {
 
     fn group_selected(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let members: Vec<_> = self.workspace_order(true).into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id())
-            .filter(|id| self.sidebar_selection.contains(id)).map(|id| id.to_string()).collect();
+            .filter(|id| self.workspace_state.sidebar_selection.contains(id)).map(|id| id.to_string()).collect();
         if members.len() < 2 { cx.propagate(); return; }
         let name = self.workspace_state.next_group_name();
         let create = automation::GroupCreate { cwd: None, window_id: cx.entity_id().to_string(), name, workspace_ids: Some(members), external_id: None };
         match self.automation_group_create(&create, window, cx) {
-            Ok(_) => { self.sidebar_selection.clear(); self.sidebar_selection_anchor = None; }
+            Ok(_) => { self.workspace_state.sidebar_selection.clear(); self.workspace_state.sidebar_selection_anchor = None; }
             Err(error) => self.notice = Some(error.message.into()),
         }
         cx.notify();
     }
 
     fn extend_sidebar_selection(&mut self, target: EntityId, range: bool, cx: &mut Context<Self>) {
-        let active = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id());
-        let anchor = self.sidebar_selection_anchor.or(active).unwrap_or(target);
-        if range {
-            let visible: Vec<_> = self.sidebar_order().into_iter().map(|index| self.workspace_state.entries[index].workspace.entity_id()).collect();
-            let start = visible.iter().position(|id| *id == anchor);
-            let end = visible.iter().position(|id| *id == target);
-            if let (Some(start), Some(end)) = (start, end) {
-                self.sidebar_selection = visible[start.min(end)..=start.max(end)].to_vec();
-            } else { self.sidebar_selection = vec![target]; }
-        } else {
-            if self.sidebar_selection.is_empty() { self.sidebar_selection.extend(active); }
-            if self.sidebar_selection.contains(&target) { self.sidebar_selection.retain(|id| *id != target); }
-            else { self.sidebar_selection.push(target); }
-        }
-        self.sidebar_selection_anchor = Some(anchor);
+        self.workspace_state.extend_sidebar_selection(target, range, |entry| (entry.workspace.entity_id(), entry.pinned));
         cx.notify();
     }
 
@@ -2389,9 +2373,6 @@ impl WorkspaceWindow {
         let Some(closed) = self.workspace_state.close(index, |entry| (entry.workspace.entity_id(), entry.pinned),
         ) else { return; };
         self.rename = None;
-        let removed = closed.removed;
-        self.sidebar_selection.retain(|id| *id != removed.workspace.entity_id());
-        if self.sidebar_selection_anchor == Some(removed.workspace.entity_id()) { self.sidebar_selection_anchor = None; }
         if self.workspace_state.entries.is_empty() {
             window.remove_window();
             return;
@@ -3246,8 +3227,6 @@ impl WorkspaceWindow {
             workspace_menu_blur: None,
             rename: None,
             workspace_state: rmux_core::workspace_lifecycle::State { active: snapshot.active_workspace, ..Default::default() },
-            sidebar_selection: Vec::new(),
-            sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
             close_prompt: None,
@@ -3458,8 +3437,6 @@ impl WorkspaceWindow {
             workspace_menu_blur: None,
             rename: None,
             workspace_state: Default::default(),
-            sidebar_selection: Vec::new(),
-            sidebar_selection_anchor: None,
             rendered_workspace: None,
             rendered_background: None,
             close_prompt: None,
@@ -4339,7 +4316,7 @@ impl Render for WorkspaceWindow {
                                 .when(cfg!(target_os = "macos"), |header| header.pl(px(80.)))
                                  .child(gpui::div().id("sidebar-title-drag").flex_1().min_w_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } })
-                                    .child(if self.sidebar_selection.len() > 1 { format!("{} selected", self.sidebar_selection.len()) } else { "Workspaces".into() }))
+                                    .child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
                                 .child(pane_view::action_control("sidebar-new-workspace", "New Workspace", NewWorkspace, None)
                                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.start_workspace(None, window, cx); } })).child(icons::icon("plus")))
                                 .tooltip(|window, cx| {
@@ -4382,7 +4359,7 @@ impl Render for WorkspaceWindow {
                                     let container = cx.entity_id();
                                     let target = entry.workspace.entity_id();
                                     let menu_group = header.map(|group| group.id);
-                                    let selected = self.sidebar_selection.contains(&target) || index == self.workspace_state.active || header.is_some_and(|group| group.collapsed && self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
+                                    let selected = self.workspace_state.sidebar_selection.contains(&target) || index == self.workspace_state.active || header.is_some_and(|group| group.collapsed && self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
                                     let title_hint: SharedString = display_name.clone().into();
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
@@ -4411,8 +4388,8 @@ impl Render for WorkspaceWindow {
                                                         return;
                                                     }
                                                 }
-                                                this.sidebar_selection.clear();
-                                                this.sidebar_selection_anchor = Some(target);
+                                                this.workspace_state.sidebar_selection.clear();
+                                                this.workspace_state.sidebar_selection_anchor = Some(target);
                                             }
                                             if let Some((id, input, _)) = &this.rename
                                                 && this.workspace_state.entries.get(index).is_some_and(|entry| {

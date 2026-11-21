@@ -180,7 +180,7 @@ impl Render for BrowserHost {
             .map(|root| crate::workspace_actions::bind(root, cx))
             .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(width)
                 .child(sidebar_presentation::header()
-                    .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child("Workspaces"))
+                    .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
                     .child(div().id("new-workspace").px_2().cursor_pointer().child("+")
                         .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
                 .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
@@ -188,7 +188,7 @@ impl Render for BrowserHost {
                         let (name, entity) = &self.workspace_state.entries[index];
                         let group = self.workspace_state.groups.containing(entity.entity_id());
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
-                        let selected = index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
+                        let selected = self.workspace_state.sidebar_selection.contains(&entity.entity_id()) || index == self.workspace_state.active || self.workspace_state.groups.visible_workspace(
                             self.workspace_state.entries[self.workspace_state.active].1.entity_id()) == entity.entity_id();
                         sidebar_presentation::row(("workspace",entity.entity_id()),selected)
                             .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
@@ -207,7 +207,23 @@ impl Render for BrowserHost {
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.is_some_and(|group| group.pinned), |row| row.child(
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, true))))
-                            .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx)))
+                            .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
+                                if !event.standard_click() { return; }
+                                let Some((_, entity)) = this.workspace_state.entries.get(index) else { return; };
+                                let target = entity.entity_id();
+                                if let ClickEvent::Mouse(mouse) = event {
+                                    let modifiers = mouse.down.modifiers;
+                                    let toggle = if crate::terminal_engine::is_mac() { modifiers.platform } else { modifiers.control };
+                                    if toggle || modifiers.shift {
+                                        this.workspace_state.extend_sidebar_selection(target, modifiers.shift, |(_, entity)| (entity.entity_id(), false));
+                                        cx.notify();
+                                        return;
+                                    }
+                                }
+                                this.workspace_state.sidebar_selection.clear();
+                                this.workspace_state.sidebar_selection_anchor = Some(target);
+                                this.select(index,window,cx);
+                            }))
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
              .child(div().flex_1().min_w_0().h_full().child(

@@ -44,7 +44,7 @@ views and core policies are useful migration steps, not completion evidence.
 
 - **Application state:** pane trees, directional focus, resizing/equalization,
   workspace groups and logical ordering, shared creation/visibility rules,
-  previous-workspace identity tracking, tab ownership/selection/reordering and join transfer order, tab-to-split placement,
+  previous-workspace identity tracking, sidebar multi-selection/range anchors and removal cleanup, tab ownership/selection/reordering and join transfer order, tab-to-split placement,
   command identities, palette matching, terminal frames and style runs.
 - **Views:** native palette and text field, sidebar/workspace-toolbar/tab/pane presentation,
   recursive split layout and interaction, sidebar resize/reset, icons, row cache/painter, cell metrics,

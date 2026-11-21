@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Sidebar multi-selection now belongs to shared workspace State, including its
+range anchor and cleanup when a workspace closes or transfers out. Native uses
+that model; the browser now supports Cmd/Ctrl-click toggles, Shift-click visible
+ranges, selection counts and ordinary-click reset without switching terminals
+on modified clicks. Eleven focused lifecycle tests pass, covering pinned order,
+collapsed children, stale identities, unchanged active/MRU and removal cleanup.
+Native check and WASM build pass; browser Cmd-click and Shift-click smoke passed.
+Screenshot: target/shared-sidebar-selection.jpg. Native runtime and non-mac
+modifier behavior were not exercised. Browser Group Selected Workspaces routing
+and full shared application entry point remain open. Not deployed.
+
 Moved workspace Up/Down keybindings into shared workspace defaults, adding missing
 browser shortcuts: Cmd+Option+Shift+Up/Down on macOS and Ctrl+Alt+Shift+Up/Down
 elsewhere. Terminal/find-input search bindings now come from one shared factory;
