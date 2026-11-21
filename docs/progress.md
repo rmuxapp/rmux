@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser sample command interpretation now lives in a rendering-independent
+SampleSession service in rmux-core. The terminal view forwards input and renders
+returned output; it no longer implements command dispatch, echo, interrupt or
+draft editing itself. Existing bounded grapheme-aware input is retained. Focused
+tests cover independent session drafts, interrupt, unsupported input, bounded log
+output and input limits; WASM compile passes. This prepares the session boundary
+but does not add a real shell or complete the desktop/browser backend interface.
+No visual change or deployment.
+
 Bulk tab-close target capture now belongs to the shared Tabs model. Both hosts
 provide session identities and completion status; the model applies the same
 scope and active-tab exclusion before any native confirmation delay. Native

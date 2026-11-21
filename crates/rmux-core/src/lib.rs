@@ -15,3 +15,4 @@ pub mod pane_commands;
 pub mod sample_input;
 pub mod workspace_lifecycle;
 pub mod search_state;
+pub mod sample_session;
