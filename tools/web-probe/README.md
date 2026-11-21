@@ -127,3 +127,8 @@ Ctrl+U and application arrows; browser plain-command input is verified. Full
 browser control-key interaction remains open. The pinned library does not expose
 native-equivalent keyboard-state synchronization, so Kitty negotiation, release
 pairing and IME remain pending. The sample interpreter is still ASCII-only.
+
+Verified browser Ctrl+U with a partial draft followed by a sample command. Draft
+erasure uses one engine write; an empty draft skips snapshot work. Automated
+browser input needed the explicit Control modifier. Ctrl+C UI delivery remains
+unverified, although its engine encoding is covered.

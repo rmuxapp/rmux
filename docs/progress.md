@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Resolved the Ctrl+U interaction question with a clean browser regression:
+type ab → explicit Control+U → ls → Enter clears the draft and runs ls correctly.
+The earlier generic ctrl chord was not delivered to the page. Batched draft
+erasure into one WASM write instead of one per character; an empty draft now
+skips snapshot/allocation work. WASM check passes. Ctrl+C browser delivery and
+broader keyboard/IME behavior remain separate acceptance work.
+
 Connected shared symbolic keys to the pinned ghostty-web encoder through an
 explicit numeric adapter (browser and native Ghostty key enums differ). Each
 session owns/disposes its encoder; cursor/keypad modes are queried before encode.

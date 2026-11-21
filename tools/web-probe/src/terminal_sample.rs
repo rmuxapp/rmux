@@ -49,7 +49,8 @@ impl TerminalSample {
             }
             "\x03" => { self.engine.write("^C\r\n$ "); self.command.clear(); }
             "\x15" => {
-                for _ in 0..self.command.len() { self.engine.write("\x08 \x08"); }
+                if self.command.is_empty() { cx.stop_propagation(); return; }
+                self.engine.write(&"\x08 \x08".repeat(self.command.len()));
                 self.command.clear();
             }
             text => {
