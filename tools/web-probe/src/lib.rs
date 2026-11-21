@@ -29,6 +29,8 @@ const COMMANDS: &[CommandId] = &[
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
+    CommandId::SwapPaneNext, CommandId::SwapPaneLeft, CommandId::SwapPaneRight,
+    CommandId::SwapPaneUp, CommandId::SwapPaneDown,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
     CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
@@ -246,6 +248,21 @@ impl InputProbe {
                     CommandId::FocusUp => Direction::Up, _ => Direction::Down,
                 };
                 self.focus_direction(direction, window, cx);
+            }
+            command @ (CommandId::SwapPaneNext | CommandId::SwapPaneLeft | CommandId::SwapPaneRight | CommandId::SwapPaneUp | CommandId::SwapPaneDown) => {
+                use rmux_core::layout::Direction;
+                let direction = match command {
+                    CommandId::SwapPaneLeft => Some(Direction::Left),
+                    CommandId::SwapPaneRight => Some(Direction::Right),
+                    CommandId::SwapPaneUp => Some(Direction::Up),
+                    CommandId::SwapPaneDown => Some(Direction::Down),
+                    _ => None,
+                };
+                if let Some(tree) = &mut self.tree {
+                    if let Some(next) = rmux_core::pane_commands::swap_target(tree, &self.focused, direction, self.zoomed) {
+                        if tree.swap(&self.focused, &next) { self.zoomed = false; }
+                    }
+                }
             }
             CommandId::EqualizePanes => {
                 let mut zoomed = self.zoomed.then_some(self.focused);

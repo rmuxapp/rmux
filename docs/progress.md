@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser palette now includes all five desktop pane-swap commands: next, left,
+right, up and down. Both hosts share target selection, including directional
+swap restrictions while zoomed. Swaps keep the existing pane/session identity;
+they do not recreate terminals. Six focused pane-command tests, desktop check
+and local WASM build pass. Browser smoke confirmed Swap Pane Left exchanges
+existing output and preserves typing focus in the moved pane. Screenshot:
+target/shared-pane-swap.jpg. Not deployed yet; native runtime and the remaining
+browser direction/zoom interactions were not re-tested in this cycle.
+
 Shared-demo build optimization: successful CI run 44933212995 spent ~104s in
 Ghostty source build, 52.38s in Cargo, and ~51s generating the compressed-size
 report. CI now puts Zig's global cache under already-cached `.deps`; a subsequent

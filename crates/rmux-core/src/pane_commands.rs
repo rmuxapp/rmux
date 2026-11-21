@@ -56,6 +56,17 @@ pub fn cycle<T: Clone + PartialEq>(tree: &PaneTree<T>, focused: Option<&T>, dire
     tree.pane_at(crate::layout::cycle_index(current, tree.pane_count(), direction)?).cloned()
 }
 
+/// Resolve the desktop swap policy. Directional swaps are unavailable while
+/// zoomed; cycling to the next pane can still swap and then reveal the layout.
+pub fn swap_target<T: Clone + PartialEq>(tree: &PaneTree<T>, focused: &T, direction: Option<Direction>, zoomed: bool) -> Option<T> {
+    if tree.pane_count() < 2 || tree.pane_index(focused).is_none() { return None; }
+    match direction {
+        Some(_) if zoomed => None,
+        Some(direction) => tree.neighbor(focused, direction),
+        None => cycle(tree, Some(focused), 1),
+    }
+}
+
 /// Decide focus before removing ownership. Closing an inactive pane preserves
 /// focus; closing the active pane selects the following pane, or the previous
 /// pane when the last leaf closes. The final pane has no successor.
@@ -71,6 +82,21 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn swapping_keeps_identity_and_updates_navigation() {
+        let mut tree = PaneTree::Split { axis: Axis::Columns, weights: vec![1., 1.],
+            children: vec![PaneTree::Pane(10), PaneTree::Pane(20)] };
+        assert_eq!(swap_target(&tree, &10, Some(Direction::Left), false), None);
+        assert_eq!(swap_target(&tree, &10, Some(Direction::Right), true), None);
+        assert_eq!(swap_target(&tree, &10, None, true), Some(20));
+        let next = swap_target(&tree, &10, Some(Direction::Right), false).unwrap();
+        assert!(tree.swap(&10, &next));
+        assert_eq!(tree.pane_at(1), Some(&10));
+        assert_eq!(cycle(&tree, Some(&10), 1), Some(20));
+        assert_eq!(focus_after_close(&tree, &10, Some(&10)), Some(20));
+        assert_eq!(swap_target(&PaneTree::Pane(10), &10, None, false), None);
+    }
 
     #[test]
     fn insert_is_atomic_and_reports_visual_order() {

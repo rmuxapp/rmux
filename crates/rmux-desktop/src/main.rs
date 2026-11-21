@@ -2742,15 +2742,19 @@ impl Workspace {
         let Some(current) = self.focused_index(window, cx) else {
             return;
         };
-        let next = (current + 1) % self.panes.len();
-        self.swap_panes(current, next, cx);
-    }
-    fn swap_pane_direction(&mut self, direction: layout::Direction, window: &Window, cx: &mut Context<Self>) {
-        if self.zoomed.is_some() { return; }
-        let Some(current) = self.focused_index(window, cx) else { return; };
-        if let Some(next) = self.directional_neighbor(current, direction) {
+        if let Some(next) = self.swap_target_index(current, None) {
             self.swap_panes(current, next, cx);
         }
+    }
+    fn swap_pane_direction(&mut self, direction: layout::Direction, window: &Window, cx: &mut Context<Self>) {
+        let Some(current) = self.focused_index(window, cx) else { return; };
+        if let Some(next) = self.swap_target_index(current, Some(direction)) {
+            self.swap_panes(current, next, cx);
+        }
+    }
+    fn swap_target_index(&self, current: usize, direction: Option<layout::Direction>) -> Option<usize> {
+        let next = rmux_core::pane_commands::swap_target(self.layout.as_ref()?, self.panes.get(current)?, direction, self.zoomed.is_some())?;
+        self.panes.iter().position(|pane| *pane == next)
     }
     fn swap_panes(&mut self, current: usize, next: usize, cx: &mut Context<Self>) -> bool {
         let Some(tree) = &mut self.layout else {
