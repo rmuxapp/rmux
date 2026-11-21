@@ -1,5 +1,25 @@
 # rmux performance acceptance plan
 
+## v0.1.4 focused eight-pane idle observation
+
+A GitHub-built v0.1.4 macOS ARM64 binary, installed and verified through mise,
+was measured in one fresh instance with eight isolated idle fixture shells,
+10 seconds of settling and a 60.019-second idle window. App RSS was **94.86 MiB**;
+app CPU accumulated 0.01 seconds, approximately **0.0167% of one core**. Seven
+split requests had **6.07 ms median / 6.76 ms maximum** CLI/RPC completion time.
+[Raw sample and binary SHA-256](benchmarks/rpc-idle-release-v0.1.4-eight-panes.jsonl).
+
+This is one observation on an uncontrolled desktop, not full idle acceptance or
+a before/after comparison. CPU uses quantized macOS ps accounting. Child/helper
+CPU, child RSS, GPU resources and input-to-display latency are excluded. The
+fixture app shut down normally. The harness revision in the result is f78001c
+plus the pane-count/repetition option change committed with this record; the
+sampling path was unchanged.
+
+The harness accepts `--panes 8 --iterations 1` for focused runs; defaults remain
+1/8/32 panes with three iterations. Both options are bounded to avoid accidentally
+launching an unbounded workload.
+
 ## Published v0.1.1 macOS split baseline
 
 The harness also accepts `--idle-seconds` (0–60) and records app process CPU-time

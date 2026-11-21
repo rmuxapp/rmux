@@ -122,7 +122,13 @@ if __name__ == "__main__":
     parser.add_argument("--settle-seconds", type=float, default=0)
     parser.add_argument("--measure-close", action="store_true")
     parser.add_argument("--idle-seconds", type=float, default=0)
+    parser.add_argument("--panes", type=int, nargs="+", default=[1, 8, 32])
+    parser.add_argument("--iterations", type=int, default=3)
     args = parser.parse_args()
+    if not 1 <= args.iterations <= 20:
+        parser.error("iterations must be between 1 and 20")
+    if any(not 1 <= panes <= 32 for panes in args.panes):
+        parser.error("pane counts must be between 1 and 32")
     if not 0 <= args.settle_seconds <= 60:
         parser.error("settle-seconds must be between 0 and 60")
     if not 0 <= args.idle_seconds <= 60:
@@ -133,8 +139,8 @@ if __name__ == "__main__":
     assert platform.system() == "Darwin", "This baseline currently targets macOS"
     revision = subprocess.run(["git", "rev-parse", "--short", "HEAD"], check=True,
                               capture_output=True, text=True).stdout.strip()
-    for panes in [1, 8, 32]:
-        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds) for iteration in range(3)]
+    for panes in args.panes:
+        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds) for iteration in range(args.iterations)]
         timings = [value for row in samples for value in row["split_ms"]]
         print(json.dumps({"harness_revision": revision, "binary_label": args.label,
                           "binary_sha256": binary_sha256, "settle_seconds": args.settle_seconds,

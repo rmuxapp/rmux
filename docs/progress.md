@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Measured GitHub v0.1.4 through a mise-managed installation: one eight-pane idle
+fixture instance, 10s settling, 60s observation. App RSS 94.86 MiB, quantized app
+CPU 0.0167% of one core, split RPC p50/max 6.07/6.76ms. Native fixture shutdown
+succeeded. Raw sample and limits are recorded in docs/performance.md. Harness
+now supports bounded pane-count/repetition options for short targeted runs.
+This is not complete helper/GPU, latency, output-pressure or cross-platform acceptance.
+
 Added on-demand UI/engine WASM capacity diagnostics and a reproducible engine
 session-lifetime benchmark. At 1/4/16 panes with 2,000 sample log lines per pane,
 engine linear-memory capacity was 3.50/10.56/38.81 MiB. All sessions close and
