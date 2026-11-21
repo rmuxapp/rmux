@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Native pointer selection, Select All, Clear Scrollback and viewport scrolling now
+share a bounded ordered interaction queue. Busy parser admission is nonblocking;
+frames and selection exports apply pending interactions before reading, so an
+immediate Copy sees Select All or the latest completed gesture without requiring
+a redraw. Adjacent drags coalesce while press/release and viewport boundaries
+remain ordered. Deferred active gestures use the existing selection timer.
+Clear Scrollback moved out of the PTY writer to avoid racing newer selection.
+Held-parser tests cover immediate copy, later pointer override, 100 coalesced
+drags, clear/select ordering, and scroll/input precedence. Desktop cargo check
+passes. Native drag/autoscroll UX and cross-platform runtime acceptance remain
+pending; these tests do not measure visible input latency.
+
 Native clipboard copies can now cancel during streaming formatting, in addition
 to parser-lock waiting. The formatter checks ownership at the first callback and
 after each additional 4 KiB of emitted data, avoiding a predicate call per glyph.
@@ -9,7 +21,8 @@ Cancellation discards partial output and releases the parser; it does not alter
 the selection. Callback panics are contained before returning across the C ABI.
 Eight export tests and the parser-contention fixture pass; the explicit timing
 fixture remains ignored. The new Unicode mid-stream cancellation case is in CI.
-Native pointer-selection parser waits remain a separate open item.
+Native pointer-selection admission is now deferred by the shared interaction
+queue described above; native gesture acceptance remains open.
 
 Deployed cc15502 from successful GitHub Shared WASM run 44962351505 to
 Cloudflare ece559ce. The live rmux.app embed references that source. Verified
@@ -109,13 +122,12 @@ cross-request isolation, and cancellation while the parser remains locked.
 Formatting also supports cooperative cancellation at streaming checkpoints, as
 recorded above; successful complete copies remain bounded to 16 MiB.
 
-Native Clear Scrollback now uses the bounded input worker queue rather than
-acquiring the parser lock on the UI thread. Completion wakes the UI even when
-no PTY bytes are produced; full/closed queues report an error. The worker keeps
-input ordering and weak terminal ownership. Focused checks verify retained
-visible contents, removed history, completion wakeup and safe closed-terminal
-handling. The parser-contention fixture now includes clear admission and passes;
-native cargo check passed. Native visual acceptance remains pending.
+The earlier bounded-writer Clear Scrollback implementation was superseded by the
+shared interaction queue above, preserving ordering with selection and Copy.
+The action's existing redraw notification drives deferred application even on a
+quiet terminal; a copy/export also flushes pending history changes. Screen
+preservation and clear/select ordering are covered by focused tests. Native
+visual acceptance remains pending.
 
 Deployed source 374b4c5 from successful GitHub Shared WASM run 44959331001
 to Cloudflare 67b13589. Live rmux.app references it. Verified dragging the last

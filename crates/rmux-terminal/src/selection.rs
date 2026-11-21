@@ -1,7 +1,7 @@
 //! Tracked Ghostty gestures; borrowed grid references never escape an engine call.
 use super::*;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub enum Action {
     Press,
     Drag,
@@ -9,7 +9,7 @@ pub enum Action {
     Autoscroll,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Event {
     pub action: Action,
     pub x: f32,

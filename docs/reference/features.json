@@ -432,7 +432,7 @@
       ],
       "acceptance": "Search and copy from bounded scrollback while output continues; preserve Unicode selections.",
       "rmux_status": "in_progress",
-      "implementation": "Selection, clipboard, bounded scrollback, on-demand find with bounded selection prefill and per-terminal last-query recall, engine-backed Select All, and Clear Scrollback preserving the current screen and restoring history retention.",
+      "implementation": "Selection, clipboard, bounded scrollback, on-demand find with bounded selection prefill and per-terminal last-query recall, engine-backed Select All, and Clear Scrollback preserving the current screen and restoring history retention. Native pointer gestures, Select All, Clear Scrollback and scrolling now share a bounded interaction queue with nonblocking parser admission. Frames and selection exports flush requests in order, preserving immediate Copy without an intervening frame. Clipboard exports support cooperative cancellation during formatting.",
       "remaining": "Full Unicode, native interaction and platform acceptance.",
       "implementation_sources": [
         "crates/rmux-desktop/src/find_bar.rs"

@@ -12,6 +12,54 @@ use std::{
     thread,
 };
 
+#[derive(Clone, Copy, Debug, PartialEq)]
+enum Interaction {
+    Scroll(crate::Scroll),
+    Selection(crate::selection::Event),
+    SelectAll,
+    ClearScrollback,
+}
+#[derive(Default)]
+struct Interactions {
+    pending: Vec<Interaction>,
+    autoscroll: bool,
+}
+impl Interactions {
+    fn push(&mut self, request: Interaction) -> Result<()> {
+        if matches!(request, Interaction::Scroll(crate::Scroll::Top | crate::Scroll::Bottom | crate::Scroll::Row(_) | crate::Scroll::LastPrompt)) {
+            // Selection operations are ordering barriers: their coordinates refer
+            // to the viewport at that point in the user's interaction sequence.
+            while matches!(self.pending.last(), Some(Interaction::Scroll(_))) { self.pending.pop(); }
+        }
+        match (self.pending.last_mut(), request) {
+            (Some(Interaction::Scroll(crate::Scroll::Lines(previous))), Interaction::Scroll(crate::Scroll::Lines(lines))) if previous.signum() == lines.signum() => {
+                *previous = previous.saturating_add(lines);
+                return Ok(());
+            }
+            (Some(Interaction::Selection(previous)), Interaction::Selection(event))
+                if previous.action == crate::selection::Action::Drag && event.action == crate::selection::Action::Drag => {
+                    *previous = event;
+                    return Ok(());
+                }
+            _ => {},
+        }
+        anyhow::ensure!(self.pending.len() < 64, "terminal interaction queue is full; retry interaction");
+        self.pending.push(request);
+        Ok(())
+    }
+    fn apply(&mut self, terminal: &mut Terminal) -> Result<bool> {
+        for request in self.pending.drain(..) {
+            match request {
+                Interaction::Scroll(scroll) => terminal.scroll(scroll)?,
+                Interaction::Selection(event) => self.autoscroll = terminal.selection_event(event)?,
+                Interaction::SelectAll => { terminal.select_all()?; self.autoscroll = false; },
+                Interaction::ClearScrollback => { terminal.clear_scrollback()?; self.autoscroll = false; },
+            }
+        }
+        Ok(self.autoscroll)
+    }
+}
+
 pub struct Session {
     initial_directory: Option<std::path::PathBuf>,
     remote_destination: Option<String>,
@@ -24,7 +72,7 @@ pub struct Session {
     input_errors: async_channel::Receiver<String>,
     paste_pending: Arc<AtomicBool>,
     paste_generation: Arc<AtomicU64>,
-    pending_scroll: Mutex<Vec<crate::Scroll>>,
+    interactions: Arc<Mutex<Interactions>>,
     report_all_keys: Arc<AtomicBool>,
     mouse_tracking: Arc<AtomicBool>,
     shutdown: ShutdownHandle,
@@ -68,7 +116,6 @@ enum InputPayload {
     KeyPress { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers, repeat: bool, plain_text: Option<String> },
     KeyRelease { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers },
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
-    ClearScrollback { terminal: std::sync::Weak<Mutex<Terminal>> },
     Paste { text: String, bracketed: bool },
     NativePaste { terminal: std::sync::Weak<Mutex<Terminal>>, text: String },
     Mouse { terminal: std::sync::Weak<Mutex<Terminal>>, event: crate::mouse::Event },
@@ -102,12 +149,6 @@ impl InputPayload {
             Self::Mouse { terminal, event } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 terminal.lock().unwrap_or_else(|error| error.into_inner()).encode_mouse(event).map(Option::unwrap_or_default)
-            }
-            Self::ClearScrollback { terminal } => {
-                if let Some(terminal) = terminal.upgrade() {
-                    terminal.lock().unwrap_or_else(|error| error.into_inner()).clear_scrollback()?;
-                }
-                Ok(Vec::new())
             }
             Self::KeyPress { terminal, key, mods, repeat, plain_text } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
@@ -154,7 +195,7 @@ impl From<Vec<u8>> for InputMessage {
 
 fn write_messages(writes: mpsc::Receiver<InputMessage>, mut writer: impl Write, mut report: impl FnMut(String), mut finished: impl FnMut()) {
     while let Ok(message) = writes.recv() {
-        let notify = message._paste.is_some() || matches!(&message.payload, InputPayload::Focus { .. } | InputPayload::ClearScrollback { .. });
+        let notify = message._paste.is_some() || matches!(&message.payload, InputPayload::Focus { .. });
         let keep_writing = write_message(message, &mut writer, &mut report);
         // The permit must be released before waking a quiet terminal's UI.
         if notify { finished(); }
@@ -361,7 +402,7 @@ impl Session {
             input_errors,
             paste_pending: Arc::new(AtomicBool::new(false)),
             paste_generation: paste_generation.clone(),
-            pending_scroll: Mutex::new(Vec::new()),
+            interactions: Default::default(),
             shutdown: ShutdownHandle {
                 exit: exit.clone(),
                 closing: Arc::new(AtomicBool::new(false)),
@@ -672,39 +713,29 @@ impl Session {
     fn follow_output(&self) -> Result<()> {
         self.scroll(crate::Scroll::Bottom)
     }
-    fn apply_pending_scroll(&self, terminal: &mut Terminal) -> Result<()> {
-        let mut pending = self.pending_scroll.lock().unwrap_or_else(|error| error.into_inner());
-        // Only viewport operations hold this small queue lock, never parsing or
-        // PTY I/O. Retain its bounded allocation across gestures.
-        for scroll in pending.drain(..) { terminal.scroll(scroll)?; }
-        Ok(())
+    fn apply_pending_interactions(&self, terminal: &mut Terminal) -> Result<bool> {
+        self.interactions.lock().unwrap_or_else(|error| error.into_inner()).apply(terminal)
     }
-    /// Apply immediately when idle, otherwise before the next coherent frame.
-    /// Opposite directions remain ordered because viewport edges clamp each step.
-    pub fn scroll(&self, scroll: crate::Scroll) -> Result<()> {
-        {
-            let mut pending = self.pending_scroll.lock().unwrap_or_else(|error| error.into_inner());
-            if matches!(scroll, crate::Scroll::Top | crate::Scroll::Bottom | crate::Scroll::Row(_) | crate::Scroll::LastPrompt) {
-                pending.clear();
-            }
-            let merged = match (pending.last_mut(), scroll) {
-                (Some(crate::Scroll::Lines(previous)), crate::Scroll::Lines(lines)) if previous.signum() == lines.signum() => {
-                    *previous = previous.saturating_add(lines);
-                    true
-                }
-                _ => false,
-            };
-            if !merged {
-                anyhow::ensure!(pending.len() < 64, "terminal scroll queue is full; retry navigation");
-                pending.push(scroll);
-            }
-        }
+    fn queue_interaction(&self, request: Interaction) -> Result<Option<bool>> {
+        self.interactions.lock().unwrap_or_else(|error| error.into_inner()).push(request)?;
         let mut terminal = match self.terminal.try_lock() {
             Ok(terminal) => terminal,
             Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
-            Err(std::sync::TryLockError::WouldBlock) => return Ok(()),
+            Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
         };
-        self.apply_pending_scroll(&mut terminal)
+        self.apply_pending_interactions(&mut terminal).map(Some)
+    }
+    /// Busy viewport changes apply before the next coherent frame or selection export.
+    pub fn scroll(&self, scroll: crate::Scroll) -> Result<()> {
+        self.queue_interaction(Interaction::Scroll(scroll)).map(|_| ())
+    }
+    /// None indicates deferred work. Hosts may retry their active gesture timer;
+    /// press/release events remain ordered and consecutive drags coalesce.
+    pub fn queue_selection_event(&self, event: crate::selection::Event) -> Result<Option<bool>> {
+        self.queue_interaction(Interaction::Selection(event))
+    }
+    pub fn queue_select_all(&self) -> Result<()> {
+        self.queue_interaction(Interaction::SelectAll).map(|_| ())
     }
     /// Queue focus reporting/acknowledgement without waiting for the parser.
     /// The writer wakes metadata observers after processing even if focus
@@ -851,7 +882,7 @@ impl Session {
     }
     pub fn frame(&self) -> Result<Frame> {
         let mut terminal = self.terminal.lock().unwrap_or_else(|e| e.into_inner());
-        self.apply_pending_scroll(&mut terminal)?;
+        self.apply_pending_interactions(&mut terminal)?;
         terminal.frame()
     }
     pub fn try_frame(&self) -> Result<Option<Frame>> {
@@ -860,7 +891,7 @@ impl Session {
             Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
             Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
         };
-        self.apply_pending_scroll(&mut terminal)?;
+        self.apply_pending_interactions(&mut terminal)?;
         terminal.frame().map(Some)
     }
     pub fn history_export(&self, max_bytes: usize) -> HistoryExport {
@@ -883,10 +914,11 @@ impl Session {
     /// acquires the parser lock or keeps a closed terminal alive.
     pub fn clipboard_export(&self, unwrap: bool, current: impl Fn() -> bool + Send + 'static) -> Box<dyn FnOnce() -> Result<Option<String>> + Send> {
         let terminal = Arc::downgrade(&self.terminal);
+        let interactions = self.interactions.clone();
         Box::new(move || {
             if !current() { return Ok(None); }
             let terminal = terminal.upgrade().context("terminal closed before copying")?;
-            let engine = loop {
+            let mut engine = loop {
                 match terminal.try_lock() {
                     Ok(engine) => break engine,
                     Err(std::sync::TryLockError::Poisoned(error)) => break error.into_inner(),
@@ -899,6 +931,7 @@ impl Session {
             };
             // Another clipboard write may have superseded us while waiting.
             if !current() { return Ok(None); }
+            interactions.lock().unwrap_or_else(|error| error.into_inner()).apply(&mut engine)?;
             engine.selected_text_cancellable(16 * 1024 * 1024, unwrap, &current)
         })
     }
@@ -925,43 +958,38 @@ impl Session {
     }
     fn text_export(&self, max_bytes: usize, selected: bool, unwrap: bool, lines: Option<usize>) -> HistoryExport {
         let terminal = Arc::downgrade(&self.terminal);
+        let interactions = self.interactions.clone();
         Box::new(move || {
             let terminal = terminal.upgrade().context("terminal closed before history export")?;
-            let engine = match terminal.try_lock() {
+            let mut engine = match terminal.try_lock() {
                 Ok(engine) => engine,
                 Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
                 Err(std::sync::TryLockError::WouldBlock) => return Ok(None),
             };
+            interactions.lock().unwrap_or_else(|error| error.into_inner()).apply(&mut engine)?;
             if selected { engine.selection_text_prefix_with_wraps(max_bytes, unwrap).map(|text| Some(text.unwrap_or_default())) }
             else if let Some(lines) = lines { engine.history_tail_limited(lines, max_bytes).map(Some) }
             else { engine.history_text_limited(max_bytes).map(Some) }
         })
     }
     pub fn selection_event(&self, event: crate::selection::Event) -> Result<bool> {
-        self.terminal
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .selection_event(event)
+        let mut terminal = self.terminal.lock().unwrap_or_else(|error| error.into_inner());
+        self.apply_pending_interactions(&mut terminal)?;
+        terminal.selection_event(event)
     }
     pub fn select_all(&self) -> Result<()> {
-        self.terminal
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .select_all()
+        let mut terminal = self.terminal.lock().unwrap_or_else(|error| error.into_inner());
+        self.apply_pending_interactions(&mut terminal)?;
+        terminal.select_all()
     }
     pub fn clear_scrollback(&self) -> Result<()> {
-        self.terminal
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .clear_scrollback()
+        let mut terminal = self.terminal.lock().unwrap_or_else(|error| error.into_inner());
+        self.apply_pending_interactions(&mut terminal)?;
+        terminal.clear_scrollback()
     }
-    /// Admit a history-clear command without acquiring the parser on the caller.
-    /// The existing writer serializes it with input and wakes the UI on completion.
+    /// Viewport/selection ordering is shared with gestures, Select All and Copy.
     pub fn queue_clear_scrollback(&self) -> Result<()> {
-        self.writer.try_send(InputMessage {
-            payload: InputPayload::ClearScrollback { terminal: Arc::downgrade(&self.terminal) },
-            _paste: None,
-        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))
+        self.queue_interaction(Interaction::ClearScrollback).map(|_| ())
     }
     pub fn memory_usage(&self) -> Result<crate::MemoryUsage> {
         self.terminal
@@ -992,22 +1020,15 @@ impl Session {
         terminal.memory_usage().map(Some)
     }
     pub fn selected_text(&self) -> Result<Option<String>> {
-        self.terminal
-            .lock()
-            .unwrap_or_else(|e| e.into_inner())
-            .selected_text()
+        let mut terminal = self.terminal.lock().unwrap_or_else(|error| error.into_inner());
+        self.apply_pending_interactions(&mut terminal)?;
+        terminal.selected_text()
     }
     /// A small single-line selection can seed Find without copying a large selection.
     pub fn selected_search_query(&self) -> Option<String> {
-        // Find can fall back to its remembered query while output is being parsed.
-        self.terminal
-            .try_lock()
-            .ok()?
-            // Streaming stops at the limit; a size-probing formatter would
-            // still walk the entire selection while holding the parser lock.
-            .selection_text_prefix(4096)
-            .ok()
-            .flatten()
+        let mut terminal = self.terminal.try_lock().ok()?;
+        self.apply_pending_interactions(&mut terminal).ok()?;
+        terminal.selection_text_prefix(4096).ok().flatten()
             .filter(|(_, truncated)| !truncated)
             .map(|(text, _)| text)
             .filter(|text| !text.is_empty() && !text.chars().any(char::is_control))
@@ -1626,32 +1647,65 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn queued_scrollback_clear_preserves_screen_and_wakes_ui() -> Result<()> {
-        let terminal = Arc::new(Mutex::new(Terminal::new(20, 3)?));
-        let before = {
-            let mut engine = terminal.lock().unwrap();
-            for _ in 0..12 { engine.write(b"history\r\n"); }
-            engine.write(b"screen");
-            let frame = engine.frame()?;
-            assert!(frame.scrollback_lines > 0);
-            frame.text()
-        };
-        let (sender, receiver) = mpsc::sync_channel(3);
-        sender.send(b"before".to_vec().into())?;
-        sender.send(InputMessage { payload: InputPayload::ClearScrollback { terminal: Arc::downgrade(&terminal) }, _paste: None })?;
-        sender.send(b"after".to_vec().into())?;
-        drop(sender);
-        let mut output = Vec::new();
-        let mut wakes = 0;
-        write_messages(receiver, &mut output, |error| panic!("{error}"), || wakes += 1);
-        assert_eq!(output, b"beforeafter");
-        assert_eq!(wakes, 1);
-        let frame = terminal.lock().unwrap().frame()?;
+    fn queued_selection_is_nonblocking_and_copy_observes_it_before_a_frame() -> Result<()> {
+        let session = Session::spawn(shell_command("stty -echo; printf 'hello 世界\\r\\nREADY'; read -r line"), 40, 4)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !session.frame()?.text().contains("READY") {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "selection fixture not ready");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        for pointer_override in [false, true] {
+            let terminal = session.terminal.clone();
+            let (started, starting) = mpsc::channel();
+            let (release, waiting) = mpsc::channel();
+            let holder = thread::spawn(move || {
+                let _engine = terminal.lock().unwrap();
+                started.send(()).unwrap();
+                let _ = waiting.recv_timeout(std::time::Duration::from_secs(2));
+            });
+            starting.recv()?;
+            let start = std::time::Instant::now();
+            session.queue_select_all()?;
+            if pointer_override {
+                let mut event = crate::selection::Event { action: crate::selection::Action::Press,
+                    x: 15., y: 10., cell_width: 10., cell_height: 20., rectangle: false, clicks: 2 };
+                assert!(session.queue_selection_event(event)?.is_none());
+                event.action = crate::selection::Action::Drag;
+                for _ in 0..100 { assert!(session.queue_selection_event(event)?.is_none()); }
+                assert_eq!(session.interactions.lock().unwrap().pending.len(), 3, "drag motion was not coalesced");
+                event.action = crate::selection::Action::Release;
+                assert!(session.queue_selection_event(event)?.is_none());
+            }
+            let export = session.clipboard_export(true, || true);
+            let elapsed = start.elapsed();
+            release.send(())?;
+            holder.join().unwrap();
+            assert!(elapsed < std::time::Duration::from_millis(500), "selection admission blocked on parser");
+            // No frame acquisition between queue admission and Copy.
+            let text = thread::spawn(export).join().unwrap()?.unwrap();
+            if pointer_override { assert_eq!(text, "hello"); }
+            else { assert_eq!(text, "hello 世界\nREADY"); }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn queued_scrollback_clear_preserves_screen_and_selection_order() -> Result<()> {
+        let mut terminal = Terminal::new(20, 3)?;
+        for _ in 0..12 { terminal.write(b"history\r\n"); }
+        terminal.write(b"screen");
+        let before = terminal.frame()?;
+        assert!(before.scrollback_lines > 0);
+        let mut queue = Interactions::default();
+        queue.push(Interaction::SelectAll)?;
+        queue.push(Interaction::ClearScrollback)?;
+        queue.push(Interaction::SelectAll)?;
+        queue.apply(&mut terminal)?;
+        let frame = terminal.frame()?;
         assert_eq!(frame.scrollback_lines, 0);
-        assert_eq!(frame.text(), before);
-        let pending = InputPayload::ClearScrollback { terminal: Arc::downgrade(&terminal) };
-        drop(terminal);
-        assert!(pending.encode()?.is_empty());
+        assert_eq!(frame.text(), before.text());
+        assert!(terminal.selected_text()?.unwrap().contains("screen"));
+        assert!(queue.pending.is_empty());
         Ok(())
     }
     #[test]
@@ -1979,26 +2033,26 @@ trap - EXIT HUP TERM
                     session.scroll(crate::Scroll::Lines(if index % 2 == 0 { -1 } else { 1 }))?;
                 }
                 assert!(session.scroll(crate::Scroll::Lines(-1)).is_err());
-                assert_eq!(session.pending_scroll.lock().unwrap().len(), 64);
+                assert_eq!(session.interactions.lock().unwrap().pending.len(), 64);
             }
             session.input(b"x")?;
             if explicit_navigation {
                 session.scroll(crate::Scroll::Top)?;
                 for _ in 0..100 { session.scroll(crate::Scroll::Lines(-1))?; }
                 session.scroll(crate::Scroll::Lines(1))?;
-                assert_eq!(session.pending_scroll.lock().unwrap().as_slice(),
-                    &[crate::Scroll::Top, crate::Scroll::Lines(-100), crate::Scroll::Lines(1)]);
+                assert_eq!(session.interactions.lock().unwrap().pending.as_slice(),
+                    &[Interaction::Scroll(crate::Scroll::Top), Interaction::Scroll(crate::Scroll::Lines(-100)), Interaction::Scroll(crate::Scroll::Lines(1))]);
             }
             if later_input { session.input(b"y")?; }
             let elapsed = start.elapsed();
-            let pending = !session.pending_scroll.lock().unwrap().is_empty();
+            let pending = !session.interactions.lock().unwrap().pending.is_empty();
             let _ = release.send(());
             parser.join().unwrap();
             assert!(elapsed < std::time::Duration::from_millis(500), "input waited for parser: {elapsed:?}");
             assert!(pending);
             let frame = session.try_frame()?.expect("parser released");
             assert_eq!(frame.scrollback_offset, if explicit_navigation && !later_input { frame.scrollback_lines - 1 } else { 0 });
-            assert!(session.pending_scroll.lock().unwrap().is_empty());
+            assert!(session.interactions.lock().unwrap().pending.is_empty());
         }
         Ok(())
     }

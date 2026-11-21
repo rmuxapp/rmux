@@ -1647,7 +1647,7 @@ impl TerminalView {
         let position = position - self.last_bounds.origin;
         let result = self
             .session
-            .selection_event(rmux_terminal::selection::Event {
+            .queue_selection_event(rmux_terminal::selection::Event {
                 action,
                 x: f32::from(position.x),
                 y: f32::from(position.y),
@@ -1657,7 +1657,7 @@ impl TerminalView {
                 clicks,
             });
         match result {
-            Ok(true) if self.selecting => {
+            Ok(None | Some(true)) if self.selecting => {
                 if self.selection_scroll.is_none() {
                     let timer = cx
                         .background_executor()
@@ -1779,7 +1779,7 @@ impl TerminalView {
         self.selecting = false;
         self.selection_scroll = None;
         self.selection_pointer = None;
-        if let Err(error) = self.session.select_all() {
+        if let Err(error) = self.session.queue_select_all() {
             self.error = Some(error.to_string());
         }
         cx.notify();

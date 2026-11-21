@@ -705,10 +705,13 @@ comparison above measures the earlier style-only change.
 
 ### Clearing scrollback under output load
 
-The desktop Clear Scrollback action admits a command to the existing bounded
-writer queue without taking the parser lock. The worker clears history under
-that lock and emits a completion wakeup, including on a quiet terminal. This
-avoids UI-thread contention; it does not make the engine operation itself
-instantaneous. Queue saturation is reported instead of blocking. Focused tests
-cover parser-lock contention, visible-screen preservation, input ordering and
-the wakeup, but native click-to-redraw timing has not been measured.
+Clear Scrollback shares a 64-request interaction queue with scrolling, pointer
+selection and Select All. Admission uses opportunistic parser access; otherwise
+the next frame or selection export applies requests in order. This replaces the
+earlier PTY-writer command so a subsequent Select All/Copy cannot race a delayed
+history clear. The action already notifies the UI, including on quiet terminals.
+Consecutive drag events coalesce, but selection events remain ordering barriers
+for scroll coalescing. Queue saturation reports an error instead of waiting on
+the parser. Tests cover held-parser admission, visible-screen preservation,
+selection/clear ordering and immediate Copy without an intervening frame. Native
+drag/autoscroll behavior and click-to-redraw latency remain unmeasured.
