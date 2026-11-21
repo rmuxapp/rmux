@@ -1378,6 +1378,33 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn queued_protocol_events_arrive_in_order_through_pty() -> Result<()> {
+        let expected = b"\x1b[I\x1b[1;2:1A\x1b[1;2:3A\x1b[O";
+        let command = format!("stty raw -echo; printf '\\033[>3u\\033[?1004hready\\r\\n'; dd bs=1 count={} 2>/dev/null | od -An -tx1", expected.len());
+        let mut builder = CommandBuilder::new("/bin/sh");
+        builder.args(["-c", &command]);
+        let session = Session::spawn(builder, 80, 8)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !session.frame()?.text().contains("ready") {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "protocol fixture not ready");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let mods = crate::keyboard::Modifiers { shift: true, ..Default::default() };
+        session.queue_focus(true)?;
+        assert!(session.key("up", mods, false)?);
+        session.queue_key_release("up", mods)?;
+        session.queue_focus(false)?;
+        let expected_hex = expected.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>();
+        loop {
+            let frame = session.frame()?.text();
+            let received: Vec<_> = frame.split_whitespace().filter(|token| token.len() == 2 && token.bytes().all(|byte| byte.is_ascii_hexdigit())).collect();
+            if received == expected_hex && session.exit_status().is_some() { break; }
+            anyhow::ensure!(std::time::Instant::now() < deadline, "protocol bytes missing or reordered: {frame:?}");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        Ok(())
+    }
+    #[test]
     fn queued_navigation_press_repeat_and_release_preserve_protocol_order() -> Result<()> {
         let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
         terminal.lock().unwrap().write(b"\x1b[>3u");

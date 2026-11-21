@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+The existing macOS terminal library suite passes after queued keyboard changes:
+118 passed, four manual benchmarks ignored, 2.66 seconds execution. Added a real
+PTY protocol fixture that enables focus reports and Kitty event types, queues
+focus-in → Shift+Up press → release → focus-out, and checks the exact bytes read
+by a raw-mode child plus clean process exit. That additional test passes in
+0.03 seconds and is included in CI's queued-input filter. This complements the
+parser-contention and in-memory writer checks; native UI/IME and other platforms
+remain outside this evidence.
+
 Native non-text/navigation and Ctrl/Alt key presses now enqueue encoding on the
 PTY writer. Press/repeat/release order follows the bounded queue; unknown keys
 return unhandled without locking, exited processes remain rejected, and accepted
