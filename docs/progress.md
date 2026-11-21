@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Published GitHub Shared WASM demo run 44950500137 (a4740dc) to rmux.app via
+Cloudflare deployment b179207d. The artifact includes workspace/group rename and
+workspace pinning. Production embedded-demo smoke verified Cmd+Shift+R rename,
+palette pin/reordering, and terminal input. Screenshot:
+target/live-demo-workspaces-a4740dc.jpg. Group closure and terminal font controls
+remain in newer GitHub builds; native downloads remain v0.1.4. Website source
+stays outside GitHub.
+
 Browser new tabs and splits now inherit the active source terminal's font size
 at creation, matching desktop behavior. Existing terminals retain independent
 sizes; initial workspaces still use the default. The constructor applies shared
