@@ -1,7 +1,7 @@
 //! Workspace action routing shared by native and browser application hosts.
 use gpui::{prelude::*, *};
 use rmux_core::commands::CommandId;
-use crate::{NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, CloseWorkspace, UngroupWorkspaces,
+use crate::{NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, CloseWorkspace, UngroupWorkspaces,
     NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar, SelectWorkspaceNumber};
 
 pub(crate) trait WorkspaceCommandHost: Sized + 'static {
@@ -22,5 +22,5 @@ macro_rules! workspace_commands {
         }
     };
 }
-workspace_commands! { NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, CloseWorkspace, UngroupWorkspaces,
+workspace_commands! { NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, CloseWorkspace, UngroupWorkspaces,
     NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar }

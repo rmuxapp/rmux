@@ -19,6 +19,9 @@ impl<T, W> Default for State<T, W> {
 #[derive(Clone, Copy)]
 pub enum Navigation { Cycle(isize), Number(usize), Previous }
 
+#[derive(Clone, Copy)]
+pub enum GroupEdit { Remove, SetAnchor, TogglePin }
+
 impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
     pub fn order(&self, include_collapsed: bool, metadata: impl Fn(&T) -> (W, bool)) -> Vec<usize> {
         let identities: Vec<_> = self.entries.iter().map(metadata).collect();
@@ -37,6 +40,32 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
     pub fn sidebar_row(&self, index: usize, metadata: impl Fn(&T) -> (W, bool)) -> Option<usize> {
         let visible = self.groups.visible_workspace(metadata(self.entries.get(index)?).0);
         self.order(false, &metadata).iter().position(|index| metadata(&self.entries[*index]).0 == visible)
+    }
+    pub fn edit_group(&mut self, index: usize, edit: GroupEdit, key: impl Fn(&T) -> W) -> anyhow::Result<bool> {
+        let Some(member) = self.entries.get(index).map(&key) else { return Ok(false); };
+        let Some(group) = self.groups.containing(member) else { return Ok(false); };
+        let id = group.id;
+        let previous = group.members[0];
+        let slot = self.entries.iter().position(|entry| key(entry) == previous);
+        let selected = self.entries.get(self.active).map(&key);
+        match edit {
+            GroupEdit::Remove => self.groups.remove(member),
+            GroupEdit::SetAnchor => self.groups.set_anchor(id, member)?,
+            GroupEdit::TogglePin => {
+                let group = self.groups.get_mut(id).unwrap();
+                group.pinned = !group.pinned;
+            }
+        }
+        if let Some(slot) = slot {
+            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == id)
+                .and_then(|group| group.members.first()).copied() {
+                workspace_groups::preserve_anchor_slot(&mut self.entries, &key, previous, slot, anchor);
+            }
+        }
+        if let Some(index) = selected.and_then(|selected| self.entries.iter().position(|entry| key(entry) == selected)) {
+            self.active = index;
+        }
+        Ok(true)
     }
     pub fn next_group_name(&self) -> String {
         (1..).map(|number| format!("Group {number}"))
@@ -197,6 +226,26 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn group_edits_preserve_selection_and_promoted_anchor_slot() {
+        let mut state = State { entries: vec![1, 2, 3, 4], active: 3, ..Default::default() };
+        let group = state.groups.create("group".into(), vec![1, 4], false).unwrap();
+        assert!(state.edit_group(3, GroupEdit::SetAnchor, |id| *id).unwrap());
+        assert_eq!(state.entries, vec![4, 2, 3, 1]);
+        assert_eq!(state.entries[state.active], 4);
+        assert_eq!(state.groups.containing(4).unwrap().members, vec![4, 1]);
+        assert!(state.edit_group(0, GroupEdit::TogglePin, |id| *id).unwrap());
+        assert!(state.groups.containing(4).unwrap().pinned);
+        assert!(state.edit_group(0, GroupEdit::Remove, |id| *id).unwrap());
+        assert_eq!(state.entries, vec![1, 2, 3, 4]);
+        assert_eq!(state.entries[state.active], 4);
+        assert!(state.groups.containing(4).is_none());
+        assert_eq!(state.groups.containing(1).unwrap().id, group);
+        assert!(state.groups.containing(1).unwrap().pinned);
+        assert!(!state.edit_group(3, GroupEdit::Remove, |id| *id).unwrap());
+        assert!(!state.edit_group(99, GroupEdit::SetAnchor, |id| *id).unwrap());
+    }
 
     #[test]
     fn extracting_group_anchor_preserves_old_slot_selection_and_unique_names() {

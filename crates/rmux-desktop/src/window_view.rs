@@ -822,12 +822,12 @@ impl WorkspaceWindow {
 
     fn toggle_group_pin(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        if let Some(id) = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| self.workspace_state.groups.containing(entry.workspace.entity_id())).map(|group| group.id) {
-            let group = self.workspace_state.groups.get_mut(id).unwrap();
-            group.pinned = !group.pinned;
-            self.scroll_to_workspace(self.workspace_state.active);
-            cx.notify();
+        match self.workspace_state.edit_group(self.workspace_state.active, rmux_core::workspace_lifecycle::GroupEdit::TogglePin, |entry| entry.workspace.entity_id()) {
+            Ok(false) => return,
+            Ok(true) => self.scroll_to_workspace(self.workspace_state.active),
+            Err(error) => self.notice = Some(format!("Update group: {error}")),
         }
+        cx.notify();
     }
 
     pub(super) fn show_startup_notice(&mut self, notice: String, cx: &mut Context<Self>) {
@@ -853,26 +853,21 @@ impl WorkspaceWindow {
 
     fn remove_workspace_from_group(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        if let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) {
-            let selected = entry.workspace.entity_id();
-            let slot = self.group_anchor_slot(selected);
-            self.workspace_state.groups.remove(selected);
-            self.preserve_group_slot(slot, Some(selected));
-            self.scroll_to_workspace(self.workspace_state.active);
-            cx.notify();
+        match self.workspace_state.edit_group(self.workspace_state.active, rmux_core::workspace_lifecycle::GroupEdit::Remove, |entry| entry.workspace.entity_id()) {
+            Ok(false) => return,
+            Ok(true) => self.scroll_to_workspace(self.workspace_state.active),
+            Err(error) => self.notice = Some(format!("Update group: {error}")),
         }
+        cx.notify();
     }
 
     fn set_group_anchor(&mut self, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(member) = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id()) else { return; };
-        let Some(group) = self.workspace_state.groups.containing(member).map(|group| group.id) else { return; };
-        let slot = self.group_anchor_slot(member);
-        if let Err(error) = self.workspace_state.groups.set_anchor(group, member) {
-            self.notice = Some(format!("Set group anchor: {error}"));
+        match self.workspace_state.edit_group(self.workspace_state.active, rmux_core::workspace_lifecycle::GroupEdit::SetAnchor, |entry| entry.workspace.entity_id()) {
+            Ok(false) => return,
+            Ok(true) => self.scroll_to_workspace(self.workspace_state.active),
+            Err(error) => self.notice = Some(format!("Update group: {error}")),
         }
-        self.preserve_group_slot(slot, Some(member));
-        self.scroll_to_workspace(self.workspace_state.active);
         cx.notify();
     }
     fn metadata_presets(input: &Entity<text_field::TextField>, field: MetadataField, cx: &App) -> AnyElement {
@@ -4053,6 +4048,9 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
+            CommandId::ToggleGroupPin => self.toggle_group_pin(cx),
+            CommandId::RemoveWorkspaceFromGroup => self.remove_workspace_from_group(cx),
+            CommandId::SetGroupAnchor => self.set_group_anchor(cx),
             CommandId::UngroupWorkspaces => self.ungroup_active(cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),
             CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
@@ -4347,12 +4345,9 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
             .on_action(cx.listener(|this, _: &CloseWorkspaceGroup, window, cx| this.request_close_group(window, cx)))
-            .on_action(cx.listener(|this, _: &ToggleGroupPin, _, cx| this.toggle_group_pin(cx)))
             .on_action(cx.listener(|this, action: &MoveWorkspaceToGroup, _, cx| this.move_workspace_to_group(action.group, cx)))
-            .on_action(cx.listener(|this, _: &RemoveWorkspaceFromGroup, _, cx| this.remove_workspace_from_group(cx)))
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))
-            .on_action(cx.listener(|this, _: &SetGroupAnchor, _, cx| this.set_group_anchor(cx)))
             .on_action(cx.listener(|this, _: &LastTerminal, window, cx| this.last_terminal(window, cx)))
             .on_action(cx.listener(|this, _: &FocusBack, window, cx| { this.navigate_focus(false, window, cx); }))
             .on_action(cx.listener(|this, _: &FocusForward, window, cx| { this.navigate_focus(true, window, cx); }))

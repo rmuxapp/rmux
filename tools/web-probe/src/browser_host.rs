@@ -135,6 +135,18 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
             CommandId::LastWorkspace => self.last_workspace(window, cx),
             CommandId::NextWorkspace => self.cycle(1, window, cx),
             CommandId::PreviousWorkspace => self.cycle(-1, window, cx),
+            command @ (CommandId::ToggleGroupPin | CommandId::RemoveWorkspaceFromGroup | CommandId::SetGroupAnchor) => {
+                use rmux_core::workspace_lifecycle::GroupEdit;
+                let edit = match command {
+                    CommandId::ToggleGroupPin => GroupEdit::TogglePin,
+                    CommandId::SetGroupAnchor => GroupEdit::SetAnchor,
+                    _ => GroupEdit::Remove,
+                };
+                if self.workspace_state.edit_group(self.workspace_state.active, edit, |(_, entity)| entity.entity_id()).unwrap_or(false) {
+                    self.scroll_to_workspace();
+                    cx.notify();
+                }
+            }
             CommandId::UngroupWorkspaces => self.ungroup(cx),
             _ => {}
         }

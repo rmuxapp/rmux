@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Shared workspace state now owns group member removal, anchor promotion and group
+pin toggling, preserving the selected identity and promoted-anchor sidebar slot.
+Native routes all three through the shared workspace action binder, and the
+browser palette exposes them through the same commands/state transitions.
+Native check and WASM build pass; eight focused lifecycle tests pass, including
+anchor promotion/removal, pin retention and stale/ungrouped no-ops. Browser smoke
+verified promoting a child to anchor and then removing it while keeping that
+workspace selected. The pin command was exercised; pin state/order is covered by
+core tests rather than a distinct browser pin indicator. Screenshot:
+target/shared-group-edit.jpg. Not deployed; full application parity remains open.
+
 Added the browser palette's missing New Group from Current Workspace command,
 routed through shared workspace actions and shared group-creation state. Native
 uses the same action binding instead of a separate listener. Browser grouping
