@@ -2723,12 +2723,12 @@ impl Workspace {
         let target = cx.new(|cx| PaneView::from_transfer(tab, workspace, cx));
         // Remove the original tab only after the tree accepts its destination.
         // Both handles refer to the existing terminal; no PTY is created.
-        if !tree.split_positioned(&source, target.clone(), axis, before) {
-            return;
-        }
+        let Some(inserted) = rmux_core::pane_commands::insert(
+            &mut self.layout, Some(&source), target.clone(), axis, before,
+        ) else { return; };
         self.error = None;
         source.update(cx, |pane, cx| pane.take_tab(id, cx));
-        self.panes.insert(index + usize::from(!before), target.clone());
+        self.panes.insert(inserted, target.clone());
         self.observe_pane(&target, window, cx);
         self.split_drag = None;
         self.zoomed = None;
@@ -3124,7 +3124,6 @@ impl Workspace {
                 let view = cx.new(|cx| {
                     PaneView::new(terminal, command_label, self.benchmark, workspace_id, cx)
                 });
-                self.observe_pane(&view, window, cx);
                 if self.benchmark {
                     // Preserve the existing equal-width benchmark fixture.
                     self.panes.push(view.clone());
@@ -3133,13 +3132,18 @@ impl Workspace {
                         children: self.panes.iter().cloned().map(PaneTree::Pane).collect(),
                         weights: vec![1.; self.panes.len()],
                     });
-                } else if let Some(tree) = &mut self.layout {
-                    tree.split_positioned(&self.panes[focused], view.clone(), axis, before);
-                    self.panes.insert(focused + usize::from(!before), view.clone());
                 } else {
-                    self.layout = Some(PaneTree::Pane(view.clone()));
-                    self.panes.push(view.clone());
+                    let anchor = self.panes.get(focused);
+                    let Some(inserted) = rmux_core::pane_commands::insert(
+                        &mut self.layout, anchor, view.clone(), axis, before,
+                    ) else {
+                        self.error = Some("Cannot insert terminal into the current layout".into());
+                        cx.notify();
+                        return None;
+                    };
+                    self.panes.insert(inserted, view.clone());
                 }
+                self.observe_pane(&view, window, cx);
                 created = Some(view.entity_id());
                 if focus { view.read(cx).focus(window, cx); }
             }

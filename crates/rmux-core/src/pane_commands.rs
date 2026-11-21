@@ -31,6 +31,25 @@ pub fn equalize<T: Clone + PartialEq, Z>(tree: &mut Option<PaneTree<T>>, zoomed:
     }
 }
 
+/// Commit a new pane to the layout and return its visual ordinal. Rejected
+/// targets, duplicate identities and depth limits leave ownership unchanged.
+/// Hosts create their session first, then register it only after this succeeds.
+pub fn insert<T: Clone + PartialEq>(tree: &mut Option<PaneTree<T>>, target: Option<&T>, pane: T, axis: crate::layout::Axis, before: bool) -> Option<usize> {
+    match tree {
+        None => {
+            if target.is_some() { return None; }
+            *tree = Some(PaneTree::Pane(pane));
+            Some(0)
+        }
+        Some(tree) => {
+            let target = target?;
+            if tree.pane_index(&pane).is_some() { return None; }
+            let index = tree.pane_index(target)? + usize::from(!before);
+            tree.split_positioned(target, pane, axis, before).then_some(index)
+        }
+    }
+}
+
 /// Cycle in visual layout order, independent of host entity storage order.
 pub fn cycle<T: Clone + PartialEq>(tree: &PaneTree<T>, focused: Option<&T>, direction: isize) -> Option<T> {
     let current = focused.and_then(|pane| tree.pane_index(pane)).unwrap_or(0);
@@ -52,6 +71,34 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn insert_is_atomic_and_reports_visual_order() {
+        let mut tree = None;
+        assert_eq!(insert(&mut tree, Some(&9), 1, Axis::Columns, false), None);
+        assert!(tree.is_none());
+        assert_eq!(insert(&mut tree, None, 30, Axis::Columns, false), Some(0));
+        assert_eq!(insert(&mut tree, Some(&30), 10, Axis::Rows, true), Some(0));
+        assert_eq!(insert(&mut tree, Some(&30), 20, Axis::Columns, false), Some(2));
+        assert_eq!(insert(&mut tree, Some(&99), 40, Axis::Columns, false), None);
+        assert_eq!(insert(&mut tree, Some(&30), 10, Axis::Rows, false), None);
+        assert_eq!(insert(&mut tree, None, 40, Axis::Rows, false), None);
+        let tree = tree.unwrap();
+        assert_eq!(tree.pane_count(), 3);
+        assert_eq!((tree.pane_at(0), tree.pane_at(1), tree.pane_at(2)), (Some(&10), Some(&30), Some(&20)));
+    }
+
+    #[test]
+    fn rejected_deep_insert_preserves_the_layout() {
+        let mut tree = Some(PaneTree::Pane(0));
+        for pane in 1..=crate::layout::MAX_SPLIT_DEPTH {
+            assert!(insert(&mut tree, Some(&0), pane, Axis::Columns, false).is_some());
+        }
+        let count = tree.as_ref().unwrap().pane_count();
+        assert_eq!(insert(&mut tree, Some(&0), count, Axis::Rows, false), None);
+        assert_eq!(tree.as_ref().unwrap().pane_count(), count);
+        assert!(tree.as_ref().unwrap().pane_index(&count).is_none());
+    }
 
     #[test]
     fn nested_layout_controls_cycle_and_close_focus() {

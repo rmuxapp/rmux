@@ -234,7 +234,7 @@ impl InputProbe {
                 if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if command == CommandId::Split { Axis::Columns } else { Axis::Rows };
                 if self.tree.is_none() { self.start_terminal(window, cx); return; }
-                if self.tree.as_mut().is_some_and(|tree| tree.split_positioned(&self.focused, self.next_pane, axis, false)) {
+                if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), self.next_pane, axis, false).is_some() {
                     self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+New desktop terminals, desktop tab-to-split transfers and browser splits now use
+one shared pane insertion transaction. It validates the target, unique pane
+identity and nesting limit before changing the tree, and returns visual order
+for native entity storage. Native new-pane subscriptions are registered only
+after insertion succeeds. Five focused pane-command tests cover empty layouts,
+before/after placement, stale targets, duplicate IDs, depth rejection and the
+previous focus/zoom transitions. Both host checks pass; this insertion change
+has not yet had a runtime smoke. GitHub run 44934228048 was confirmed still
+building optimized UI; run 44934453970 was pending at the start of this cycle.
+No new demo deployment was made.
+
 Pane cycling and focus-after-close now use shared core transitions in both hosts.
 They follow depth-first layout order, preserve focus when an inactive pane closes,
 and choose the next/previous survivor when the active pane closes. Browser no
