@@ -53,7 +53,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
     CommandId::ResizePaneUp, CommandId::ResizePaneDown,
     CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
-    CommandId::CloseWorkspaceGroup, CommandId::ToggleWorkspacePin, CommandId::RenameWorkspaceGroup, CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
+    CommandId::IncreaseFontSize, CommandId::DecreaseFontSize, CommandId::ResetFontSize, CommandId::CloseWorkspaceGroup, CommandId::ToggleWorkspacePin, CommandId::RenameWorkspaceGroup, CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
     CommandId::ScrollToTop, CommandId::ScrollToBottom,
 ];
 struct WorkspaceCommand(CommandId);
@@ -62,7 +62,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [IncreaseFontSize, DecreaseFontSize, ResetFontSize, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -519,6 +519,9 @@ pub fn start() {
         cx.bind_keys(pane_shortcuts::splits(mac));
         cx.bind_keys(pane_shortcuts::tab_reordering());
         cx.bind_keys([
+            KeyBinding::new(if mac { "cmd-=" } else { "ctrl-=" }, IncreaseFontSize, Some("Terminal")),
+            KeyBinding::new(if mac { "cmd--" } else { "ctrl--" }, DecreaseFontSize, Some("Terminal")),
+            KeyBinding::new(if mac { "cmd-0" } else { "ctrl-0" }, ResetFontSize, Some("Terminal")),
             KeyBinding::new(if mac { "cmd-c" } else { "ctrl-shift-c" }, CopySelection, Some("Terminal")),
             KeyBinding::new("ctrl-tab", NextPane, Some("Terminal")),
             KeyBinding::new("ctrl-shift-tab", PreviousPane, Some("Terminal")),

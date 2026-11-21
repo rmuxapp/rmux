@@ -1904,6 +1904,9 @@ impl TerminalView {
     }
 }
 impl terminal_actions::TerminalCommandHost for TerminalView {
+    fn resize_terminal_font(&mut self, delta: Option<f32>, cx: &mut Context<Self>) {
+        self.set_font_size(delta.map_or(cx.global::<Preferences>().font_size, |delta| self.cells.font_size + delta), cx);
+    }
     fn copy_terminal_with_line_breaks(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(false, cx); }
     fn copy_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.copy(&CopySelection, window, cx); }
     fn select_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.select_all(&EditorSelectAll, window, cx); }
@@ -1983,15 +1986,6 @@ impl Render for TerminalView {
             }))
             .on_action(cx.listener(|view, _: &ToggleProgramStatus, window, cx| {
                 view.toggle_status_details(window, cx);
-            }))
-            .on_action(cx.listener(|view, _: &IncreaseFontSize, _, cx| {
-                view.set_font_size(view.cells.font_size + 1., cx)
-            }))
-            .on_action(cx.listener(|view, _: &DecreaseFontSize, _, cx| {
-                view.set_font_size(view.cells.font_size - 1., cx)
-            }))
-            .on_action(cx.listener(|view, _: &ResetFontSize, _, cx| {
-                view.set_font_size(cx.global::<Preferences>().font_size, cx)
             }))
             .on_action(cx.listener(|view, action: &SetTerminalFont, _, cx| {
                 if !action.family.trim().is_empty() && action.family.len() <= 128 && !action.family.chars().any(char::is_control) {

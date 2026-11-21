@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser terminal font increase/decrease/reset now share native terminal action
+routing and CellMetrics bounds (8–40). Palette commands and Cmd+=/Cmd+-/Cmd+0
+(Ctrl on other platforms) update only the focused terminal. Font changes release
+row/cursor caches and stale selection geometry; the existing resize path reflows
+output and preserves the sample input draft. Reset uses browser default 14;
+native reset still uses configured preferences. Native check and WASM build pass.
+Browser smoke verified palette increase, shortcut increase/decrease/reset, draft
+execution after reset, and retained font/output after workspace switching.
+Screenshot: target/browser-font-zoom.jpg. Not deployed; new terminals currently
+start at the default size rather than inheriting the current terminal's zoom.
+
 Browser Close Workspace Group now shares native action routing and captured-member
 resolution. Each member is resolved immediately before removal; moved members and
 unrelated workspaces are preserved. Native confirmation and process-close policy

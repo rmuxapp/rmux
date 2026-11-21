@@ -15,6 +15,7 @@ pub(crate) struct TerminalSample {
     last_find_query: String,
     frame: Frame,
     font_revision: u64,
+    font_size: f32,
     rows: row_cache::RowCache,
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
@@ -120,7 +121,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, font_size: 14., rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -293,7 +294,7 @@ impl Render for TerminalSample {
                     this.font_revision = revision;
                 }
                 let family: SharedString = "Fira Mono".into();
-                let cells = CellMetrics::measured(14., family.clone(), window);
+                let cells = CellMetrics::measured(this.font_size, family.clone(), window);
                 let content = crate::cell_metrics::content_bounds(bounds, 8);
                 this.selection_geometry = Some((content,cells));
                 let (columns, height) = cells.grid_size(content.size);
@@ -411,6 +412,20 @@ impl EntityInputHandler for TerminalSample {
 }
 
 impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
+    fn resize_terminal_font(&mut self, delta: Option<f32>, cx: &mut Context<Self>) {
+        let next = CellMetrics::new(delta.map_or(14., |delta| self.font_size + delta)).font_size;
+        if next == self.font_size { return; }
+        self.font_size = next;
+        self.rows.release();
+        self.cursor_cache = Default::default();
+        self.selection_geometry = None;
+        self.selecting = false;
+        self.selection_pointer = None;
+        self.selection_scroll = None;
+        self.scrollbar_drag = None;
+        self.scroll_remainder = 0.;
+        cx.notify();
+    }
     fn copy_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(true, cx); }
     fn copy_terminal_with_line_breaks(&mut self, _: &mut Window, cx: &mut Context<Self>) { self.copy_selection(false, cx); }
     fn select_terminal(&mut self, _: &mut Window, cx: &mut Context<Self>) {
