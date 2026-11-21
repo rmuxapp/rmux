@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Native browser CI now saves compiled caches per source revision, preferring the
+latest cache with matching dependency/tool pins. Previously its immutable cache
+key prevented successful later builds from updating compiled application code.
+Exact reruns skip saving an existing cache. This follows the shared demo's cache
+strategy; speed improvement has not yet been measured. Demo run 44950500137 is
+queued behind the still-running 44950076655; workspace rename/pin changes are
+not yet published to the site.
+
 Browser workspace pinning now uses the native shared action route and core
 ordering/navigation rules. Each browser workspace owns its pin state; sidebar
 badges match desktop group/workspace semantics. Palette pin/unpin preserves the
