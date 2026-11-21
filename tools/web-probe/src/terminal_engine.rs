@@ -16,8 +16,19 @@ extern "C" {
     fn free(id: u32);
 }
 #[derive(serde::Deserialize)]
+struct WireCell(smol_str::SmolStr, u8, Color, Color, u8);
+impl WireCell {
+    fn into_cell(self, column: usize) -> Cell {
+        let Self(text, width, foreground, background, flags) = self;
+        Cell { text, column: column as u16, width, foreground, background,
+            bold: flags & 1 != 0, italic: flags & 2 != 0, underline: flags & 4 != 0,
+            strikethrough: flags & 8 != 0, hidden: flags & 32 != 0,
+            underline_color: foreground, underline_curly: false, overline: false }
+    }
+}
+#[derive(serde::Deserialize)]
 struct Patch {
-    revision: u64, columns: u16, height: usize, rows: Vec<(usize, Vec<Cell>)>,
+    revision: u64, columns: u16, height: usize, rows: Vec<(usize, Vec<WireCell>)>,
     background: Color, cursor: Option<(u16,u16)>, cursor_shape: CursorShape,
     cursor_color: Color, cursor_color_explicit: bool, scrollback_lines: u64,
 }
@@ -30,7 +41,9 @@ impl TerminalEngine {
         let patch: Patch = serde_json::from_str(&snapshot(self.0)).expect("browser Ghostty frame");
         let mut rows = previous.map(|f| f.rows.as_ref().clone()).unwrap_or_default();
         rows.resize_with(patch.height, || Arc::new(Vec::new()));
-        for (y, cells) in patch.rows { rows[y] = Arc::new(cells); }
+        for (y, cells) in patch.rows {
+            rows[y] = Arc::new(cells.into_iter().enumerate().map(|(x, cell)| cell.into_cell(x)).collect());
+        }
         Frame { revision: patch.revision, columns: patch.columns, rows: Arc::new(rows),
             selections: Arc::new(vec![None; patch.height]), background: patch.background,
             cursor: patch.cursor, cursor_shape: patch.cursor_shape, cursor_color: patch.cursor_color,

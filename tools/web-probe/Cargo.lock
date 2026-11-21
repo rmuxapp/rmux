@@ -4827,6 +4827,7 @@ dependencies = [
  "rmux-core",
  "serde",
  "serde_json",
+ "smol_str 0.2.2",
  "unicode-segmentation",
  "wasm-bindgen",
 ]

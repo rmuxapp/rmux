@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Compacted browser cell transport to tuples, retaining dirty-row updates, resolved
+colors, grapheme strings, widths and style flags. Rust reconstructs the shared
+Cell type with inline small strings and unchanged-row Arc reuse. Engine checks
+and WASM build pass; browser split/typing retains colors and cursor placement.
+The same 16-pane benchmark reduced full-update payload from 7.34 MB to 0.99 MB
+(86.5%) and median engine/serialization time from 7.93 to 2.85 ms. Results exclude
+Rust decoding and UI rendering; full performance acceptance remains open.
+
 Added a repeatable browser engine/JSON boundary benchmark for 1/4/16 panes,
 80×24 cells, clean/one-row/full-viewport workloads, isolated Node processes and
 20 warmup + 100 measured updates. Dirty-row assertions pass in all nine cases.

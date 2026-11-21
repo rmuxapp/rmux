@@ -36,3 +36,27 @@ GPU rendering, font shaping, Rust deserialization, browser scheduling, input-to-
 latency, actual browser memory and long-session retention still need measurement.
 
 Raw results: [browser-engine-json.jsonl](browser-engine-json.jsonl).
+
+## Compact tuple transport
+
+Same machine, workload, warmup and sample counts. Cells now transfer as
+`[text, width, foreground, background, flags]`; row position supplies the column
+and Rust reconstructs omitted defaults. Small strings deserialize inline.
+
+| Panes | Update | Median ms | p95 ms | JSON bytes/update |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | clean-snapshot | 0.018 | 0.043 | 189 |
+| 1 | one-row | 0.033 | 0.053 | 2,755 |
+| 1 | full-viewport | 0.183 | 0.317 | 61,788 |
+| 4 | clean-snapshot | 0.074 | 0.080 | 757 |
+| 4 | one-row | 0.105 | 0.135 | 11,021 |
+| 4 | full-viewport | 0.728 | 0.917 | 247,153 |
+| 16 | clean-snapshot | 0.278 | 0.296 | 3,028 |
+| 16 | one-row | 0.400 | 0.489 | 44,084 |
+| 16 | full-viewport | 2.845 | 3.429 | 988,612 |
+
+The 16-pane full-update payload fell from 7,343,812 to 988,612 bytes (86.5%).
+Median engine/serialization time fell from 7.930 to 2.845 ms in these runs.
+These are sequential microbenchmark runs, not statistically controlled browser
+latency comparisons. Rust decoding and GPU presentation remain outside timing.
+Raw results: [browser-engine-tuples.jsonl](browser-engine-tuples.jsonl).

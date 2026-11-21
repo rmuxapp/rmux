@@ -33,10 +33,10 @@ export function createHost(engine) {
           let foreground = [c.fg_r,c.fg_g,c.fg_b], background = [c.bg_r,c.bg_g,c.bg_b];
           if (c.flags & F.INVERSE) [foreground,background] = [background,foreground];
           if (c.flags & F.FAINT) foreground = foreground.map((v,i)=>Math.round((v+background[i])/2));
-          cells.push({text:c.grapheme_len ? t.getGraphemeString(y,x) : String.fromCodePoint(c.codepoint||32),
-            column:x,width:c.width,foreground,background,bold:!!(c.flags&F.BOLD),italic:!!(c.flags&F.ITALIC),
-            underline:!!(c.flags&F.UNDERLINE),underline_color:foreground,underline_curly:false,
-            strikethrough:!!(c.flags&F.STRIKETHROUGH),overline:false,hidden:!!(c.flags&F.INVISIBLE)});
+          // Wire tuple: text, width, resolved foreground/background, style flags.
+          // Column is implied by row position; defaults are reconstructed in Rust.
+          cells.push([c.grapheme_len ? t.getGraphemeString(y,x) : String.fromCodePoint(c.codepoint||32),
+            c.width,foreground,background,c.flags]);
         }
         rows.push([y,cells]);
       }

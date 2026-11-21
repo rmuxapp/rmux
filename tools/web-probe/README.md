@@ -86,3 +86,9 @@ engine/JSON boundary benchmark. It validates dirty-row counts and reports payloa
 sizes, median/p95 serialization cost and whole-process memory. See
 `../../docs/benchmarks/browser-engine.md` for scope and the recorded baseline.
 This does not measure browser rendering or input latency.
+
+Cell payloads use `[text, width, resolved foreground, resolved background, flags]`
+tuples; columns come from row position and omitted style defaults are rebuilt in
+Rust. Text deserializes into SmolStr to retain inline short-cell storage. The
+recorded tuple benchmark cuts dense 16-pane payload by 86.5%; see the benchmark
+report for timing and measurement limits.
