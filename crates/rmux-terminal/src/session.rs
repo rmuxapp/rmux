@@ -26,6 +26,7 @@ pub struct Session {
     paste_generation: Arc<AtomicU64>,
     pending_scroll: Mutex<Vec<crate::Scroll>>,
     report_all_keys: Arc<AtomicBool>,
+    mouse_tracking: Arc<AtomicBool>,
     shutdown: ShutdownHandle,
     pub updates: async_channel::Receiver<()>,
     size: (u16, u16),
@@ -70,6 +71,7 @@ enum InputPayload {
     ClearScrollback { terminal: std::sync::Weak<Mutex<Terminal>> },
     Paste { text: String, bracketed: bool },
     NativePaste { terminal: std::sync::Weak<Mutex<Terminal>>, text: String },
+    Mouse { terminal: std::sync::Weak<Mutex<Terminal>>, event: crate::mouse::Event },
 }
 impl InputPayload {
     fn encode_pending(self, paste: Option<&PastePermit>) -> Result<Option<Vec<u8>>> {
@@ -97,6 +99,10 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
+            Self::Mouse { terminal, event } => {
+                let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
+                terminal.lock().unwrap_or_else(|error| error.into_inner()).encode_mouse(event).map(Option::unwrap_or_default)
+            }
             Self::ClearScrollback { terminal } => {
                 if let Some(terminal) = terminal.upgrade() {
                     terminal.lock().unwrap_or_else(|error| error.into_inner()).clear_scrollback()?;
@@ -301,6 +307,8 @@ impl Session {
         engine.set_scrollback_limit(scrollback_bytes)?;
         let report_all_keys = Arc::new(AtomicBool::new(engine.reports_all_keys()?));
         let reader_report_all_keys = report_all_keys.clone();
+        let mouse_tracking = Arc::new(AtomicBool::new(engine.mouse_tracking()?));
+        let reader_mouse_tracking = mouse_tracking.clone();
         let terminal = Arc::new(Mutex::new(engine));
         let pair = native_pty_system().openpty(PtySize {
             rows,
@@ -369,6 +377,7 @@ impl Session {
             exit,
             output_bytes,
             report_all_keys,
+            mouse_tracking,
         };
         let reaper = thread::Builder::new()
             .name("rmux-pty-reap".into())
@@ -428,6 +437,10 @@ impl Session {
                                 match terminal.reports_all_keys() {
                                     Ok(enabled) => reader_report_all_keys.store(enabled, Ordering::Release),
                                     Err(error) => { let _ = mode_error.try_send(format!("Keyboard mode query failed: {error}")); }
+                                }
+                                match terminal.mouse_tracking() {
+                                    Ok(enabled) => reader_mouse_tracking.store(enabled, Ordering::Release),
+                                    Err(error) => { let _ = mode_error.try_send(format!("Mouse mode query failed: {error}")); }
                                 }
                                 terminal.take_replies()
                             };
@@ -629,6 +642,16 @@ impl Session {
             self.follow_output()?;
         }
         Ok(())
+    }
+    /// Decide local handling from the last parsed mode without a parser wait.
+    /// Application reports use the existing bounded, ordered input worker.
+    pub fn queue_mouse(&self, event: crate::mouse::Event) -> Result<bool> {
+        if !self.mouse_tracking.load(Ordering::Acquire) { return Ok(false); }
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::Mouse { terminal: Arc::downgrade(&self.terminal), event },
+            _paste: None,
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))?;
+        Ok(true)
     }
     pub fn mouse(&self, event: crate::mouse::Event) -> Result<bool> {
         let bytes = self
@@ -1463,6 +1486,51 @@ mod tests {
         }
         Ok(())
     }
+    #[test]
+    fn queued_mouse_uses_published_mode_without_waiting_for_parser() -> Result<()> {
+        let expected = b"\x1b[<64;3;2M";
+        let command = format!("stty raw -echo; printf '\\033[?1000h\\033[?1006hready\\r\\n'; dd bs=1 count={} 2>/dev/null | od -An -tx1; printf '\\033[?1000l'", expected.len());
+        let mut builder = CommandBuilder::new("/bin/sh");
+        builder.args(["-c", &command]);
+        let session = Session::spawn(builder, 80, 8)?;
+        let event = crate::mouse::Event {
+            action: crate::mouse::Action::Press, button: Some(crate::mouse::Button::WheelUp),
+            x: 20., y: 20., width: 800, height: 160, cell_width: 10., cell_height: 20.,
+            pressed: false, modifiers: Default::default(),
+        };
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !session.mouse_tracking.load(Ordering::Acquire) {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "mouse mode was not published");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let terminal = session.terminal.clone();
+        let (started, starting) = mpsc::channel();
+        let (release, waiting) = mpsc::channel();
+        let holder = thread::spawn(move || {
+            let _parser = terminal.lock().unwrap();
+            started.send(()).unwrap();
+            let _ = waiting.recv_timeout(std::time::Duration::from_secs(2));
+        });
+        starting.recv()?;
+        let start = std::time::Instant::now();
+        assert!(session.queue_mouse(event)?);
+        let elapsed = start.elapsed();
+        release.send(())?;
+        holder.join().unwrap();
+        assert!(elapsed < std::time::Duration::from_millis(500), "mouse admission waited for parser");
+        let expected_hex = expected.iter().map(|byte| format!("{byte:02x}")).collect::<Vec<_>>();
+        loop {
+            let frame = session.frame()?.text();
+            let received: Vec<_> = frame.split_whitespace().filter(|token| token.len() == 2 && token.bytes().all(|byte| byte.is_ascii_hexdigit())).collect();
+            if received == expected_hex && !session.mouse_tracking.load(Ordering::Acquire) && session.exit_status().is_some() { break; }
+            anyhow::ensure!(std::time::Instant::now() < deadline, "queued mouse bytes or reset missing: {frame:?}");
+            thread::sleep(std::time::Duration::from_millis(5));
+        }
+        let _parser = session.terminal.lock().unwrap();
+        assert!(!session.queue_mouse(event)?, "disabled reporting must leave scrolling local");
+        Ok(())
+    }
+
     #[test]
     fn queued_plain_text_preserves_native_text_across_mode_changes() -> Result<()> {
         let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));

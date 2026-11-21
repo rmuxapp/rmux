@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Native mouse dispatch now reads a tracking flag published after each parsed PTY
+batch. Local scrolling no longer locks the parser to check reporting; application
+mouse events enter the bounded input queue and Ghostty encodes them on its writer.
+The worker honors the mode at encoding time; a report whose application has since
+disabled tracking is suppressed rather than replayed as unrelated local input.
+Three mouse tests pass, including a real PTY that enables SGR reporting, receives
+the exact wheel bytes after admission under a held parser lock, then disables
+tracking and returns handling to local scrolling. Desktop cargo check passes.
+Pointer selection itself still has synchronous parser operations; GUI latency,
+mode-publication overhead and cross-platform runtime acceptance remain open.
+
 Native scroll requests no longer wait for the parser lock. Busy requests are
 applied before the next coherent frame; same-direction line motion coalesces,
 opposite directions retain clamping order, and absolute navigation or later input
@@ -9,9 +20,8 @@ supersedes older requests. The queue holds at most 64 requests, reports saturati
 and retains its small allocation across gestures. No background scroll timer or
 worker is added. The held-parser fixture verifies nonblocking admission, bounded
 queue recovery, viewport edge behavior and typing-after-scroll precedence; CI
-includes it. Mouse-wheel dispatch still checks application mouse reporting via
-a separate parser-lock path; removing that wait remains follow-up work. GUI
-scrolling latency and cross-platform acceptance remain open.
+includes it. Mouse-report dispatch now uses the published-mode/queued-input path
+described above. GUI scrolling latency and cross-platform acceptance remain open.
 
 Explicit terminal shutdown now cancels queued paste before requesting process
 termination, even if the session remains owned by UI code. Native and automation

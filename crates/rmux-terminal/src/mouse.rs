@@ -64,6 +64,13 @@ impl Drop for Encoder {
     }
 }
 impl Terminal {
+    pub fn mouse_tracking(&self) -> Result<bool> {
+        let mut tracking = false;
+        unsafe {
+            check(ghostty_terminal_get(self.terminal, GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING, out(&mut tracking)))?;
+        }
+        Ok(tracking)
+    }
     /// None means local scrolling/selection should handle this event. An empty
     /// Some means reporting is active but the selected mode suppresses it.
     pub fn encode_mouse(&mut self, event: Event) -> Result<Option<Vec<u8>>> {
@@ -81,13 +88,7 @@ impl Terminal {
         // SAFETY: all handles are owned by this terminal and all pointers refer
         // to initialized, correctly typed values for the duration of each call.
         unsafe {
-            let mut tracking = false;
-            check(ghostty_terminal_get(
-                self.terminal,
-                GHOSTTY_TERMINAL_DATA_MOUSE_TRACKING,
-                out(&mut tracking),
-            ))?;
-            if !tracking {
+            if !self.mouse_tracking()? {
                 return Ok(None);
             }
             let encoder = self.mouse.encoder;

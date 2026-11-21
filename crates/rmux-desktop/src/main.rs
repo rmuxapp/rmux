@@ -1240,7 +1240,7 @@ impl TerminalView {
                 alt: modifiers.alt,
             },
         };
-        match self.session.mouse(event) {
+        match self.session.queue_mouse(event) {
             Ok(reported) => reported,
             Err(error) => {
                 self.error = Some(error.to_string());
