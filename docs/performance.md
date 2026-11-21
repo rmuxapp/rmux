@@ -576,8 +576,9 @@ The contention fixture now exercises both ordinary text and report-all admission
 while another thread owns the parser. A real PTY fixture enables report-all,
 receives the shifted-A sequence and disables the mode again. These are functional
 and lock-avoidance checks; they do not measure end-to-end key-to-pixel latency.
-The reader adds one keyboard-mode query per parsed output batch; its throughput
-impact and native IME interaction still need measurement/acceptance.
+The reader adds one keyboard-mode query per parsed output batch. A current PTY
+pressure baseline is recorded below; its isolated throughput impact still needs
+a matched comparison, and native IME interaction still needs acceptance.
 
 ### Queued keyboard pressure measurement
 
@@ -603,3 +604,26 @@ independent key costs. There is no matched before/after throughput comparison.
 The 128-sample results exclude writer completion, native composition, rendering
 and presentation, and do not establish a key-to-pixel latency target.
 [Raw results, platform and source/binary hashes](benchmarks/pty-queued-keyboard.jsonl).
+
+### PTY pressure after queued input changes
+
+November 21 macOS arm64 release run, source 374b4c5 with the benchmark cleanup
+change identified by its source hash. One responding PTY plus continuous output
+in every other pane, 160×48 cells, 128 requests per pane count. The harness now
+waits for all shutdown handles before starting the next count, preventing
+asynchronous cleanup from overlapping workloads.
+
+| Total panes | Aggregate flood MiB/s | Input admission p99 | Response snapshot p99 | Snapshot batch p99 |
+| --- | ---: | ---: | ---: | ---: |
+| 1 | — | 14.3 µs | 1.26 ms | 0.81 ms |
+| 4 | 298.98 | 6.2 µs | 0.70 ms | 0.68 ms |
+| 8 | 118.42 | 8.1 µs | 1.41 ms | 1.39 ms |
+| 16 | 103.57 | 11.8 µs | 5.94 ms | 5.91 ms |
+
+All 512 responses arrived, every flood producer advanced and all workload
+shutdowns completed within the five-second bound. Snapshot observation includes
+sampling the busy panes before checking the response. This single uncontrolled
+run excludes the GUI, shaping and presentation; it is neither key-to-pixel
+latency nor a matched before/after regression comparison. The throughput fall
+at larger pane counts warrants profiling, not an attribution from this run.
+[Raw results and provenance](benchmarks/pty-post-queued-input.jsonl).

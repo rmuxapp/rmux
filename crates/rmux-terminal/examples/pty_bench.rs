@@ -121,9 +121,20 @@ fn benchmark(panes: usize) -> Result<()> {
     admission.sort_unstable();
     responses.sort_unstable();
     snapshot_batches.sort_unstable();
+    // Session shutdown is asynchronous. Reap this workload before the next
+    // pane count so its writers cannot contaminate the following measurement.
+    let shutdowns: Vec<_> = busy.iter().chain(std::iter::once(&responder))
+        .map(Session::shutdown_handle).collect();
+    drop(busy);
+    drop(responder);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while shutdowns.iter().any(|shutdown| !shutdown.is_finished()) {
+        ensure!(Instant::now() < deadline, "PTY responder workload cleanup timed out");
+        thread::sleep(Duration::from_millis(5));
+    }
     println!(
         "{{\"panes\":{panes},\"flood_panes\":{},\"columns\":160,\"rows\":48,\"samples\":128,\"elapsed_seconds\":{elapsed:.6},\"parsed_flood_bytes\":{total_bytes},\"flood_mib_per_second\":{:.3},\"input_call_p50_ns\":{},\"input_call_p99_ns\":{},\"response_snapshot_p50_ns\":{},\"response_snapshot_p95_ns\":{},\"response_snapshot_p99_ns\":{},\"snapshot_batch_p99_ns\":{}}}",
-        busy.len(),
+        panes - 1,
         total_bytes as f64 / 1048576. / elapsed,
         percentile(&admission, 50),
         percentile(&admission, 99),

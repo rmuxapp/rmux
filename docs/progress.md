@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Refreshed native release PTY pressure measurements after queued-input changes.
+Fixed the responder harness to await asynchronous workload shutdown before the
+next pane count. All 512 requests completed at 1/4/8/16 panes, output advanced
+and shutdown checks passed. At 16 panes: 103.57 MiB/s aggregate flood output,
+11.8 µs input-admission p99 and 5.94 ms response-snapshot p99. Raw provenance in
+`benchmarks/pty-post-queued-input.jsonl`; scope/limits in performance.md. This
+does not measure GUI latency or isolate the mode-publication query's cost.
+
 Browser sidebar rows accept terminal-tab drops from another workspace. Source
 tab identity, rename state and destination capacity are checked before transfer;
 the existing terminal entity/session moves to the destination's active pane.
