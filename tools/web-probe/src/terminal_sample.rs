@@ -15,11 +15,13 @@ pub(crate) struct TerminalSample {
     selection_geometry: Option<(Bounds<Pixels>, CellMetrics)>,
     selecting: bool,
     scroll_remainder: f32,
+    scrollbar_drag: Option<crate::scrollbar_view::Drag>,
 }
 impl TerminalSample {
     pub fn scroll(&mut self, scroll: rmux_core::scroll::Scroll, cx: &mut Context<Self>) {
         use rmux_core::scroll::Scroll;
         let (kind,delta) = match scroll {
+            Scroll::Row(row) => ("ROW",row.min(i32::MAX as u64) as isize),
             Scroll::Lines(delta) => ("DELTA",delta),
             Scroll::Prompts(delta) => ("DELTA_PROMPT",delta),
             Scroll::Top => ("TOP",0),
@@ -38,6 +40,7 @@ impl TerminalSample {
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
     pub fn release_render_cache(&mut self) {
         self.selecting = false;
+        self.scrollbar_drag = None;
         self.engine.focus(false);
         self.rows.release();
         self.cursor_cache = Default::default();
@@ -47,7 +50,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0. }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -57,6 +60,13 @@ impl TerminalSample {
         cx.notify();
     }
     fn mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
+        if let Some(drag) = self.scrollbar_drag.take() {
+            if let Some((bounds,_)) = self.selection_geometry {
+                if let Some(scroll) = drag.target(bounds,&self.frame,event.position) { self.scroll(scroll,cx); }
+            }
+            cx.stop_propagation();
+            return;
+        }
         if self.selecting {
             self.selecting = false;
             self.select("RELEASE", event.position, event.modifiers.alt, 1, cx);
@@ -129,10 +139,27 @@ impl Render for TerminalSample {
         div().size_full().key_context("Terminal").track_focus(&self.focus)
             .on_mouse_down(MouseButton::Left, cx.listener(|this, event: &MouseDownEvent, window, cx| {
                 this.focus.focus(window, cx);
+                if let Some((bounds,_)) = this.selection_geometry {
+                    if let Some(drag) = crate::scrollbar_view::begin_drag(bounds,&this.frame,event.position) {
+                        this.selecting = false;
+                        this.scrollbar_drag = Some(drag);
+                        if let Some(scroll) = drag.target(bounds,&this.frame,event.position) { this.scroll(scroll,cx); }
+                        return;
+                    }
+                }
                 this.selecting = true;
                 this.select("PRESS", event.position, event.modifiers.alt, event.click_count as usize, cx);
             }))
             .on_mouse_move(cx.listener(|this, event: &MouseMoveEvent, _, cx| {
+                if let Some(drag) = this.scrollbar_drag {
+                    if event.dragging() {
+                        if let Some((bounds,_)) = this.selection_geometry {
+                            if let Some(scroll) = drag.target(bounds,&this.frame,event.position) { this.scroll(scroll,cx); }
+                        }
+                        cx.stop_propagation();
+                    } else { this.scrollbar_drag = None; }
+                    return;
+                }
                 if this.selecting && event.dragging() {
                     this.select("DRAG", event.position, event.modifiers.alt, 1, cx);
                     cx.stop_propagation();

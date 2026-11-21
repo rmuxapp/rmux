@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Desktop and browser now share draggable scrollback geometry and absolute history
+row commands. Dragging preserves the thumb grab position and clamps to history
+limits; the existing indicator stays hidden at the live bottom. Three focused
+core scroll tests, native check, WASM build and direct engine ROW checks pass.
+Browser dragging reaches the expected history rows. An apparent idle repaint
+failure in displayed tool screenshots was not supported by raw captures: three
+raw captures were byte-identical, including the visible text (27,567 bright
+pixels in the terminal text region). Experimental cache/layer
+changes were removed. Selection edge autoscroll remains pending; this shared
+browser build is still local and has not replaced the published demo.
+Evidence: target/shared-scrollbar-drag-verified.png.
+
 Desktop and browser now render the same extracted scrollback position indicator:
 3px width, minimum 8px thumb, native color and hidden at the live bottom. Native
 check and WASM build pass. Browser verified top/middle placement and hiding after

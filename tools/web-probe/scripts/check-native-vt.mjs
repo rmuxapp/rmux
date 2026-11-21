@@ -86,6 +86,12 @@ try {
   const top=history.snapshot();
   assert.equal(top.scrollback_offset,top.scrollback_lines);
   assert.equal(top.rows[0][1].map(c=>c[0]).join(''),'line-0');
+  history.scroll('ROW',4);
+  const absolute=history.snapshot();
+  assert.equal(absolute.scrollback_offset,absolute.scrollback_lines-4);
+  history.scroll('ROW',4);
+  assert.equal(history.snapshot().scrollback_offset,absolute.scrollback_offset,'absolute drags do not accumulate');
+  history.scroll('TOP');
   history.select('PRESS',12,0,8,20,20,3,false,3);
   assert.equal(history.selectedText(),'line-0');
   history.scroll('BOTTOM');

@@ -634,6 +634,7 @@ impl Terminal {
         }
         self.revision = self.revision.wrapping_add(1);
         let (tag, delta) = match scroll {
+            Scroll::Row(_) => (GHOSTTY_TERMINAL_SCROLL_VIEWPORT_ROW, 0),
             Scroll::Lines(delta) => (GHOSTTY_TERMINAL_SCROLL_VIEWPORT_DELTA, delta),
             Scroll::Prompts(delta) => (GHOSTTY_TERMINAL_SCROLL_VIEWPORT_DELTA_PROMPT, delta),
             Scroll::Top => (GHOSTTY_TERMINAL_SCROLL_VIEWPORT_TOP, 0),
@@ -646,7 +647,9 @@ impl Terminal {
                 self.terminal,
                 GhosttyTerminalScrollViewport {
                     tag,
-                    value: if matches!(scroll, Scroll::Prompts(_)) {
+                    value: if let Scroll::Row(row) = scroll {
+                        GhosttyTerminalScrollViewportValue { row: usize::try_from(row).unwrap_or(usize::MAX) }
+                    } else if matches!(scroll, Scroll::Prompts(_)) {
                         GhosttyTerminalScrollViewportValue {
                             delta_prompt: delta,
                         }

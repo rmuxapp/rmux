@@ -4,6 +4,11 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+The shared scrollback indicator now accepts dragging on both hosts, preserving
+the grab point and issuing absolute native viewport row commands. Core geometry
+and engine checks cover clamping and repeated absolute targets. Browser drag
+interaction is verified. No continuous repaint loop or cache bypass was added.
+
 The scrollback position indicator is now shared native source, including geometry,
 color and visibility. Browser top/middle/bottom behavior is verified. It is a
 position indicator; neither host currently implements dragging it.

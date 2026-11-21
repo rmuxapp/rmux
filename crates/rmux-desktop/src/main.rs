@@ -620,6 +620,7 @@ struct TerminalView {
     render_snapshot_released: bool,
     cursor_cache: row_cache::CursorCache,
     scroll_remainder: f32,
+    scrollbar_drag: Option<scrollbar_view::Drag>,
     mouse_button: Option<MouseButton>,
     metrics: Option<diagnostics::Metrics>,
     pressed_keys: std::collections::HashMap<rmux_terminal::keyboard::KeyIdentity, String>,
@@ -996,6 +997,7 @@ impl TerminalView {
             metrics: diagnostics::Metrics::enabled(),
             mouse_button: None,
             scroll_remainder: 0.,
+            scrollbar_drag: None,
             row_cache: row_cache::RowCache::default(),
             render_snapshot_released: false,
             cursor_cache: row_cache::CursorCache::default(),
@@ -1265,6 +1267,17 @@ impl TerminalView {
     fn mouse_down(&mut self, event: &MouseDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         self.clear_link_hover(cx);
         self.focus.focus(window);
+        if event.button == MouseButton::Left {
+            if let Some(drag) = scrollbar_view::begin_drag(self.last_bounds,&self.frame,event.position) {
+                self.selecting = false;
+                self.selection_scroll = None;
+                self.selection_pointer = None;
+                self.scrollbar_drag = Some(drag);
+                if let Some(scroll) = drag.target(self.last_bounds,&self.frame,event.position) { self.scroll(scroll,cx); }
+                cx.stop_propagation();
+                return;
+            }
+        }
         if !self.last_bounds.contains(&event.position) {
             cx.stop_propagation();
             return;
@@ -1333,6 +1346,13 @@ impl TerminalView {
         }
     }
     fn mouse_up(&mut self, event: &MouseUpEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if event.button == MouseButton::Left {
+            if let Some(drag) = self.scrollbar_drag.take() {
+                if let Some(scroll) = drag.target(self.last_bounds,&self.frame,event.position) { self.scroll(scroll,cx); }
+                cx.stop_propagation();
+                return;
+            }
+        }
         if self.selecting && event.button == MouseButton::Left {
             self.selecting = false;
             self.selection_scroll = None;
@@ -1388,6 +1408,13 @@ impl TerminalView {
         if next != self.link_hover { self.link_hover = next; cx.notify(); }
     }
     fn mouse_move(&mut self, event: &MouseMoveEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(drag) = self.scrollbar_drag {
+            if event.dragging() {
+                if let Some(scroll) = drag.target(self.last_bounds,&self.frame,event.position) { self.scroll(scroll,cx); }
+                cx.stop_propagation();
+            } else { self.scrollbar_drag = None; }
+            return;
+        }
         self.update_link_hover(event.position, event.modifiers, cx);
         if self.selecting {
             if event.dragging() {
