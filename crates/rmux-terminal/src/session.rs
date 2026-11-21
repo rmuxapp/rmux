@@ -67,6 +67,7 @@ enum InputPayload {
     KeyPress { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers, repeat: bool, plain_text: Option<String> },
     KeyRelease { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers },
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
+    ClearScrollback { terminal: std::sync::Weak<Mutex<Terminal>> },
     Paste { text: String, bracketed: bool },
 }
 impl InputPayload {
@@ -81,6 +82,12 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
+            Self::ClearScrollback { terminal } => {
+                if let Some(terminal) = terminal.upgrade() {
+                    terminal.lock().unwrap_or_else(|error| error.into_inner()).clear_scrollback()?;
+                }
+                Ok(Vec::new())
+            }
             Self::KeyPress { terminal, key, mods, repeat, plain_text } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
@@ -125,7 +132,7 @@ impl From<Vec<u8>> for InputMessage {
 
 fn write_messages(writes: mpsc::Receiver<InputMessage>, mut writer: impl Write, mut report: impl FnMut(String), mut finished: impl FnMut()) {
     while let Ok(message) = writes.recv() {
-        let notify = message._paste.is_some() || matches!(&message.payload, InputPayload::Focus { .. });
+        let notify = message._paste.is_some() || matches!(&message.payload, InputPayload::Focus { .. } | InputPayload::ClearScrollback { .. });
         let keep_writing = write_message(message, &mut writer, &mut report);
         // The permit must be released before waking a quiet terminal's UI.
         if notify { finished(); }
@@ -878,6 +885,14 @@ impl Session {
             .unwrap_or_else(|e| e.into_inner())
             .clear_scrollback()
     }
+    /// Admit a history-clear command without acquiring the parser on the caller.
+    /// The existing writer serializes it with input and wakes the UI on completion.
+    pub fn queue_clear_scrollback(&self) -> Result<()> {
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::ClearScrollback { terminal: Arc::downgrade(&self.terminal) },
+            _paste: None,
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))
+    }
     pub fn memory_usage(&self) -> Result<crate::MemoryUsage> {
         self.terminal
             .lock()
@@ -1298,6 +1313,7 @@ mod tests {
         session.queue_key_release("up", Default::default())?;
         session.queue_focus_with_releases(false, vec!["a".into(), "enter".into()])?;
         session.queue_focus(true)?;
+        session.queue_clear_scrollback()?;
         session.input_without_scroll("state-世界\n".as_bytes())?;
         let elapsed = started_at.elapsed();
         let _ = release.send(());
@@ -1493,6 +1509,35 @@ mod tests {
             let payload = InputPayload::Focus { terminal: Arc::downgrade(&terminal), focused, releases: vec!["a".into(), "enter".into()] };
             assert_eq!(payload.encode()?, expected);
         }
+        Ok(())
+    }
+    #[test]
+    fn queued_scrollback_clear_preserves_screen_and_wakes_ui() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 3)?));
+        let before = {
+            let mut engine = terminal.lock().unwrap();
+            for _ in 0..12 { engine.write(b"history\r\n"); }
+            engine.write(b"screen");
+            let frame = engine.frame()?;
+            assert!(frame.scrollback_lines > 0);
+            frame.text()
+        };
+        let (sender, receiver) = mpsc::sync_channel(3);
+        sender.send(b"before".to_vec().into())?;
+        sender.send(InputMessage { payload: InputPayload::ClearScrollback { terminal: Arc::downgrade(&terminal) }, _paste: None })?;
+        sender.send(b"after".to_vec().into())?;
+        drop(sender);
+        let mut output = Vec::new();
+        let mut wakes = 0;
+        write_messages(receiver, &mut output, |error| panic!("{error}"), || wakes += 1);
+        assert_eq!(output, b"beforeafter");
+        assert_eq!(wakes, 1);
+        let frame = terminal.lock().unwrap().frame()?;
+        assert_eq!(frame.scrollback_lines, 0);
+        assert_eq!(frame.text(), before);
+        let pending = InputPayload::ClearScrollback { terminal: Arc::downgrade(&terminal) };
+        drop(terminal);
+        assert!(pending.encode()?.is_empty());
         Ok(())
     }
     #[test]

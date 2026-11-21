@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Native Clear Scrollback now uses the bounded input worker queue rather than
+acquiring the parser lock on the UI thread. Completion wakes the UI even when
+no PTY bytes are produced; full/closed queues report an error. The worker keeps
+input ordering and weak terminal ownership. Focused checks verify retained
+visible contents, removed history, completion wakeup and safe closed-terminal
+handling. The parser-contention fixture now includes clear admission and passes;
+native cargo check passed. Native visual acceptance remains pending.
+
 Deployed source 374b4c5 from successful GitHub Shared WASM run 44959331001
 to Cloudflare 67b13589. Live rmux.app references it. Verified dragging the last
 rmux terminal onto website preserves output, accepts further input and removes

@@ -1798,7 +1798,7 @@ impl TerminalView {
         if self.dismiss_find(cx) {
             self.focus.focus(window);
         }
-        if let Err(error) = self.session.clear_scrollback() {
+        if let Err(error) = self.session.queue_clear_scrollback() {
             self.error = Some(error.to_string());
         }
         cx.notify();

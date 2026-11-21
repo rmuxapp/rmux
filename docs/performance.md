@@ -651,3 +651,13 @@ per-cell lookup: equal packed base characters can have different combining
 extensions. The regression fixture covers acute/grave variants and wide tails.
 This follow-up has correctness coverage but no separate timing claim; the
 comparison above measures the earlier style-only change.
+
+### Clearing scrollback under output load
+
+The desktop Clear Scrollback action admits a command to the existing bounded
+writer queue without taking the parser lock. The worker clears history under
+that lock and emits a completion wakeup, including on a quiet terminal. This
+avoids UI-thread contention; it does not make the engine operation itself
+instantaneous. Queue saturation is reported instead of blocking. Focused tests
+cover parser-lock contention, visible-screen preservation, input ordering and
+the wakeup, but native click-to-redraw timing has not been measured.
