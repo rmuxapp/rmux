@@ -33,7 +33,7 @@ measurements; JSON is not the final optimized transport.
 
 The engine's exported cells omit custom underline colors/styles and overline;
 those fields currently use foreground/straight underline/no overline. Cursor
-metadata is transferred but not painted yet. Selection, tabs, workspaces,
+geometry and block glyph shaping now use the native cursor_view and CursorCache. Selection, tabs, workspaces,
 divider dragging, broader input and browser acceptance remain pending. This is
 not the public demo replacement yet.
 
@@ -66,3 +66,8 @@ Terminal geometry follows shared native cell metrics and padding on split/zoom.
 Resizes keep the same engine/session, invalidate all viewport rows, and skip work
 when dimensions are unchanged. Engine checks cover shrinking, growing, a 1×1
 viewport and repeated no-op geometry. Browser split/zoom retains visible output.
+
+Cursor rendering follows engine block/bar/underline shape when focused, and uses
+a hollow cursor when unfocused. Browser checks cover block placement after input
+and an unfocused hollow cursor. Native blink scheduling and cursor preference
+policy are not connected yet.

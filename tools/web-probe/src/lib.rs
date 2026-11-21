@@ -162,3 +162,5 @@ mod row_host;
 mod terminal_sample;
 
 mod terminal_engine;
+#[path = "../../../crates/rmux-desktop/src/cursor_view.rs"]
+mod cursor_view;

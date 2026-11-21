@@ -57,6 +57,7 @@ mod restore;
 mod recovery;
 mod row_cache;
 mod row_host;
+mod cursor_view;
 mod list_navigation;
 mod menu_navigation;
 mod snapshot;
@@ -2464,37 +2465,7 @@ impl Element for TerminalElement {
                     });
                 }
                 let cursor_fill = cell.map(|cell| cx.global::<Preferences>().cursor_fill(cell.foreground, cell.background, frame.cursor_color, frame.cursor_color_explicit)).unwrap_or(frame.cursor_color);
-                let paint = |offset, dimensions| {
-                    fill(
-                        Bounds::new(origin + offset, dimensions),
-                        color(cursor_fill),
-                    )
-                };
-                match shape {
-                    CursorShape::Bar => {
-                        vec![paint(point(px(0.), px(0.)), size(px(2.), px(cells.height)))]
-                    }
-                    CursorShape::Underline => vec![paint(
-                        point(px(0.), px(cells.height - 2.)),
-                        size(px(width), px(2.)),
-                    )],
-                    CursorShape::Block => vec![paint(
-                        point(px(0.), px(0.)),
-                        size(px(width), px(cells.height)),
-                    )],
-                    CursorShape::Hollow => vec![
-                        paint(point(px(0.), px(0.)), size(px(width), px(1.))),
-                        paint(
-                            point(px(0.), px(cells.height - 1.)),
-                            size(px(width), px(1.)),
-                        ),
-                        paint(point(px(0.), px(0.)), size(px(1.), px(cells.height))),
-                        paint(
-                            point(px(width - 1.), px(0.)),
-                            size(px(1.), px(cells.height)),
-                        ),
-                    ],
-                }
+                cursor_view::quads(shape, origin, width, cells.height, color(cursor_fill))
             })
             .unwrap_or_default();
         let state = TerminalPaint {

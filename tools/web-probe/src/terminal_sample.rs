@@ -6,6 +6,7 @@ pub(crate) struct TerminalSample {
     engine: TerminalEngine,
     frame: Frame,
     rows: row_cache::RowCache,
+    cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
     command: String,
 }
@@ -14,7 +15,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), focus: cx.focus_handle(), command: String::new() }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new() }
     }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
@@ -63,12 +64,25 @@ impl Render for TerminalSample {
                     this.frame = this.engine.frame(Some(&this.frame));
                 }
                 let rows = this.rows.update(&this.frame, cells, &family, window, None);
-                (rows, cells, row_host::color(this.frame.background), bounds, content)
-            }), move |_, (rows, cells, background, bounds, content), window, cx| {
+                let cursor = this.frame.cursor.and_then(|(x,y)| {
+                    let cell = this.frame.rows.get(usize::from(y))?.get(usize::from(x))?;
+                    let shape = if this.focus.is_focused(window) { this.frame.cursor_shape } else { rmux_core::terminal_frame::CursorShape::Hollow };
+                    let origin = content.origin + point(px(f32::from(x) * cells.width), px(f32::from(y) * cells.height));
+                    let quads = crate::cursor_view::quads(shape, origin, f32::from(cell.width.max(1))*cells.width, cells.height, row_host::color(this.frame.cursor_color));
+                    let glyph = (shape == rmux_core::terminal_frame::CursorShape::Block && !cell.hidden && !cell.text.is_empty())
+                        .then(|| this.cursor_cache.shape(cell, cell.background, cells, &family, window, None));
+                    Some((quads, glyph, origin))
+                });
+                (rows, cells, row_host::color(this.frame.background), bounds, content, cursor)
+            }), move |_, (rows, cells, background, bounds, content, cursor), window, cx| {
                 window.with_content_mask(Some(row_host::mask(bounds)), |window| {
                     window.paint_quad(fill(bounds, background));
                     for (y, row) in rows.iter().enumerate() {
                         row_cache::paint_row(row, content.origin + point(px(0.), px(y as f32 * cells.height)), None, None, cells, window, cx);
+                    }
+                    if let Some((quads, glyph, origin)) = cursor {
+                        for quad in quads { window.paint_quad(quad); }
+                        if let Some(glyph) = glyph { glyph.paint(origin, px(cells.height), window, cx); }
                     }
                 });
             }).size_full())

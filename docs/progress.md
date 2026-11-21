@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Extracted native block/bar/underline/hollow cursor quads into cursor_view and
+compiled the same drawing code into the browser. The browser uses the existing
+shared CursorCache for block-cursor glyph inversion, honors hidden cells and
+cell width, and draws hollow cursors when unfocused. Desktop compile and WASM
+build pass; browser verified focused block placement after typing alongside an
+unfocused hollow cursor. Blink scheduling, preference policy and native input
+sharing remain pending; this is not full cursor/input parity yet.
+
 Browser terminal dimensions now follow pane content bounds through the same
 CellMetrics::grid_size and padding calculation used by native. Split/zoom resize
 the existing Ghostty instance; unchanged geometry skips resizing and snapshots.
