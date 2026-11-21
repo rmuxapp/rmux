@@ -2,9 +2,24 @@
 use gpui::{prelude::*, *};
 use crate::text_field::TextField;
 pub(crate) trait FindHost: Sized + 'static {
+    fn find_input(&self) -> Entity<TextField>;
+    fn find_history(&mut self) -> &mut rmux_core::search_state::QueryHistory;
     fn focus_find(&mut self, window: &mut Window, cx: &mut Context<Self>);
     fn navigate_find(&mut self, older: bool, cx: &mut Context<Self>);
     fn close_find(&mut self, cx: &mut Context<Self>);
+}
+fn history_key<V: FindHost>(this: &mut V, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<V>) {
+    let key = &event.keystroke;
+    let input = this.find_input();
+    if !key.modifiers.alt || key.modifiers.control || key.modifiers.platform || key.modifiers.shift
+        || !matches!(key.key.as_str(), "up" | "down") || input.read(cx).is_composing() { return; }
+    if let Some(query) = this.find_history().recall(key.key == "up", input.read(cx).value()) {
+        input.update(cx, |input, cx| {
+            input.replace_draft(&query, cx);
+            input.select_all_text(cx);
+        });
+    }
+    cx.stop_propagation();
 }
 fn control(id: &'static str, hint: &'static str) -> Stateful<Div> {
     crate::pane_presentation::control_button(id)
@@ -13,6 +28,7 @@ fn control(id: &'static str, hint: &'static str) -> Stateful<Div> {
 pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_error: bool, cx: &mut Context<V>) -> Div {
         div()
             .key_context("FindInput")
+            .on_key_down(cx.listener(history_key::<V>))
             .min_h(px(34.))
             .flex_shrink_0()
             .flex().flex_wrap().min_w_0()
@@ -34,7 +50,7 @@ pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_
             .on_mouse_move(|_, _, cx| cx.stop_propagation())
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
             .child(div().id("find-query").flex_1().min_w(px(80.)).max_w_full()
-                .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Find in terminal · Enter / Shift+Enter navigates matches".into())).into())
+                .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Find in terminal · Enter / Shift+Enter navigates matches · Alt+Up/Down recalls queries".into())).into())
                 .child(input))
             .child(div().flex().items_center().gap_1().min_w_0().max_w_full()
                 .child(div().id("find-status").min_w_0().max_w(px(140.))

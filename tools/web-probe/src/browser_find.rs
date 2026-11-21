@@ -47,27 +47,13 @@ impl FindBar {
         history.remember(self.input.read(cx).value());
         history
     }
-    fn history_key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
-        let key = &event.keystroke;
-        if !key.modifiers.alt || key.modifiers.control || key.modifiers.platform || key.modifiers.shift
-            || !matches!(key.key.as_str(), "up" | "down") || self.input.read(cx).is_composing() { return; }
-        if let Some(query) = self.history.recall(key.key == "up", self.input.read(cx).value()) {
-            self.input.update(cx, |input, cx| {
-                input.replace_draft(&query, cx);
-                input.select_all_text(cx);
-            });
-        }
-        cx.stop_propagation();
-    }
+
     fn accept(&mut self, result: Result<SearchProgress, String>, cx: &mut Context<Self>) {
         match result {
             Ok(progress) => {
                 self.pending = progress.pending;
                 self.error = false;
-                self.status = if progress.pending { format!("{} matches · searching…", progress.matches) }
-                    else if self.input.read(cx).value().is_empty() { "Find in terminal".into() }
-                    else if let Some(selected) = progress.selected { format!("{} of {}", selected + 1, progress.matches) }
-                    else { format!("{} matches", progress.matches) };
+                self.status = rmux_core::search_state::status(self.input.read(cx).value().is_empty(), progress.matches, progress.selected, progress.pending);
                 if self.pending { self.schedule(cx); }
                 else {
                     self.task = None;
@@ -94,6 +80,8 @@ impl FindBar {
     }
 }
 impl FindHost for FindBar {
+    fn find_input(&self) -> Entity<TextField> { self.input.clone() }
+    fn find_history(&mut self) -> &mut rmux_core::search_state::QueryHistory { &mut self.history }
     fn focus_find(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.input.read(cx).focus.clone().focus(window, cx); }
     fn close_find(&mut self, cx: &mut Context<Self>) { cx.emit(Closed); }
     fn navigate_find(&mut self, older: bool, cx: &mut Context<Self>) {
@@ -114,7 +102,6 @@ impl FindHost for FindBar {
 impl Render for FindBar {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.error, cx)
-            .on_key_down(cx.listener(Self::history_key))
             .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.focus_query(window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindOlder, _, cx| this.navigate_find(true, cx)))
             .on_action(cx.listener(|this, _: &crate::FindNewer, _, cx| this.navigate_find(false, cx)))

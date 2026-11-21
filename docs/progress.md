@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Consolidated find-bar Alt+Up/Down handling into the shared presentation module,
+including modifier filtering, composition guard, draft replacement/selection and
+propagation control. Native and browser status now use one core formatter for
+empty queries, pending scans, no matches and selected counts, removing separate
+browser wording. Both native and WASM checks pass. GitHub run 44940804954 was
+still building the earlier search UI integration when checked; no new production
+deployment is claimed. Shared application/session orchestration remains unfinished.
+
 Moved terminal query history into `rmux-core::search_state`, used by native and
 browser find bars. Both now use the same deduplication, draft restoration,
 eight-query/16 KiB limits and 4096-byte query bound. Browser history survives

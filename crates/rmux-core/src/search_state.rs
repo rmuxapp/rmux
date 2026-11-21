@@ -80,3 +80,10 @@ mod history_tests {
         assert_eq!(history.entries, before);
     }
 }
+
+/// Match status shared by synchronous browser steps and desktop worker updates.
+pub fn status(empty_query: bool, matches: usize, selected: Option<usize>, pending: bool) -> String {
+    if empty_query { return "Find in terminal".into(); }
+    if matches == 0 { return if pending { "Searching…" } else { "No matches" }.into(); }
+    format!("{} / {}{}", selected.map_or(0, |index| index + 1), matches, if pending { " …" } else { "" })
+}
