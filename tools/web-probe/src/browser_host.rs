@@ -366,7 +366,7 @@ impl Render for BrowserHost {
                                         })))
                                 })
                                 .when_some(header.map_or(metadata.color, |group| group.color), |row, color| row.child(div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
-                                .when_some(header.map(|group| group.icon.clone().or_else(|| Some("▰".into()))).unwrap_or_else(|| metadata.icon.clone()), |row, icon| row.child(div().w(px(16.)).flex_shrink_0().text_center().text_color(rgb(0xaaaaaa)).child(icon)))
+                                .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| metadata.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
                                 .child(div().min_w_0().flex_1().truncate().font_weight(FontWeight::SEMIBOLD)
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(

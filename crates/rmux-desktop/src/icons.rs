@@ -2,6 +2,7 @@
 use gpui::{prelude::*, *};
 use std::borrow::Cow;
 const ASSETS: &[(&str, &[u8])] = &[
+    ("icons/group.svg", include_bytes!("../assets/icons/group.svg")),
     ("icons/expand.svg", include_bytes!("../assets/icons/expand.svg")),
     ("icons/external-link.svg", include_bytes!("../assets/icons/external-link.svg")),
     ("icons/branch.svg", include_bytes!("../assets/icons/branch.svg")),

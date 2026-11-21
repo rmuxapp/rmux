@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Replaced the missing default workspace-group text glyph with an embedded folder
+SVG. Native and browser hosts share the icon slot and selection contrast; custom
+workspace/group symbols still use their existing text values. A fresh browser
+group renders the icon without requesting optional fonts. Screenshot:
+`target/browser-group-svg.jpg`. WASM build and native check pass. Shared WASM
+CI now also triggers for desktop asset-only edits so embedded SVG changes cannot
+be missed. Not deployed yet.
+
 Browser sidebar workspace/group context menus now share native labels, command
 order, frame/row geometry and action routing. Right-click captures the target
 identity; group actions reject stale group membership. Menus support keyboard

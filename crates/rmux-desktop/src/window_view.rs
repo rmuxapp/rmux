@@ -4379,7 +4379,7 @@ impl Render for WorkspaceWindow {
                                                     .child(gpui::div().flex_1().min_w_0().flex().flex_col().gap_1()
                                                         .child(gpui::div().flex().items_center().gap_2()
                                                             .when_some(header.map(|group| group.color).unwrap_or(entry.color), |row, color| row.child(gpui::div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
-                                                            .when_some(header.map(|group| group.icon.clone().or_else(|| Some("▰".into()))).unwrap_or_else(|| entry.icon.clone()), |row, icon| row.child(gpui::div().w(px(16.)).flex_shrink_0().text_center().text_color(rgb(0xaaaaaa)).child(icon)))
+                                                            .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| entry.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
                                                             .child(gpui::div().id(("workspace-name", target)).min_w_0().truncate()
                                                                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(title_hint.clone())).into())
                                                                 .font_weight(FontWeight::SEMIBOLD).child(display_name))

@@ -26,3 +26,15 @@ pub(crate) fn pin(id: impl Into<ElementId>, selected: bool, group: bool) -> Stat
             if group { "Pinned group" } else { "Pinned workspace" }.into())).into())
         .child(crate::icons::icon("pin").text_color(rgb(if selected { 0xdcecff } else { 0x969696 })))
 }
+
+/// Custom workspace symbols keep their text shaping; default groups never
+/// depend on a font containing a particular Unicode glyph.
+pub(crate) fn workspace_icon(custom: Option<String>, group: bool, selected: bool) -> Option<AnyElement> {
+    let color = rgb(if selected { 0xdcecff } else { 0xaaaaaa });
+    let slot = div().w(px(16.)).flex_shrink_0().flex().items_center().justify_center();
+    match custom {
+        Some(icon) => Some(slot.text_color(color).child(icon).into_any_element()),
+        None if group => Some(slot.child(crate::icons::icon("group").text_color(color)).into_any_element()),
+        None => None,
+    }
+}
