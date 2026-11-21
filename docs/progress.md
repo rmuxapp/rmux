@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Workspace toolbar frame/title styling is now shared through workspace_presentation.
+Browser uses the native 36px toolbar, border, spacing and truncated semibold title;
+its title now follows the workspace instead of always saying rmux. Native check
+and WASM build pass. Browser switching to website and typing ls verified, with
+screenshot target/shared-workspace-toolbar.jpg. Platform-specific controls remain
+separate; this does not complete full toolbar action parity.
+
 Optimized artifact 44931038517 (source c83e72a) passed a browser smoke check:
 logs in the left split, help in the right, switch to website and run ls, return
 with both original pane outputs preserved, Cmd+P zoom search, execute zoom and

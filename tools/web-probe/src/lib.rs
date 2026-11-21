@@ -61,6 +61,7 @@ mod clipboard {
     }
 }
 struct InputProbe {
+    name: String,
     empty_focus: FocusHandle,
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
@@ -78,7 +79,7 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
-    fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    fn new(name: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
             let input = cx.new(|cx| text_field::TextField::new("", cx));
             input.update(cx, |input, cx| {
                 input.placeholder = Some("Type a command or workspace name…");
@@ -93,7 +94,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -308,10 +309,10 @@ impl Render for InputProbe {
             .on_action(cx.listener(|this, _: &NextPane, window, cx| this.cycle_pane(1, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
-            .child(div().h(px(44.)).flex_shrink_0().px_3().flex().items_center().justify_between()
-                .child("rmux")
+            .child(workspace_presentation::toolbar()
+                .child(workspace_presentation::title("workspace-title", self.name.clone()))
                 .child(div().text_xs().text_color(rgb(0x9b9ba3)).child("Sample sessions"))
-                .child(div().id("open-commands").px_3().py_1().cursor_pointer().child("Commands")
+                .child(div().id("open-commands").px_2().py_1().rounded_sm().text_size(px(13.)).cursor_pointer().hover(|style| style.bg(rgb(0x353535))).child("Commands")
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);
                     }))))
@@ -424,6 +425,8 @@ mod key_adapter;
 
 #[path = "../../../crates/rmux-desktop/src/sidebar_presentation.rs"]
 mod sidebar_presentation;
+#[path = "../../../crates/rmux-desktop/src/workspace_presentation.rs"]
+mod workspace_presentation;
 mod browser_host;
 
 #[path = "../../../crates/rmux-desktop/src/workspace_shortcuts.rs"]

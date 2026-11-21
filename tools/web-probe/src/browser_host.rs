@@ -12,13 +12,13 @@ pub(crate) struct BrowserHost {
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
-            (name.to_owned(), Self::new_workspace_view(window, cx))).collect();
+            (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx))).collect();
         let mut host = Self { workspaces, active: 0, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
-    fn new_workspace_view(window: &mut Window, cx: &mut Context<Self>) -> Entity<InputProbe> {
-        let entity = cx.new(|cx| InputProbe::new(window, cx));
+    fn new_workspace_view(name: String, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputProbe> {
+        let entity = cx.new(|cx| InputProbe::new(name, window, cx));
         cx.subscribe_in(&entity, window, |this, _, command: &WorkspaceCommand, window, cx| {
             match command.0 {
                 CommandId::CloseWorkspace => this.close_workspace(window, cx),
@@ -132,7 +132,7 @@ impl BrowserHost {
         let group = current.filter(|_| inherit_group).and_then(|id| self.groups.containing(id)).map(|group| group.id);
         let name = (1..).map(|number| format!("Workspace {number}"))
             .find(|name| !self.workspaces.iter().any(|(existing, _)| existing == name)).unwrap();
-        let entity = Self::new_workspace_view(window, cx);
+        let entity = Self::new_workspace_view(name.clone(), window, cx);
         if let Some(group) = group {
             self.groups.add_new(group, entity.entity_id(), current, rmux_core::workspace_groups::Placement::AfterCurrent)
                 .expect("current group exists");
