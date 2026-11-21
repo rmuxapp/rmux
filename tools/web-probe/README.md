@@ -182,3 +182,8 @@ come from the same native renderer, with host-specific leaf content. Native chec
 and WASM build pass. Nested vertical dragging exposed a transient upper-pane text
 repaint issue (returns on the next pointer interaction); nested equalization also
 needs checking. These remain open, despite shared source and passing compilation.
+
+The shared drag-release handler now notifies its host after clearing drag state,
+committing a final non-dragging scene. Browser regression confirms the previously
+missing upper text is visible immediately after nested vertical dragging. Native
+check and WASM build pass. Nested double-click equalization remains unresolved.

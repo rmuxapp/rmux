@@ -54,6 +54,9 @@ pub(crate) fn drag_capture<H: SplitHost>(cx: &Context<H>) -> impl IntoElement {
                 if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
                     let _ = released.update(cx, |this, cx| {
                         if this.split_state().1.take().is_some() {
+                            // Commit a final non-dragging scene even when no
+                            // further pointer movement follows the release.
+                            cx.notify();
                             cx.stop_propagation();
                         }
                     });

@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Fixed the observed post-drag missing-text frame by notifying the shared split
+host when mouse release clears its drag state. The final non-dragging scene now
+renders without needing another pointer action. A prepaint invalidation attempt
+did not fix the issue and was removed. Native check and WASM build pass; the same
+nested vertical drag now leaves all three terminals visible immediately afterward.
+Nested double-click at the moved divider still did not equalize; hit testing/
+retained child geometry remains an open investigation. Evidence:
+target/shared-resize-repaint-fixed.png. Do not treat this as complete resize parity.
+
+
 Native and browser now call one recursive split renderer, including branch bounds,
 weighted child layout, divider hover/cursor/tooltip, drag start and double-click
 weight equalization. Hosts supply only leaf content and layout/drag state. Native
