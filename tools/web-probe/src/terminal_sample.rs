@@ -15,7 +15,7 @@ pub(crate) struct TerminalSample {
     last_find_query: String,
     frame: Frame,
     font_revision: u64,
-    font_size: f32,
+    pub(crate) font_size: f32,
     rows: row_cache::RowCache,
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
@@ -108,7 +108,7 @@ impl TerminalSample {
         self.cursor_cache = Default::default();
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) { self.focus.focus(window, cx); }
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(font_size: f32, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus = cx.focus_handle();
         cx.on_blur(&focus, window, |this, _, cx| {
             this.release_pressed(cx);
@@ -121,7 +121,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, font_size: 14., rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };

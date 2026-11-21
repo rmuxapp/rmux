@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Browser new tabs and splits now inherit the active source terminal's font size
+at creation, matching desktop behavior. Existing terminals retain independent
+sizes; initial workspaces still use the default. The constructor applies shared
+CellMetrics bounds. WASM build passes; browser smoke verified a zoomed new tab,
+matching split size, and resetting only the new split. Screenshot:
+target/browser-font-inheritance.jpg. Not deployed.
+
 Browser terminal font increase/decrease/reset now share native terminal action
 routing and CellMetrics bounds (8–40). Palette commands and Cmd+=/Cmd+-/Cmd+0
 (Ctrl on other platforms) update only the focused terminal. Font changes release

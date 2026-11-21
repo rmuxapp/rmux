@@ -122,7 +122,8 @@ impl InputProbe {
     }
 
     fn add_pane(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
-        let pane = cx.new(|cx| sample_pane::SamplePane::new(window,cx));
+        let font_size = self.samples.get(&self.focused).map_or(14., |pane| pane.read(cx).active_font_size(cx));
+        let pane = cx.new(|cx| sample_pane::SamplePane::new(font_size, window,cx));
         self.register_pane(id, pane, window, cx);
     }
     fn register_pane(&mut self, id: usize, pane: Entity<sample_pane::SamplePane>, window: &mut Window, cx: &mut Context<Self>) {
