@@ -5393,7 +5393,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-cli"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "serde_json",
  "tempfile",
@@ -5401,7 +5401,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-desktop"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
@@ -5434,7 +5434,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-terminal"
-version = "0.1.3"
+version = "0.1.4"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
