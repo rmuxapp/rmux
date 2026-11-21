@@ -97,3 +97,7 @@ Cmd+[ / Cmd+] now use the native pane shortcut definitions and shared core
 wraparound logic. Cycling follows layout order and preserves zoom. Browser checks
 verified commands typed in the selected pane after each shortcut. Shifted bracket
 tab navigation remains pending until tabs are connected.
+
+Initial or hidden layouts smaller than one full terminal cell do not resize the
+engine. This avoids a destructive intermediate 1×1 reflow before the canvas has
+its real dimensions. Fresh-load/split/input verification preserves prompt spacing.

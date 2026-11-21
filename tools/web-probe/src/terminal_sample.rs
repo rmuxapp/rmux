@@ -60,7 +60,10 @@ impl Render for TerminalSample {
                 let cells = CellMetrics::measured(14., family.clone(), window);
                 let content = crate::cell_metrics::content_bounds(bounds, 8);
                 let (columns, height) = cells.grid_size(content.size);
-                if columns != this.frame.columns || usize::from(height) != this.frame.rows.len() {
+                // Initial/hidden canvas layout may have zero space. Do not
+                // reflow a live session through a synthetic 1×1 viewport.
+                let visible = content.size.width >= px(cells.width) && content.size.height >= px(cells.height);
+                if visible && (columns != this.frame.columns || usize::from(height) != this.frame.rows.len()) {
                     this.engine.resize(columns, height);
                     this.frame = this.engine.frame(Some(&this.frame));
                 }

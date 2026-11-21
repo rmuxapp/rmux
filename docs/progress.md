@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Fixed first-pane prompt/cursor displacement in the browser. A temporary resize
+trace showed the initial zero-space canvas resized the live engine 52×16 → 1×1
+→ 150×30; reflow moved the prompt cursor from column 2 to column 1. Skip engine
+resize until content fits at least one full cell. Actual visible resizes remain
+unchanged. WASM build passes; fresh browser load → split → previous pane → ls
+now preserves the prompt space. Temporary trace logging was not committed.
+
 Shared native Cmd+[ / Cmd+] pane bindings with the browser host and moved
 wraparound index calculation into rmux-core. Browser cycles in layout leaf order,
 retains zoom state, and routes typing to the selected terminal. Shifted brackets
