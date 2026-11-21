@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Fixed missing browser palette dismissal paths: a visible Close button,
+backdrop click dismissal and command-palette shortcut toggling now restore
+terminal focus. Panel clicks do not dismiss it. Escape already worked in the
+standalone live demo, but pointer users had no explicit dismissal control.
+Browser build passed; local Close/outside-click/shortcut checks verified
+subsequent terminal typing. Screenshot: `target/palette-close-controls.jpg`.
+
 Browser terminal tabs support pointer reordering within their pane. Dropping
 on another tab inserts before it; dropping in the strip's empty area appends.
 Native and browser hosts use the same rmux-core insertion rule. Stable entity

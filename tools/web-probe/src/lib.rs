@@ -282,6 +282,7 @@ impl InputProbe {
         else { &self.group_results[index - COMMANDS.len() - self.workspace_results.len()].1 }
     }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette_open { self.close_palette(window, cx); return; }
         self.palette_origin = window.focused(cx);
         self.palette_open = true;
         cx.emit(PaletteRequest::Open);
@@ -475,8 +476,13 @@ impl Render for InputProbe {
             .when_some(self.feedback.clone().filter(|_| !self.palette_open), |root, message|
                 root.child(div().flex_shrink_0().px_3().py_2().text_sm().text_color(rgb(0xf0b85b)).child(message)))
             .when(self.palette_open, |root| root.child(div().absolute().inset_0().bg(rgba(0x00000066))
+                .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
+                    cx.stop_propagation();
+                    this.close_palette(window, cx);
+                }))
                 .flex().items_start().justify_center().pt(px(palette_view::top_inset(height)))
                 .child(palette_view::panel(height)
+                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                     if this.input.read(cx).is_composing() { return; }
                     let key = event.keystroke.key.as_str();
@@ -490,7 +496,12 @@ impl Render for InputProbe {
                         this.feedback = None; cx.notify(); cx.stop_propagation();
                     }
                 }))
-                .child(palette_view::heading("Search commands and workspaces"))
+                .child(div().flex().items_center().justify_between()
+                    .child(palette_view::heading("Search commands and workspaces"))
+                    .child(div().id("close-command-palette").mt_2().mr_2().px_2().rounded_sm()
+                        .text_sm().cursor_pointer().hover(|style| style.bg(rgb(0x454545)))
+                        .child("Close ×")
+                        .on_click(cx.listener(|this, _, window, cx| this.close_palette(window, cx)))))
                 .child(palette_view::search(self.input.clone()))
                 .child({
                     let entity = cx.entity();
