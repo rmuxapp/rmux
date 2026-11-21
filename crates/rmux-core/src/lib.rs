@@ -12,3 +12,4 @@ pub mod scroll;
 pub mod tabs;
 pub mod terminal_text;
 pub mod pane_commands;
+pub mod sample_input;

@@ -67,7 +67,15 @@ release shaped-row caches. Tab titles remain attached to session identity.
 Closing the last terminal focuses the empty workspace, allowing keyboard or
 palette creation of a replacement terminal.
 
+Sample sessions accept a bounded 4 KiB single-line Unicode draft. Ghostty supplies
+cluster widths and segmentation; backspace removes whole graphemes. Narrow panes
+show the draft suffix without wrapping; submitting restores the full command to
+history. `echo <text>` is a bundled sample operation, not a real shell command.
+Actual IME event verification and multiline paste remain open.
+
 The browser font adapter uses bundled Fira Mono. Desktop uses platform fonts.
+The browser currently shows missing-glyph boxes for CJK in the tested fixture;
+Unicode input support does not establish font/rendering parity.
 GPUI CE lacks the native fixed-cell-width shaping argument, so the adapter uses
 batched ASCII runs only when every caret boundary matches the terminal grid;
 otherwise it falls back to explicit placement. Do not infer native performance
@@ -121,7 +129,7 @@ is not part of the replacement runtime or optimized artifact.
 1. Continue moving workspace orchestration into shared application state/views;
    keep browser sample services behind platform adapters. Tab and group models
    alone do not complete the Rustable-style architecture.
-2. Complete browser terminal input: verify IME preedit/events, Unicode sample input/paste,
+2. Complete browser terminal input: verify IME preedit/events, Unicode font fallback and multiline paste,
    negotiated report-all printable-key routing and platform-reserved shortcut behavior. Validate held
    edge selection, Alt-drag and cancellation when focus leaves the browser.
 3. Close missing UI/service parity against [feature parity](feature-parity.md)

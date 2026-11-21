@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Sample session input now uses Ghostty grapheme segmentation (mode 2027 enabled),
+accepts a bounded 4 KiB Unicode draft, and backspaces entire clusters including
+combining/ZWJ sequences split across input events. A horizontal draft viewport
+keeps editing on one row through narrow-pane resizes; submission records the
+full command, and bundled `echo <text>` supports exercising Unicode. Draft
+measurement failures/oversize edits preserve existing input. Native engine-backed
+model tests and the local WASM build pass. Browser smoke verified accented text,
+joined-emoji deletion, long draft resizing, backspace and full command history.
+Screenshot: target/shared-unicode-input.jpg. CJK glyphs still render as missing
+boxes with the browser's current bundled fonts; actual IME events, multiline
+paste and full shell editing remain open. Not yet deployed.
+
 Published GitHub artifact 44934228048 / e52115e to rmux.app through Cloudflare
 deployment 3783d1ac. This brings sidebar resizing, parallel startup, native paste
 encoding, on-demand memory diagnostics and shared zoom/resize/equalize policy to

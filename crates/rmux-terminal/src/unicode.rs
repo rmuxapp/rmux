@@ -43,6 +43,31 @@ pub fn graphemes(text: &str) -> Result<Vec<Grapheme>> {
 mod tests {
     use super::*;
     #[test]
+    fn sample_input_handles_split_unicode_commits_and_narrow_panes() -> Result<()> {
+        use rmux_core::sample_input::{SampleInput, MAX_INPUT_BYTES};
+        let mut input = SampleInput::default();
+        let measure = |text: &str| graphemes(text).ok();
+        for text in ["echo ", "e", "\u{301}", "界", "👩", "\u{200d}", "💻"] {
+            input.append(text, measure).unwrap();
+        }
+        assert_eq!(input.text(), "echo e\u{301}界👩‍💻");
+        assert_eq!(input.display(7), "\r\x1b[2K$ 界👩‍💻");
+        input.backspace();
+        assert_eq!(input.text(), "echo e\u{301}界");
+        input.backspace(); input.backspace();
+        assert_eq!(input.text(), "echo ");
+        assert!(input.append("\n", measure).is_err());
+        assert!(input.append(&"x".repeat(MAX_INPUT_BYTES), measure).is_err());
+        assert_eq!(input.text(), "echo ");
+        input.clear();
+        assert_eq!(input.display(1), "\r\x1b[2K");
+        assert_eq!(input.display(2), "\r\x1b[2K$");
+        assert!(input.append("bad", |_| Some(vec![])).is_err());
+        assert_eq!(input.text(), "");
+        Ok(())
+    }
+
+    #[test]
     fn engine_graphemes_cover_wide_combining_and_emoji() -> Result<()> {
         assert_eq!(
             graphemes("a界e\u{301}👩‍💻")?,

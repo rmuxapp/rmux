@@ -9,7 +9,7 @@ pub(crate) struct TerminalSample {
     rows: row_cache::RowCache,
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
-    command: String,
+    command: rmux_core::sample_input::SampleInput,
     input_error: Option<String>,
     pressed_keys: rmux_core::keyboard::PressedKeys,
     composition: crate::composition::Composition,
@@ -64,9 +64,9 @@ impl TerminalSample {
             this.engine.focus(false);
         }).detach();
         let engine = TerminalEngine::new(52, 16);
-        engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
+        engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: String::new(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -148,38 +148,52 @@ impl TerminalSample {
         if !encoded.is_empty() && self.frame.scrollback_offset > 0 { self.engine.scroll("BOTTOM", 0); }
         match encoded {
             "\r" => {
-                self.engine.write("\r\n");
-                if self.command.trim() == "logs" {
+                self.engine.write(&format!("\r\x1b[2K$ {}\r\n", self.command.text()));
+                if let Some(text) = self.command.text().strip_prefix("echo ") {
+                    self.engine.write(text);
+                    self.engine.write("\r\n");
+                }
+                if self.command.text().trim() == "logs" {
                     let output = (1..=80).map(|line| format!("Sample log {line:03}: workspace ready\r\n")).collect::<String>();
                     self.engine.write(&output);
                 }
-                let response = match self.command.trim() {
-                    "help" => "Sample commands: help, clear, ls, logs\r\nNo shell or server access.\r\n",
+                let response = match self.command.text().trim() {
+                    "help" => "Sample commands: help, clear, ls, logs, echo <text>\r\nNo shell or server access.\r\n",
                     "logs" => "",
                     "ls" => "\x1b[34mcrates/  docs/  scripts/\x1b[0m  Cargo.toml\r\n",
                     "clear" => "\x1b[2J\x1b[H",
                     "" => "",
+                    _ if self.command.text().starts_with("echo ") => "",
                     _ => "Unknown sample command. Try help.\r\n",
                 };
                 self.engine.write(response);
-                self.engine.write("$ ");
                 self.command.clear();
+                self.engine.write(&self.command.display(self.frame.columns));
             }
-            "\x7f" | "\x08" if !self.command.is_empty() => {
-                self.command.pop(); self.engine.write("\x08 \x08");
+            "\x7f" | "\x08" => {
+                self.command.backspace();
+                self.engine.write(&self.command.display(self.frame.columns));
             }
-            "\x03" => { self.engine.write("^C\r\n$ "); self.command.clear(); }
+            "\x03" => {
+                self.engine.write(&format!("\r\x1b[2K$ {}^C\r\n", self.command.text()));
+                self.command.clear();
+                self.engine.write(&self.command.display(self.frame.columns));
+            }
             "\x15" => {
-                if self.command.is_empty() { cx.stop_propagation(); return; }
-                self.engine.write(&"\x08 \x08".repeat(self.command.len()));
                 self.command.clear();
+                self.engine.write(&self.command.display(self.frame.columns));
             }
             text => {
-                // The sample shell accepts ASCII; IME and a real backend follow.
-                if text.is_empty() || self.command.len()+text.len() > 48 || !text.bytes().all(|b| (32..127).contains(&b)) { return; }
-                self.command.push_str(text); self.engine.write(text);
+                if text.is_empty() || text.chars().any(char::is_control) { return; }
+                if let Err(error) = self.command.append(text, |text| crate::terminal_engine::graphemes(text).ok()) {
+                    self.input_error = Some(error.into());
+                    cx.notify();
+                    return;
+                }
+                self.engine.write(&self.command.display(self.frame.columns));
             }
         }
+        self.input_error = None;
         self.frame = self.engine.frame(Some(&self.frame));
         cx.notify();
     }
@@ -254,7 +268,11 @@ impl Render for TerminalSample {
                 // reflow a live session through a synthetic 1×1 viewport.
                 let visible = content.size.width >= px(cells.width) && content.size.height >= px(cells.height);
                 if visible && (columns != this.frame.columns || usize::from(height) != this.frame.rows.len()) {
+                    // The draft never wraps. Erase it before reflow and redraw
+                    // its grapheme-safe visible suffix at the new width.
+                    this.engine.write("\r\x1b[2K");
                     this.engine.resize(columns, height);
+                    this.engine.write(&this.command.display(columns));
                     this.frame = this.engine.frame(Some(&this.frame));
                 }
                 let (cursor_x, cursor_y) = this.frame.cursor.unwrap_or_default();
