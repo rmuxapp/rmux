@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Desktop and browser now share grouped-workspace reveal and visible-row resolution.
+The browser sidebar tracks scroll position and requests the selected row into view
+on workspace switches, matching the native host. Focused core navigation test and
+both native/WASM cargo checks pass. Browser visual verification of this scrolling
+change remains pending; full workspace orchestration is still not unified.
+
 First optimized GitHub artifact succeeded: run 44929617746, source 5d7c703.
 Downloaded `rmux-shared-demo` reports UI WASM 20,368,659 bytes raw / 7,085,501
 gzip / 5,019,884 Brotli, compared with development 86,695,622 raw / 12,455,794

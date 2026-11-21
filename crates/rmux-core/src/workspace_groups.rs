@@ -141,6 +141,19 @@ impl<W: Copy + Eq> Groups<W> {
         self.entries.iter().find(|group| group.members.contains(&workspace))
     }
 
+    /// A collapsed group represents its selected children through its anchor.
+    pub fn visible_workspace(&self, workspace: W) -> W {
+        self.containing(workspace).filter(|group| group.collapsed)
+            .and_then(|group| group.members.first()).copied().unwrap_or(workspace)
+    }
+
+    /// Selecting an anchor preserves collapse; selecting a child reveals it.
+    pub fn reveal(&mut self, workspace: W) {
+        if let Some(group) = self.entries.iter_mut().find(|group| group.members.contains(&workspace)) {
+            if group.members.first() != Some(&workspace) { group.collapsed = false; }
+        }
+    }
+
     pub fn get_mut(&mut self, id: u64) -> Option<&mut Group<W>> {
         self.entries.iter_mut().find(|group| group.id == id)
     }
@@ -247,6 +260,21 @@ impl<W: Copy + Eq> Groups<W> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn navigation_reveals_children_but_preserves_collapsed_anchors() {
+        let mut groups = super::Groups::default();
+        let id = groups.create("Project".into(), vec![1u64, 2, 3], false).unwrap();
+        groups.get_mut(id).unwrap().collapsed = true;
+        assert_eq!(groups.visible_workspace(2), 1);
+        assert_eq!(groups.visible_workspace(9), 9);
+        groups.reveal(1);
+        assert!(groups.get_mut(id).unwrap().collapsed);
+        groups.reveal(3);
+        assert!(!groups.get_mut(id).unwrap().collapsed);
+        assert_eq!(groups.visible_workspace(2), 2);
+        groups.reveal(9);
+        assert_eq!(groups.entries().len(), 1);
+    }
     #[test]
     fn close_neighbor_follows_logical_order_without_wrapping() {
         let order = [4, 1, 7, 2];

@@ -5,13 +5,14 @@ pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
     empty_focus: FocusHandle,
+    workspace_scroll: ScrollHandle,
     groups: rmux_core::workspace_groups::Groups<EntityId>,
 }
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, empty_focus: cx.focus_handle(), groups: Default::default() };
+        let mut host = Self { workspaces, active: 0, empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -87,14 +88,18 @@ impl BrowserHost {
         });
         self.active=index;
         let member = self.workspaces[index].1.entity_id();
-        if let Some(group) = self.groups.containing(member) {
-            if group.members.first() != Some(&member) {
-                let id = group.id;
-                self.groups.get_mut(id).unwrap().collapsed = false;
-            }
-        }
+        self.groups.reveal(member);
+        self.scroll_to_workspace();
         self.workspaces[index].1.update(cx, |workspace,cx| workspace.close_palette(window,cx));
         cx.notify();
+    }
+    fn scroll_to_workspace(&self) {
+        let Some((_, entity)) = self.workspaces.get(self.active) else { return; };
+        let visible = self.groups.visible_workspace(entity.entity_id());
+        if let Some(row) = self.workspace_order(false).iter().position(|index|
+            self.workspaces[*index].1.entity_id() == visible) {
+            self.workspace_scroll.scroll_to_item(row);
+        }
     }
     fn workspace_order(&self, include_collapsed: bool) -> Vec<usize> {
         let entries: Vec<_> = self.workspaces.iter().map(|(_, entity)| (entity.entity_id(), false)).collect();
@@ -150,13 +155,13 @@ impl Render for BrowserHost {
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child("Workspaces"))
                     .child(div().id("new-workspace").px_2().cursor_pointer().child("+")
                         .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
-                .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().py_2()
+                .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
                     .children(self.workspace_order(false).into_iter().map(|index| {
                         let (name, entity) = &self.workspaces[index];
                         let group = self.groups.containing(entity.entity_id());
                         let header = group.filter(|group| group.members.first() == Some(&entity.entity_id()));
-                        let selected = index == self.active || header.is_some_and(|group|
-                            group.collapsed && group.members.contains(&self.workspaces[self.active].1.entity_id()));
+                        let selected = index == self.active || self.groups.visible_workspace(
+                            self.workspaces[self.active].1.entity_id()) == entity.entity_id();
                         sidebar_presentation::row(("workspace",entity.entity_id()),selected)
                             .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                             .child(div().flex().items_center().gap_2()

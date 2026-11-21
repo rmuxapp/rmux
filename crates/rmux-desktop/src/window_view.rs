@@ -770,23 +770,14 @@ impl WorkspaceWindow {
 
     fn reveal_workspace(&mut self, index: usize) {
         let Some(entry) = self.entries.get(index) else { return; };
-        let member = entry.workspace.entity_id();
-        if let Some(group) = self.groups.containing(member) {
-            if group.members.first() != Some(&member) {
-                let id = group.id;
-                self.groups.get_mut(id).unwrap().collapsed = false;
-            }
-        }
+        self.groups.reveal(entry.workspace.entity_id());
     }
 
     fn scroll_to_workspace(&self, index: usize) {
-        let visible_index = self.entries.get(index)
-            .and_then(|entry| self.groups.containing(entry.workspace.entity_id()))
-            .filter(|group| group.collapsed)
-            .and_then(|group| group.members.first())
-            .and_then(|anchor| self.entries.iter().position(|entry| entry.workspace.entity_id() == *anchor))
-            .unwrap_or(index);
-        if let Some(row) = self.sidebar_order().iter().position(|candidate| *candidate == visible_index) {
+        let Some(entry) = self.entries.get(index) else { return; };
+        let visible = self.groups.visible_workspace(entry.workspace.entity_id());
+        if let Some(row) = self.sidebar_order().iter().position(|candidate|
+            self.entries[*candidate].workspace.entity_id() == visible) {
             self.workspace_scroll.scroll_to_item(row);
         }
     }
