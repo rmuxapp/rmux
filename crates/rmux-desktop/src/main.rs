@@ -30,6 +30,7 @@ mod close_policy;
 use cell_metrics::CellMetrics;
 use close_policy::{ClosePolicy, PromptGate};
 mod command_palette;
+mod palette_view;
 mod composition;
 mod control_hint;
 mod diagnostics;

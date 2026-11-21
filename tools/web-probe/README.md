@@ -29,3 +29,12 @@ does not approximate glyph positions. Native calls preserve the previous APIs.
 The bundled font and shared field render in the in-app browser. Typing,
 select-all/replacement and undo passed a focused interaction check. IME, clipboard,
 other browsers and full application parity remain unverified.
+
+## Shared palette presentation
+
+The probe imports the same `palette_view` panel, input surround, result row,
+footer and keyboard-navigation functions used by the native command palette.
+It also uses native `RankedSearch`. The seven fixture commands only report
+selection; they do not pretend to create workspaces or terminals. A browser check
+verified `splt` fuzzy matching and Down/Enter selection of Split Below, and the
+panel fits its contents. Full application actions and result metadata are pending.

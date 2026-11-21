@@ -61,9 +61,7 @@ mod preview_typography_tests {
     }
 }
 
-pub(super) fn top_inset(height: f32) -> f32 {
-    if height >= 480. { 48. } else { 8. }
-}
+pub(super) use crate::palette_view::top_inset;
 
 fn result_row_height(has_subtitle: bool) -> f32 {
     if has_subtitle { 56. } else { 36. }
@@ -84,17 +82,7 @@ fn result_area_height(rows: impl IntoIterator<Item = bool>) -> f32 {
     height
 }
 
-pub(super) fn navigated_result(selected: usize, count: usize, key: &str) -> Option<usize> {
-    if count == 0 { return None; }
-    let selected = selected.min(count - 1);
-    match key {
-        "up" => Some(if selected == 0 { count - 1 } else { selected - 1 }),
-        "down" => Some(if selected + 1 == count { 0 } else { selected + 1 }),
-        "pageup" => Some(selected.saturating_sub(8)),
-        "pagedown" => Some(selected.saturating_add(8).min(count - 1)),
-        _ => None,
-    }
-}
+pub(super) use crate::palette_view::navigated_result;
 
 // Keep the destination within one viewport of the starting row. Always advance
 // at least one result, including in a window shorter than a single row.
@@ -1010,23 +998,12 @@ impl CommandPalette {
                 range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
             )))
         });
-        div()
-            .id(("command", command))
-            .w_full().min_w_0()
-            .px_3()
-            .h(px(self.command_height(command)))
-            .text_sm().line_height(px(20.))
+        palette_view::result(command, self.command_height(command), selected)
             .when(self.hex_preview && self.commands[command].preview_line().is_some(), |row| row.font_family(FONT_FAMILY))
             .when_some(heading, |row, level| row.font_weight(FontWeight::BOLD).text_size(px(match level { 1 => 20., 2 => 18., 3 => 16., _ => 14. })).line_height(px(24.)))
             .when(markdown == Some(markdown_preview::Kind::Code), |row| row.font_family(FONT_FAMILY))
             .when_some(match markdown { Some(markdown_preview::Kind::List { depth, .. }) => Some(depth), _ => None }, |row, depth| row.pl(px(12. + depth.saturating_sub(1).min(8) as f32 * 12.)))
             .when(matches!(markdown, Some(markdown_preview::Kind::Quote | markdown_preview::Kind::List { .. })), |row| row.border_l_2().border_color(rgb(0x637894)))
-            .flex()
-            .items_center()
-            .gap_3()
-            .cursor_pointer()
-            .when(selected, |row| row.bg(rgb(0x354969)))
-            .hover(move |row| row.bg(rgb(if selected { 0x40577b } else { 0x303030 })))
             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                 if !event.standard_click() { return; }
                 let Some(row) = this.search.matches.iter().position(|index| *index == command) else { return; };
@@ -1242,8 +1219,7 @@ impl Render for CommandPalette {
         } else { String::new() };
         let wrap_hint = shortcuts::hint(&TogglePreviewWrap, &self.input.read(cx).focus, window);
         let copy_hint = shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window);
-        div()
-            .id("command-palette")
+        palette_view::panel(height)
             .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
             .on_action(cx.listener(|this, _: &TogglePreviewWrap, _, cx| this.toggle_preview_wrap(cx)))
             .on_action(cx.listener(|this, action: &FileBrowserBack, _, cx| this.navigate_folder(action, cx)))
@@ -1257,17 +1233,6 @@ impl Render for CommandPalette {
             .on_action(cx.listener(|this, _: &ToggleMarkdownPreview, _, cx| this.toggle_markdown_preview(cx)))
             .on_action(cx.listener(|this, _: &EditSelectedFile, _, cx| this.edit_selected_file(cx)))
             .on_action(cx.listener(|this, _: &CopySearchExcerpt, _, cx| this.copy_search_excerpt(cx)))
-            .w(px(520.))
-            .max_w(relative(0.9))
-            .h_auto()
-            .max_h(px((height - top_inset(height) - 8.).max(0.)))
-            .overflow_hidden()
-            .flex()
-            .flex_col()
-            .rounded_lg()
-            .border_1()
-            .border_color(rgb(0x454545))
-            .bg(rgb(0x252525))
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(|_, _, cx| cx.stop_propagation())
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
@@ -1291,13 +1256,7 @@ impl Render for CommandPalette {
                 }
             }))
             .when(!compact, |palette| palette.child(
-                div()
-                    .flex_shrink_0()
-                    .px_3()
-                    .pt_2()
-                    .text_xs()
-                    .text_color(rgb(0xa0a0a0))
-                    .child(self.heading),
+                palette_view::heading(self.heading),
             ))
             .when_some(self.location.clone(), |palette, location| palette.child(
                 div().id("file-browser-location").flex_shrink_0().min_w_0().px_3().pt_2()
@@ -1340,11 +1299,7 @@ impl Render for CommandPalette {
                         .child(if self.wrap_preview { "Single-line excerpts" } else { "Wrap excerpts" }))
                     .when(self.wrap_preview, |bar| bar.child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Up to 4 visual lines")))
             ))
-            .child(div().flex_shrink_0().p_3().child(
-                div().w_full().px_3().py_2().rounded_md()
-                    .border_1().border_color(rgb(0x4b5668)).bg(rgb(0x12141a))
-                    .child(self.input.clone())
-            ))
+            .child(palette_view::search(self.input.clone()))
             .child(if self.search.matches.is_empty() {
                 div().p_3().text_sm().child(self.empty_message).into_any_element()
             } else {
@@ -1373,14 +1328,7 @@ impl Render for CommandPalette {
                         })).child(if self.ssh_input { "Connect" } else if self.terminal_search_input { "Search" } else if self.directory_input { "Open" } else { "Save" }))
             ))
             .when((!compact || self.feedback.is_some() || has_search_excerpt || has_ssh_destination || has_preview_file) && self.buffer_rename.is_none() && !self.directory_input && !self.terminal_search_input && !self.ssh_input, |palette| palette.child(
-                div()
-                    .flex_shrink_0()
-                    .px_3()
-                    .py_2()
-                    .border_t_1().border_color(rgb(0x363636))
-                    .flex().flex_wrap().items_center().gap_2()
-                    .text_xs()
-                    .text_color(rgb(0xa0a0a0))
+                palette_view::footer()
                     .child(div().flex_1().min_w_0().child(self.feedback.unwrap_or("↑↓ Navigate     ↵ Run     Esc Close")))
                     .when(has_preview_file, |footer| footer.child(
                         div().id("preview-selected-hex").px_2().py_1().rounded_sm()

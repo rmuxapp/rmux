@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Extracted palette panel, heading, search surround, result row styling, footer and
+arrow navigation into one shared `palette_view` source consumed by desktop and
+the WASM probe. The probe also imports the actual RankedSearch implementation.
+Native compile and WASM build pass. Browser check verified compact panel sizing,
+fuzzy `splt` filtering and Down/Enter selection of Split Below. Commands remain
+fixtures with explicit probe-only feedback, not a port of application actions;
+full palette/workspace/terminal integration and native visual review remain pending.
+
 Published v0.1.4 with all six GitHub-built assets. All native jobs succeeded;
 publication succeeded, then the Sparkle-feed push collided with a concurrent main
 update. Recovered the unchanged generated appcast from the published release.

@@ -14,6 +14,12 @@ mod edit_history;
 #[path = "../../../crates/rmux-desktop/src/text_field.rs"]
 mod text_field;
 mod text_layout;
+#[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
+mod palette_view;
+#[path = "../../../crates/rmux-desktop/src/palette_match.rs"]
+mod palette_match;
+const COMMANDS: &[&str] = &["New Workspace", "New Terminal Tab", "Split Right", "Split Below", "Toggle Pane Zoom", "Next Tab", "Previous Tab"];
+
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll]);
 mod clipboard {
@@ -23,11 +29,39 @@ mod clipboard {
 }
 struct InputProbe {
     input: Entity<text_field::TextField>,
+    search: palette_match::RankedSearch,
+    selected: usize,
+    feedback: Option<String>,
+}
+impl InputProbe {
+    fn choose(&mut self, cx: &mut Context<Self>) {
+        self.feedback = self.search.matches.get(self.selected).map(|index| format!("Selected: {} · probe only", COMMANDS[*index]));
+        cx.notify();
+    }
 }
 impl Render for InputProbe {
-    fn render(&mut self, _: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().font_family(FONT_FAMILY).size_full().bg(rgb(0x252525)).p_4()
-            .child(self.input.clone())
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let height = f32::from(window.viewport_size().height);
+        div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7))
+            .flex().items_start().justify_center().pt(px(palette_view::top_inset(height)))
+            .child(palette_view::panel(height)
+                .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
+                    if this.input.read(cx).is_composing() { return; }
+                    if let Some(next) = palette_view::navigated_result(this.selected, this.search.matches.len(), &event.keystroke.key) {
+                        this.selected = next; this.feedback = None; cx.notify(); cx.stop_propagation();
+                    }
+                }))
+                .child(palette_view::heading("Shared rmux palette · development probe"))
+                .child(palette_view::search(self.input.clone()))
+                .children(self.search.matches.iter().enumerate().map(|(row, &index)| {
+                    palette_view::result(index, 36., row == self.selected)
+                        .child(div().flex_1().min_w_0().truncate().child(COMMANDS[index]))
+                        .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
+                            if event.standard_click() { this.selected = row; this.choose(cx); }
+                        }))
+                }))
+                .when(self.search.matches.is_empty(), |panel| panel.child(div().p_3().text_sm().child("No matching commands")))
+                .child(palette_view::footer().child(self.feedback.clone().unwrap_or_else(|| "↑↓ Navigate     ↵ Select     Esc Clear".into()))))
     }
 }
 #[wasm_bindgen::prelude::wasm_bindgen(start)]
@@ -50,7 +84,15 @@ pub fn start() {
                 input.placeholder = Some("Type a command or workspace name…");
                 input.focus.focus(window, cx);
             });
-            InputProbe { input }
+            cx.subscribe(&input, |this: &mut InputProbe, _, event: &text_field::EditEvent, cx| {
+                match event {
+                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Submitted { .. } => this.choose(cx),
+                    text_field::EditEvent::Cancelled => this.input.update(cx, |input, cx| input.replace_draft("", cx)),
+                }
+                cx.notify();
+            }).detach();
+            InputProbe { input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.to_lowercase()).collect()), selected: 0, feedback: None }
         })).expect("open probe window");
     });
 }
