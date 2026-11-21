@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Published GitHub demo run 44949065490 (11fe7bc) to rmux.app, Cloudflare deployment
+93090bbf. Optimized build and all font/startup/clipboard/engine/search checks passed.
+Production embedded-demo smoke verified palette terminal-menu access, text-only
+menu paste and Shift+F10 tab-menu shortcut hints. Added a concise browser-demo
+section to the user guide. Screenshot: target/live-demo-menus-11fe7bc.jpg.
+Website source remains local/off GitHub; native downloads remain v0.1.4.
+
 Menu paste now uses a text-only browser clipboard adapter. Inspection showed
 GPUI's general reader also fetches supported image payloads, which a sample text
 terminal does not need. The adapter starts readText under user activation and

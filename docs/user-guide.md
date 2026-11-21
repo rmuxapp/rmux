@@ -10,6 +10,7 @@ and scripting instructions have their own pages.
 
 ## In this guide
 
+- [Try the browser demo](#try-the-browser-demo)
 - [Install and open rmux](#install-and-open-rmux)
 - [Your first workspace](#your-first-workspace)
 - [Everyday shortcuts](#everyday-shortcuts)
@@ -21,6 +22,28 @@ and scripting instructions have their own pages.
 - [Customize rmux](#customize-rmux)
 - [Notifications and diagnostics](#notifications-and-diagnostics)
 - [More detailed guides](#more-detailed-guides)
+
+## Try the browser demo
+
+Open [rmux.app](https://rmux.app) to try workspaces, tabs, split panes, and terminal
+search without installing the app. Sessions use bundled sample commands:
+`help`, `ls`, `logs`, `clear`, and `echo <text>`. They cannot access your files or
+run programs on your computer. Refreshing the page starts fresh.
+
+Right-click a tab to rename, move, or close tabs. **Shift+F10** opens the active
+tab's menu. Right-click terminal output for copy, paste, selection, find, and
+scrollback actions. These menus are also available through **Show Tab Actions**
+and **Terminal Actions** in the command palette.
+
+**Copy with Line Breaks** keeps the terminal's visible row breaks; normal copy
+joins lines that wrapped at the pane edge. **Clear Scrollback** removes older
+history while keeping the current screen. Multiline sample paste runs complete
+lines and leaves the final unfinished line ready to edit. Sample input is limited
+to 4 KiB. If the browser denies menu clipboard access, use your keyboard paste
+shortcut instead.
+
+The demo shares rmux UI code and the Ghostty terminal engine. Desktop-only
+features and some browser interactions are still being brought over.
 
 ## Install and open rmux
 

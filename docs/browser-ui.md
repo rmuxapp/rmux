@@ -8,11 +8,11 @@ the architectural target.
 ## Published versus shared build
 
 The Cloudflare site embeds the optimized shared Rust/GPUI demo from GitHub
-run 44947179213, source 376e37b (Cloudflare deployment f2dcd3d8). Production
-clipboard smoke verified multiline sample commands execute and retain the final
-unfinished draft. This artifact also includes shared pane layout ownership,
-tab rename and bounded titles, bulk tab-close commands, and the separated sample
-session service. Those UI changes passed local checks before publication.
+run 44949065490, source 11fe7bc (Cloudflare deployment 93090bbf). Production
+embedded-demo smoke verified Terminal Actions palette access, bounded text menu
+paste and Shift+F10 opening the tab menu with shortcut hints. This artifact adds
+tab/terminal context menus, shared keyboard navigation and terminal action
+routing, Select All, Clear Scrollback and both clipboard copy modes.
 The old JavaScript/ghostty-web layout imitation is no longer published. The
 marketing site remains local and off GitHub; native downloads remain v0.1.4.
 
