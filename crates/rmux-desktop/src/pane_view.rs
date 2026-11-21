@@ -267,8 +267,7 @@ impl PaneView {
         let actions: [Box<dyn Action>; 10] = [Box::new(NewTab), Box::new(RenameTab), Box::new(CopyWorkingDirectory), Box::new(RevealWorkingDirectory), Box::new(MoveTabLeft), Box::new(MoveTabRight), Box::new(ClosePane), Box::new(CloseOtherTabs), Box::new(CloseTabsToRight), Box::new(CloseFinishedTabs)];
         let hints: Vec<_> = actions.iter().map(|action| focus.as_ref().and_then(|focus| shortcuts::hint(action.as_ref(), focus, window))).collect();
         deferred(anchored().position(menu.position).snap_to_window().child(
-            div().id("tab-context-menu").track_focus(&menu.focus).key_context("TabMenu")
-                .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.)))).py_1().bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md().occlude()
+            tab_presentation::menu_frame(window).track_focus(&menu.focus).key_context("TabMenu")
                 .on_mouse_down_out(cx.listener(|this, _, window, cx| this.dismiss_tab_menu(window, cx)))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
@@ -307,10 +306,7 @@ impl PaneView {
                     let label = if index == 0 && inherits_ssh { "New SSH Tab".to_owned() }
                         else if index == 9 { format!("Close Finished Tabs ({})…", self.finished_tab_count(menu.target, cx)) }
                         else { (*label).to_owned() };
-                    div().id(("tab-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
-                        // Keep one scroll child per action; separate sections without
-                        // inserting focusable rows or shifting keyboard reveal indices.
-                        .when(matches!(index, 1 | 4 | 6), |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
+                    tab_presentation::menu_row(index, matches!(index, 1 | 4 | 6))
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(rgb(0x354969)))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {

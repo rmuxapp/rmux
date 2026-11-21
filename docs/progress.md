@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Browser tabs now have a context menu for new/rename, movement, close, close others
+and close right. It shares desktop menu frame/row presentation, prefix type-ahead
+and existing tab command routing. Right-click selects and captures the terminal
+identity; activation revalidates ownership and availability. Escape, outside click
+and blur dismiss; keyboard navigation skips disabled items. Browser type-ahead
+uses web-time rather than unsupported WASM std::time::Instant. Native compile
+and WASM build pass. Browser smoke passed right-click selection of an inactive
+tab, type-ahead rename, End/Enter close-right and Escape restoring terminal input.
+Screenshot: target/browser-tab-context-menu.jpg. Native-only directory/process
+actions and shortcut hint labels are not yet included in the browser menu.
+Not deployed.
+
 Extended the native live-RPC fixture with pane-swap identity checks after the
 shared pane-state migration. The fresh debug build and live-shell run pass:
 RPC swap rejects a zoomed workspace without changing zoom/layout; after unzoom,

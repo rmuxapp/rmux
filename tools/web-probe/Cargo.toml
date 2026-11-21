@@ -23,6 +23,7 @@ js-sys = "=0.3.107"
 gpui = { package = "gpui-ce", version = "=0.3.0", default-features = false }
 gpui_platform = { package = "gpui_ce_platform", version = "=0.3.0", default-features = false }
 unicode-segmentation = "1.13.3"
+web-time = "1"
 
 [profile.dev]
 debug = 0

@@ -3,7 +3,10 @@ use gpui::{prelude::*, *};
 use crate::{terminal_sample::TerminalSample, tab_presentation};
 pub(crate) struct PaneEmpty;
 impl EventEmitter<PaneEmpty> for SamplePane {}
+include!("sample_tab_menu.rs");
 pub(crate) struct SamplePane {
+    menu: Option<SampleTabMenu>,
+    menu_blur: Option<Subscription>,
     rename: Option<Entity<crate::text_field::TextField>>,
     terminals: rmux_core::tabs::Tabs<Entity<TerminalSample>>,
     labels: std::collections::HashMap<EntityId, String>,
@@ -54,7 +57,7 @@ impl SamplePane {
             active: 0, next_number: self.next_number })
     }
     pub fn from_transfer(transfer: TabTransfer) -> Self {
-        Self { rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
+        Self { menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
             labels: transfer.labels, next_number: transfer.next_number, tab_scroll: ScrollHandle::new() }
     }
     pub fn tab_count(&self) -> usize { self.terminals.len() }
@@ -105,7 +108,7 @@ impl SamplePane {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let terminal = cx.new(|cx| TerminalSample::new(window,cx));
         let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
-        Self { rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
+        Self { menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
         if let Some(terminal) = self.terminals.active() {
@@ -181,6 +184,9 @@ impl Render for SamplePane {
                                 .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))
                             .on_mouse_down(MouseButton::Middle, cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); }))
+                            .on_mouse_down(MouseButton::Right, cx.listener(move |this,event: &MouseDownEvent,window,cx| {
+                                cx.stop_propagation(); this.show_menu(index, event.position, window, cx);
+                            }))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
                                 this.select(index,window,cx);
@@ -202,6 +208,7 @@ impl Render for SamplePane {
                         }))
                 })))
             .child(div().flex_1().min_h_0().children(self.terminals.active().cloned()))
+            .when_some(self.menu.clone(), |root, menu| root.child(self.menu_element(menu, window, cx)))
             .when_some(self.rename.as_ref(), |root, input| root.child(tab_presentation::rename_editor(input.clone())))
     }
 }

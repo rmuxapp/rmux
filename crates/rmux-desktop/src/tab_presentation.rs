@@ -1,5 +1,16 @@
 //! Tab strip appearance shared by native and browser hosts.
 use gpui::{prelude::*, *};
+pub(crate) fn menu_frame(window: &Window) -> Stateful<Div> {
+    div().id("tab-context-menu")
+        .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.))))
+        .py_1().bg(rgb(0x292929)).border_1().border_color(rgb(0x465063))
+        .rounded_md().shadow_md().occlude()
+}
+pub(crate) fn menu_row(index: usize, section: bool) -> Stateful<Div> {
+    div().id(("tab-menu-item", index)).mx_1().px_3().py_2().rounded_sm()
+        .text_size(px(13.)).flex().items_center().gap_3()
+        .when(section, |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
+}
 pub(crate) fn strip() -> Div {
     div().flex().h(px(30.)).flex_shrink_0().items_center()
         .border_b_1().border_color(rgb(0x383838)).bg(rgb(0x242424))

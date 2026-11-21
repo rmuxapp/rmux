@@ -5,6 +5,8 @@ use std::ops::Range;
 const FONT_FAMILY: &str = "Inter";
 #[path = "../../../crates/rmux-desktop/src/control_hint.rs"]
 mod control_hint;
+#[path = "../../../crates/rmux-desktop/src/menu_navigation.rs"]
+mod menu_navigation;
 #[path = "../../../crates/rmux-desktop/src/scrollbar_view.rs"]
 mod scrollbar_view;
 mod pane_view { pub(crate) use crate::control_hint::ControlHint; }

@@ -1,4 +1,8 @@
-use std::time::{Duration, Instant};
+use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
+#[cfg(target_arch = "wasm32")]
+use web_time::Instant;
 
 #[derive(Clone, Default)]
 pub struct Typeahead {
