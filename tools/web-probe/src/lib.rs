@@ -22,7 +22,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspace, NextWorkspace, PreviousWorkspace]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }

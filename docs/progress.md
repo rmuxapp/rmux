@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Connected browser group creation through the shared native Ctrl+Cmd+G binding.
+New workspaces inherit the active group through Groups::add_new; sidebar rows use
+the model's visible order, anchor titles and member indentation. Disclosure toggles
+keep the active session unchanged and highlight its collapsed group. Numbered or
+cyclic selection includes hidden children and reveals the selected member. Native
+check and WASM build pass. Browser verified creation → add child → ls → collapse
+→ select another workspace → Cmd+4 reveals the child with output/focus retained.
+Evidence: target/shared-workspace-groups-wasm.png. Group editing, ungrouping,
+drag/reorder and command-palette exposure remain unfinished in the browser.
+
 Moved the existing native workspace group model into rmux-core, including pin/
 member ordering, anchor promotion, insertion/removal rules, restore validation
 and its tests. Desktop re-exports the shared model; browser owns the same Groups

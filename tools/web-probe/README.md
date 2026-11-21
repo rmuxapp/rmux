@@ -143,3 +143,10 @@ Native check and WASM build pass. Browser checks verified Cmd+N, Cmd+1 and
 Cmd+Option+Up wraparound with restored output, plus mouse switching with split/tab
 restoration. Workspace groups, persistence and the full native state/service model
 are still separate acceptance work; this is not the published demo yet.
+
+Ctrl+Cmd+G now creates an empty group using the shared native shortcut. Cmd+N
+inside a group adds a child through the shared group model. Click the disclosure
+to collapse/expand without changing the active session. Numbered/cyclic navigation
+includes collapsed children and reveals a selected child. Browser checks verified
+creation, inheritance, collapse and numbered reveal with retained terminal output.
+Group editing, ungrouping and drag/reorder controls remain pending.
