@@ -80,3 +80,9 @@ pressing Escape returns keyboard focus to the selected terminal. Splitting
 focuses the new terminal; clicking a pane header focuses its terminal. Verified
 split → type ls and Cmd+P → Escape → type help without a terminal click.
 Other browsers may reserve this shortcut; the Commands button remains available.
+
+Run `mise run bench-browser-engine` after building for the isolated 1/4/16-pane
+engine/JSON boundary benchmark. It validates dirty-row counts and reports payload
+sizes, median/p95 serialization cost and whole-process memory. See
+`../../docs/benchmarks/browser-engine.md` for scope and the recorded baseline.
+This does not measure browser rendering or input latency.

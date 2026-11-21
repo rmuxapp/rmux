@@ -12,3 +12,7 @@ run = "python -m http.server 4319 --bind 127.0.0.1 --directory dist"
 
 [tasks.check]
 run = "cargo check --target wasm32-unknown-unknown"
+
+[tasks.bench-browser-engine]
+description = "Measure the Ghostty WASM/JSON boundary at 1, 4 and 16 panes (build first)"
+run = "node scripts/bench-browser-engine.mjs"

@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added a repeatable browser engine/JSON boundary benchmark for 1/4/16 panes,
+80×24 cells, clean/one-row/full-viewport workloads, isolated Node processes and
+20 warmup + 100 measured updates. Dirty-row assertions pass in all nine cases.
+On M4 Max, 16-pane full updates serialize 7.34 MB at 7.93 ms median / 9.14 ms p95;
+one-row updates take 0.57 ms median. This excludes Rust deserialization and UI
+rendering. Raw results and limits are in docs/benchmarks/browser-engine.md.
+Compact cell transport is the next measured optimization target, not a claim
+that end-to-end browser performance acceptance has passed.
+
 Added a guarded batched ASCII shaping path to the browser adapter. It shapes a
 run once, verifies every caret boundary and trailing width against terminal
 columns, then retains the full run if aligned. Unsupported shaping falls back
