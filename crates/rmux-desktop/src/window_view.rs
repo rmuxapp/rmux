@@ -4486,11 +4486,7 @@ impl Render for WorkspaceWindow {
                                                 gpui::div().flex().items_center().gap_2()
                                                     .when_some(header, |row, group| {
                                                         let id = group.id;
-                                                        row.child(gpui::div().id(("group-collapse", target))
-                                                            .w(px(24.)).h(px(24.)).flex_shrink_0().flex().items_center().justify_center().rounded_sm()
-                                                            .hover(|style| style.bg(rgb(0x43516a)))
-                                                            .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Expand / Collapse Group".into())).into())
-                                                            .child(icons::icon(if group.collapsed { "chevron-right" } else { "chevron-down" }))
+                                                        row.child(sidebar_presentation::group_toggle(("group-collapse", target), group.collapsed)
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                                 if !event.standard_click() { return; }
                                                                 cx.stop_propagation();
@@ -4512,8 +4508,7 @@ impl Render for WorkspaceWindow {
                                                                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(title_hint.clone())).into())
                                                                 .font_weight(FontWeight::SEMIBOLD).child(display_name))
                                                             .when(header.map(|group| group.pinned).unwrap_or(entry.pinned), |row| row.child(
-                                                                gpui::div().id(("workspace-pin", target)).flex_shrink_0().text_color(rgb(if selected { 0xdcecff } else { 0x969696 }))
-                                                                    .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Pinned workspace".into())).into()).child(icons::icon("pin")))))
+                                                                sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
                                                         .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { 0xdcecff } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
                                                         .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
                                                         .when_some(preview, |column, message| {

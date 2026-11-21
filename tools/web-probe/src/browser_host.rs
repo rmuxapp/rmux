@@ -180,17 +180,18 @@ impl Render for BrowserHost {
                             .child(div().flex().items_center().gap_2()
                                 .when_some(header, |row, group| {
                                     let id = group.id;
-                                    row.child(div().id(("group-collapse",entity.entity_id()))
-                                        .w(px(24.)).h(px(24.)).flex_shrink_0().flex().items_center().justify_center()
-                                        .child(if group.collapsed { "›" } else { "⌄" })
-                                        .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
-                                        .on_click(cx.listener(move |this,_,_,cx| {
+                                    row.child(sidebar_presentation::group_toggle(("group-collapse", entity.entity_id()), group.collapsed)
+                                        .on_click(cx.listener(move |this,event: &ClickEvent,_,cx| {
+                                            if !event.standard_click() { return; }
                                             cx.stop_propagation();
                                             if let Some(group) = this.workspace_state.groups.get_mut(id) { group.collapsed = !group.collapsed; }
                                             cx.notify();
                                         })))
                                 })
-                                .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
+                                .child(div().min_w_0().flex_1().truncate().font_weight(FontWeight::SEMIBOLD)
+                                    .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
+                                .when(header.is_some_and(|group| group.pinned), |row| row.child(
+                                    sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, true))))
                             .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx)))
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 

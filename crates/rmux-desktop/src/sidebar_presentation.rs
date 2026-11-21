@@ -12,3 +12,17 @@ pub(crate) fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
         .when(selected, |row| row.bg(rgb(0x007aff)).text_color(rgb(0xffffff)))
         .hover(move |style| style.bg(rgb(if selected {0x1685ff} else {0x303030})))
 }
+
+pub(crate) fn group_toggle(id: impl Into<ElementId>, collapsed: bool) -> Stateful<Div> {
+    div().id(id).w(px(24.)).h(px(24.)).flex_shrink_0().flex().items_center().justify_center().rounded_sm()
+        .hover(|style| style.bg(rgb(0x43516a)))
+        .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Expand / Collapse Group".into())).into())
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .child(crate::icons::icon(if collapsed { "chevron-right" } else { "chevron-down" }))
+}
+pub(crate) fn pin(id: impl Into<ElementId>, selected: bool, group: bool) -> Stateful<Div> {
+    div().id(id).flex_shrink_0()
+        .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(
+            if group { "Pinned group" } else { "Pinned workspace" }.into())).into())
+        .child(crate::icons::icon("pin").text_color(rgb(if selected { 0xdcecff } else { 0x969696 })))
+}

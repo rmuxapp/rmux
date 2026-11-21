@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Sidebar group collapse controls and pin indicators now use shared presentation
+functions in both hosts. Browser groups use native SVG chevrons, hover treatment,
+tooltip and standard-click guard; pinned groups now visibly show their pin. Native
+pin tooltips distinguish groups from workspaces and set the SVG color directly.
+Browser names use desktop semibold weight and truncate within available width.
+Native check and browser build pass. Browser smoke verified visible pinning and
+collapsing a group containing the active child without changing that terminal.
+Screenshot: target/shared-sidebar-group-controls.jpg. Not deployed yet.
+
 Shared workspace state now owns group member removal, anchor promotion and group
 pin toggling, preserving the selected identity and promoted-anchor sidebar slot.
 Native routes all three through the shared workspace action binder, and the
