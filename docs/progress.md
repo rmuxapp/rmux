@@ -2,6 +2,11 @@
 
 ## Current implementation focus
 
+Deployed palette dismissal and tab-reordering source ef467b6 from successful
+GitHub Shared WASM run 44957843451 to Cloudflare 7ea03ba2. Live rmux.app uses
+the new artifact. Verified the embedded palette's visible Close button and
+subsequent terminal typing. Screenshot: `target/live-palette-close-ef467b6.jpg`.
+
 Fixed missing browser palette dismissal paths: a visible Close button,
 backdrop click dismissal and command-palette shortcut toggling now restore
 terminal focus. Panel clicks do not dismiss it. Escape already worked in the
