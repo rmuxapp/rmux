@@ -17,6 +17,28 @@ site remains local and off GitHub. Newer changes on main are not yet deployed.
 build shares substantial application code, but its workspace orchestration and
 platform services are still separate. Do not describe it as full parity yet.
 
+## Remaining application migration
+
+The target is one application with interchangeable terminal/platform services,
+not two hosts that independently reproduce the same features. Current shared
+views and core policies are useful migration steps, not completion evidence.
+
+1. Consolidate workspace/pane/tab command handling and lifecycle state into the
+   shared application layer. Both hosts must dispatch the same commands; native
+   process creation and browser sample sessions should return through the same
+   session interface. Zoom/resize/equalize now share command transitions.
+2. Resolve the GPUI 0.2.2 / CE 0.3.0 boundary so the application view hierarchy
+   and event orchestration compile for both hosts. Keep rendering/font adapters
+   explicit; do not silently replace the shipped desktop backend without checks.
+3. Replace browser-only palette/workspace assembly with that application entry
+   point. Keep OS menus, updater, clipboard and persistence behind platform
+   services. The demo retains sample processes and advertises unavailable OS
+   operations, rather than reimplementing app behavior.
+4. Verify the same interaction scenarios on both hosts: workspace restoration,
+   tab/pane ownership, focus after close, palette dispatch, zoom/resize, Unicode
+   input and selection. Measure desktop performance before accepting a renderer
+   migration. Native Windows runtime validation remains deferred by request.
+
 ## Shared implementation
 
 - **Application state:** pane trees, directional focus, resizing/equalization,

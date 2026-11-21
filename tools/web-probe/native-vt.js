@@ -26,6 +26,30 @@ export async function loadNativeVt(bytes) {
   }
   return {
     manifest,
+    graphemes(text) {
+      if (!text.isWellFormed()) throw new RangeError('Invalid Unicode text');
+      if (text.length > 1024*1024) throw new RangeError('Text exceeds measurement limit');
+      const chars = Array.from(text), utf8 = new TextEncoder();
+      if (utf8.encode(text).length > 1024*1024 || /[\u0000-\u001f\u007f-\u009f]/u.test(text)) throw new RangeError('Invalid terminal text');
+      if (!chars.length) return [];
+      return buffer(chars.length*4+1, ptr => {
+        const view = new DataView(api.memory.buffer);
+        chars.forEach((ch,i)=>view.setUint32(ptr+i*4,ch.codePointAt(0),true));
+        const result=[];
+        let offset=0,end=0;
+        while (offset<chars.length) {
+          const count=api.ghostty_unicode_grapheme_width(ptr+offset*4,chars.length-offset,ptr+chars.length*4);
+          const width=memory()[ptr+chars.length*4];
+          if (!count || count>chars.length-offset || width>2) throw new Error('Invalid grapheme measurement');
+          for (let i=offset;i<offset+count;i++) {
+            const cp=chars[i].codePointAt(0);
+            end+=cp<=0x7f ? 1 : cp<=0x7ff ? 2 : cp<=0xffff ? 3 : 4;
+          }
+          offset+=count;result.push({end,width});
+        }
+        return result;
+      });
+    },
     memoryBytes() { return api.memory.buffer.byteLength; },
     create(columns, rows, options = {}) {
       let terminal = handle(slot => api.ghostty_terminal_new(0, slot, columns, rows));
@@ -201,6 +225,7 @@ export function createNativeHost(engine, isMac) {
   let next = 0, focused = null;
   return {
     isMac,
+    graphemes(text) { return JSON.stringify(engine.graphemes(text)); },
     memoryStats() { return {engine_linear_memory_bytes: engine.memoryBytes(), sessions: sessions.size}; },
     create(columns,rows,foreground,background,scrollback) {
       const terminal=engine.create(columns,rows,{foreground,background,scrollback});

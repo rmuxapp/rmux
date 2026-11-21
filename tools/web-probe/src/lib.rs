@@ -252,7 +252,11 @@ impl InputProbe {
                 };
                 self.focus_direction(direction, window, cx);
             }
-            CommandId::EqualizePanes => { if let Some(tree) = &mut self.tree { tree.equalize(); } }
+            CommandId::EqualizePanes => {
+                let mut zoomed = self.zoomed.then_some(self.focused);
+                rmux_core::pane_commands::equalize(&mut self.tree, &mut zoomed);
+                self.zoomed = zoomed.is_some();
+            }
             command @ (CommandId::ResizePaneLeft | CommandId::ResizePaneRight | CommandId::ResizePaneUp | CommandId::ResizePaneDown) => {
                 use rmux_core::layout::Direction;
                 let direction = match command {
@@ -261,9 +265,13 @@ impl InputProbe {
                     CommandId::ResizePaneUp => Direction::Up,
                     _ => Direction::Down,
                 };
-                if let Some(tree) = &mut self.tree { tree.resize_direction(&self.focused, direction); }
+                rmux_core::pane_commands::resize(&mut self.tree, &self.focused, direction, self.zoomed);
             }
-            CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
+            CommandId::TogglePaneZoom => self.zoomed = rmux_core::pane_commands::toggle_zoom(
+                self.zoomed.then_some(self.focused),
+                self.samples.contains_key(&self.focused).then_some(self.focused),
+                self.samples.len(),
+            ).is_some(),
             command @ (CommandId::ToggleSidebar | CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
                 | CommandId::LastWorkspace | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);

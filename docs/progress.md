@@ -2,6 +2,19 @@
 
 ## Current implementation focus
 
+Desktop and browser now invoke shared pane-command transitions for zoom, resize
+and equalize. This fixes browser-only single-pane zoom, resizing hidden splits
+while zoomed, and equalize leaving zoom active. Two focused policy tests and both
+host compilation checks pass; these changes have not yet had a browser smoke or
+been deployed. Platform lifecycle guards remain in desktop.
+
+Exposed pinned Ghostty grapheme measurements through native and WASM adapters,
+with shared UTF-8 endpoint/cell-width data. Native and WASM fixtures agree for
+wide, combining, ZWJ emoji, flags and variation selectors; controls and oversized
+input are rejected, as are malformed JS surrogates. This is preparation for the
+sample editor, which still accepts only bounded ASCII. It does not establish
+Unicode editing/IME parity. Full shared-application migration remains open.
+
 Measured GitHub v0.1.4 through a mise-managed installation: one eight-pane idle
 fixture instance, 10s settling, 60s observation. App RSS 94.86 MiB, quantized app
 CPU 0.0167% of one core, split RPC p50/max 6.07/6.76ms. Native fixture shutdown

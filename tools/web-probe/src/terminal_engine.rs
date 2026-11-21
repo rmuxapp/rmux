@@ -4,6 +4,8 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = graphemes)]
+    fn measure_graphemes(text: &str) -> Result<String, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = focus)]
     fn focus(id: u32, active: bool);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = isMac)]
@@ -86,3 +88,7 @@ impl TerminalEngine {
     }
 }
 impl Drop for TerminalEngine { fn drop(&mut self) { free(self.0); } }
+
+pub fn graphemes(text: &str) -> Result<Vec<rmux_core::terminal_text::Grapheme>, JsValue> {
+    serde_json::from_str(&measure_graphemes(text)?).map_err(|error| JsValue::from_str(&error.to_string()))
+}

@@ -2637,29 +2637,25 @@ impl Workspace {
     }
     fn toggle_zoom(&mut self, window: &Window, cx: &mut Context<Self>) {
         self.split_drag = None;
-        self.zoomed = if self.zoomed.is_some() {
-            None
-        } else if self.panes.len() > 1 {
-            self.focused_index(window, cx)
-                .map(|index| self.panes[index].entity_id())
-        } else {
-            None
-        };
+        self.zoomed = rmux_core::pane_commands::toggle_zoom(
+            self.zoomed,
+            self.focused_index(window, cx).map(|index| self.panes[index].entity_id()),
+            self.panes.len(),
+        );
         cx.notify();
     }
     fn resize_pane(&mut self, direction: layout::Direction, window: &Window, cx: &mut Context<Self>) {
-        if self.zoomed.is_some() || self.spawning_split.is_some() || cx.global::<Shutdowns>().quitting { return; }
+        if self.spawning_split.is_some() || cx.global::<Shutdowns>().quitting { return; }
         let Some(index) = self.focused_index(window, cx) else { return; };
-        if self.layout.as_mut().is_some_and(|tree| tree.resize_direction(&self.panes[index], direction)) {
+        if rmux_core::pane_commands::resize(&mut self.layout, &self.panes[index], direction, self.zoomed.is_some()) {
             self.split_drag = None;
             cx.notify();
         }
     }
     fn equalize_panes(&mut self, cx: &mut Context<Self>) {
-        if let Some(layout) = &mut self.layout {
-            layout.equalize();
+        if self.layout.is_some() {
+            rmux_core::pane_commands::equalize(&mut self.layout, &mut self.zoomed);
             self.split_drag = None;
-            self.zoomed = None;
             cx.notify();
         }
     }

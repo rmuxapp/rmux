@@ -4,6 +4,12 @@ import {loadNativeVt, createNativeHost} from '../native-vt.js';
 const bytes = await readFile(new URL('../../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm', import.meta.url));
 const host = await loadNativeVt(bytes);
 const bridge = createNativeHost(host,()=>true);
+assert.deepEqual(JSON.parse(bridge.graphemes('a界e\u0301👩‍💻')), [{end:1,width:1},{end:4,width:2},{end:7,width:1},{end:18,width:2}]);
+for (const text of ['👍🏽','🇮🇪','❤️']) assert.deepEqual(JSON.parse(bridge.graphemes(text)),[{end:Buffer.byteLength(text),width:2}]);
+assert.deepEqual(JSON.parse(bridge.graphemes('')),[]);
+assert.throws(()=>bridge.graphemes('a\nb'),RangeError);
+assert.throws(()=>bridge.graphemes('\ud800'),RangeError);
+assert.throws(()=>bridge.graphemes('é'.repeat(524289)),RangeError);
 const inputSession = bridge.create(20,4);
 try {
   bridge.write(inputSession,'\x1b[>11u');

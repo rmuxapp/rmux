@@ -1884,3 +1884,5 @@ mod tests {
         Ok(())
     }
 }
+
+pub mod unicode;

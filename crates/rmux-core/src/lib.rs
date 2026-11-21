@@ -10,3 +10,5 @@ pub mod keyboard;
 pub mod workspace_groups;
 pub mod scroll;
 pub mod tabs;
+pub mod terminal_text;
+pub mod pane_commands;
