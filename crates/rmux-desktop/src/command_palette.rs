@@ -1247,7 +1247,11 @@ impl Render for CommandPalette {
                 }
             }))
             .when(!compact, |palette| palette.child(
-                palette_view::heading(self.heading),
+                palette_view::header(self.heading, palette_view::close_button()
+                    .on_click(cx.listener(|_, event: &ClickEvent, _, cx| {
+                        if event.standard_click() { cx.emit(PaletteEvent::Close); }
+                        cx.stop_propagation();
+                    }))),
             ))
             .when_some(self.location.clone(), |palette, location| palette.child(
                 div().id("file-browser-location").flex_shrink_0().min_w_0().px_3().pt_2()

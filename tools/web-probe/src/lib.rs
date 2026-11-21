@@ -549,12 +549,11 @@ impl Render for InputProbe {
                         this.feedback = None; cx.notify(); cx.stop_propagation();
                     }
                 }))
-                .child(div().flex().items_center().justify_between()
-                    .child(palette_view::heading("Search commands and workspaces"))
-                    .child(div().id("close-command-palette").mt_2().mr_2().px_2().rounded_sm()
-                        .text_sm().cursor_pointer().hover(|style| style.bg(rgb(0x454545)))
-                        .child("Close ×")
-                        .on_click(cx.listener(|this, _, window, cx| this.close_palette(window, cx)))))
+                .child(palette_view::header("Search commands and workspaces", palette_view::close_button()
+                    .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
+                        if event.standard_click() { this.close_palette(window, cx); }
+                        cx.stop_propagation();
+                    }))))
                 .child(palette_view::search(self.input.clone()))
                 .child({
                     let entity = cx.entity();

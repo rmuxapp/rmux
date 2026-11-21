@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Native palettes now expose the same visible Close control as the browser demo
+through a shared header/button implementation, with vertical padding on the hit
+target. Native dismissal uses the existing focus-restoration event; browser
+dismissal restores its active terminal. Native windows below 300 px retain the
+existing compact header omission and Escape/outside-click dismissal. Both desktop
+and WASM cargo checks pass. Native visual inspection was attempted but the Mac is
+locked; visual acceptance and deployment of this UI change remain pending.
+
 Recorded a six-run, alternating 16-pane comparison of ffa98af against the retained
 e8e486a style-only benchmark binary. Median parsed throughput was 108.71 versus
 110.92 MiB/s; response-snapshot p99 was 4.87 versus 5.06 ms. All requests and

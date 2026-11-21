@@ -24,6 +24,16 @@ pub(crate) fn panel(height: f32) -> Stateful<Div> {
 pub(crate) fn heading(text: impl Into<SharedString>) -> Div {
     div().flex_shrink_0().px_3().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(text.into())
 }
+pub(crate) fn header(text: impl Into<SharedString>, close: impl IntoElement) -> Div {
+    div().flex().flex_shrink_0().items_center().justify_between()
+        .child(heading(text).min_w_0().flex_1())
+        .child(close)
+}
+pub(crate) fn close_button() -> Stateful<Div> {
+    div().id("close-command-palette").flex_shrink_0().mt_2().mr_2().px_2().py_1()
+        .rounded_sm().text_sm().cursor_pointer().hover(|style| style.bg(rgb(0x454545)))
+        .child("Close ×")
+}
 pub(crate) fn search(input: impl IntoElement) -> Div {
     div().flex_shrink_0().p_3().child(div().w_full().px_3().py_2().rounded_md()
         .border_1().border_color(rgb(0x4b5668)).bg(rgb(0x12141a)).child(input))
