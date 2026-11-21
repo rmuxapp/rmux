@@ -63,6 +63,7 @@ impl Drop for PastePermit {
 
 enum InputPayload {
     Bytes(Vec<u8>),
+    KeyRelease { terminal: std::sync::Weak<Mutex<Terminal>>, key: String, mods: crate::keyboard::Modifiers },
     Focus { terminal: std::sync::Weak<Mutex<Terminal>>, focused: bool, releases: Vec<String> },
     Paste { text: String, bracketed: bool },
 }
@@ -78,6 +79,11 @@ impl InputPayload {
     fn encode(self) -> Result<Vec<u8>> {
         match self {
             Self::Bytes(bytes) => Ok(bytes),
+            Self::KeyRelease { terminal, key, mods } => {
+                let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
+                let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
+                Ok(terminal.encode_key_action(&key, mods, crate::keyboard::Action::Release)?.unwrap_or_default())
+            }
             Self::Focus { terminal, focused, releases } => {
                 let Some(terminal) = terminal.upgrade() else { return Ok(Vec::new()); };
                 let mut terminal = terminal.lock().unwrap_or_else(|error| error.into_inner());
@@ -733,6 +739,14 @@ impl Session {
         Ok(Some(count))
     }
 
+    /// Release a delivered key without parser waits or viewport scrolling.
+    pub fn queue_key_release(&self, key: &str, mods: crate::keyboard::Modifiers) -> Result<()> {
+        anyhow::ensure!(key.len() <= 128, "oversized key name");
+        self.writer.try_send(InputMessage {
+            payload: InputPayload::KeyRelease { terminal: Arc::downgrade(&self.terminal), key: key.into(), mods },
+            _paste: None,
+        }).map_err(|_| anyhow::anyhow!("terminal input queue is full or closed"))
+    }
     pub fn key_release(&self, key: &str, mods: crate::keyboard::Modifiers) -> Result<()> {
         let bytes = self
             .terminal
@@ -1262,6 +1276,7 @@ mod tests {
         let paste_error = session.paste("must-not-be-queued").unwrap_err();
         assert!(paste_error.to_string().contains("No paste input was queued"));
         assert!(!session.paste_pending.load(Ordering::Acquire), "rejected paste retained its permit");
+        session.queue_key_release("up", Default::default())?;
         session.queue_focus_with_releases(false, vec!["a".into(), "enter".into()])?;
         session.queue_focus(true)?;
         session.input_without_scroll("state-世界\n".as_bytes())?;
@@ -1338,6 +1353,26 @@ mod tests {
         drop(engine);
         worker.join().unwrap();
         assert!(result??.is_none(), "obsolete directory lookup waited for parser access");
+        Ok(())
+    }
+    #[test]
+    fn queued_key_release_preserves_modifiers_and_writer_order() -> Result<()> {
+        let terminal = Arc::new(Mutex::new(Terminal::new(20, 4)?));
+        terminal.lock().unwrap().write(b"\x1b[>3u");
+        let (sender, receiver) = mpsc::sync_channel(3);
+        sender.send(b"before".to_vec().into())?;
+        sender.send(InputMessage { payload: InputPayload::KeyRelease {
+            terminal: Arc::downgrade(&terminal), key: "up".into(),
+            mods: crate::keyboard::Modifiers { shift: true, ..Default::default() },
+        }, _paste: None })?;
+        sender.send(b"after".to_vec().into())?;
+        drop(sender);
+        let mut output = Vec::new();
+        write_messages(receiver, &mut output, |error| panic!("{error}"), || {});
+        assert_eq!(output, b"before\x1b[1;2:3Aafter");
+        let pending = InputPayload::KeyRelease { terminal: Arc::downgrade(&terminal), key: "up".into(), mods: Default::default() };
+        drop(terminal);
+        assert!(pending.encode()?.is_empty());
         Ok(())
     }
     #[test]

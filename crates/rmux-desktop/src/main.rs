@@ -1558,7 +1558,9 @@ impl TerminalView {
             control: key.modifiers.control,
             alt: key.modifiers.alt,
         };
-        if let Err(error) = self.session.key_release(&pressed, mods) {
+        if let Err(error) = self.session.queue_key_release(&pressed, mods) {
+            // Keep a rejected release available for focus-loss cleanup.
+            self.pressed_keys.press(&pressed);
             self.error = Some(error.to_string());
             cx.notify();
         }

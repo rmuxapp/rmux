@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Native ordinary key-up reporting now uses a bounded writer message instead of
+synchronously acquiring the parser. It preserves the original pressed-key name,
+modifiers and writer ordering, holds a weak terminal reference, and never follows
+output/changes the viewport. Rejected releases remain tracked for later focus-loss
+cleanup, with a visible error. Tests pass for exact Kitty modifier/release bytes,
+ordering between ordinary input messages, closed-engine cleanup and admission
+under a held parser lock. Existing queued-focus tests and desktop check pass.
+CI's queued-input filter includes the new regression. Press/text handling remains
+separate work; no end-to-end keyboard latency claim. Not released.
+
 Published successful GitHub demo run 44951581189 (fab099c) to rmux.app,
 Cloudflare deployment 8f4bd996. Hidden workspace/tab/zoom snapshot reclamation is
 now live. Embedded production smoke verified both split outputs survive zoom,
