@@ -176,3 +176,9 @@ Double-click equalizes the neighboring pair; existing engines resize in place.
 Native compilation and WASM build pass. Browser verification covers a horizontal
 divider drag and equalization with terminal output retained. Nested and vertical
 drag interaction checks remain pending.
+
+Split traversal, branch measurement, divider creation and mouse-down handling now
+come from the same native renderer, with host-specific leaf content. Native check
+and WASM build pass. Nested vertical dragging exposed a transient upper-pane text
+repaint issue (returns on the next pointer interaction); nested equalization also
+needs checking. These remain open, despite shared source and passing compilation.

@@ -172,8 +172,7 @@ impl InputProbe {
         self.close_palette(window, cx);
     }
     fn panes(&self, tree: &PaneTree<usize>, path: Vec<usize>, cx: &mut Context<Self>) -> AnyElement {
-        match tree {
-            PaneTree::Pane(id) => {
+        split_interaction::render_panes(tree, path, false, cx, &|id, cx| {
                 let id = *id;
                 split_presentation::leaf(("pane", id)).flex().flex_col().bg(rgb(0x111216))
                     .border_t_2().border_color(rgb(if self.focused == id { 0x9790d7 } else { 0x383838 }))
@@ -181,49 +180,7 @@ impl InputProbe {
                     .child(div().p_3().flex_shrink_0().text_sm().child(format!("Pane {} · live Ghostty · sample session", id + 1)))
                     .child(div().flex_1().min_h_0().child(self.samples[&id].clone()))
                     .into_any_element()
-            }
-            PaneTree::Split { axis, children, weights } => {
-                let axis = *axis;
-                let bounds = std::rc::Rc::new(std::cell::Cell::new(Bounds::<Pixels>::default()));
-                let measured = bounds.clone();
-                let mut elements = Vec::new();
-                for (index, child) in children.iter().enumerate() {
-                    if index > 0 {
-                        let bounds = bounds.clone();
-                        let path = path.clone();
-                        let weights = weights.clone();
-                        let count = children.len();
-                        elements.push(split_presentation::divider(SharedString::from(format!("divider-{path:?}-{index}")), axis, 5.)
-                            .cursor(if axis == Axis::Columns { CursorStyle::ResizeLeftRight } else { CursorStyle::ResizeUpDown })
-                            .hover(|style| style.bg(rgb(0x40536b)))
-                            .on_mouse_down(MouseButton::Left, cx.listener(move |this, event: &MouseDownEvent, _, cx| {
-                                let extent = if axis == Axis::Columns { bounds.get().size.width } else { bounds.get().size.height };
-                                let available = (f32::from(extent) - 5. * (count - 1) as f32).max(1.);
-                                if event.click_count == 2 {
-                                    if let Some(PaneTree::Split { weights, .. }) = this.tree.as_mut().and_then(|tree| tree.at_mut(&path)) {
-                                        let equal = (weights[index - 1] + weights[index]) / 2.;
-                                        weights[index - 1] = equal; weights[index] = equal;
-                                    }
-                                    this.split_drag = None;
-                                    cx.notify();
-                                } else {
-                                    this.split_drag = Some(split_interaction::SplitDrag {
-                                        path: path.clone(), boundary: index - 1, axis, origin: event.position,
-                                        units_per_pixel: weights.iter().sum::<f32>() / available,
-                                        left: weights[index - 1], right: weights[index],
-                                    });
-                                }
-                                cx.stop_propagation();
-                            })).into_any_element());
-                    }
-                    let mut child_path = path.clone(); child_path.push(index);
-                    elements.push(split_presentation::weighted(weights[index]).child(self.panes(child, child_path, cx)).into_any_element());
-                }
-                split_presentation::branch(axis)
-                    .child(canvas(move |bounds, _, _| measured.set(bounds), |_, _, _, _| {}).absolute().size_full())
-                    .children(elements).into_any_element()
-            }
-        }
+        })
     }
 
 }

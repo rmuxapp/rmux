@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Native and browser now call one recursive split renderer, including branch bounds,
+weighted child layout, divider hover/cursor/tooltip, drag start and double-click
+weight equalization. Hosts supply only leaf content and layout/drag state. Native
+check and WASM build pass. Browser nested right/below layout and vertical dragging
+work, but exposed a transient repaint issue: upper-pane text disappeared after
+shrinking height and reappeared on the next pointer interaction at unchanged
+geometry. Output was retained, but vertical resize rendering acceptance is NOT
+complete. The attempted nested double-click did not visibly restore equal heights;
+check hit geometry/measurement as well as painting next. Evidence:
+target/shared-nested-split-wasm.png captures the later repaint, not a bug fix.
+
+
 Extracted native divider drag capture/state updates into split_interaction and
 consumed it from both hosts. Browser dividers measure their branch, update shared
 PaneTree weights with the native 48-pixel minimum policy, show resize cursors and
