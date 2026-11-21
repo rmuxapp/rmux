@@ -240,3 +240,5 @@ mod pane_shortcuts;
 #[path = "../../../crates/rmux-desktop/src/tab_presentation.rs"]
 mod tab_presentation;
 mod sample_pane;
+
+mod key_adapter;

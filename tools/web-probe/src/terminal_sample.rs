@@ -25,9 +25,13 @@ impl TerminalSample {
     }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         let key = &event.keystroke;
-        if key.modifiers.platform || key.modifiers.control || key.modifiers.alt { return; }
-        match rmux_core::keyboard::key(&key.key) {
-            Some(rmux_core::keyboard::Key::Enter) => {
+        if key.modifiers.platform { return; }
+        let Some(symbol) = rmux_core::keyboard::key(&key.key) else { return; };
+        let mods = rmux_core::keyboard::Modifiers { shift:key.modifiers.shift, control:key.modifiers.control, alt:key.modifiers.alt };
+        let text = if mods.control || mods.alt { key.key.as_str() } else { key.key_char.as_deref().unwrap_or("") };
+        let encoded = self.engine.encode(symbol, mods, event.is_held, text);
+        match encoded.as_str() {
+            "\r" => {
                 self.engine.write("\r\n");
                 let response = match self.command.trim() {
                     "help" => "Sample commands: help, clear, ls\r\nNo shell or server access.\r\n",
@@ -40,13 +44,17 @@ impl TerminalSample {
                 self.engine.write("$ ");
                 self.command.clear();
             }
-            Some(rmux_core::keyboard::Key::Backspace) if !self.command.is_empty() => {
+            "\x7f" | "\x08" if !self.command.is_empty() => {
                 self.command.pop(); self.engine.write("\x08 \x08");
             }
-            _ => {
-                let Some(text) = key.key_char.as_deref() else { return; };
-                // Initial ASCII sample-shell path; native IME/input sharing follows.
-                if self.command.len() >= 48 || !text.bytes().all(|b| (32..127).contains(&b)) { return; }
+            "\x03" => { self.engine.write("^C\r\n$ "); self.command.clear(); }
+            "\x15" => {
+                for _ in 0..self.command.len() { self.engine.write("\x08 \x08"); }
+                self.command.clear();
+            }
+            text => {
+                // The sample shell accepts ASCII; IME and a real backend follow.
+                if text.is_empty() || self.command.len()+text.len() > 48 || !text.bytes().all(|b| (32..127).contains(&b)) { return; }
                 self.command.push_str(text); self.engine.write(text);
             }
         }

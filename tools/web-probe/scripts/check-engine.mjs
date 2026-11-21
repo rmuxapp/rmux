@@ -37,3 +37,17 @@ for (const [columns,height] of [[20,4],[80,24],[1,1],[40,8]]) {
 }
 host.free(sized);
 console.log('Resize dimensions, full invalidation and unchanged-size no-op passed.');
+// Exercise the same pinned key values used by the Rust adapter.
+const adapter = await readFile(new URL('../src/key_adapter.rs',import.meta.url),'utf8');
+const keyCode = name => Number(adapter.match(new RegExp(`Key::${name} => (\\d+)`))[1]);
+const input = host.create(20,4);
+assert.equal(host.encode(input,keyCode('Enter'),0,false,''),'\r');
+assert.equal(host.encode(input,keyCode('Backspace'),0,false,''),'\x7f');
+assert.equal(host.encode(input,22,2,false,'c'),'\x03');
+assert.equal(host.encode(input,40,2,false,'u'),'\x15');
+assert.equal(host.encode(input,31,0,false,'l'),'l');
+assert.equal(host.encode(input,keyCode('ArrowUp'),0,false,''),'\x1b[A');
+host.write(input,'\x1b[?1h');
+assert.equal(host.encode(input,keyCode('ArrowUp'),0,false,''),'\x1bOA');
+host.free(input);
+console.log('Key encoding, control bytes and application cursor mode passed.');

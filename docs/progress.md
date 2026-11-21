@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Connected shared symbolic keys to the pinned ghostty-web encoder through an
+explicit numeric adapter (browser and native Ghostty key enums differ). Each
+session owns/disposes its encoder; cursor/keypad modes are queried before encode.
+Sample-shell input now consumes encoded bytes, including control-byte handlers.
+WASM build and engine assertions pass for plain text, Enter, Backspace, Ctrl+C,
+Ctrl+U and normal/application arrows. Browser verified plain ls input end to end.
+Control-key browser interaction remains unresolved: some automated chords never
+reached DOM, and the attempted mixed control/plain sequence needs further checks.
+Do not claim control-key UI parity yet. Kitty state synchronization, release events,
+IME and full native input-view sharing remain pending. Temporary trace logs removed.
+
 Moved symbolic terminal key normalization, modifiers and press/repeat/release
 identity into rmux-core::keyboard. Native keyboard encoding maps shared symbols
 to Ghostty FFI constants; the browser sample handler uses the same normalization

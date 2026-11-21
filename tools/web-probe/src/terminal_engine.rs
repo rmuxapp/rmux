@@ -14,6 +14,8 @@ extern "C" {
     fn snapshot(id: u32) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
     fn free(id: u32);
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = encode)]
+    fn encode(id: u32, key: u32, mods: u8, repeat: bool, text: &str) -> String;
 }
 #[derive(serde::Deserialize)]
 struct WireCell(smol_str::SmolStr, u8, Color, Color, u8);
@@ -36,6 +38,10 @@ pub struct TerminalEngine(u32);
 impl TerminalEngine {
     pub fn new(columns: u16, rows: u16) -> Self { Self(create(columns, rows)) }
     pub fn write(&self, text: &str) { write(self.0, text); }
+    pub fn encode(&self, key: rmux_core::keyboard::Key, mods: rmux_core::keyboard::Modifiers, repeat: bool, text: &str) -> String {
+        let bits = u8::from(mods.shift) | (u8::from(mods.control)<<1) | (u8::from(mods.alt)<<2);
+        encode(self.0, crate::key_adapter::code(key), bits, repeat, text)
+    }
     pub fn resize(&self, columns: u16, rows: u16) { resize(self.0, columns, rows); }
     pub fn frame(&self, previous: Option<&Frame>) -> Frame {
         let patch: Patch = serde_json::from_str(&snapshot(self.0)).expect("browser Ghostty frame");

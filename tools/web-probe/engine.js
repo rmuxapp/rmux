@@ -1,5 +1,5 @@
 // Browser VT host only: all layout and terminal drawing remain in Rust.
-import {Ghostty, CellFlags as F} from './ghostty-web.js';
+import {Ghostty, CellFlags as F, KeyEncoderOption as O} from './ghostty-web.js';
 export function createHost(engine) {
   const sessions = new Map();
   let next = 0;
@@ -9,7 +9,7 @@ export function createHost(engine) {
       const id = next++;
       const terminal = engine.createTerminal(columns, rows);
       terminal.write('\x1bc\x1b[2J\x1b[3J\x1b[H');
-      sessions.set(id, {terminal, revision:0, first:true});
+      sessions.set(id, {terminal, encoder:engine.createKeyEncoder(), revision:0, first:true});
       return id;
     },
     write(id, text) { sessions.get(id).terminal.write(text); },
@@ -19,7 +19,14 @@ export function createHost(engine) {
       state.terminal.resize(columns, rows);
       state.first = true;
     },
-    free(id) { sessions.get(id)?.terminal.free(); sessions.delete(id); },
+    free(id) { const s=sessions.get(id); s?.encoder.dispose(); s?.terminal.free(); sessions.delete(id); },
+    encode(id, key, mods, repeat, text) {
+      const {terminal,encoder}=sessions.get(id);
+      encoder.setOption(O.CURSOR_KEY_APPLICATION,terminal.getMode(1));
+      encoder.setOption(O.KEYPAD_KEY_APPLICATION,terminal.getMode(66));
+      encoder.setOption(O.ALT_ESC_PREFIX,true);
+      return new TextDecoder().decode(encoder.encode({key,mods,action:repeat?2:1,utf8:text}));
+    },
     snapshot(id) {
       const state = sessions.get(id), t = state.terminal;
       t.update();

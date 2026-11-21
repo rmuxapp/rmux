@@ -119,3 +119,11 @@ close and middle-click interaction coverage remain pending.
 Symbolic key normalization now comes from rmux-core::keyboard, also used by
 native Ghostty encoding. Browser Enter/Backspace dispatch uses those shared keys.
 This does not yet connect full terminal keyboard encoding or native IME handling.
+
+Input now passes shared key symbols through a version-specific ghostty-web key
+adapter into an owned Ghostty encoder per session. The adapter synchronizes DEC
+cursor/keypad modes. Encoder checks cover plain input, Enter, Backspace, Ctrl+C,
+Ctrl+U and application arrows; browser plain-command input is verified. Full
+browser control-key interaction remains open. The pinned library does not expose
+native-equivalent keyboard-state synchronization, so Kitty negotiation, release
+pairing and IME remain pending. The sample interpreter is still ASCII-only.
