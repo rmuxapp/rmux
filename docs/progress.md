@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Added an isolated `tools/web-probe` using pinned GPUI CE 0.3.0 and mise-managed
+WASM target. It imports the actual desktop text field, composition, undo and
+control tooltip sources. The backend dependencies compile for WASM; the shared
+field exposes concrete focus/text-shaping/paint API differences. The probe README
+records diagnostics and explicitly marks the probe as failing, not a working demo.
+Extracted the existing ControlHint unchanged for reuse. Production renderer stays
+on GPUI 0.2.2; web runtime/font/input acceptance remains pending.
+
 Started the shared-browser architecture work after confirming Rustable hosts its
 actual application UI while rmux's current site is a separate JavaScript showcase.
 Moved the existing pane tree, directional navigation and focus history unchanged

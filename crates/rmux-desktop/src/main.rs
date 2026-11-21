@@ -31,6 +31,7 @@ use cell_metrics::CellMetrics;
 use close_policy::{ClosePolicy, PromptGate};
 mod command_palette;
 mod composition;
+mod control_hint;
 mod diagnostics;
 mod memory_view;
 mod settings_view;

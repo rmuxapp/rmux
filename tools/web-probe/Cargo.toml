@@ -1,0 +1,14 @@
+[package]
+name = "rmux-web-probe"
+version = "0.0.0"
+edition = "2024"
+publish = false
+license = "MIT"
+
+# Isolated dependency graph: this does not migrate the shipped desktop renderer.
+[workspace]
+
+[dependencies]
+gpui = { package = "gpui-ce", version = "=0.3.0", default-features = false }
+gpui_platform = { package = "gpui_ce_platform", version = "=0.3.0", default-features = false }
+unicode-segmentation = "1.13.3"
