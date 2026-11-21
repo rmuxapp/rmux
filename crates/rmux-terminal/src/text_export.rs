@@ -1,17 +1,32 @@
 //! Bounded plain-text export of the active screen and its retained history.
 use super::*;
 
-struct Output {
+#[derive(Default)]
+struct Output<'a> {
     bytes: Vec<u8>,
     limit: usize,
     skip_lines: usize,
     truncated: bool,
     allocation_failed: bool,
+    current: Option<&'a dyn Fn() -> bool>,
+    next_check: usize,
+    canceled: bool,
+    callback_panicked: bool,
 }
 
 unsafe extern "C" fn write_output(userdata: *mut c_void, data: *const u8, len: usize) -> bool {
     // Ghostty calls synchronously with a valid context and borrowed byte slice.
     let output = unsafe { &mut *userdata.cast::<Output>() };
+    if let Some(current) = output.current && output.bytes.len() >= output.next_check {
+        output.next_check = output.bytes.len().saturating_add(4096);
+        // Never unwind through Ghostty's C callback. Most callbacks contain just
+        // one character, so sample cancellation by exported bytes instead.
+        match std::panic::catch_unwind(std::panic::AssertUnwindSafe(current)) {
+            Ok(true) => {},
+            Ok(false) => { output.canceled = true; return false; },
+            Err(_) => { output.callback_panicked = true; return false; },
+        }
+    }
     let mut bytes = unsafe { std::slice::from_raw_parts(data, len) };
     while output.skip_lines > 0 {
         let Some(index) = bytes.iter().position(|byte| *byte == b'\n') else { return true; };
@@ -149,6 +164,18 @@ impl Terminal {
     }
 
     fn export_text_range(&self, max_bytes: usize, selected: bool, unwrap: bool, range: Option<GhosttySelection>, tail_lines: Option<usize>) -> Result<Option<(String, bool)>> {
+        self.export_text_range_cancellable(max_bytes, selected, unwrap, range, tail_lines, None)
+    }
+
+    /// Complete clipboard selection, or no result if the owning copy is obsolete.
+    pub fn selected_text_cancellable(&self, max_bytes: usize, unwrap: bool, current: &dyn Fn() -> bool) -> Result<Option<String>> {
+        ensure!(max_bytes <= 16 * 1024 * 1024, "selection export limit exceeds 16 MiB");
+        let Some((text, truncated)) = self.export_text_range_cancellable(max_bytes, true, unwrap, None, None, Some(current))? else { return Ok(None); };
+        ensure!(!truncated, "selection exceeds {max_bytes} byte limit");
+        Ok(Some(text))
+    }
+
+    fn export_text_range_cancellable(&self, max_bytes: usize, selected: bool, unwrap: bool, range: Option<GhosttySelection>, tail_lines: Option<usize>, current: Option<&dyn Fn() -> bool>) -> Result<Option<(String, bool)>> {
         let explicit_range = range.is_some();
         struct Formatter(GhosttyFormatter);
         impl Drop for Formatter {
@@ -162,6 +189,10 @@ impl Terminal {
             skip_lines: 0,
             truncated: false,
             allocation_failed: false,
+            current,
+            next_check: 0,
+            canceled: false,
+            callback_panicked: false,
         };
         // The immutable engine borrow excludes writes throughout formatting.
         unsafe {
@@ -208,6 +239,8 @@ impl Terminal {
                     userdata: (&mut output as *mut Output).cast(),
                 },
             );
+            ensure!(!output.callback_panicked, "clipboard cancellation callback panicked");
+            if output.canceled { return Ok(None); }
             ensure!(
                 !output.allocation_failed,
                 "could not allocate history export"
@@ -349,6 +382,7 @@ mod tests {
             skip_lines: 0,
             truncated: false,
             allocation_failed: false,
+            ..Default::default()
         };
         let mut growths = 0;
         for _ in 0..output.limit {
@@ -360,6 +394,22 @@ mod tests {
         assert!(!unsafe { write_output((&mut output as *mut Output).cast(), b"x".as_ptr(), 1) });
         assert_eq!(output.bytes.len(), output.limit);
         assert!(output.truncated && !output.allocation_failed);
+    }
+    #[test]
+    fn clipboard_cancellation_stops_streaming_without_changing_selection() -> Result<()> {
+        let mut terminal = Terminal::new(80, 8)?;
+        for _ in 0..300 { terminal.write("hello 世界 e\u{301} repeated text\r\n".as_bytes()); }
+        terminal.select_all()?;
+        let expected = terminal.selected_text()?.unwrap();
+        assert!(expected.len() > 8192);
+        let calls = std::cell::Cell::new(0);
+        let current = || { let count = calls.get(); calls.set(count + 1); count == 0 };
+        assert!(terminal.selected_text_cancellable(16 * 1024 * 1024, true, &current)?.is_none());
+        assert_eq!(calls.get(), 2, "copy must stop at the first obsolete callback");
+        assert_eq!(terminal.selected_text()?, Some(expected.clone()));
+        assert_eq!(terminal.selected_text_cancellable(16 * 1024 * 1024, true, &|| true)?, Some(expected));
+        assert!(terminal.selected_text_cancellable(16, true, &|| true).is_err(), "partial clipboard contents must not be returned");
+        Ok(())
     }
     #[test]
     fn history_export_preserves_viewport_and_selection_and_is_screen_local() -> Result<()> {

@@ -899,7 +899,7 @@ impl Session {
             };
             // Another clipboard write may have superseded us while waiting.
             if !current() { return Ok(None); }
-            engine.selected_text_with_wraps(16 * 1024 * 1024, unwrap)
+            engine.selected_text_cancellable(16 * 1024 * 1024, unwrap, &current)
         })
     }
     /// Deferred directory lookup without retaining the terminal while queued.

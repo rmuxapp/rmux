@@ -43,8 +43,13 @@ if no later clipboard write changes the global generation. This avoids retaining
 an engine or polling indefinitely after abandoning a copy. Cancellation of an
 older request cannot invalidate a newer request in another pane. Focused tests
 exercise unpolled-task destruction and cancellation under a held parser lock;
-this is a lifecycle fix, not a measured latency improvement. An export already
-formatting under the lock still finishes its bounded (16 MiB) operation.
+this is a lifecycle fix, not a measured latency improvement. Formatting also
+checks cancellation at its first streaming callback and at the next callback
+after each additional 4 KiB of output. Obsolete copies discard partial output and
+release the parser rather than finishing the entire selection. A formatter call
+between checkpoints is not preempted. The byte cap remains 16 MiB. A Unicode
+mid-stream cancellation test verifies early termination, unchanged selection and
+complete successful output; eight export tests pass.
 
 ## Explicit process shutdown on close
 

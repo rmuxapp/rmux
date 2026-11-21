@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Native clipboard copies can now cancel during streaming formatting, in addition
+to parser-lock waiting. The formatter checks ownership at the first callback and
+after each additional 4 KiB of emitted data, avoiding a predicate call per glyph.
+Cancellation discards partial output and releases the parser; it does not alter
+the selection. Callback panics are contained before returning across the C ABI.
+Eight export tests and the parser-contention fixture pass; the explicit timing
+fixture remains ignored. The new Unicode mid-stream cancellation case is in CI.
+Native pointer-selection parser waits remain a separate open item.
+
 Deployed cc15502 from successful GitHub Shared WASM run 44962351505 to
 Cloudflare ece559ce. The live rmux.app embed references that source. Verified
 Option-Left word motion, Command-Backspace deletion and Close-button focus
@@ -97,7 +106,8 @@ task is canceled (selection changes, history clear, or pane destruction). A
 per-request drop guard complements global clipboard ordering without canceling
 a newer copy in another pane. Focused tests cover dropping an unpolled task,
 cross-request isolation, and cancellation while the parser remains locked.
-Formatting already in progress remains bounded to 16 MiB and is not preempted.
+Formatting also supports cooperative cancellation at streaming checkpoints, as
+recorded above; successful complete copies remain bounded to 16 MiB.
 
 Native Clear Scrollback now uses the bounded input worker queue rather than
 acquiring the parser lock on the UI thread. Completion wakes the UI even when
