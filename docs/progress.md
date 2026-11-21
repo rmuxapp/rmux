@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser panes hidden by zoom now release their terminal rendering caches and
+snapshots using the same reclamation path as hidden workspaces/tabs. The host
+tracks zoom visibility transitions, including directional focus changes while
+zoomed, so ordinary output redraws do not repeatedly reclaim caches. Sessions
+remain alive. WASM build passes; browser smoke verified zoom, Focus Left while
+zoomed, restoring both panes with retained output, and subsequent terminal input.
+Screenshot: target/browser-zoom-reclamation.jpg. Not deployed.
+
 Added and ran a render-reclamation benchmark at 1/4/8/16 panes. Full engine/JSON
 reconstruction medians are 0.325/1.285/2.601/5.264 ms; engine linear-memory capacity
 is unchanged over 120 cycles per pane count. The benchmark validates full row

@@ -92,6 +92,7 @@ struct InputProbe {
     feedback: Option<String>,
     pane_state: rmux_core::pane_commands::State<usize, usize>,
     focused: usize,
+    rendered_zoom: Option<usize>,
     next_pane: usize,
     split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
@@ -115,7 +116,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, next_pane: 1, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -429,6 +430,16 @@ impl pane_actions::PaneCommandHost for InputProbe {
 }
 impl Render for InputProbe {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Reclaim only on visibility transitions, not every output repaint.
+        // Focus navigation can change the zoom target without toggling zoom.
+        if self.rendered_zoom != self.pane_state.zoomed {
+            if let Some(visible) = self.pane_state.zoomed {
+                for (id, pane) in &self.samples {
+                    if *id != visible { pane.update(cx, |pane, cx| pane.release_render_caches(cx)); }
+                }
+            }
+            self.rendered_zoom = self.pane_state.zoomed;
+        }
         let height = f32::from(window.viewport_size().height);
         let panes = if let Some(tree) = &self.pane_state.layout {
             if let Some(zoomed) = self.pane_state.zoomed { self.panes(&PaneTree::Pane(zoomed), vec![], cx) } else { self.panes(tree, vec![], cx) }
