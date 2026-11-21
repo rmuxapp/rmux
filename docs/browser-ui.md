@@ -4,6 +4,13 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Selection edge autoscroll is now wired into the browser host. The adapter returns
+the native gesture's continuation request, checking 64-bit scrollbar bounds;
+the host schedules one cancellable tick at the shared desktop 30 ms interval.
+Release, re-entry, scrollbar dragging and hidden-terminal cache release cancel
+the task. Engine tests cover both directions, history selection and stopping.
+Native check and WASM build pass; held-pointer browser timing is not yet verified.
+
 The shared scrollback indicator now accepts dragging on both hosts, preserving
 the grab point and issuing absolute native viewport row commands. Core geometry
 and engine checks cover clamping and repeated absolute targets. Browser drag

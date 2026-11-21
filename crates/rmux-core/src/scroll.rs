@@ -1,4 +1,7 @@
 //! Shared terminal wheel accumulation in logical pixels.
+/// Schedule only while the native gesture requests another edge-scroll tick.
+pub const SELECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(30);
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Scroll {
     Row(u64),

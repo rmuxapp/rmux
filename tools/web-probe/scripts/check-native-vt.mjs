@@ -96,5 +96,21 @@ try {
   assert.equal(history.selectedText(),'line-0');
   history.scroll('BOTTOM');
   assert.equal(history.snapshot().scrollback_offset,0);
+  const select=(action,y)=>history.select(action,12,y,8,20,20,3,false,1);
+  assert.equal(select('PRESS',20),false);
+  assert.equal(select('DRAG',-20),true,'drag above viewport requests scheduled ticks');
+  let active=true, ticks=0;
+  while (active && ticks++<100) active=select('AUTOSCROLL_TICK',-20);
+  assert.equal(active,false,'ticks stop at oldest history');
+  const scrolled=history.snapshot();
+  assert.equal(scrolled.scrollback_offset,scrolled.scrollback_lines);
+  assert.ok(history.selectedText().includes('line-1'),'selection extends into history');
+  assert.equal(select('DRAG',20),false,'returning inside cancels scheduling');
+  assert.equal(select('DRAG',90),true,'drag below viewport scrolls toward live output');
+  active=true; ticks=0;
+  while (active && ticks++<100) active=select('AUTOSCROLL_TICK',90);
+  assert.equal(active,false);
+  assert.ok(history.snapshot().scrollback_offset<scrolled.scrollback_offset,'ticks move down toward live output');
+  assert.equal(select('RELEASE',90),false);
 } finally { history.dispose(); }
 console.log('Pinned native VT WASM: selection gestures/copy, keyboard modes and sparse styled snapshots passed.');

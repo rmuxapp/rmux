@@ -47,7 +47,7 @@ export async function loadNativeVt(bytes) {
         select(...args) {
           alive();
           selection ??= createSelectionAdapter(api,manifest,terminal,{buffer,handle,check,value});
-          selection.select(...args);
+          return selection.select(...args);
         },
         snapshot() {
           alive();
@@ -164,7 +164,7 @@ export function createNativeHost(engine, isMac) {
     write(id,text) { sessions.get(id).write(text); },
     resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
-    select(id,...args) { sessions.get(id).select(...args); },
+    select(id,...args) { return sessions.get(id).select(...args); },
     selectedText(id) { return sessions.get(id).selectedText(); },
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },

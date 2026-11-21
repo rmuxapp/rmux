@@ -1679,7 +1679,7 @@ impl TerminalView {
                 if self.selection_scroll.is_none() {
                     let timer = cx
                         .background_executor()
-                        .timer(std::time::Duration::from_millis(30));
+                        .timer(rmux_core::scroll::SELECTION_INTERVAL);
                     self.selection_scroll = Some(cx.spawn(async move |entity, cx| {
                         timer.await;
                         let _ = entity.update(cx, |view, cx| {

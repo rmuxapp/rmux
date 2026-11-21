@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser text selection now schedules native AUTOSCROLL_TICK events while dragging
+beyond the viewport. The browser and desktop share the 30 ms cadence; native
+gesture state and 64-bit scrollbar bounds determine whether to continue. The
+browser cancels its single pending task on release, returning inside, switching
+hidden terminals or starting scrollbar dragging. Direct engine tests verify
+up/down motion, selecting historical text, re-entry and history-bound stopping.
+Native check and WASM build pass. Held-pointer timing in a browser remains an
+interaction check; no deployment or full browser-parity claim is made.
+
 Desktop and browser now share draggable scrollback geometry and absolute history
 row commands. Dragging preserves the thumb grab position and clamps to history
 limits; the existing indicator stays hidden at the live bottom. Three focused

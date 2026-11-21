@@ -46,8 +46,18 @@ export function createSelectionAdapter(api, manifest, terminal, {buffer, handle,
         const result=api.ghostty_selection_gesture_event(gesture,terminal,event,selected);
         if (result===0) check(api.ghostty_terminal_set(terminal,value('GhosttyTerminalOption','SELECTION'),selected));
         else if (result===value('GhosttyResult','NO_VALUE')) {
+          if (action==='AUTOSCROLL_TICK') return false;
           if (action==='PRESS') check(api.ghostty_terminal_set(terminal,value('GhosttyTerminalOption','SELECTION'),0));
         } else check(result);
+        if (action!=='DRAG' && action!=='AUTOSCROLL_TICK') return false;
+        const direction=p+132, scrollbar=p+136;
+        check(api.ghostty_selection_gesture_get(gesture,terminal,value('GhosttySelectionGestureData','AUTOSCROLL'),direction));
+        check(api.ghostty_terminal_get(terminal,value('GhosttyTerminalData','SCROLLBAR'),scrollbar));
+        const read=name=>view().getBigUint64(scrollbar+field('GhosttyTerminalScrollbar',name),true);
+        const motion=view().getUint32(direction,true);
+        if (motion===value('GhosttySelectionGestureAutoscroll','UP')) return read('offset')>0n;
+        if (motion===value('GhosttySelectionGestureAutoscroll','DOWN')) return read('offset')+read('len')<read('total');
+        return false;
       });
     },
   };
