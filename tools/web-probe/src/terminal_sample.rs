@@ -3,7 +3,10 @@ use gpui::{prelude::*, *};
 use std::ops::Range;
 use rmux_core::terminal_frame::Frame;
 use crate::{cell_metrics::CellMetrics, row_cache, row_host, terminal_engine::TerminalEngine};
+include!("sample_terminal_menu.rs");
 pub(crate) struct TerminalSample {
+    menu: Option<TerminalMenu>,
+    menu_blur: Option<Subscription>,
     pub(crate) engine: TerminalEngine,
     pub(crate) custom_title: Option<String>,
     find: Option<Entity<crate::browser_find::FindBar>>,
@@ -116,7 +119,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -215,10 +218,18 @@ impl TerminalSample {
     }
 }
 impl Render for TerminalSample {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
         let input = entity.clone();
         crate::terminal_actions::bind(div(), cx).size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
+            .when_some(self.menu.clone(), |root, menu| root.child(self.menu_element(menu, window, cx)))
+            .on_mouse_down(MouseButton::Right, cx.listener(|this, event: &MouseDownEvent, window, cx| {
+                cx.stop_propagation(); this.show_menu(event.position, window, cx);
+            }))
+            .on_action(cx.listener(|this, _: &crate::ShowTerminalMenu, window, cx| {
+                let position = this.selection_geometry.map(|(bounds, _)| bounds.origin).unwrap_or_default();
+                this.show_menu(position + point(px(8.), px(8.)), window, cx);
+            }))
             .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.open_find(window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindOlder, window, cx| this.navigate_find(true, window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindNewer, window, cx| this.navigate_find(false, window, cx)))

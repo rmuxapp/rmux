@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser terminals now expose a right-click menu and Terminal Actions palette
+entry for Copy, Copy with Line Breaks, Select All, Find and Clear Scrollback.
+The menu shares desktop spacing/presentation and navigation/type-ahead, resolves
+shortcut hints at opening, preserves the selection, and disables copy without
+selected text. Actions restore terminal focus and use existing dispatch handlers.
+WASM build passes. Browser smoke verified disabled copy, Enter selecting all,
+palette invocation, enabled Copy and exact terminal text reaching the clipboard.
+Screenshot: target/browser-terminal-context-menu.jpg. Menu Paste and directory/
+link service adapters remain open; keyboard clipboard paste remains available.
+Not deployed.
+
 Copy with Line Breaks is now available in the browser palette through shared
 terminal action routing. Normal copy still unwraps soft wraps; the explicit
 action preserves visual row breaks, both with the existing 1 MiB copy limit.
