@@ -5404,6 +5404,7 @@ name = "rmux-core"
 version = "0.1.4"
 dependencies = [
  "serde",
+ "smol_str",
 ]
 
 [[package]]
@@ -5451,6 +5452,7 @@ dependencies = [
  "libc",
  "memchr",
  "portable-pty",
+ "rmux-core",
  "smol_str",
  "tempfile",
 ]

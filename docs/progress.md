@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Moved terminal Cell/Color/CursorShape/Frame/FrameStorage and bounded text export
+unchanged into rmux-core::terminal_frame. The native engine re-exports these types
+and retains the Ghostty FFI color conversion; desktop row_cache now consumes the
+shared types directly. This removes native engine/PTY linkage from the snapshot
+contract while retaining Arc row identities and inline cell text. Four snapshot
+tests plus bounded UTF-8 export pass; desktop and WASM compile pass. No browser
+terminal renderer or VT-engine adapter is connected yet.
+
 Extracted native pane sizing, weighted children, branch orientation and divider
 appearance into shared split_presentation components. Desktop retains its existing
 drag capture and resize handlers. The browser host now executes shared command

@@ -1,5 +1,5 @@
 use gpui::*;
-use rmux_terminal::{Cell, Color, Frame};
+use rmux_core::terminal_frame::{Cell, Color, Frame};
 use std::{cell::RefCell, sync::{Arc, Weak}};
 
 use crate::{CellMetrics, color, preferences::CellColor};

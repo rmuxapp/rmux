@@ -10,7 +10,7 @@ Rustable demonstrates the intended architecture: its browser host imports the sa
 
 ## Implementation path
 
-1. Share existing application behavior without rewriting it. `rmux-core` now owns the existing pane tree, directional navigation and bounded focus history; desktop consumes that crate. Preserve current behavior and tests.
+1. Share existing application behavior without rewriting it. The terminal snapshot contract (`Cell`, `Frame`, cursor/colors and bounded text export) is now in core as well; native engine types are re-exports. `rmux-core` now owns the existing pane tree, directional navigation and bounded focus history; desktop consumes that crate. Preserve current behavior and tests.
 2. Run a bounded compatibility probe using an actual rmux GPUI view on a web-capable GPUI distribution. Check native API compatibility before changing the production dependency. Do not replace GPUI with a second UI framework merely for the demo.
 3. Extract shared views and application state from the desktop entry point. Introduce platform services for terminal sessions, files, persistence, notifications and window control. Native hosts keep real PTYs; browser hosts receive bundled sample sessions and no server access.
 4. Adapt the same terminal grid renderer to a browser terminal engine interface. A WASM VT parser alone does not provide shared UI. Verify cell snapshots, input, selection, resize and focus with the shared view.

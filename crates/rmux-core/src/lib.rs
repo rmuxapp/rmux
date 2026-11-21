@@ -4,3 +4,4 @@ pub mod focus_trail;
 pub mod layout;
 pub mod commands;
 pub mod palette_match;
+pub mod terminal_frame;
