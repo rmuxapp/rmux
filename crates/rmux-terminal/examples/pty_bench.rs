@@ -11,7 +11,21 @@ use std::{
 
 fn child(mode: &str) -> Result<()> {
     let mut output = io::stdout().lock();
-    if mode == "--flood" || mode == "--focus-flood" {
+    let keyboard = mode == "--keyboard-flood" || mode == "--plain-keyboard-flood";
+    if keyboard {
+        #[cfg(unix)]
+        unsafe {
+            let mut settings: libc::termios = std::mem::zeroed();
+            ensure!(libc::tcgetattr(libc::STDIN_FILENO, &mut settings) == 0, "read PTY modes");
+            libc::cfmakeraw(&mut settings);
+            ensure!(libc::tcsetattr(libc::STDIN_FILENO, libc::TCSANOW, &settings) == 0, "set raw PTY modes");
+        }
+        // Consume accepted input so the benchmark cannot merely fill an unread
+        // canonical line buffer. This is not an input-response timing test.
+        thread::spawn(|| io::copy(&mut io::stdin().lock(), &mut io::sink()));
+        if mode == "--keyboard-flood" { output.write_all(b"\x1b[>27u")?; }
+    }
+    if mode == "--flood" || mode == "--focus-flood" || keyboard {
         if mode == "--focus-flood" { output.write_all(b"\x1b[?1004h")?; }
         let chunk = "\x1b[32mbuild\x1b[0m output pressure 界 e\u{301}\r\n".repeat(256);
         loop {
@@ -167,6 +181,52 @@ fn keyboard_benchmark(panes: usize) -> Result<()> {
     Ok(())
 }
 
+fn queued_keyboard_benchmark(panes: usize, report_all: bool) -> Result<()> {
+    let sessions: Vec<_> = (0..panes).map(|_| spawn(if report_all { "--keyboard-flood" } else { "--plain-keyboard-flood" })).collect::<Result<_>>()?;
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while sessions.iter().any(|session| session.output_bytes() == 0) {
+        ensure!(Instant::now() < deadline, "keyboard flood workloads did not become ready");
+        thread::sleep(Duration::from_millis(5));
+    }
+    let before: u64 = sessions.iter().map(Session::output_bytes).sum();
+    let mut presses = Vec::with_capacity(128);
+    let mut releases = Vec::with_capacity(128);
+    let mut text = Vec::with_capacity(128);
+    let started = Instant::now();
+    for _ in 0..128 {
+        let target = &sessions[0];
+        let time = Instant::now();
+        ensure!(target.key("up", Default::default(), false)?, "up key was not encoded");
+        presses.push(time.elapsed().as_nanos());
+        let time = Instant::now();
+        target.queue_key_release("up", Default::default())?;
+        releases.push(time.elapsed().as_nanos());
+        let time = Instant::now();
+        ensure!(target.key_with_text("a", Default::default(), false, Some("a"))? == report_all, "unexpected text routing");
+        text.push(time.elapsed().as_nanos());
+        if report_all { target.queue_key_release("a", Default::default())?; }
+        thread::sleep(Duration::from_millis(5));
+    }
+    presses.sort_unstable(); releases.sort_unstable(); text.sort_unstable();
+    let parsed = sessions.iter().map(Session::output_bytes).sum::<u64>() - before;
+    ensure!(parsed > 0, "output stopped during keyboard sampling");
+    let mode = if report_all { "queued_report_all_same_pane_output" } else { "queued_native_text_same_pane_output" };
+    println!(
+        "{{\"mode\":\"{mode}\",\"panes\":{panes},\"samples\":128,\"elapsed_seconds\":{:.6},\"parsed_flood_bytes\":{parsed},\"key_press_p50_ns\":{},\"key_press_p99_ns\":{},\"key_press_max_ns\":{},\"key_release_p99_ns\":{},\"key_release_max_ns\":{},\"text_dispatch_p99_ns\":{},\"text_dispatch_max_ns\":{}}}",
+        started.elapsed().as_secs_f64(), percentile(&presses, 50), percentile(&presses, 99), presses.last().unwrap(),
+        percentile(&releases, 99), releases.last().unwrap(), percentile(&text, 99), text.last().unwrap(),
+    );
+    // Wait for owned workload cleanup so the next size starts without prior floods.
+    let shutdowns: Vec<_> = sessions.iter().map(Session::shutdown_handle).collect();
+    drop(sessions);
+    let deadline = Instant::now() + Duration::from_secs(5);
+    while shutdowns.iter().any(|shutdown| !shutdown.is_finished()) {
+        ensure!(Instant::now() < deadline, "keyboard workload cleanup timed out");
+        thread::sleep(Duration::from_millis(5));
+    }
+    Ok(())
+}
+
 fn focus_benchmark(panes: usize, queued: bool) -> Result<()> {
     let sessions: Vec<_> = (0..panes).map(|_| spawn("--focus-flood")).collect::<Result<_>>()?;
     let deadline = Instant::now() + Duration::from_secs(5);
@@ -226,10 +286,14 @@ fn focus_benchmark(panes: usize, queued: bool) -> Result<()> {
 
 fn main() -> Result<()> {
     let mode = std::env::args().nth(1).unwrap_or_else(|| "all".into());
-    if mode == "--flood" || mode == "--focus-flood" || mode == "--echo" {
+    if mode == "--flood" || mode == "--focus-flood" || mode == "--echo" || mode == "--keyboard-flood" || mode == "--plain-keyboard-flood" {
         return child(&mode);
     }
-    if mode == "keyboard" {
+    if mode == "queued-keyboard" {
+        for report_all in [false, true] {
+            for panes in [1, 4, 8, 16] { queued_keyboard_benchmark(panes, report_all)?; }
+        }
+    } else if mode == "keyboard" {
         for panes in [1, 4, 8, 16] { keyboard_benchmark(panes)?; }
     } else if mode == "focus" || mode == "queued-focus" {
         for panes in [1, 4, 8, 16] { focus_benchmark(panes, mode == "queued-focus")?; }

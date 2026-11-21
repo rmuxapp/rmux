@@ -205,3 +205,7 @@ run = "mise exec powershell@7.5.4 -- cargo test -p rmux-terminal automatic_power
 [tasks.bench-queued-focus]
 description = "Measure queued focus admission under output pressure, excluding delivery and UI"
 run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-focus"
+
+[tasks.bench-queued-keyboard]
+description = "Measure queued key admission and native text routing under 1/4/8/16 busy panes"
+run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-keyboard"

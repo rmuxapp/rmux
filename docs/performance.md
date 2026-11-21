@@ -578,3 +578,28 @@ receives the shifted-A sequence and disables the mode again. These are functiona
 and lock-avoidance checks; they do not measure end-to-end key-to-pixel latency.
 The reader adds one keyboard-mode query per parsed output batch; its throughput
 impact and native IME interaction still need measurement/acceptance.
+
+### Queued keyboard pressure measurement
+
+`mise run bench-queued-keyboard` measures 128 dispatches per mode with 1/4/8/16
+continuously outputting PTYs. Unlike the older keyboard mode's synchronous
+release call, this mode uses the native UI's queued press/release path. Unix
+children use raw/no-echo input and drain received bytes to avoid filling an
+unread canonical input buffer. Every workload is reaped before the next size.
+
+macOS arm64 release run, terminal source 212d230:
+
+| Busy panes | Native text routing p99 (µs) | Report-all text admission p99 (µs) | Report-all Up admission p99 (µs) |
+| --- | ---: | ---: | ---: |
+| 1 | 0.125 | 0.250 | 3.459 |
+| 4 | 0.125 | 0.375 | 5.875 |
+| 8 | 0.166 | 0.292 | 17.209 |
+| 16 | 0.333 | 0.709 | 7.666 |
+
+All admissions succeeded, parsed output advanced in every case, and workload
+cleanup completed. Dispatches run sequentially (Up, release, text), so these
+columns have different preceding work and should not be read as equivalent
+independent key costs. There is no matched before/after throughput comparison.
+The 128-sample results exclude writer completion, native composition, rendering
+and presentation, and do not establish a key-to-pixel latency target.
+[Raw results, platform and source/binary hashes](benchmarks/pty-queued-keyboard.jsonl).

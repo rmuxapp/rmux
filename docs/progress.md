@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added/run the release queued-keyboard pressure benchmark for native text and
+report-all modes with 1/4/8/16 output-flooding PTYs. All eight cases admitted
+128 samples, advanced output and cleaned up children. At 16 panes p99 native
+text routing was 0.333 µs, report-all text admission 0.709 µs and report-all Up
+admission 7.666 µs. Raw data/provenance: benchmarks/pty-queued-keyboard.jsonl;
+method and limits in performance.md. This measures Session dispatch/admission,
+not writer completion, native IME or presentation, and is not a matched
+throughput comparison. Reproduce with `mise run bench-queued-keyboard`.
+
 Native plain-key dispatch no longer acquires the terminal parser lock. The PTY
 reader publishes negotiated report-all mode after each parsed output batch;
 ordinary text stays on native text/IME handling, while report-all keys queue
