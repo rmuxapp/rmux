@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+First optimized GitHub artifact succeeded: run 44929617746, source 5d7c703.
+Downloaded `rmux-shared-demo` reports UI WASM 20,368,659 bytes raw / 7,085,501
+gzip / 5,019,884 Brotli, compared with development 86,695,622 raw / 12,455,794
+gzip. This is a 76.5% raw and 43.1% gzip payload reduction, not a runtime memory
+or latency result. Native engine WASM is 913,686 raw / 305,701 gzip / 235,124
+Brotli. Packaging follow-up 44929803785 is running; key-release build 44930447459
+is queued. Optimized browser interaction and deployment remain pending.
+
 Shared delivered-key tracking between desktop and browser, preserving original
 press spelling through shifted aliases/repeats and suppressing orphan releases.
 Browser encoded control/non-text keys now use explicit Press/Repeat/Release
