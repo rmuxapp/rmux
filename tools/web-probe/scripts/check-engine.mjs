@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {Ghostty} from '../dist/ghostty-web.js';
-import {createHost, isMacPlatform} from '../dist/engine.js';
+import {createHost} from '../dist/legacy-engine.js';
+import {isMacPlatform} from '../dist/engine.js';
 const wasm = await readFile(new URL('../dist/ghostty-vt.wasm',import.meta.url));
 const host = createHost(await Ghostty.load('data:application/wasm;base64,'+wasm.toString('base64')));
 const first = host.create(20,4), second = host.create(20,4);
@@ -37,9 +38,9 @@ for (const [columns,height] of [[20,4],[80,24],[1,1],[40,8]]) {
 }
 host.free(sized);
 console.log('Resize dimensions, full invalidation and unchanged-size no-op passed.');
-// Exercise the same pinned key values used by the Rust adapter.
-const adapter = await readFile(new URL('../src/key_adapter.rs',import.meta.url),'utf8');
-const keyCode = name => Number(adapter.match(new RegExp(`Key::${name} => (\\d+)`))[1]);
+// Historical wrapper baseline only; production keys use the native ABI manifest.
+// Values in ghostty-web 0.4.0 index.d.ts (the bundle erases the enum export).
+const keyCode = name => ({Enter:58, Backspace:53, ArrowUp:78})[name];
 const input = host.create(20,4);
 assert.equal(host.encode(input,keyCode('Enter'),0,false,''),'\r');
 assert.equal(host.encode(input,keyCode('Backspace'),0,false,''),'\x7f');

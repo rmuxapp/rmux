@@ -4,6 +4,12 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+The local browser runtime now uses the same pinned libghostty-vt 1.0.1 as desktop,
+through a direct WASM C API adapter. Sparse row/selection decoding and native key
+encoding are connected to the shared Rust painter/input host. Focused engine and
+browser interaction checks pass. Selection gestures, copy UI and other platform
+services remain unfinished; the published website still has the old demo.
+
 The local shared browser build now also uses native pane framing, control sizes
 and SVG icons. Tooltips select the host font explicitly, avoiding the unavailable
 macOS font in the browser overlay. Split buttons and zoom/unzoom are verified;
@@ -50,6 +56,11 @@ Unicode copy, soft wraps, bounded output and session isolation pass in Node's
 WASM runtime. This is migration groundwork, not browser selection completion:
 the UI still uses ghostty-web until render snapshots, keyboard and selection
 gestures are connected to the direct engine adapter.
+
+The direct adapter also encodes keys through native set_from_terminal, sharing
+negotiated modes rather than mirroring only two DEC flags. Runtime tests cover
+application arrows, control/Alt keys, Kitty press/repeat/release, Unicode text and
+mode isolation. Browser event routing has not switched to this adapter yet.
 
 The owned frame contract and style-run grouping now live in rmux-core and are
 used by the native renderer. Keep row Arc identity and style-run batching when

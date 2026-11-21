@@ -1,10 +1,12 @@
 # Shared rmux web compatibility probe
 
-The next engine migration uses the desktop's pinned libghostty-vt 1.0.1 WASM
-build directly. Run `mise run build-native-vt` then `mise run check-native-vt`.
-The direct adapter currently covers lifecycle and bounded selection export;
-its runtime checks pass, but the UI still uses ghostty-web. Connecting render
-snapshots, keyboard encoding and native selection gestures remains in progress.
+The browser now uses desktop's pinned libghostty-vt 1.0.1 WASM build directly.
+`mise run build` includes this engine build; `mise run check-native-vt` checks
+selection export, keyboard modes and sparse styled snapshots. Browser checks
+cover typing, Ctrl+U, splits and workspace restoration. Selection gestures/copy
+UI, scrollback and keyboard release routing remain incomplete. Historical notes
+below describe the migration; legacy-engine.js preserves the old ghostty-web
+benchmark, whose recorded timings do not measure this new runtime adapter.
 
 Latest pane chrome shares native framing, control sizes and SVG icons. Split
 Right/Below and Zoom buttons work with shared tooltips using the host font.

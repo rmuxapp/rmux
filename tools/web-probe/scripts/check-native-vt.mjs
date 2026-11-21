@@ -14,10 +14,51 @@ try {
   second.write('hello 世界');
   second.selectAll();
   assert.equal(second.selectedText(), 'hello 世界');
+  const encode = (key, options) => new TextDecoder().decode(second.encode(key, options));
+  assert.equal(encode('ENTER'), '\r');
+  assert.equal(encode('C', {control:true, text:'c'}), '\x03');
+  assert.equal(encode('U', {control:true, text:'u'}), '\x15');
+  assert.equal(encode('A', {alt:true, text:'a'}), '\x1ba');
+  assert.equal(encode('ARROW_UP'), '\x1b[A');
+  second.write('\x1b[?1h');
+  assert.equal(encode('ARROW_UP'), '\x1bOA');
+  assert.equal(new TextDecoder().decode(first.encode('ARROW_UP')), '\x1b[A');
+  second.write('\x1b[?1l\x1b[>11u');
+  for (const [action, expected] of [['PRESS','\x1b[97u'],['REPEAT','\x1b[97;1:2u'],['RELEASE','\x1b[97;1:3u']]) {
+    assert.equal(encode('A', {action, text:'a'}), expected);
+  }
+  assert.equal(encode('UNIDENTIFIED', {text:'é'}), '\x1b[233u');
+  second.write('\x1b[<u');
+  assert.equal(encode('A', {action:'RELEASE', text:'a'}), '');
+  assert.throws(() => encode('NOT_A_KEY'));
   first.clearSelection();
   assert.equal(first.selectedText(), null);
   assert.equal(second.selectedText(), 'hello 世界');
 } finally { first.dispose(); second.dispose(); }
 first.dispose();
 assert.throws(() => first.write('after disposal'));
-console.log('Pinned native VT WASM: selection, Unicode copy, soft wraps, limits and isolation passed.');
+const rendered=host.create(20,4);
+try {
+  assert.equal(rendered.snapshot().rows.length,4);
+  assert.equal(rendered.snapshot().rows.length,0,'idle frames have no cell payload');
+  rendered.write('\x1b[31mred\x1b[0m 世界 e\u0301');
+  const patch=rendered.snapshot(), row=patch.rows[0][1];
+  assert.equal(patch.rows.length,1);
+  assert.equal(row.slice(0,3).map(c=>c[0]).join(''),'red');
+  assert.notDeepEqual(row[0][2],row[3][2]);
+  assert.equal(row[4][0],'世'); assert.equal(row[4][1],2); assert.equal(row[5][1],0);
+  assert.equal(row[9][0],'e\u0301');
+  rendered.selectAll();
+  assert.ok(rendered.snapshot().selections.some(([,range])=>range!==null));
+  rendered.clearSelection();
+  assert.ok(rendered.snapshot().selections.every(([,range])=>range===null));
+  rendered.write('\x1b[2J\x1b[H\x1b[4:3;58:2::12:34:56;53mX\x1b[0m');
+  const styled=rendered.snapshot().rows[0][1][0];
+  assert.equal(styled[0],'X'); assert.ok(styled[4]&4);
+  assert.deepEqual(styled[5],[12,34,56]); assert.equal(styled[6],true); assert.equal(styled[7],true);
+  rendered.resize(30,6);
+  const resized=rendered.snapshot();
+  assert.equal(resized.columns,30); assert.equal(resized.height,6);
+  assert.equal(resized.rows.length,6);
+} finally { rendered.dispose(); }
+console.log('Pinned native VT WASM: selection/copy, keyboard modes and sparse styled snapshots passed.');

@@ -17,17 +17,17 @@ extern "C" {
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
     fn free(id: u32);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = encode)]
-    fn encode(id: u32, key: u32, mods: u8, repeat: bool, text: &str) -> String;
+    fn encode(id: u32, key: &str, mods: u8, repeat: bool, text: &str) -> String;
 }
 #[derive(serde::Deserialize)]
-struct WireCell(smol_str::SmolStr, u8, Color, Color, u8);
+struct WireCell(smol_str::SmolStr, u8, Color, Color, u8, Color, bool, bool);
 impl WireCell {
     fn into_cell(self, column: usize) -> Cell {
-        let Self(text, width, foreground, background, flags) = self;
+        let Self(text, width, foreground, background, flags, underline_color, underline_curly, overline) = self;
         Cell { text, column: column as u16, width, foreground, background,
             bold: flags & 1 != 0, italic: flags & 2 != 0, underline: flags & 4 != 0,
             strikethrough: flags & 8 != 0, hidden: flags & 32 != 0,
-            underline_color: foreground, underline_curly: false, overline: false }
+            underline_color, underline_curly, overline }
     }
 }
 #[derive(serde::Deserialize)]
@@ -35,6 +35,7 @@ struct Patch {
     revision: u64, columns: u16, height: usize, rows: Vec<(usize, Vec<WireCell>)>,
     background: Color, cursor: Option<(u16,u16)>, cursor_shape: CursorShape,
     cursor_color: Color, cursor_color_explicit: bool, scrollback_lines: u64,
+    selections: Vec<(usize, Option<(u16,u16)>)>, scrollback_offset: u64,
 }
 pub struct TerminalEngine(u32);
 impl TerminalEngine {
@@ -42,21 +43,24 @@ impl TerminalEngine {
     pub fn write(&self, text: &str) { write(self.0, text); }
     pub fn encode(&self, key: rmux_core::keyboard::Key, mods: rmux_core::keyboard::Modifiers, repeat: bool, text: &str) -> String {
         let bits = u8::from(mods.shift) | (u8::from(mods.control)<<1) | (u8::from(mods.alt)<<2);
-        encode(self.0, crate::key_adapter::code(key), bits, repeat, text)
+        encode(self.0, &crate::key_adapter::name(key), bits, repeat, text)
     }
     pub fn resize(&self, columns: u16, rows: u16) { resize(self.0, columns, rows); }
     pub fn frame(&self, previous: Option<&Frame>) -> Frame {
         let patch: Patch = serde_json::from_str(&snapshot(self.0)).expect("browser Ghostty frame");
         let mut rows = previous.map(|f| f.rows.as_ref().clone()).unwrap_or_default();
         rows.resize_with(patch.height, || Arc::new(Vec::new()));
+        let mut selections = previous.map(|f| f.selections.as_ref().clone()).unwrap_or_default();
+        selections.resize(patch.height, None);
+        for (y, selection) in patch.selections { selections[y] = selection; }
         for (y, cells) in patch.rows {
             rows[y] = Arc::new(cells.into_iter().enumerate().map(|(x, cell)| cell.into_cell(x)).collect());
         }
         Frame { revision: patch.revision, columns: patch.columns, rows: Arc::new(rows),
-            selections: Arc::new(vec![None; patch.height]), background: patch.background,
+            selections: Arc::new(selections), background: patch.background,
             cursor: patch.cursor, cursor_shape: patch.cursor_shape, cursor_color: patch.cursor_color,
             cursor_color_explicit: patch.cursor_color_explicit, scrollback_lines: patch.scrollback_lines,
-            scrollback_offset: 0 }
+            scrollback_offset: patch.scrollback_offset }
     }
 }
 impl Drop for TerminalEngine { fn drop(&mut self) { free(self.0); } }

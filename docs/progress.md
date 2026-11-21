@@ -2,6 +2,27 @@
 
 ## Current implementation focus
 
+The local browser now runs desktop's pinned libghostty-vt 1.0.1 directly, replacing
+ghostty-web in its runtime path. The new render-state adapter emits dirty rows,
+cursor and selection updates, wide/combining glyphs, custom underline colors,
+curly underlines and overlines. Rust retains sparse rows and selection ranges.
+Key names resolve against the engine ABI rather than the older wrapper's numeric
+enum. WASM build and focused engine checks pass; browser verified typing, Ctrl+U,
+split isolation and workspace switch/restore without errors. Evidence:
+target/shared-native-vt-engine-wasm.png. Mouse selection/copy UI, scrollback,
+keyboard release routing and full IME remain incomplete. The old adapter is
+isolated for historical benchmarks; its timings do not measure the new adapter.
+No public deployment yet.
+
+Direct libghostty-vt WASM adapter now owns reusable key encoder/event handles,
+synchronizes all terminal keyboard modes before encoding, and supports press,
+repeat and release through the same C calls as native. Focused runtime tests
+cover Ctrl+C/U, Alt prefix, normal/application arrows, per-session mode isolation,
+Kitty press/repeat/release, Unicode key text and return to legacy release behavior.
+Enum/struct layout comes from the pinned ABI manifest; key text/output are bounded
+and handles are freed on disposal. These checks pass; the browser now routes
+its control keys through this adapter. Release-event routing remains pending.
+
 The pinned desktop libghostty-vt 1.0.1 source now has an isolated WASM build
 target via mise (892 KiB ReleaseSmall, all engine features retained). The older
 ghostty-web wrapper does not expose desktop's native selection gesture API.

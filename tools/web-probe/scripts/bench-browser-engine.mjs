@@ -4,7 +4,7 @@ import {spawnSync} from 'node:child_process';
 import {cpus} from 'node:os';
 import assert from 'node:assert/strict';
 import {Ghostty} from '../dist/ghostty-web.js';
-import {createHost} from '../dist/engine.js';
+import {createHost} from '../dist/legacy-engine.js';
 const [countArg, scenario] = process.argv.slice(2);
 if (!countArg) {
   console.log(JSON.stringify({kind:'environment',date:new Date().toISOString(),node:process.version,

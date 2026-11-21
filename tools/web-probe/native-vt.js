@@ -1,5 +1,5 @@
 // Direct adapter for the same pinned libghostty-vt C API used by rmux desktop.
-// Not yet wired into the browser renderer; engine migration is incremental.
+import {createRenderAdapter} from './native-vt-render.js';
 export async function loadNativeVt(bytes) {
   const {instance} = await WebAssembly.instantiate(bytes, {});
   const api = instance.exports;
@@ -27,8 +27,60 @@ export async function loadNativeVt(bytes) {
     manifest,
     create(columns, rows) {
       let terminal = handle(slot => api.ghostty_terminal_new(0, slot, columns, rows));
+      let encoder = 0, event = 0, renderer;
       const alive = () => { if (!terminal) throw new Error('Terminal disposed'); };
       return {
+        snapshot() {
+          alive();
+          renderer ??= createRenderAdapter(api,manifest,terminal,{buffer,handle,check,value});
+          return renderer.snapshot();
+        },
+        resize(columns, rows) {
+          alive();
+          check(api.ghostty_terminal_resize(terminal,columns,rows,0,0));
+        },
+        encode(key, {shift = false, control = false, alt = false, action = 'PRESS', text = ''} = {}) {
+          alive();
+          const keyCode = value('GhosttyKey', key), actionCode = value('GhosttyKeyAction', action);
+          if (keyCode === undefined || actionCode === undefined) throw new RangeError('Unknown key or action');
+          const utf8 = new TextEncoder().encode(text);
+          if (utf8.length > 4096) throw new RangeError('Key text too long');
+          if (!encoder) encoder = handle(slot => api.ghostty_key_encoder_new(0, slot));
+          if (!event) event = handle(slot => api.ghostty_key_event_new(0, slot));
+          // Synchronize all negotiated modes, including Kitty press/release flags.
+          check(api.ghostty_key_encoder_set_from_terminal(encoder, terminal));
+          return buffer(4, written => {
+            new DataView(api.memory.buffer).setUint32(written, value('GhosttyOptionAsAlt', 'TRUE'), true);
+            check(api.ghostty_key_encoder_set(encoder, value('GhosttyKeyEncoderOption', 'MACOS_OPTION_AS_ALT'), written));
+            check(api.ghostty_key_event_set_action(event, actionCode));
+            check(api.ghostty_key_event_set_key(event, keyCode));
+            // Modifier bits are fixed macros in the pinned key/event.h.
+            check(api.ghostty_key_event_set_mods(event, Number(shift) | Number(control)<<1 | Number(alt)<<2));
+            const codepoint = text.codePointAt(0) ?? 0;
+            check(api.ghostty_key_event_set_unshifted_codepoint(event, codepoint >= 65 && codepoint <= 90 ? codepoint + 32 : codepoint));
+            const string = manifest.types.GhosttyString;
+            return buffer(string.size + utf8.length, ptr => {
+              const data = ptr + string.size;
+              memory().set(utf8, data);
+              const view = new DataView(api.memory.buffer);
+              view.setUint32(ptr + string.fields.ptr.offset, data, true);
+              view.setUint32(ptr + string.fields.len.offset, utf8.length, true);
+              // WASM lowers a by-value C struct parameter to its address.
+              check(api.ghostty_key_event_set_utf8(event, ptr));
+              const encode = size => buffer(size, output => {
+                const result = api.ghostty_key_encoder_encode(encoder, event, output, size, written);
+                const length = new DataView(api.memory.buffer).getUint32(written, true);
+                if (result === value('GhosttyResult', 'OUT_OF_SPACE')) {
+                  if (length <= size || length > 65536) throw new RangeError('Encoded key exceeds limit');
+                  return encode(length);
+                }
+                check(result);
+                return memory().slice(output, output + length);
+              });
+              return encode(128);
+            });
+          });
+        },
         write(text) {
           alive();
           const encoded = new TextEncoder().encode(text);
@@ -71,8 +123,29 @@ export async function loadNativeVt(bytes) {
             } finally { api.ghostty_formatter_free(formatter); }
           });
         },
-        dispose() { if (terminal) { api.ghostty_terminal_free(terminal); terminal = 0; } },
+        dispose() {
+          renderer?.dispose(); renderer = undefined;
+          if (event) { api.ghostty_key_event_free(event); event = 0; }
+          if (encoder) { api.ghostty_key_encoder_free(encoder); encoder = 0; }
+          if (terminal) { api.ghostty_terminal_free(terminal); terminal = 0; }
+        },
       };
     },
+  };
+}
+
+export function createNativeHost(engine, isMac) {
+  const sessions = new Map();
+  let next = 0;
+  return {
+    isMac,
+    create(columns,rows) { const id=next++; sessions.set(id,engine.create(columns,rows)); return id; },
+    write(id,text) { sessions.get(id).write(text); },
+    resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
+    snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
+    encode(id,key,mods,repeat,text) {
+      return new TextDecoder().decode(sessions.get(id).encode(key,{shift:!!(mods&1),control:!!(mods&2),alt:!!(mods&4),action:repeat?'REPEAT':'PRESS',text}));
+    },
+    free(id) { sessions.get(id)?.dispose(); sessions.delete(id); },
   };
 }
