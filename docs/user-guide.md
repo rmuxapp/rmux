@@ -46,6 +46,13 @@ Rename a workspace with **Cmd+Shift+R** (Ctrl+Shift+R elsewhere) or double-click
 its sidebar name. Use the palette to pin workspaces or create, rename, and close
 workspace groups. Closing a group removes its sample sessions.
 
+Use **Edit Workspace Description**, **Edit Workspace Color**, or **Edit Workspace
+Icon** in the palette to personalize the sidebar. Groups have their own color
+and icon commands. Choose a preset or type a value, then press **Enter** to save
+or **Esc** to cancel. Empty input clears the value. Editing a workspace inside a
+collapsed group reveals it automatically. These changes last until you refresh
+the demo.
+
 **Cmd+=**, **Cmd+-**, and **Cmd+0** increase, decrease, and reset terminal text
 size (Ctrl elsewhere). New tabs and splits inherit the active terminal's size;
 resetting one terminal leaves the others unchanged.

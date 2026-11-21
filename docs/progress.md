@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Deployed GitHub Shared WASM run 44954176105, source ee11e6a, to rmux.app
+(Cloudflare deployment 0d57063b). This includes workspace descriptions,
+collapsed metadata editor reveal, workspace/group colors and icons, shared
+preset pickers and on-demand sidebar Unicode fonts. GitHub optimized build,
+font/startup/engine/search checks passed before import. Live browser checks
+verified the site links the ee11e6a artifact, color preset saving and icon
+picker font rendering. Screenshot: `target/live-demo-metadata-ee11e6a.jpg`.
+Updated the user guide and W07 feature ledger; native downloads remain v0.1.4.
+Website source remains local/off GitHub.
+
 Color/icon preset pickers now use one shared desktop/browser module, including
 choices, selection outlines, tooltips, sizing and draft-only click behavior.
 Browser metadata edits notify their host so selection outlines follow typing

@@ -175,7 +175,7 @@
       ],
       "acceptance": "User labels persist; automatic metadata never silently replaces a manual name.",
       "rmux_status": "in_progress",
-      "implementation": "Manual names/descriptions, preset and custom glyph icons/hex colors, sidebar metadata display, and saved layout persistence with backward-compatible defaults.",
+      "implementation": "Manual names/descriptions, preset and custom glyph icons/hex colors, sidebar metadata display, and saved layout persistence with backward-compatible defaults. Browser metadata editing now shares command routing, validation, text editor and preset picker sources; browser UI checks cover save/cancel/clear, invalid inputs, Unicode icons and revealing collapsed targets. Browser metadata is intentionally session-local.",
       "remaining": "Native acceptance of the new graphical preset icon/color pickers and metadata editing, automatic persistence, and layout acceptance. Preset buttons stage changes in the existing editor with Enter to save and Escape to cancel; custom glyph/hex entry remains supported.",
       "implementation_sources": [
         "crates/rmux-desktop/src/window_view.rs"
