@@ -24,6 +24,8 @@ extern "C" {
     fn select(id: u32, action: &str, x: f32, y: f32, cell_width: f32, cell_height: f32, columns: u16, rows: usize, rectangle: bool, clicks: usize);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedText)]
     fn selected_text(id: u32) -> Option<String>;
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = scroll)]
+    fn scroll(id: u32, kind: &str, delta: i32);
 }
 #[derive(serde::Deserialize)]
 struct WireCell(smol_str::SmolStr, u8, Color, Color, u8, Color, bool, bool);
@@ -49,6 +51,7 @@ impl TerminalEngine {
     pub fn write(&self, text: &str) { write(self.0, text); }
     pub fn selected_text(&self) -> Option<String> { selected_text(self.0) }
     pub fn focus(&self, active: bool) { focus(self.0, active); }
+    pub fn scroll(&self, kind: &str, delta: i32) { scroll(self.0, kind, delta); }
     pub fn select(&self, action: &str, x: f32, y: f32, cells: crate::cell_metrics::CellMetrics, frame: &Frame, rectangle: bool, clicks: usize) {
         select(self.0, action, x, y, cells.width, cells.height, frame.columns, frame.rows.len(), rectangle, clicks);
     }

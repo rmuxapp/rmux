@@ -1,5 +1,10 @@
 # Shared rmux web compatibility probe
 
+Run `logs` for 80 bundled sample lines. Wheel scrolling uses the native viewport
+API and the same fractional wheel accumulation as desktop. Historical selection
+and copying work; typing returns to the live prompt. Browser checks cover these
+paths. Scrollbar controls, scroll shortcuts and selection edge autoscroll remain.
+
 Native Ghostty gestures now drive mouse selection. Drag, double-click word and
 triple-click line selection and copying pass browser checks. Cmd+C (macOS) or
 Ctrl+Shift+C (other platforms) copies; browser copy events handle native menu

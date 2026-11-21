@@ -31,6 +31,19 @@ export async function loadNativeVt(bytes) {
       let encoder = 0, event = 0, renderer, selection;
       const alive = () => { if (!terminal) throw new Error('Terminal disposed'); };
       return {
+        scroll(kind,delta=0) {
+          alive();
+          const tag=value('GhosttyTerminalScrollViewportTag',kind);
+          if (tag===undefined || !Number.isSafeInteger(delta) || delta < -2147483648 || delta > 2147483647) throw new RangeError('Invalid scroll');
+          const type=manifest.types.GhosttyTerminalScrollViewport;
+          buffer(type.size,p=>{
+            new Uint8Array(api.memory.buffer,p,type.size).fill(0);
+            const view=new DataView(api.memory.buffer);
+            view.setUint32(p+type.fields.tag.offset,tag,true);
+            view.setInt32(p+type.fields.value.offset,delta,true);
+            check(api.ghostty_terminal_scroll_viewport(terminal,p));
+          });
+        },
         select(...args) {
           alive();
           selection ??= createSelectionAdapter(api,manifest,terminal,{buffer,handle,check,value});
@@ -153,6 +166,7 @@ export function createNativeHost(engine, isMac) {
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
     select(id,...args) { sessions.get(id).select(...args); },
     selectedText(id) { return sessions.get(id).selectedText(); },
+    scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },
     copySelection() { return focused===null ? null : sessions.get(focused)?.selectedText() ?? null; },
     encode(id,key,mods,repeat,text) {

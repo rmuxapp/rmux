@@ -4,6 +4,11 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Wheel scrollback now uses the native viewport API and shared Rust wheel
+accumulation. The browser check covers historical selection/copy and returning
+to the prompt on input. Scrollbar controls, keyboard scroll navigation and
+selection edge autoscroll remain unfinished.
+
 Mouse selection and copying now use native Ghostty gestures and selection export.
 The shared painter highlights the resulting ranges. Browser checks cover drag,
 word/line clicks, Cmd+C clipboard text and palette clipboard isolation. Browser

@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser wheel scrolling now calls the native Ghostty viewport API. Desktop and
+browser share fractional wheel accumulation and the existing 32-line dispatch
+bound through rmux-core::scroll. Typing returns to the bottom; the bundled logs
+command produces 80 sample lines for scrollback interaction. Focused wheel and
+engine history/selection tests, native check and WASM build pass. Browser verified
+scrolling to older lines, copying an exact historical line and typing ls back at
+the live prompt with no errors. Evidence: target/shared-scrollback-copy-wasm.png
+and target/shared-scrollback-input-wasm.png. Scrollbar UI, scroll navigation
+shortcuts and selection edge autoscroll remain pending.
+
 Browser mouse selection now uses the same libghostty-vt gesture API as desktop:
 fractional cell geometry, tracked anchors, word/line behavior and rectangular
 ranges stay engine-owned. Shared Rust row painting displays selection ranges.

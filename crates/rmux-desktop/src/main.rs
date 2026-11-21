@@ -1421,11 +1421,9 @@ impl TerminalView {
         );
     }
     fn wheel(&mut self, event: &ScrollWheelEvent, window: &mut Window, cx: &mut Context<Self>) {
-        self.scroll_remainder -=
-            f32::from(event.delta.pixel_delta(px(self.cells.height)).y) / self.cells.height;
-        let lines = (self.scroll_remainder.trunc() as isize).clamp(-32, 32);
+        let lines = rmux_core::scroll::wheel_lines(&mut self.scroll_remainder,
+            f32::from(event.delta.pixel_delta(px(self.cells.height)).y), self.cells.height);
         if lines != 0 {
-            self.scroll_remainder -= lines as f32;
             let button = if lines < 0 {
                 rmux_terminal::mouse::Button::WheelUp
             } else {

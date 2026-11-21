@@ -14,6 +14,7 @@ pub(crate) struct TerminalSample {
     cursor_bounds: Bounds<Pixels>,
     selection_geometry: Option<(Bounds<Pixels>, CellMetrics)>,
     selecting: bool,
+    scroll_remainder: f32,
 }
 impl TerminalSample {
     pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
@@ -28,7 +29,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus: cx.focus_handle(), command: String::new(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0. }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -57,11 +58,17 @@ impl TerminalSample {
         cx.stop_propagation();
     }
     fn accept(&mut self, encoded: &str, cx: &mut Context<Self>) {
+        if !encoded.is_empty() && self.frame.scrollback_offset > 0 { self.engine.scroll("BOTTOM", 0); }
         match encoded {
             "\r" => {
                 self.engine.write("\r\n");
+                if self.command.trim() == "logs" {
+                    let output = (1..=80).map(|line| format!("Sample log {line:03}: workspace ready\r\n")).collect::<String>();
+                    self.engine.write(&output);
+                }
                 let response = match self.command.trim() {
-                    "help" => "Sample commands: help, clear, ls\r\nNo shell or server access.\r\n",
+                    "help" => "Sample commands: help, clear, ls, logs\r\nNo shell or server access.\r\n",
+                    "logs" => "",
                     "ls" => "\x1b[34mcrates/  docs/  scripts/\x1b[0m  Cargo.toml\r\n",
                     "clear" => "\x1b[2J\x1b[H",
                     "" => "",
@@ -114,6 +121,18 @@ impl Render for TerminalSample {
                 }
             }))
             .on_key_down(cx.listener(Self::key))
+            .on_scroll_wheel(cx.listener(|this, event: &ScrollWheelEvent, _, cx| {
+                if let Some((_,cells)) = this.selection_geometry {
+                    let lines = rmux_core::scroll::wheel_lines(&mut this.scroll_remainder,
+                        f32::from(event.delta.pixel_delta(px(cells.height)).y), cells.height);
+                    if lines != 0 {
+                        this.engine.scroll("DELTA", lines as i32);
+                        this.frame = this.engine.frame(Some(&this.frame));
+                        cx.notify();
+                    }
+                    cx.stop_propagation();
+                }
+            }))
             .child(canvas(move |bounds, window, cx| entity.update(cx, |this, _| {
                 let family: SharedString = "Fira Mono".into();
                 let cells = CellMetrics::measured(14., family.clone(), window);

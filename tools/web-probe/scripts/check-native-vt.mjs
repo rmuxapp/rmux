@@ -74,4 +74,21 @@ try {
   select('PRESS',2,1,false,3);
   assert.equal(gestures.selectedText(),'uvwxyz');
 } finally { gestures.dispose(); }
+const history=host.create(20,3);
+try {
+  history.write(Array.from({length:12},(_,i)=>`line-${i}\r\n`).join(''));
+  const bottom=history.snapshot();
+  assert.ok(bottom.scrollback_lines>0);
+  assert.equal(bottom.scrollback_offset,0);
+  history.scroll('DELTA',-2);
+  assert.equal(history.snapshot().scrollback_offset,2);
+  history.scroll('TOP');
+  const top=history.snapshot();
+  assert.equal(top.scrollback_offset,top.scrollback_lines);
+  assert.equal(top.rows[0][1].map(c=>c[0]).join(''),'line-0');
+  history.select('PRESS',12,0,8,20,20,3,false,3);
+  assert.equal(history.selectedText(),'line-0');
+  history.scroll('BOTTOM');
+  assert.equal(history.snapshot().scrollback_offset,0);
+} finally { history.dispose(); }
 console.log('Pinned native VT WASM: selection gestures/copy, keyboard modes and sparse styled snapshots passed.');
