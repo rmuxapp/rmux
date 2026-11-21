@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser workspace groups can now be renamed through Rename Workspace Group in
+the palette or by double-clicking the group header. Native/browser group rename
+actions share routing and the existing inline editor captures the group identity.
+Group names remain separate from the anchor workspace's name. Native compile and
+WASM build pass; browser smoke verified palette save, unchanged workspace header,
+and double-click/Escape cancellation. Screenshot: target/browser-group-rename.jpg.
+Not deployed; browser reload persistence remains absent.
+
 Browser workspaces can now be renamed through the palette, Cmd+Shift+R
 (Ctrl+Shift+R elsewhere), or sidebar double-click. The inline editor uses the
 shared TextField; both hosts share RenameWorkspace routing and bounded name

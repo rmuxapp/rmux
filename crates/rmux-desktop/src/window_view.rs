@@ -3967,6 +3967,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
             CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
+            CommandId::RenameWorkspaceGroup => self.edit_metadata(MetadataField::GroupName, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
@@ -4264,7 +4265,6 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &RenameWorkspaceGroup, window, cx| this.edit_metadata(MetadataField::GroupName, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
             .on_action(cx.listener(|this, _: &CloseWorkspaceGroup, window, cx| this.request_close_group(window, cx)))

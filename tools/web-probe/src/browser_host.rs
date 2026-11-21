@@ -43,16 +43,24 @@ impl BrowserHost {
         }).detach();
         entity
     }
-    fn rename_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+    fn rename_workspace(&mut self, group: bool, window: &mut Window, cx: &mut Context<Self>) {
         if let Some((_, input)) = &self.rename { input.read(cx).focus.clone().focus(window, cx); return; }
         let Some((name, workspace)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let target = workspace.entity_id();
+        let group = if group {
+            let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
+            Some(group)
+        } else { None };
+        let target = group.map_or(workspace.entity_id(), |group| group.members[0]);
+        let name = group.map_or(name, |group| &group.name);
+        let group_id = group.map(|group| group.id);
         let input = cx.new(|cx| crate::text_field::TextField::new(name, cx));
         cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
             match event {
                 crate::text_field::EditEvent::Submitted { text, .. } => {
                     if let Some(name) = rmux_core::workspace_lifecycle::normalized_name(text) {
-                        if let Some((label, workspace)) = this.workspace_state.entries.iter_mut().find(|(_, workspace)| workspace.entity_id() == target) {
+                        if let Some(id) = group_id {
+                            if let Some(group) = this.workspace_state.groups.get_mut(id) { group.name = name; }
+                        } else if let Some((label, workspace)) = this.workspace_state.entries.iter_mut().find(|(_, workspace)| workspace.entity_id() == target) {
                             *label = name.clone();
                             workspace.update(cx, |workspace, cx| { workspace.name = name; cx.notify(); });
                         }
@@ -166,7 +174,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
     fn run_workspace_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         match command {
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
-            CommandId::RenameWorkspace => self.rename_workspace(window, cx),
+            CommandId::RenameWorkspace => self.rename_workspace(false, window, cx),
+            CommandId::RenameWorkspaceGroup => self.rename_workspace(true, window, cx),
             CommandId::NewWorkspace => self.add(window, cx),
             CommandId::NewWorkspaceGroup => self.create_group(true, window, cx),
             CommandId::GroupCurrentWorkspace => self.create_group(false, window, cx),
@@ -276,7 +285,8 @@ impl Render for BrowserHost {
                                 this.workspace_state.sidebar_selection.clear();
                                 this.workspace_state.sidebar_selection_anchor = Some(target);
                                 this.select(index,window,cx);
-                                if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_workspace(window, cx); }
+                                if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { let is_anchor = this.workspace_state.groups.containing(target).is_some_and(|group| group.members.first() == Some(&target));
+                                    this.rename_workspace(is_anchor, window, cx); }
                             }))
                     })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
