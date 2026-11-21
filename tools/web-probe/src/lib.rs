@@ -16,9 +16,10 @@ mod text_field;
 mod text_layout;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
-#[path = "../../../crates/rmux-desktop/src/palette_match.rs"]
-mod palette_match;
-const COMMANDS: &[&str] = &["New Workspace", "New Terminal Tab", "Split Right", "Split Below", "Toggle Pane Zoom", "Next Tab", "Previous Tab"];
+use rmux_core::{palette_match, commands::CommandId};
+const COMMANDS: &[CommandId] = &[CommandId::NewWorkspace, CommandId::NewTab,
+    CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
+    CommandId::NextTab, CommandId::PreviousTab];
 
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll]);
@@ -35,7 +36,7 @@ struct InputProbe {
 }
 impl InputProbe {
     fn choose(&mut self, cx: &mut Context<Self>) {
-        self.feedback = self.search.matches.get(self.selected).map(|index| format!("Selected: {} · probe only", COMMANDS[*index]));
+        self.feedback = self.search.matches.get(self.selected).map(|index| format!("Selected: {} · probe only", COMMANDS[*index].title()));
         cx.notify();
     }
 }
@@ -55,7 +56,7 @@ impl Render for InputProbe {
                 .child(palette_view::search(self.input.clone()))
                 .children(self.search.matches.iter().enumerate().map(|(row, &index)| {
                     palette_view::result(index, 36., row == self.selected)
-                        .child(div().flex_1().min_w_0().truncate().child(COMMANDS[index]))
+                        .child(div().flex_1().min_w_0().truncate().child(COMMANDS[index].title()))
                         .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                             if event.standard_click() { this.selected = row; this.choose(cx); }
                         }))
@@ -92,7 +93,7 @@ pub fn start() {
                 }
                 cx.notify();
             }).detach();
-            InputProbe { input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.to_lowercase()).collect()), selected: 0, feedback: None }
+            InputProbe { input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None }
         })).expect("open probe window");
     });
 }

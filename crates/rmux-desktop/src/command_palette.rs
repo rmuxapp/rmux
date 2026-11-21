@@ -286,39 +286,39 @@ impl CommandPalette {
         let origin_focus = window.focused(cx);
         let mut commands = Vec::new();
         macro_rules! command {
-            ($title:literal, $action:expr) => {
+            ($action:ident) => {
                 commands.push(Command {
-                    title: $title.into(),
+                    title: rmux_core::commands::CommandId::$action.title().into(),
                     target: PaletteEvent::Run(Box::new($action)),
                     shortcut: None,
                 subtitle: None,
                 });
             };
         }
-        command!("New Workspace", NewWorkspace);
-        command!("New Terminal Tab", NewTab);
-        command!("Split Right", Split);
-        command!("Split Below", SplitBelow);
-        command!("Toggle Pane Zoom", TogglePaneZoom);
-        command!("Find in Terminal", Find);
-        command!("Connect via SSH…", ShowSshConnection);
-        command!("Settings", ToggleSettings);
-        if pending.workspace { command!("Cancel New Workspace", CancelNewWorkspace); }
-        command!("Show / Refresh Terminal Memory", RefreshTerminalMemory);
-        command!("Cycle Terminal Memory Sort", CycleTerminalMemorySort);
-        command!("New Empty Workspace Group", NewWorkspaceGroup);
-        command!("New Group from Current Workspace", GroupCurrentWorkspace);
-        command!("Group Selected Workspaces", GroupSelectedWorkspaces);
-        command!("Use Current Terminal Directory for Group", UseCurrentDirectoryForGroup);
-        command!("Reset Group Directory to Follow Anchor", ResetGroupDirectory);
-        command!("Rename Workspace Group", RenameWorkspaceGroup);
-        command!("Edit Group Color", EditGroupColor);
-        command!("Edit Group Icon", EditGroupIcon);
-        command!("Ungroup Workspaces", UngroupWorkspaces);
-        command!("Close Workspace Group…", CloseWorkspaceGroup);
-        command!("Pin / Unpin Workspace Group", ToggleGroupPin);
-        command!("Remove Workspace from Group", RemoveWorkspaceFromGroup);
-        command!("Use Workspace as Group Anchor", SetGroupAnchor);
+        command!(NewWorkspace);
+        command!(NewTab);
+        command!(Split);
+        command!(SplitBelow);
+        command!(TogglePaneZoom);
+        command!(Find);
+        command!(ShowSshConnection);
+        command!(ToggleSettings);
+        if pending.workspace { command!(CancelNewWorkspace); }
+        command!(RefreshTerminalMemory);
+        command!(CycleTerminalMemorySort);
+        command!(NewWorkspaceGroup);
+        command!(GroupCurrentWorkspace);
+        command!(GroupSelectedWorkspaces);
+        command!(UseCurrentDirectoryForGroup);
+        command!(ResetGroupDirectory);
+        command!(RenameWorkspaceGroup);
+        command!(EditGroupColor);
+        command!(EditGroupIcon);
+        command!(UngroupWorkspaces);
+        command!(CloseWorkspaceGroup);
+        command!(ToggleGroupPin);
+        command!(RemoveWorkspaceFromGroup);
+        command!(SetGroupAnchor);
         for (group, name) in groups {
             commands.push(Command {
                 title: format!("Move Workspace to Group: {name} (#{group})"),
@@ -327,119 +327,119 @@ impl CommandPalette {
                 subtitle: None,
             });
         }
-        command!("New Local Tab", NewLocalTab);
-        if pending.tab { command!("Cancel New Terminal Tab", CancelNewTab); }
-        if pending.paste { command!("Cancel Queued Paste", CancelQueuedPaste); }
-        if pending.split { command!("Cancel Split Terminal", CancelSplit); }
-        command!("New Window", NewWindow);
-        command!("Split Left", SplitLeft);
-        command!("Split Above", SplitAbove);
-        command!("Equalize Pane Sizes", EqualizePanes);
-        command!("Resize Pane Left", ResizePaneLeft);
-        command!("Resize Pane Right", ResizePaneRight);
-        command!("Resize Pane Up", ResizePaneUp);
-        command!("Resize Pane Down", ResizePaneDown);
-        command!("Swap Pane with Next", SwapPaneNext);
-        command!("Swap Pane Left", SwapPaneLeft);
-        command!("Swap Pane Right", SwapPaneRight);
-        command!("Swap Pane Up", SwapPaneUp);
-        command!("Swap Pane Down", SwapPaneDown);
-        command!("Move Tab to Split Right", BreakTabRight);
-        command!("Move Tab to Split Below", BreakTabBelow);
-        command!("Move Tab to Split Left", BreakTabLeft);
-        command!("Move Tab to Split Above", BreakTabAbove);
-        command!("Join Pane into Next", JoinPaneNext);
-        command!("Join Pane Left", JoinPaneLeft);
-        command!("Join Pane Right", JoinPaneRight);
-        command!("Join Pane Up", JoinPaneUp);
-        command!("Join Pane Down", JoinPaneDown);
-        command!("Move Tab to Next Workspace", MoveTabNextWorkspace);
-        command!("Detach Tab to New Window", DetachTab);
-        command!("Move Workspace to New Window", DetachWorkspace);
-        command!("Merge Workspace into…", ShowWorkspaceMergePicker);
-        command!("Move Workspace to Window…", ShowWorkspaceWindowPicker);
-        command!("Move Workspace to Next Window", MoveWorkspaceToNextWindow);
+        command!(NewLocalTab);
+        if pending.tab { command!(CancelNewTab); }
+        if pending.paste { command!(CancelQueuedPaste); }
+        if pending.split { command!(CancelSplit); }
+        command!(NewWindow);
+        command!(SplitLeft);
+        command!(SplitAbove);
+        command!(EqualizePanes);
+        command!(ResizePaneLeft);
+        command!(ResizePaneRight);
+        command!(ResizePaneUp);
+        command!(ResizePaneDown);
+        command!(SwapPaneNext);
+        command!(SwapPaneLeft);
+        command!(SwapPaneRight);
+        command!(SwapPaneUp);
+        command!(SwapPaneDown);
+        command!(BreakTabRight);
+        command!(BreakTabBelow);
+        command!(BreakTabLeft);
+        command!(BreakTabAbove);
+        command!(JoinPaneNext);
+        command!(JoinPaneLeft);
+        command!(JoinPaneRight);
+        command!(JoinPaneUp);
+        command!(JoinPaneDown);
+        command!(MoveTabNextWorkspace);
+        command!(DetachTab);
+        command!(DetachWorkspace);
+        command!(ShowWorkspaceMergePicker);
+        command!(ShowWorkspaceWindowPicker);
+        command!(MoveWorkspaceToNextWindow);
         #[cfg(all(target_os = "macos", feature = "browser"))]
-        command!("New Browser Window (Experimental)", NewBrowserWindow);
-        command!("Toggle Sidebar", ToggleSidebar);
-        command!("Rename Workspace", RenameWorkspace);
-        command!("Edit Workspace Icon", EditWorkspaceIcon);
-        command!("Edit Workspace Color", EditWorkspaceColor);
-        command!("Edit Workspace Description", EditWorkspaceDescription);
-        command!("Next Workspace", NextWorkspace);
-        command!("Last Workspace", LastWorkspace);
-        command!("Last Terminal", LastTerminal);
-        command!("Focus Back", FocusBack);
-        command!("Focus Forward", FocusForward);
-        command!("Rename Tab…", RenameTab);
-        command!("Next Tab", NextTab);
-        command!("Choose Terminal Tab", ShowTabPicker);
-        command!("Show Tab Actions", ShowTabMenu);
-        command!("Show Workspace Actions", ShowWorkspaceMenu);
-        command!("Previous Tab", PreviousTab);
-        command!("Pin / Unpin Workspace", ToggleWorkspacePin);
-        command!("Previous Workspace", PreviousWorkspace);
-        command!("Next Unread Terminal", NextUnreadTerminal);
-        command!("Mark All Read in This Window", MarkAllRead);
-        command!("Toggle Notifications", ToggleNotifications);
-        command!("Dismiss All Notifications", DismissAllNotifications);
-        command!("Refresh Git Branch for Current Terminal", RefreshGitContext);
-        command!("Toggle Program Status", ToggleProgramStatus);
-        command!("Show Listening Ports", ShowListeningPorts);
-        command!("Close Listening Ports", CloseListeningPorts);
-        command!("Find Older Match", FindOlder);
-        command!("Find Newer Match", FindNewer);
-        command!("Select All", EditorSelectAll);
-        command!("Terminal Actions", ShowTerminalMenu);
-        command!("Copy with Line Breaks", CopySelectionWithLineBreaks);
-        command!("Copy Working Directory", CopyWorkingDirectory);
-        command!("Reveal Working Directory", RevealWorkingDirectory);
-        command!("Clear Scrollback", ClearScrollback);
-        command!("Previous Prompt", PreviousPrompt);
-        command!("Next Prompt", NextPrompt);
-        command!("Last Prompt", LastPrompt);
-        command!("Scroll to Top", ScrollToTop);
-        command!("Scroll to Bottom", ScrollToBottom);
-        command!("Increase Font Size", IncreaseFontSize);
-        command!("Decrease Font Size", DecreaseFontSize);
-        command!("Reset Font Size", ResetFontSize);
-        command!("Enter Copy Mode", EnterCopyMode);
-        command!("Paste Named Buffer…", ShowBufferPicker);
-        command!("Delete Named Buffer…", ShowDeleteBufferPicker);
-        command!("Rename Named Buffer…", ShowRenameBufferPicker);
-        command!("Copy Named Buffer…", ShowCopyBufferPicker);
-        command!("Browse Terminal Directory…", BrowseTerminalFiles);
-        command!("Open Text Preview…", OpenTextPreview);
-        command!("Cancel File / SSH Host Loading", CancelFileLoading);
-        command!("Search Terminal Output…", ShowTerminalSearch);
-        command!("SSH Hosts…", ShowSshHosts);
-        command!("Open Folder…", OpenFolderBrowser);
-        command!("Choose Terminal Font…", ShowFontPicker);
-        command!("Choose Default Font…", ShowDefaultFontPicker);
-        command!("Use Configured Font", UseConfiguredFont);
-        command!("Save Layout…", SaveLayout);
-        command!("Save Session…", SaveSession);
-        command!("Open Session in New Windows…", OpenSession);
-        command!("Open Layout Preset…", ShowLayoutPresetPicker);
-        command!("Run Configured Command…", ShowCustomCommandPicker);
-        command!("Cancel Layout / Session Restore", CancelRestore);
-        command!("Save Appearance Settings", SaveAppearanceSettings);
-        command!("Reload Settings", ReloadSettings);
-        command!("Open Settings File", OpenSettingsFile);
-        command!("Open Layout in New Window…", OpenLayout);
-        command!("Focus Pane Left", FocusLeft);
-        command!("Focus Pane Right", FocusRight);
-        command!("Focus Pane Up", FocusUp);
-        command!("Focus Pane Down", FocusDown);
-        command!("Move Workspace Up", MoveWorkspaceUp);
-        command!("Move Workspace Down", MoveWorkspaceDown);
-        command!("Close Terminal Tab", ClosePane);
-        command!("Close Other Terminal Tabs…", CloseOtherTabs);
-        command!("Close Terminal Tabs to the Right…", CloseTabsToRight);
-        command!("Close Finished Terminal Tabs…", CloseFinishedTabs);
-        command!("Close Workspace", CloseWorkspace);
-        command!("Close Window", CloseWindow);
-        command!("Import Terminal Theme…", ImportTerminalTheme);
+        command!(NewBrowserWindow);
+        command!(ToggleSidebar);
+        command!(RenameWorkspace);
+        command!(EditWorkspaceIcon);
+        command!(EditWorkspaceColor);
+        command!(EditWorkspaceDescription);
+        command!(NextWorkspace);
+        command!(LastWorkspace);
+        command!(LastTerminal);
+        command!(FocusBack);
+        command!(FocusForward);
+        command!(RenameTab);
+        command!(NextTab);
+        command!(ShowTabPicker);
+        command!(ShowTabMenu);
+        command!(ShowWorkspaceMenu);
+        command!(PreviousTab);
+        command!(ToggleWorkspacePin);
+        command!(PreviousWorkspace);
+        command!(NextUnreadTerminal);
+        command!(MarkAllRead);
+        command!(ToggleNotifications);
+        command!(DismissAllNotifications);
+        command!(RefreshGitContext);
+        command!(ToggleProgramStatus);
+        command!(ShowListeningPorts);
+        command!(CloseListeningPorts);
+        command!(FindOlder);
+        command!(FindNewer);
+        command!(EditorSelectAll);
+        command!(ShowTerminalMenu);
+        command!(CopySelectionWithLineBreaks);
+        command!(CopyWorkingDirectory);
+        command!(RevealWorkingDirectory);
+        command!(ClearScrollback);
+        command!(PreviousPrompt);
+        command!(NextPrompt);
+        command!(LastPrompt);
+        command!(ScrollToTop);
+        command!(ScrollToBottom);
+        command!(IncreaseFontSize);
+        command!(DecreaseFontSize);
+        command!(ResetFontSize);
+        command!(EnterCopyMode);
+        command!(ShowBufferPicker);
+        command!(ShowDeleteBufferPicker);
+        command!(ShowRenameBufferPicker);
+        command!(ShowCopyBufferPicker);
+        command!(BrowseTerminalFiles);
+        command!(OpenTextPreview);
+        command!(CancelFileLoading);
+        command!(ShowTerminalSearch);
+        command!(ShowSshHosts);
+        command!(OpenFolderBrowser);
+        command!(ShowFontPicker);
+        command!(ShowDefaultFontPicker);
+        command!(UseConfiguredFont);
+        command!(SaveLayout);
+        command!(SaveSession);
+        command!(OpenSession);
+        command!(ShowLayoutPresetPicker);
+        command!(ShowCustomCommandPicker);
+        command!(CancelRestore);
+        command!(SaveAppearanceSettings);
+        command!(ReloadSettings);
+        command!(OpenSettingsFile);
+        command!(OpenLayout);
+        command!(FocusLeft);
+        command!(FocusRight);
+        command!(FocusUp);
+        command!(FocusDown);
+        command!(MoveWorkspaceUp);
+        command!(MoveWorkspaceDown);
+        command!(ClosePane);
+        command!(CloseOtherTabs);
+        command!(CloseTabsToRight);
+        command!(CloseFinishedTabs);
+        command!(CloseWorkspace);
+        command!(CloseWindow);
+        command!(ImportTerminalTheme);
         for theme in preferences::TerminalTheme::ALL {
             commands.push(Command {
                 title: format!("Terminal Theme: {}", theme.label()),

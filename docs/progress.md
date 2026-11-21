@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Moved all 136 static palette command identities/display names into rmux-core.
+Native command registration now references those identities while preserving its
+existing order, availability conditions and action dispatch. The browser probe
+uses the same identities instead of repeating command labels. Moved unchanged
+RankedSearch/tab scoring into core and updated its benchmark import. All 20 core
+tests, desktop compile and WASM compile pass. Dynamic workspace/file entries and
+platform services remain host-owned; this does not expose unsupported actions
+or claim that the full browser application is connected.
+
 Extracted palette panel, heading, search surround, result row styling, footer and
 arrow navigation into one shared `palette_view` source consumed by desktop and
 the WASM probe. The probe also imports the actual RankedSearch implementation.

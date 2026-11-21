@@ -48,7 +48,7 @@ mod drag_item;
 mod edit_history;
 mod find_bar;
 use rmux_core::layout;
-mod palette_match;
+use rmux_core::palette_match;
 mod pane_view;
 mod preferences;
 mod theme_file;

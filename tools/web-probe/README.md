@@ -38,3 +38,7 @@ It also uses native `RankedSearch`. The seven fixture commands only report
 selection; they do not pretend to create workspaces or terminals. A browser check
 verified `splt` fuzzy matching and Down/Enter selection of Split Below, and the
 panel fits its contents. Full application actions and result metadata are pending.
+
+Command labels/identities and RankedSearch now come from `rmux-core`, also used
+by desktop. The probe exposes a small subset of the shared catalog; dispatch
+still reports selection only. Adding a label does not implement its service.

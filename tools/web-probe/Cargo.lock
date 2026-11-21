@@ -4811,11 +4811,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "rmux-core"
+version = "0.1.4"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "rmux-web-probe"
 version = "0.0.0"
 dependencies = [
  "gpui-ce",
  "gpui_ce_platform",
+ "rmux-core",
  "unicode-segmentation",
  "wasm-bindgen",
 ]

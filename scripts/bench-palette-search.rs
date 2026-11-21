@@ -1,6 +1,6 @@
 //! Standalone optimized benchmark; no GPUI window or terminal engine required.
 #[allow(dead_code)]
-#[path = "../crates/rmux-desktop/src/palette_match.rs"]
+#[path = "../crates/rmux-core/src/palette_match.rs"]
 mod palette_match;
 use std::{hint::black_box, time::Instant};
 const QUERIES: &[&str] = &["", "s", "sw", "swi", "switch", "switch b", "switch bu", "switch build", "switch", "s", "", "東京", "東京 b"];
