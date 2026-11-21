@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Published GitHub demo run 44951200648 (05673c6) to rmux.app, Cloudflare deployment
+5a84225c. Includes group closure, terminal font controls/inheritance and measured
+cell-metric reuse. Production embedded smoke verified zoomed text inherited by a
+new split, two-workspace group closure, and surviving split output/focus.
+Screenshot: target/live-demo-fonts-05673c6.jpg. Updated the browser user guide.
+Hidden snapshot/zoom reclamation changes remain in newer CI builds; desktop
+release downloads are unchanged.
+
 Browser panes hidden by zoom now release their terminal rendering caches and
 snapshots using the same reclamation path as hidden workspaces/tabs. The host
 tracks zoom visibility transitions, including directional focus changes while

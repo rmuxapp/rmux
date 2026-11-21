@@ -42,6 +42,14 @@ lines and leaves the final unfinished line ready to edit. Sample input is limite
 to 4 KiB. If the browser denies menu clipboard access, use your keyboard paste
 shortcut instead.
 
+Rename a workspace with **Cmd+Shift+R** (Ctrl+Shift+R elsewhere) or double-click
+its sidebar name. Use the palette to pin workspaces or create, rename, and close
+workspace groups. Closing a group removes its sample sessions.
+
+**Cmd+=**, **Cmd+-**, and **Cmd+0** increase, decrease, and reset terminal text
+size (Ctrl elsewhere). New tabs and splits inherit the active terminal's size;
+resetting one terminal leaves the others unchanged.
+
 The demo shares rmux UI code and the Ghostty terminal engine. Desktop-only
 features and some browser interactions are still being brought over.
 
