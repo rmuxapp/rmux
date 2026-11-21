@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Shared native Cmd+[ / Cmd+] pane bindings with the browser host and moved
+wraparound index calculation into rmux-core. Browser cycles in layout leaf order,
+retains zoom state, and routes typing to the selected terminal. Shifted brackets
+remain reserved for tab navigation, which the browser host has not implemented.
+Focused core test, native compile and WASM build pass; browser verified previous
+pane → ls and next pane → help without mouse focus. A visual discrepancy remains:
+the first pane's initial prompt loses its trailing space after resize; investigate
+engine reflow/cursor position before public deployment.
+
 Compacted browser cell transport to tuples, retaining dirty-row updates, resolved
 colors, grapheme strings, widths and style flags. Rust reconstructs the shared
 Cell type with inline small strings and unchanged-row Arc reuse. Engine checks

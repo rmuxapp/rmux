@@ -58,6 +58,7 @@ mod recovery;
 mod row_cache;
 mod row_host;
 mod cursor_view;
+mod pane_shortcuts;
 mod list_navigation;
 mod menu_navigation;
 mod snapshot;
@@ -3012,7 +3013,7 @@ impl Workspace {
             return;
         }
         let current = self.focused_index(window, cx).unwrap_or(0);
-        let next = (current as isize + direction).rem_euclid(self.panes.len() as isize) as usize;
+        let Some(next) = layout::cycle_index(current, self.panes.len(), direction) else { return; };
         if self.zoomed.is_some() {
             self.zoomed = Some(self.panes[next].entity_id());
         }

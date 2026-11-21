@@ -22,7 +22,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane]);
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -41,6 +41,17 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<terminal_sample::TerminalSample>>,
 }
 impl InputProbe {
+    fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
+        let mut ordered: Vec<_> = self.samples.keys().copied().collect();
+        ordered.sort_by_key(|id| self.tree.pane_index(id));
+        let current = ordered.iter().position(|id| *id == self.focused).unwrap_or(0);
+        if let Some(next) = rmux_core::layout::cycle_index(current, ordered.len(), direction) {
+            self.focused = ordered[next];
+            self.samples[&self.focused].update(cx, |sample, cx| sample.focus(window, cx));
+            cx.notify();
+        }
+    }
+
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
         self.samples[&self.focused].update(cx, |sample, cx| sample.focus(window, cx));
@@ -96,6 +107,8 @@ impl Render for InputProbe {
         let height = f32::from(window.viewport_size().height);
         let panes = if self.zoomed { self.panes(&PaneTree::Pane(self.focused), "root".into(), cx) } else { self.panes(&self.tree, "root".into(), cx) };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
+            .on_action(cx.listener(|this, _: &NextPane, window, cx| this.cycle_pane(1, window, cx)))
+            .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(div().h(px(44.)).flex_shrink_0().px_3().flex().items_center().justify_between()
                 .child("Shared rmux layout · development probe")
@@ -136,6 +149,7 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/Inter-Regular.ttf").as_slice()),
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
+        cx.bind_keys(pane_shortcuts::brackets());
         cx.bind_keys([
             KeyBinding::new("cmd-p", CommandPalette, None),
             KeyBinding::new("cmd-a", EditorSelectAll, Some("TextInput")),
@@ -175,3 +189,6 @@ mod terminal_sample;
 mod terminal_engine;
 #[path = "../../../crates/rmux-desktop/src/cursor_view.rs"]
 mod cursor_view;
+
+#[path = "../../../crates/rmux-desktop/src/pane_shortcuts.rs"]
+mod pane_shortcuts;

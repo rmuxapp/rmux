@@ -5,14 +5,14 @@ use anyhow::{Result, ensure};
 /// without the Shift modifier. Keep explicit Shift bindings for other layouts.
 #[cfg(target_os = "macos")]
 pub(super) fn bracket_navigation() -> Vec<KeyBinding> {
-    vec![
-        KeyBinding::new("cmd-[", PreviousPane, Some("Terminal")),
-        KeyBinding::new("cmd-]", NextPane, Some("Terminal")),
+    let mut bindings = crate::pane_shortcuts::brackets();
+    bindings.extend([
         KeyBinding::new("cmd-{", PreviousTab, Some("Terminal")),
         KeyBinding::new("cmd-}", NextTab, Some("Terminal")),
         KeyBinding::new("cmd-shift-[", PreviousTab, Some("Terminal")),
         KeyBinding::new("cmd-shift-]", NextTab, Some("Terminal")),
-    ]
+    ]);
+    bindings
 }
 
 /// Resolve the current binding at the terminal that will receive the action.

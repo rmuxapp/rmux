@@ -1,6 +1,26 @@
 /// Shared with saved-layout validation so live splits remain restorable.
 pub const MAX_SPLIT_DEPTH: usize = 32;
 
+/// Wrap focus through a stable pane order; empty collections have no target.
+pub fn cycle_index(current: usize, len: usize, direction: isize) -> Option<usize> {
+    if len == 0 { return None; }
+    Some(((current % len) as i128 + direction as i128).rem_euclid(len as i128) as usize)
+}
+
+#[cfg(test)]
+mod cycling_tests {
+    #[test]
+    fn focus_wraps_in_both_directions() {
+        use super::cycle_index;
+        assert_eq!(cycle_index(0, 0, 1), None);
+        assert_eq!(cycle_index(0, 1, -1), Some(0));
+        assert_eq!(cycle_index(0, 3, -1), Some(2));
+        assert_eq!(cycle_index(2, 3, 1), Some(0));
+        assert_eq!(cycle_index(1, 3, 1), Some(2));
+        assert_eq!(cycle_index(usize::MAX, 3, isize::MAX), Some(((usize::MAX % 3) as i128 + isize::MAX as i128).rem_euclid(3) as usize));
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Axis {
     Columns,

@@ -92,3 +92,8 @@ tuples; columns come from row position and omitted style defaults are rebuilt in
 Rust. Text deserializes into SmolStr to retain inline short-cell storage. The
 recorded tuple benchmark cuts dense 16-pane payload by 86.5%; see the benchmark
 report for timing and measurement limits.
+
+Cmd+[ / Cmd+] now use the native pane shortcut definitions and shared core
+wraparound logic. Cycling follows layout order and preserves zoom. Browser checks
+verified commands typed in the selected pane after each shortcut. Shifted bracket
+tab navigation remains pending until tabs are connected.

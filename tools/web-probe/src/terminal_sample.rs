@@ -52,7 +52,7 @@ impl TerminalSample {
 impl Render for TerminalSample {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
-        div().size_full().track_focus(&self.focus)
+        div().size_full().key_context("Terminal").track_focus(&self.focus)
             .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| this.focus.focus(window, cx)))
             .on_key_down(cx.listener(Self::key))
             .child(canvas(move |bounds, window, cx| entity.update(cx, |this, _| {
