@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Recorded a six-run, alternating 16-pane comparison of ffa98af against the retained
+e8e486a style-only benchmark binary. Median parsed throughput was 108.71 versus
+110.92 MiB/s; response-snapshot p99 was 4.87 versus 5.06 ms. All requests and
+shutdown checks completed. Ranges overlap and the comparison bundles multiple
+changes; no isolated speedup or GUI-latency claim. Raw binary provenance and all
+samples: `docs/benchmarks/pty-post-scroll-mouse.jsonl`; interpretation is in the
+performance plan. Native CI for ffa98af is queued behind e1dffb5.
+
 Native mouse dispatch now reads a tracking flag published after each parsed PTY
 batch. Local scrolling no longer locks the parser to check reporting; application
 mouse events enter the bounded input queue and Ghostty encodes them on its writer.

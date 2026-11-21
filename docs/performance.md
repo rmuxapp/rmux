@@ -1,5 +1,27 @@
 # rmux performance acceptance plan
 
+## Post-scroll and mouse input comparison
+
+Three alternating 16-pane runs compared the retained style-only benchmark binary
+from e8e486a against ffa98af. Both use 15 output-flood panes, one responder and
+128 requests per run, waiting for workload shutdown between runs. This compares
+the combined changes since that baseline (including width reuse, clipboard/paste
+lifecycle, pending scroll and mouse-mode publication), not one isolated change.
+
+| Median of three runs | Earlier binary | ffa98af |
+| --- | ---: | ---: |
+| Parsed flood throughput | 110.92 MiB/s | 108.71 MiB/s |
+| Input-call p99 | 10.54 µs | 7.75 µs |
+| Response observed in snapshot p99 | 5.06 ms | 4.87 ms |
+| Snapshot-batch p99 | 5.03 ms | 4.84 ms |
+
+Throughput ranges overlap (103.92–113.14 versus 105.42–113.25 MiB/s).
+The small uncontrolled sample does not establish a statistically reliable change.
+This benchmark exercises input and snapshots under flood output; it does not
+dispatch mouse/scroll gestures or measure GPUI painting, visible latency, or
+cross-platform behavior. Exact binary hashes and all samples are in
+[the raw comparison](benchmarks/pty-post-scroll-mouse.jsonl).
+
 ## Native paste admission under output pressure
 
 Native clipboard paste now enqueues before consulting the terminal parser. The
