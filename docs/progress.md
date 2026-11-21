@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added optional native startup milestone measurement to the split harness:
+socket availability, first terminal registration and parsed fixture shell output.
+A fresh debug build and three isolated one-pane runs completed normally. Median
+milestones were 228.5 / 232.3 / 235.7 ms; first-run shell output was 736.7 ms.
+Raw samples and binary hash: docs/benchmarks/startup-current-debug.jsonl.
+The 20 ms socket poll and CLI/RPC overhead are included. These are not release,
+cold/warm, window-presentation or input-to-display acceptance results. Method and
+limits are recorded in performance.md. No deployment/product behavior change.
+
 Long browser tab names now use desktop's shared title view: 48–220 px width,
 truncation and full-title tooltip. Native keeps its existing richer tooltip text;
 browser uses the full custom/automatic title. Rename completion requests active

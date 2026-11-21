@@ -23,11 +23,13 @@ def cpu_seconds(pid):
     return int(days) * 86400 + seconds
 
 
-def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, idle_seconds=0, process_tree=False):
+def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, idle_seconds=0, process_tree=False, measure_startup=False):
     with tempfile.TemporaryDirectory(prefix="rmux-split-bench-") as directory:
         root = Path(directory)
         shell = root / "shell"
         shell.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nwhile IFS= read -r line; do :; done\n')
+        if measure_startup:
+            shell.write_text(shell.read_text().replace('while IFS=', "printf 'rmux-benchmark-shell-ready\\n'\nwhile IFS="))
         shell.chmod(0o700)
         config = root / "config.json"
         config.write_text(json.dumps({"confirm_close": "never", "session_file": str(root / "session.json")}))
@@ -43,6 +45,7 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
             return value["result"]
 
         with tempfile.TemporaryFile() as log:
+            launched_at = time.perf_counter_ns()
             app = subprocess.Popen([str(binary)], env=env, stdin=subprocess.DEVNULL,
                                    stdout=subprocess.DEVNULL, stderr=log)
             try:
@@ -52,7 +55,23 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
                     if time.monotonic() > deadline:
                         raise TimeoutError("native app socket did not start")
                     time.sleep(.02)
-                surface = call("surface.list")["surfaces"][0]
+                socket_ready_ms = (time.perf_counter_ns() - launched_at) / 1_000_000
+                while True:
+                    initial = call("surface.list")["surfaces"]
+                    if initial: break
+                    if time.monotonic() > deadline: raise TimeoutError("first terminal did not register")
+                    time.sleep(.02)
+                surface = initial[0]
+                first_surface_ms = (time.perf_counter_ns() - launched_at) / 1_000_000
+                startup = None
+                if measure_startup:
+                    while True:
+                        output = call("surface.read_text", surface_id=surface["id"], max_bytes=4096)
+                        if "rmux-benchmark-shell-ready" in output["text"]: break
+                        if time.monotonic() > deadline: raise TimeoutError("fixture shell output did not become readable")
+                        time.sleep(.02)
+                    startup = {"socket_ready_ms": socket_ready_ms, "first_surface_ms": first_surface_ms,
+                               "first_shell_output_ms": (time.perf_counter_ns() - launched_at) / 1_000_000}
                 work = surface["workspace_id"]
                 leaves = [surface["pane_id"]]
                 timings = []
@@ -73,6 +92,7 @@ def sample(panes, iteration, binary, cli, settle_seconds, measure_close=False, i
                                          check=True, capture_output=True, text=True).stdout.strip())
                 result = {"panes": panes, "iteration": iteration, "split_ms": timings,
                           "split_total_ms": sum(timings), "app_rss_kib": rss}
+                if startup is not None: result["startup"] = startup
                 before_tree = bench_processes.tree(app.pid) if process_tree else None
                 if before_tree is not None:
                     result["process_tree"] = before_tree
@@ -133,6 +153,7 @@ if __name__ == "__main__":
     parser.add_argument("--cli", type=Path, default=Path("target/debug/rmuxctl"))
     parser.add_argument("--label", default="local-debug")
     parser.add_argument("--settle-seconds", type=float, default=0)
+    parser.add_argument("--measure-startup", action="store_true", help="Measure socket, terminal registration and parsed fixture output; not presentation latency")
     parser.add_argument("--measure-close", action="store_true")
     parser.add_argument("--process-tree", action="store_true", help="Include child process RSS and identity-aware CPU/teardown samples")
     parser.add_argument("--idle-seconds", type=float, default=0)
@@ -154,7 +175,7 @@ if __name__ == "__main__":
     revision = subprocess.run(["git", "rev-parse", "--short", "HEAD"], check=True,
                               capture_output=True, text=True).stdout.strip()
     for panes in args.panes:
-        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds, args.process_tree) for iteration in range(args.iterations)]
+        samples = [sample(panes, iteration, binary, cli, args.settle_seconds, args.measure_close, args.idle_seconds, args.process_tree, args.measure_startup) for iteration in range(args.iterations)]
         timings = [value for row in samples for value in row["split_ms"]]
         print(json.dumps({"harness_revision": revision, "binary_label": args.label,
                           "binary_sha256": binary_sha256, "settle_seconds": args.settle_seconds,

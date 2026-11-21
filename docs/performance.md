@@ -461,3 +461,32 @@ five cycles is not proof of no leaks. This harness excludes GPUI entities, JS
 heap, fonts, GPU resources and browser overhead, so it does not validate UI
 pane destruction or whole-app memory targets. Results and the exact engine
 WASM hash are in [the raw measurements](benchmarks/browser-engine-memory-search-copy.jsonl).
+
+### Native startup milestones (2026-11-21)
+
+The split harness now accepts `--measure-startup`. Before launching the native
+app it starts a monotonic clock, then records socket-path availability, the first
+successful surface-list response containing a terminal, and the first text-read
+response containing a marker printed by an isolated fixture shell. Polling is
+bounded to ten seconds; normal app quit remains part of each run. The default
+fixture is unchanged when this option is absent.
+
+Three sequential fresh-process runs of debug source ccbf2a6 on macOS ARM64:
+
+| Milestone | Run 1 | Run 2 | Run 3 | Median |
+| --- | ---: | ---: | ---: | ---: |
+| Socket available | 655.7 ms | 228.5 ms | 216.3 ms | 228.5 ms |
+| First terminal registered | 733.1 ms | 232.3 ms | 219.5 ms | 232.3 ms |
+| Fixture shell output readable | 736.7 ms | 235.7 ms | 222.6 ms | 235.7 ms |
+
+[Raw samples and binary hash](benchmarks/startup-current-debug.jsonl). Reproduce
+with `mise exec -- python3 scripts/bench-rpc-splits.py --panes 1 --iterations 3
+--measure-startup`. The harness revision in the raw record is ccbf2a6 plus the
+startup instrumentation committed with these results.
+
+These are debug-process readiness observations, not cold/warm release statistics.
+OS caches were not controlled. Socket detection has 20 ms polling granularity;
+RPC milestones include CLI subprocess and request overhead. Parsed output does
+not prove a presented frame, interactive window, IME readiness or normal user
+shell startup. Three samples do not establish tail percentiles. Release startup
+and input-to-display acceptance remain open.
