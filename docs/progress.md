@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Pane join targeting and layout guards now run through one core transition in
+both desktop and browser hosts. Join Next follows the layout's visual leaf order;
+directional joins use the same neighbor resolution. Missing/single panes are
+no-ops, and zoom, resize or pending split rejects ownership transfer with the
+same message. Native process/editor guards and browser capacity remain host
+checks. Seven focused pane-command tests pass, including nested join targets,
+invalid focus and each busy state; desktop and WASM compilation pass. No new
+runtime or visual claim, and not deployed. Full shared application entry-point
+migration remains open.
+
 Browser now supports Move Tab to Split Right/Below/Left/Above through the shared
 pane action factory/handlers. It validates capacity/layout acceptance before
 taking the active tab, builds a pane around the existing entity and label, keeps

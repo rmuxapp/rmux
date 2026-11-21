@@ -2661,13 +2661,7 @@ impl Workspace {
         }
     }
     fn join_pane_next(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.panes.len() < 2 || cx.global::<Shutdowns>().quitting {
-            return;
-        }
-        let Some(index) = self.focused_index(window, cx) else {
-            return;
-        };
-        self.join_panes(index, (index + 1) % self.panes.len(), window, cx);
+        self.join_pane(None, window, cx);
     }
     fn join_pane_direction(
         &mut self,
@@ -2675,21 +2669,21 @@ impl Workspace {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
-        if cx.global::<Shutdowns>().quitting { return; }
-        let Some(current) = self.focused_index(window, cx) else { return; };
-        if let Some(next) = self.directional_neighbor(current, direction) {
-            self.join_panes(current, next, window, cx);
-        }
+        self.join_pane(Some(direction), window, cx);
     }
-    fn join_panes(&mut self, source: usize, target: usize, window: &mut Window, cx: &mut Context<Self>) {
-        if cx.global::<Shutdowns>().quitting || source == target { return; }
-        let Some(source) = self.panes.get(source).cloned() else { return; };
-        let Some(target) = self.panes.get(target).cloned() else { return; };
-        if self.zoomed.is_some() || self.spawning_split.is_some() || self.split_drag.is_some() {
-            self.error = Some("Finish resizing or splitting, and unzoom before joining panes.".into());
-            cx.notify();
-            return;
-        }
+    fn join_pane(&mut self, direction: Option<layout::Direction>, window: &mut Window, cx: &mut Context<Self>) {
+        if cx.global::<Shutdowns>().quitting { return; }
+        let Some(index) = self.focused_index(window, cx) else { return; };
+        let source = self.panes[index].clone();
+        let Some(tree) = &self.layout else { return; };
+        let target = match rmux_core::pane_commands::join_target(tree, &source, direction,
+            rmux_core::pane_commands::JoinState {
+                zoomed: self.zoomed.is_some(), resizing: self.split_drag.is_some(), splitting: self.spawning_split.is_some(),
+            }) {
+            Ok(Some(target)) => target,
+            Ok(None) => return,
+            Err(message) => { self.error = Some(message.into()); cx.notify(); return; }
+        };
         if source.read(cx).automation_busy(cx) || target.read(cx).automation_busy(cx) {
             self.error = Some("Finish pending tab creation and close pane editors or overlays before joining.".into());
             cx.notify();

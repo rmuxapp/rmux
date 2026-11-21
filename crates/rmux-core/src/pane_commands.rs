@@ -67,6 +67,32 @@ pub fn swap_target<T: Clone + PartialEq>(tree: &PaneTree<T>, focused: &T, direct
     }
 }
 
+/// Layout activity that makes transferring pane ownership unsafe. Session-specific
+/// guards (pending processes, editors) remain the host's responsibility.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct JoinState {
+    pub zoomed: bool,
+    pub resizing: bool,
+    pub splitting: bool,
+}
+
+/// Resolve a join before either host releases terminal ownership. A missing or
+/// single pane is a no-op; a busy layout returns a shared user-facing error.
+pub fn join_target<T: Clone + PartialEq>(
+    tree: &PaneTree<T>, focused: &T, direction: Option<Direction>, state: JoinState,
+) -> Result<Option<T>, &'static str> {
+    if tree.pane_count() < 2 || tree.pane_index(focused).is_none() {
+        return Ok(None);
+    }
+    if state.zoomed || state.resizing || state.splitting {
+        return Err("Finish resizing or splitting, and unzoom before joining panes.");
+    }
+    Ok(match direction {
+        Some(direction) => tree.neighbor(focused, direction),
+        None => cycle(tree, Some(focused), 1),
+    })
+}
+
 /// Decide focus before removing ownership. Closing an inactive pane preserves
 /// focus; closing the active pane selects the following pane, or the previous
 /// pane when the last leaf closes. The final pane has no successor.
@@ -82,6 +108,28 @@ pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, 
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn join_resolves_visual_order_and_rejects_busy_layouts() {
+        let tree = PaneTree::Split { axis: Axis::Columns, weights: vec![1., 1.], children: vec![
+            PaneTree::Pane(30), PaneTree::Split { axis: Axis::Rows, weights: vec![1., 1.],
+                children: vec![PaneTree::Pane(10), PaneTree::Pane(20)] },
+        ] };
+        assert_eq!(join_target(&tree, &20, None, JoinState::default()), Ok(Some(30)));
+        assert_eq!(join_target(&tree, &10, Some(Direction::Down), JoinState::default()), Ok(Some(20)));
+        assert_eq!(join_target(&tree, &30, Some(Direction::Left), JoinState::default()), Ok(None));
+        assert_eq!(join_target(&tree, &99, None, JoinState::default()), Ok(None));
+        assert_eq!(join_target(&PaneTree::Pane(30), &30, None, JoinState::default()), Ok(None));
+        for state in [
+            JoinState { zoomed: true, ..Default::default() },
+            JoinState { resizing: true, ..Default::default() },
+            JoinState { splitting: true, ..Default::default() },
+        ] {
+            assert!(join_target(&tree, &10, None, state).is_err());
+            assert!(join_target(&tree, &10, Some(Direction::Down), state).is_err());
+        }
+        assert_eq!(tree.pane_count(), 3);
+    }
 
     #[test]
     fn swapping_keeps_identity_and_updates_navigation() {

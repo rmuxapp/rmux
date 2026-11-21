@@ -168,16 +168,13 @@ impl InputProbe {
     }
 
     fn join_pane(&mut self, direction: Option<rmux_core::layout::Direction>, was_dragging: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.zoomed || was_dragging {
-            self.feedback = Some("Finish resizing and unzoom before joining panes.".into());
-            cx.notify(); return;
-        }
         let Some(tree) = &self.tree else { return; };
-        let target = match direction {
-            Some(direction) => tree.neighbor(&self.focused, direction),
-            None => rmux_core::pane_commands::cycle(tree, Some(&self.focused), 1),
+        let target = match rmux_core::pane_commands::join_target(tree, &self.focused, direction,
+            rmux_core::pane_commands::JoinState { zoomed: self.zoomed, resizing: was_dragging, splitting: false }) {
+            Ok(Some(target)) => target,
+            Ok(None) => return,
+            Err(message) => { self.feedback = Some(message.into()); cx.notify(); return; }
         };
-        let Some(target) = target.filter(|target| *target != self.focused) else { return; };
         let source = self.samples[&self.focused].clone();
         let destination = self.samples[&target].clone();
         if source.read(cx).tab_count() + destination.read(cx).tab_count() > 16 {
