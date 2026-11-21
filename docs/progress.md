@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Connected the shared browser row painter to live ghostty-web 0.4.0 engine
+instances per pane. The host transfers dirty rows only and Rust retains unchanged
+row Arc identities; there is no idle polling. ASCII sample commands now exercise
+real VT parsing through the shared painter. Adapter checks cover sparse updates,
+colors, isolation, clear and reused WASM memory; browser checks ran ls/help in
+separate panes. WASM build passes. Cursor painting, resize, native input/IME
+sharing, workspace integration, decoration gaps and performance remain pending.
+The public demo is unchanged; this work remains in the compatibility host.
+
 Connected the actual native row_cache and paint_row sources to the isolated
 GPUI CE browser host through small host adapters. Native keeps its existing
 fixed-width shaping call; browser currently places ASCII glyphs individually

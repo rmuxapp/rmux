@@ -2,3 +2,4 @@
 /check.log
 /dist/
 /build.log
+node_modules/

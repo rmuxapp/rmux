@@ -38,7 +38,6 @@ struct InputProbe {
     next_pane: usize,
     zoomed: bool,
     palette_open: bool,
-    sample_frame: rmux_core::terminal_frame::Frame,
     samples: std::collections::HashMap<usize, Entity<terminal_sample::TerminalSample>>,
 }
 impl InputProbe {
@@ -49,7 +48,7 @@ impl InputProbe {
                 if self.next_pane >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if COMMANDS[index] == CommandId::Split { Axis::Columns } else { Axis::Rows };
                 if self.tree.split_positioned(&self.focused, self.next_pane, axis, false) {
-                    self.samples.insert(self.next_pane, cx.new(|_| terminal_sample::TerminalSample::new(self.sample_frame.clone())));
+                    self.samples.insert(self.next_pane, cx.new(terminal_sample::TerminalSample::new));
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
             }
@@ -66,7 +65,7 @@ impl InputProbe {
                 split_presentation::leaf(("pane", id)).flex().flex_col().bg(rgb(0x111216))
                     .border_t_2().border_color(rgb(if self.focused == id { 0x9790d7 } else { 0x383838 }))
                     .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| { this.focused = id; cx.notify(); }))
-                    .child(div().p_3().flex_shrink_0().text_sm().child(format!("Pane {} · captured Ghostty frame", id + 1)))
+                    .child(div().p_3().flex_shrink_0().text_sm().child(format!("Pane {} · live Ghostty · sample session", id + 1)))
                     .child(div().flex_1().min_h_0().child(self.samples[&id].clone()))
                     .into_any_element()
             }
@@ -149,9 +148,8 @@ pub fn start() {
                 }
                 cx.notify();
             }).detach();
-            let sample_frame: rmux_core::terminal_frame::Frame = serde_json::from_str(include_str!("../assets/terminal-frame.json")).expect("captured terminal fixture");
-            let samples = std::collections::HashMap::from([(0, cx.new(|_| terminal_sample::TerminalSample::new(sample_frame.clone())))]);
-            InputProbe { sample_frame, samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: PaneTree::Pane(0), focused: 0, next_pane: 1, zoomed: false, palette_open: true }
+            let samples = std::collections::HashMap::from([(0, cx.new(terminal_sample::TerminalSample::new))]);
+            InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: PaneTree::Pane(0), focused: 0, next_pane: 1, zoomed: false, palette_open: true }
         })).expect("open probe window");
     });
 }
@@ -162,3 +160,5 @@ mod row_cache;
 mod cell_metrics;
 mod row_host;
 mod terminal_sample;
+
+mod terminal_engine;

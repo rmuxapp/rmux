@@ -20,12 +20,26 @@ Toggle Pane Zoom retains the tree and displays the focused pane. Click a pane to
 focus it. The probe is limited to 16 panes. Escape closes the palette. The macOS
 text-editing shortcuts are bound. Unsupported command services are not listed.
 
-Pane bodies use the actual desktop row cache and painter with a captured native
-Ghostty frame. The fixture is synthetic, generated from the repository root with
-`mise exec -- cargo run -q -p rmux-desktop --example web_frame > tools/web-probe/assets/terminal-frame.json`.
-This is not the public demo replacement yet. Live browser VT parsing/input,
-cursor/selection interaction, divider dragging, tabs, multiple workspaces,
-IME/clipboard acceptance, browser coverage and performance remain.
+Pane bodies now use live ghostty-web 0.4.0 VT instances with the actual desktop
+row cache and painter. Click a pane and type `help`, `ls` or `clear`. These are
+bundled sample responses, never a real shell. Each pane retains its own engine
+and output. The initial keyboard path supports ASCII typing, Enter and Backspace;
+native IME/clipboard/input handling is not shared yet.
+
+The browser engine adapter transfers only dirty rows as JSON. Rust retains Arc
+identities for unchanged rows, keeping the shared shaping cache effective. No
+snapshot polling or timer runs while idle. This boundary still needs performance
+measurements; JSON is not the final optimized transport.
+
+The engine's exported cells omit custom underline colors/styles and overline;
+those fields currently use foreground/straight underline/no overline. Cursor
+metadata is transferred but not painted yet. Resize, selection, tabs, workspaces,
+divider dragging, broader input and browser acceptance remain pending. This is
+not the public demo replacement yet.
+
+The older synthetic native frame remains available for renderer comparisons:
+`mise exec -- cargo run -q -p rmux-desktop --example web_frame > tools/web-probe/assets/terminal-frame.json`
+from the repository root.
 
 GPUI CE lacks the native fixed-cell-width shaping parameter. Its host adapter
 places ASCII glyphs individually at measured terminal columns and caches the
@@ -42,3 +56,8 @@ establish full native/browser parity.
 The shared row painter renders a two-pane captured frame with foreground and
 background colors, bold, underline, strikethrough and concealed-text suppression.
 All eight native row-cache tests pass after the adapter extraction.
+
+`mise exec -- node scripts/check-engine.mjs` after building checks sparse updates,
+colors, pane isolation, clear and disposal/recreation against the actual WASM
+engine. Browser typing verified different sample commands in two independent
+panes. Dependency licensing is copied into the build alongside the engine.

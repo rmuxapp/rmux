@@ -1,10 +1,11 @@
 [tools]
+node = "24.22.0"
 rust = { version = "1.99.1", targets = ["wasm32-unknown-unknown"] }
 
 "github:wasm-bindgen/wasm-bindgen" = "0.2.130"
 
 [tasks.build]
-run = ["cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html dist/index.html"]
+run = ["npm ci --ignore-scripts", "cargo build --locked --lib --target wasm32-unknown-unknown", "wasm-bindgen --target web --out-dir dist target/wasm32-unknown-unknown/debug/rmux_web_probe.wasm", "cp index.html engine.js dist/", "cp node_modules/ghostty-web/dist/ghostty-web.js node_modules/ghostty-web/dist/ghostty-vt.wasm node_modules/ghostty-web/LICENSE dist/"]
 
 [tasks.serve]
 run = "python -m http.server 4319 --bind 127.0.0.1 --directory dist"

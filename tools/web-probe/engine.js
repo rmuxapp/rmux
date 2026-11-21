@@ -1,0 +1,49 @@
+// Browser VT host only: all layout and terminal drawing remain in Rust.
+import {Ghostty, CellFlags as F} from './ghostty-web.js';
+export function createHost(engine) {
+  const sessions = new Map();
+  let next = 0;
+  const rgb = c => [c.r, c.g, c.b];
+  return {
+    create(columns, rows) {
+      const id = next++;
+      const terminal = engine.createTerminal(columns, rows);
+      terminal.write('\x1bc\x1b[2J\x1b[3J\x1b[H');
+      sessions.set(id, {terminal, revision:0, first:true});
+      return id;
+    },
+    write(id, text) { sessions.get(id).terminal.write(text); },
+    free(id) { sessions.get(id)?.terminal.free(); sessions.delete(id); },
+    snapshot(id) {
+      const state = sessions.get(id), t = state.terminal;
+      t.update();
+      const cursor = t.getCursor(), colors = t.getColors(), viewport = t.getViewport();
+      const rows = [];
+      for (let y = 0; y < t.rows; y++) {
+        if (!state.first && !t.isRowDirty(y)) continue;
+        const cells = [];
+        for (let x = 0; x < t.cols; x++) {
+          const c = viewport[y*t.cols+x];
+          let foreground = [c.fg_r,c.fg_g,c.fg_b], background = [c.bg_r,c.bg_g,c.bg_b];
+          if (c.flags & F.INVERSE) [foreground,background] = [background,foreground];
+          if (c.flags & F.FAINT) foreground = foreground.map((v,i)=>Math.round((v+background[i])/2));
+          cells.push({text:c.grapheme_len ? t.getGraphemeString(y,x) : String.fromCodePoint(c.codepoint||32),
+            column:x,width:c.width,foreground,background,bold:!!(c.flags&F.BOLD),italic:!!(c.flags&F.ITALIC),
+            underline:!!(c.flags&F.UNDERLINE),underline_color:foreground,underline_curly:false,
+            strikethrough:!!(c.flags&F.STRIKETHROUGH),overline:false,hidden:!!(c.flags&F.INVISIBLE)});
+        }
+        rows.push([y,cells]);
+      }
+      state.first = false;
+      t.markClean();
+      return JSON.stringify({revision:++state.revision,columns:t.cols,height:t.rows,rows,
+        background:rgb(colors.background),cursor:cursor.visible ? [cursor.x,cursor.y] : null,
+        cursor_shape:{block:'Block',bar:'Bar',underline:'Underline'}[cursor.style],
+        cursor_color:rgb(colors.cursor||colors.foreground),cursor_color_explicit:!!colors.cursor,
+        scrollback_lines:t.getScrollbackLength()});
+    }
+  };
+}
+export async function initializeEngine() {
+  globalThis.rmuxEngine = createHost(await Ghostty.load(new URL('./ghostty-vt.wasm',import.meta.url).href));
+}

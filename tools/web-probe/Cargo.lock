@@ -4825,6 +4825,7 @@ dependencies = [
  "gpui-ce",
  "gpui_ce_platform",
  "rmux-core",
+ "serde",
  "serde_json",
  "unicode-segmentation",
  "wasm-bindgen",

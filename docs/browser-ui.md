@@ -46,3 +46,10 @@ columns are explicitly placed because CE lacks fixed-width shaping; this is
 correctness-first and has not passed performance acceptance. The fixture does
 not substitute for browser VT parsing, live input, cursor/selection interaction
 or wide/combining-character acceptance.
+
+The host now also connects live ghostty-web 0.4.0 instances to that painter. Each
+pane owns an engine; sparse JSON patches replace dirty rows while preserving
+unchanged Rust Arc identities. Sample commands exercise basic ASCII input and
+independent state. Native input/IME, cursor painting, selection, resize and
+workspace integration remain acceptance work. Browser engine cell exports also
+lack native custom underline decoration and overline details.
