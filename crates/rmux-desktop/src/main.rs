@@ -51,6 +51,7 @@ mod find_bar;
 use rmux_core::layout;
 use rmux_core::palette_match;
 mod pane_view;
+mod pane_presentation;
 mod preferences;
 mod theme_file;
 use preferences::Preferences;

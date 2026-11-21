@@ -4824,6 +4824,7 @@ dependencies = [
 name = "rmux-web-probe"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
  "gpui-ce",
  "gpui_ce_platform",
  "rmux-core",

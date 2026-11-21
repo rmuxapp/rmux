@@ -4,6 +4,11 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+The local shared browser build now also uses native pane framing, control sizes
+and SVG icons. Tooltips select the host font explicitly, avoiding the unavailable
+macOS font in the browser overlay. Split buttons and zoom/unzoom are verified;
+rapid text-event delivery still needs correction. This build is not deployed.
+
 Desktop uses GPUI 0.2.2 and libghostty-vt. The local-only Cloudflare site uses JavaScript and ghostty-web 0.4.0. It shares neither the Rust application UI nor workspace state. It is a layout showcase, not a browser build of rmux. Keep that distinction visible until the shared build works.
 
 Rustable demonstrates the intended architecture: its browser host imports the same application crate and mounts its egui UI with WebRunner. Its demo services differ from native services, while its UI remains shared.

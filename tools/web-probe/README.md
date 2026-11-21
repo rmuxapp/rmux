@@ -1,5 +1,11 @@
 # Shared rmux web compatibility probe
 
+Latest pane chrome shares native framing, control sizes and SVG icons. Split
+Right/Below and Zoom buttons work with shared tooltips using the host font.
+Native check/WASM build and browser button/tooltip checks pass. Rapid browser
+text delivery dropped a character during checking; individual keypress commands
+work. Resolve input ordering before replacing the public demo.
+
 This isolated host runs actual desktop sources against GPUI CE 0.3.0 without
 changing the production GPUI 0.2.2 dependency. Shared sources include the text
 field, composition/undo, tooltip, palette presentation/navigation, and split

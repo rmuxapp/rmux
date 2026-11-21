@@ -56,7 +56,7 @@ impl SamplePane {
 impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.get(self.active).is_some_and(|terminal| terminal.read(cx).is_focused(window));
-        div().size_full().flex().flex_col().min_w_0().min_h_0()
+        crate::pane_presentation::frame(false, false)
             .on_action(cx.listener(|this, _: &NewTab, window, cx| this.add(window,cx)))
             .on_action(cx.listener(|this, _: &NextTab, window, cx| this.cycle(1,window,cx)))
             .on_action(cx.listener(|this, _: &PreviousTab, window, cx| this.cycle(-1,window,cx)))
@@ -71,8 +71,21 @@ impl Render for SamplePane {
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))
                             .on_mouse_down(MouseButton::Middle, cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); }))
                             .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx))))))
-                .child(div().id("add-tab").px_2().cursor_pointer().child("+")
-                    .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
+                .child(crate::pane_presentation::control_button("add-tab").child(crate::icons::icon("plus"))
+                    .on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
+                .children([
+                    ("split-right", "Split Right", Box::new(crate::Split) as Box<dyn Action>),
+                    ("split-down", "Split Below", Box::new(crate::SplitBelow) as Box<dyn Action>),
+                    ("expand", "Toggle Pane Zoom", Box::new(crate::TogglePaneZoom) as Box<dyn Action>),
+                ].into_iter().map(|(icon,label,action)| {
+                    crate::pane_presentation::control_button(icon).child(crate::icons::icon(icon))
+                        .tooltip(move |_,cx| cx.new(|_| crate::control_hint::ControlHint(label.into())).into())
+                        .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
+                            if !event.standard_click() { return; }
+                            this.focus(window,cx);
+                            window.dispatch_action(action.boxed_clone(),cx);
+                        }))
+                })))
             .child(div().flex_1().min_h_0().children(self.terminals.get(self.active).cloned()))
     }
 }

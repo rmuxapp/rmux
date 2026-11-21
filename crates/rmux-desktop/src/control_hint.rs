@@ -5,6 +5,7 @@ impl Render for ControlHint {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         let viewport = window.viewport_size();
         div()
+            .font_family(crate::FONT_FAMILY)
             .px_2()
             .py_1()
             .rounded_md()

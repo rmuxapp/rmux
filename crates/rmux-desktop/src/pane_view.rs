@@ -139,21 +139,7 @@ pub(super) fn pane_control(id: impl Into<ElementId>, hint: &'static str) -> Stat
     control_button(id).tooltip(move |_, cx| cx.new(|_| ControlHint(hint.into())).into())
 }
 
-pub(super) fn control_button(id: impl Into<ElementId>) -> Stateful<Div> {
-    div()
-        .id(id)
-        .flex()
-        .items_center()
-        .justify_center()
-        .w(px(28.))
-        .h(px(28.))
-        .flex_shrink_0()
-        .rounded_sm()
-        .text_color(rgb(0xaaaaaa))
-        .cursor_pointer()
-        .hover(|style| style.bg(rgb(0x353535)).text_color(rgb(0xffffff)))
-
-}
+pub(super) use crate::pane_presentation::control_button;
 
 /// Resolve on hover so settings reloads cannot leave an obsolete shortcut visible.
 pub(super) fn action_control(
@@ -1192,14 +1178,7 @@ impl Render for PaneView {
         }
         let focused = window.is_window_active() && self.is_focused(window, cx);
         let attention = self.needs_attention(cx);
-        div()
-            .relative()
-            .size_full()
-            .flex()
-            .flex_col()
-            .min_w_0()
-            .min_h_0()
-            .when(!self.benchmark, |pane| pane.border_1().border_color(if attention { rgb(0xf0b85b).into() } else { gpui::transparent_black() }))
+        crate::pane_presentation::frame(self.benchmark, attention)
             .on_action(cx.listener(|this, _: &NewTab, window, cx| this.add(window, cx)))
             .on_action(cx.listener(|this, _: &NewLocalTab, window, cx| this.add_terminal(false, window, cx)))
             .on_action(cx.listener(|this, _: &CloseOtherTabs, window, cx| this.close_tabs(TabCloseScope::Others, window, cx)))

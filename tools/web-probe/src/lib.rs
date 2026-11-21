@@ -238,11 +238,9 @@ impl InputProbe {
     fn panes(&self, tree: &PaneTree<usize>, path: Vec<usize>, cx: &mut Context<Self>) -> AnyElement {
         split_interaction::render_panes(tree, path, false, cx, &|id, cx| {
                 let id = *id;
-                split_presentation::leaf(("pane", id)).flex().flex_col().bg(rgb(0x111216))
-                    .border_t_2().border_color(rgb(if self.focused == id { 0x9790d7 } else { 0x383838 }))
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| { this.focused = id; this.samples[&id].update(cx, |sample, cx| sample.focus(window, cx)); cx.notify(); }))
-                    .child(div().p_3().flex_shrink_0().text_sm().child(format!("Pane {} · live Ghostty · sample session", id + 1)))
-                    .child(div().flex_1().min_h_0().child(self.samples[&id].clone()))
+                split_presentation::leaf(("pane", id))
+                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| { this.focused = id; this.samples[&id].update(cx, |sample, cx| sample.focus(window, cx)); }))
+                    .child(self.samples[&id].clone())
                     .into_any_element()
         })
     }
@@ -271,8 +269,8 @@ impl Render for InputProbe {
             .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(div().h(px(44.)).flex_shrink_0().px_3().flex().items_center().justify_between()
-                .child("Shared rmux layout · development probe")
-                .child(div().text_xs().text_color(rgb(0x9b9ba3)).child(row_host::shaping_summary()))
+                .child("rmux")
+                .child(div().text_xs().text_color(rgb(0x9b9ba3)).child("Sample sessions"))
                 .child(div().id("open-commands").px_3().py_1().cursor_pointer().child("Commands")
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);
@@ -294,7 +292,7 @@ impl Render for InputProbe {
                         this.feedback = None; cx.notify(); cx.stop_propagation();
                     }
                 }))
-                .child(palette_view::heading("Shared rmux palette · development probe"))
+                .child(palette_view::heading("Search commands and workspaces"))
                 .child(palette_view::search(self.input.clone()))
                 .child({
                     let entity = cx.entity();
@@ -320,7 +318,7 @@ impl Render for InputProbe {
 pub fn start() {
     #[cfg(target_family = "wasm")]
     gpui_platform::web_init();
-    gpui_platform::application().run(|cx| {
+    gpui_platform::application().with_assets(icons::Assets).run(|cx| {
         cx.text_system().add_fonts(vec![
             std::borrow::Cow::Borrowed(include_bytes!("../assets/Inter-Regular.ttf").as_slice()),
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
@@ -403,3 +401,8 @@ impl split_interaction::SplitHost for InputProbe {
 
 #[path = "../../../crates/rmux-desktop/src/shortcut_label.rs"]
 mod shortcut_label;
+
+#[path = "../../../crates/rmux-desktop/src/pane_presentation.rs"]
+mod pane_presentation;
+#[path = "../../../crates/rmux-desktop/src/icons.rs"]
+mod icons;

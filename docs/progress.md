@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser panes now use shared native framing, 28px control hit areas and bundled
+SVG icons for new tab, split right/below and zoom. Removed the extra diagnostic
+pane header and duplicate focus border. Shared tooltips explicitly select the
+host UI font: browser hover previously panicked resolving `.SystemUIFont`.
+Native check and WASM build pass. Browser checks cover visible tooltip, repeated
+split buttons, zoom/unzoom and subsequent individually delivered terminal keys,
+with no console errors. Evidence: target/shared-native-pane-chrome-wasm.png.
+Rapid browser typeText delivery dropped a character in this check; input-event
+ordering remains an open issue before public replacement. The public demo is
+unchanged and the browser host still has separate application orchestration.
+
 Browser Close Workspace command removes its workspace entity/panes/sessions and
 uses shared neighbor_after_removal plus group anchor preservation. The last close
 shows an empty state with a New Workspace button and focused host for keyboard
