@@ -30,6 +30,11 @@ search without installing the app. Sessions use bundled sample commands:
 `help`, `ls`, `logs`, `clear`, and `echo <text>`. They cannot access your files or
 run programs on your computer. Refreshing the page starts fresh.
 
+Right-click a workspace or group in the sidebar to rename it, edit its appearance,
+pin it, or close it. **Show Workspace Actions** opens the active workspace menu
+from the command palette. Use arrow keys to move, type to find an action,
+**Enter** to run it, or **Esc** to return to the terminal.
+
 Right-click a tab to rename, move, or close tabs. **Shift+F10** opens the active
 tab's menu. Right-click terminal output for copy, paste, selection, find, and
 scrollback actions. These menus are also available through **Show Tab Actions**

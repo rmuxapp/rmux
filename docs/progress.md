@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Deployed GitHub Shared WASM run 44955219219, source 5483941, to rmux.app
+(Cloudflare 0bb664a7). This adds the shared workspace/group context menus,
+palette access and embedded group icon to the previously deployed metadata
+controls. Optimized build and font/startup/engine/search checks passed. Live
+check verified the root page points to the correct source artifact, group
+creation renders the folder SVG and right-click opens group actions. Screenshot:
+`target/live-demo-workspace-menu-5483941.jpg`. User guide updated. Native
+keyboard source 212d230 passed CI run 44955508491; native downloads remain
+v0.1.4, so those keyboard changes are not released.
+
 Added/run the release queued-keyboard pressure benchmark for native text and
 report-all modes with 1/4/8/16 output-flooding PTYs. All eight cases admitted
 128 samples, advanced output and cleaned up children. At 16 panes p99 native
