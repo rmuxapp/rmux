@@ -64,6 +64,9 @@ impl SamplePane {
             labels: transfer.labels, next_number: transfer.next_number, tab_scroll: ScrollHandle::new() }
     }
     pub fn tab_count(&self) -> usize { self.terminals.len() }
+    pub fn contains_transferable_tab(&self, id: EntityId) -> bool {
+        self.rename.is_none() && self.terminals.iter().any(|terminal| terminal.entity_id() == id)
+    }
     pub fn insertion_index(&self, target: Option<EntityId>) -> Option<usize> {
         if self.rename.is_some() || self.terminals.len() >= 16 { return None; }
         match target { Some(id) => self.terminals.iter().position(|terminal| terminal.entity_id() == id), None => Some(self.terminals.len()) }

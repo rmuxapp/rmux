@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser sidebar rows accept terminal-tab drops from another workspace. Source
+tab identity, rename state and destination capacity are checked before transfer;
+the existing terminal entity/session moves to the destination's active pane.
+Empty destinations gain a pane, and empty source panes/workspaces are removed.
+Grouped targets are revealed before selection. Local pointer checks moved the
+same terminal twice with output/input continuity, covering empty source cleanup
+and nonempty source retention. Browser build passed. Screenshot:
+`target/browser-workspace-tab-transfer.jpg`. Not yet deployed.
+
 Deployed source 69d0bfb from successful GitHub Shared WASM run 44958579013
 to Cloudflare a417c7f9. Live rmux.app references this artifact. Verified a tab
 transfer between split panes retained earlier output, removed the empty source

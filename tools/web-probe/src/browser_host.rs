@@ -20,6 +20,29 @@ pub(crate) struct BrowserHost {
     workspace_scroll: ScrollHandle,
 }
 impl BrowserHost {
+    fn accepts_tab_drop(&self, item: &crate::drag_item::DragItem, target: EntityId, cx: &App) -> bool {
+        if item.scope == target { return false; }
+        let source = self.workspace_state.entries.iter().find(|entry| entry.1.entity_id() == item.scope);
+        let destination = self.workspace_state.entries.iter().find(|entry| entry.1.entity_id() == target);
+        source.is_some_and(|entry| entry.1.read(cx).owns_dragged_tab(item, cx))
+            && destination.is_some_and(|entry| entry.1.read(cx).accepts_workspace_tab(cx))
+    }
+    fn drop_workspace_tab(&mut self, item: &crate::drag_item::DragItem, target: EntityId, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.accepts_tab_drop(item, target, cx) { return; }
+        let from = self.workspace_state.entries.iter().position(|entry| entry.1.entity_id() == item.scope).unwrap();
+        let source = self.workspace_state.entries[from].1.clone();
+        let destination = self.workspace_state.entries.iter().find(|entry| entry.1.entity_id() == target).unwrap().1.clone();
+        // Validation and ownership transfer happen without an event-loop yield.
+        let Some(transfer) = source.update(cx, |workspace, cx| workspace.take_workspace_tab(item, cx)) else { return; };
+        destination.update(cx, |workspace, cx| workspace.receive_workspace_tab(transfer, window, cx));
+        if source.read(cx).samples.is_empty() {
+            self.workspace_state.close(from, |entry| (entry.1.entity_id(), entry.2));
+        }
+        if let Some(index) = self.workspace_state.entries.iter().position(|entry| entry.1.entity_id() == target) {
+            self.workspace_state.groups.reveal(target);
+            self.select(index, window, cx);
+        }
+    }
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx), false, WorkspaceMetadata::default())).collect();
@@ -353,10 +376,14 @@ impl Render for BrowserHost {
                         sidebar_presentation::row(("workspace",target),selected)
                             .when(self.rename.is_none(), |row| row
                                 .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: header.map_or_else(|| name.clone(), |group| group.name.clone()).into() }, |item, _, _, cx| cx.new(|_| item.clone()))
-                                .can_drop(move |item, _, cx| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && drop_owner.upgrade().is_some_and(|owner| owner.read(cx).workspace_state.can_drop_workspace(item.item, target, |entry| (entry.1.entity_id(), entry.2)))))
-                                .drag_over(move |style, item: &crate::drag_item::DragItem, _, _| if item.container == container && item.item != target { style.bg(rgb(0x435a7b)) } else { style })
+                                .can_drop(move |item, _, cx| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| drop_owner.upgrade().is_some_and(|owner| {
+                                    let owner = owner.read(cx);
+                                    if item.container == container { owner.workspace_state.can_drop_workspace(item.item, target, |entry| (entry.1.entity_id(), entry.2)) }
+                                    else { owner.accepts_tab_drop(item, target, cx) }
+                                })))
+                                .drag_over(|style, _: &crate::drag_item::DragItem, _, _| style.bg(rgb(0x435a7b)))
                                 .on_drop(cx.listener(move |this, item: &crate::drag_item::DragItem, window, cx| {
-                                    if item.container != cx.entity_id() { return; }
+                                    if item.container != cx.entity_id() { this.drop_workspace_tab(item, target, window, cx); return; }
                                     if let Ok(Some(index)) = this.workspace_state.drop_workspace(item.item, target, |entry| (entry.1.entity_id(), entry.2)) {
                                         this.select(index, window, cx);
                                     }

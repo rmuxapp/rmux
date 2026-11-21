@@ -126,6 +126,8 @@ description, and organize related workspaces into groups.
   space to move to the end. In the browser demo, you can also drag a tab to
   another pane in the same workspace; an emptied source pane closes.
 - **Move work:** use the palette’s move, detach, join, or merge actions.
+  You can also drag a terminal tab onto another workspace in the sidebar,
+  including in the browser demo. The terminal keeps its contents.
 - **Resize the sidebar:** drag its right edge; double-click to restore its width.
 - **Arrange sidebar rows:** drag a workspace onto another row to reorder it,
   or onto a group to join it. Drag a group header to move the group together.

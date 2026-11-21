@@ -101,6 +101,40 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
+    fn accepts_workspace_tab(&self, cx: &App) -> bool {
+        self.samples.is_empty() || self.samples.get(&self.focused).is_some_and(|pane| pane.read(cx).insertion_index(None).is_some())
+    }
+    fn owns_dragged_tab(&self, item: &drag_item::DragItem, cx: &App) -> bool {
+        self.samples.values().any(|pane| pane.entity_id() == item.container && pane.read(cx).contains_transferable_tab(item.item))
+    }
+    fn take_workspace_tab(&mut self, item: &drag_item::DragItem, cx: &mut Context<Self>) -> Option<sample_pane::TabTransfer> {
+        let (&id, pane) = self.samples.iter().find(|(_, pane)| pane.entity_id() == item.container)?;
+        let pane = pane.clone();
+        let transfer = pane.update(cx, |pane, cx| pane.take_tab(item.item, cx))?;
+        if pane.read(cx).tab_count() == 0 {
+            let next = self.pane_state.layout.as_ref().and_then(|tree|
+                rmux_core::pane_commands::focus_after_close(tree, &id, Some(&self.focused)));
+            self.pane_state.remove(&id);
+            self.samples.remove(&id);
+            if let Some(next) = next { self.focused = next; self.pane_state.focus_changed(next); }
+        }
+        self.split_drag = None;
+        cx.notify();
+        Some(transfer)
+    }
+    fn receive_workspace_tab(&mut self, transfer: sample_pane::TabTransfer, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(pane) = self.samples.get(&self.focused) {
+            pane.update(cx, |pane, cx| pane.append_tabs(transfer, window, cx));
+        } else {
+            let id = self.next_pane;
+            self.next_pane += 1;
+            let pane = cx.new(|_| sample_pane::SamplePane::from_transfer(transfer));
+            self.register_pane(id, pane, window, cx);
+            self.pane_state.layout = Some(PaneTree::Pane(id));
+            self.focused = id;
+        }
+        self.close_palette(window, cx);
+    }
     fn new(name: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
             let input = cx.new(|cx| text_field::TextField::new("", cx));
             input.update(cx, |input, cx| {
