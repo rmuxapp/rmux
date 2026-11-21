@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Rebuilt native desktop/CLI and ran the live-shell RPC fixture at 59d83de with
+queued focus/key input. All checks pass: pane swap/zoom guards, cross-window tab
+and workspace transfers, same/cross-window merge, retained nested layouts,
+seven live shell PIDs and Unicode variables, targeted input, stale-ID rejection,
+and fixture-child cleanup. Evidence and binary hash:
+benchmarks/native-queued-input-live-rpc.json. This is macOS debug lifecycle
+acceptance only, not visual, OS activation or latency acceptance. Native CI for
+cbbe959 also passed; newer native revisions were still building at observation.
+
 The existing macOS terminal library suite passes after queued keyboard changes:
 118 passed, four manual benchmarks ignored, 2.66 seconds execution. Added a real
 PTY protocol fixture that enables focus reports and Kitty event types, queues
