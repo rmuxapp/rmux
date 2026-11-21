@@ -1522,8 +1522,14 @@ impl WorkspaceWindow {
             })
         })
     }
+    fn request_process_close(&self, cx: &App) {
+        if let Some(cancel) = &self.workspace_launch_cancel { cancel.0.store(true, Ordering::Release); }
+        for entry in &self.entries { entry.workspace.read(cx).request_process_close(cx); }
+    }
+
     fn request_close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.should_confirm_close(cx) || cx.global::<Shutdowns>().quitting {
+            self.request_process_close(cx);
             window.remove_window();
             return;
         }
@@ -1541,9 +1547,10 @@ impl WorkspaceWindow {
             let confirmed = matches!(answer.await, Ok(1));
             drop(permit);
             let _ = cx.update(|window, cx| {
-                entity.update(cx, |this, _| {
+                entity.update(cx, |this, cx| {
                     this.window_close_prompt = false;
                     if confirmed {
+                        this.request_process_close(cx);
                         window.remove_window();
                     }
                 })
@@ -2414,9 +2421,7 @@ impl WorkspaceWindow {
     }
     fn close_workspace(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(entry) = self.entries.get(index) else { return; };
-        let workspace = entry.workspace.read(cx);
-        if let Some(cancel) = &workspace.split_launch_canceled { cancel.store(true, Ordering::Relaxed); }
-        for pane in &workspace.panes { pane.read(cx).request_process_close(cx); }
+        entry.workspace.read(cx).request_process_close(cx);
         self.remove_workspace_entry(index, window, cx);
     }
 
@@ -4147,6 +4152,7 @@ impl Render for WorkspaceWindow {
                 entity
                     .update(cx, |this, cx| {
                         if cx.global::<Shutdowns>().quitting || !this.should_confirm_close(cx) {
+                            this.request_process_close(cx);
                             true
                         } else {
                             this.request_close_window(window, cx);

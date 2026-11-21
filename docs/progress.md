@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Extended explicit process shutdown to window-close paths. Closing without a
+prompt, accepting the close prompt, and allowing the OS window-close callback
+now request shutdown for currently owned workspace/pane sessions before removal.
+Pending workspace, split and tab launches receive cancellation. Workspace close
+reuses the same ownership traversal; move/detach entry removal remains separate.
+Desktop compilation passes. The native window-close gesture/prompt was not
+runtime-tested this cycle, so window teardown acceptance remains unverified.
+Not released.
+
 Fixed process shutdown being delayed by retained UI entities. Current debug
 source reproduced one original child surviving workspace close; explicit shutdown
 requests in confirmed single/batch tab close and workspace close now leave none

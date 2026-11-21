@@ -2552,6 +2552,10 @@ impl EventEmitter<WorkspaceEmpty> for Workspace {}
 struct WorkspaceMetadataChanged;
 impl EventEmitter<WorkspaceMetadataChanged> for Workspace {}
 impl Workspace {
+    fn request_process_close(&self, cx: &App) {
+        if let Some(cancel) = &self.split_launch_canceled { cancel.store(true, Ordering::Relaxed); }
+        for pane in &self.panes { pane.read(cx).request_process_close(cx); }
+    }
     fn absorb_workspace(&mut self, source: &Entity<Self>, rebind: bool, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         let other = source.read(cx);
         anyhow::ensure!(source.entity_id() != cx.entity_id(), "Cannot merge a workspace into itself");
