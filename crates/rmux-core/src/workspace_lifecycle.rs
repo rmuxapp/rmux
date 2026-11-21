@@ -41,12 +41,37 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         let visible = self.groups.visible_workspace(metadata(self.entries.get(index)?).0);
         self.order(false, &metadata).iter().position(|index| metadata(&self.entries[*index]).0 == visible)
     }
+    pub fn group_anchor_slot(&self, member: W, key: impl Fn(&T) -> W) -> Option<(u64, W, usize)> {
+        let group = self.groups.containing(member)?;
+        let anchor = *group.members.first()?;
+        let index = self.entries.iter().position(|entry| key(entry) == anchor)?;
+        Some((group.id, anchor, index))
+    }
+    pub fn preserve_group_slot(&mut self, slot: Option<(u64, W, usize)>, selected: Option<W>, key: impl Fn(&T) -> W) {
+        if let Some((id, previous, position)) = slot {
+            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == id)
+                .and_then(|group| group.members.first()).copied() {
+                workspace_groups::preserve_anchor_slot(&mut self.entries, &key, previous, position, anchor);
+            }
+        }
+        if let Some(index) = selected.and_then(|selected| self.entries.iter().position(|entry| key(entry) == selected)) {
+            self.active = index;
+        }
+    }
+    pub fn move_to_group(&mut self, index: usize, destination: u64, key: impl Fn(&T) -> W) -> anyhow::Result<()> {
+        let member = self.entries.get(index).map(&key).ok_or_else(|| anyhow::anyhow!("workspace no longer exists"))?;
+        let selected = self.entries.get(self.active).map(&key);
+        let slot = self.group_anchor_slot(member, &key);
+        self.groups.add(destination, member, None)?;
+        self.preserve_group_slot(slot, selected, key);
+        self.groups.get_mut(destination).unwrap().collapsed = false;
+        Ok(())
+    }
     pub fn edit_group(&mut self, index: usize, edit: GroupEdit, key: impl Fn(&T) -> W) -> anyhow::Result<bool> {
         let Some(member) = self.entries.get(index).map(&key) else { return Ok(false); };
         let Some(group) = self.groups.containing(member) else { return Ok(false); };
         let id = group.id;
-        let previous = group.members[0];
-        let slot = self.entries.iter().position(|entry| key(entry) == previous);
+        let slot = self.group_anchor_slot(member, &key);
         let selected = self.entries.get(self.active).map(&key);
         match edit {
             GroupEdit::Remove => self.groups.remove(member),
@@ -56,15 +81,7 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
                 group.pinned = !group.pinned;
             }
         }
-        if let Some(slot) = slot {
-            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == id)
-                .and_then(|group| group.members.first()).copied() {
-                workspace_groups::preserve_anchor_slot(&mut self.entries, &key, previous, slot, anchor);
-            }
-        }
-        if let Some(index) = selected.and_then(|selected| self.entries.iter().position(|entry| key(entry) == selected)) {
-            self.active = index;
-        }
+        self.preserve_group_slot(slot, selected, key);
         Ok(true)
     }
     pub fn next_group_name(&self) -> String {
@@ -76,21 +93,9 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
     pub fn create_group(&mut self, index: usize, generated: bool, key: impl Fn(&T) -> W) -> anyhow::Result<u64> {
         let member = self.entries.get(index).map(&key).ok_or_else(|| anyhow::anyhow!("workspace no longer exists"))?;
         let selected = self.entries.get(self.active).map(&key);
-        let slot = self.groups.containing(member).and_then(|group| {
-            let anchor = *group.members.first()?;
-            let index = self.entries.iter().position(|entry| key(entry) == anchor)?;
-            Some((group.id, anchor, index))
-        });
+        let slot = self.group_anchor_slot(member, &key);
         let id = self.groups.create(self.next_group_name(), vec![member], generated)?;
-        if let Some((old_group, previous, position)) = slot {
-            if let Some(anchor) = self.groups.entries().iter().find(|group| group.id == old_group)
-                .and_then(|group| group.members.first()).copied() {
-                workspace_groups::preserve_anchor_slot(&mut self.entries, &key, previous, position, anchor);
-            }
-        }
-        if let Some(index) = selected.and_then(|selected| self.entries.iter().position(|entry| key(entry) == selected)) {
-            self.active = index;
-        }
+        self.preserve_group_slot(slot, selected, key);
         Ok(id)
     }
     pub fn select(&mut self, index: usize, key: impl Fn(&T) -> W) -> bool {
@@ -226,6 +231,27 @@ pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn moving_anchor_between_groups_preserves_selection_and_reveals_destination() {
+        let mut state = State { entries: vec![1, 2, 3, 4], active: 2, ..Default::default() };
+        let source = state.groups.create("source".into(), vec![1, 4], false).unwrap();
+        let destination = state.groups.create("destination".into(), vec![2], false).unwrap();
+        state.groups.get_mut(destination).unwrap().collapsed = true;
+        assert!(state.move_to_group(0, 999, |id| *id).is_err());
+        assert_eq!(state.entries, vec![1, 2, 3, 4]);
+        assert_eq!(state.groups.containing(1).unwrap().id, source);
+        assert!(state.groups.get_mut(destination).unwrap().collapsed);
+        state.move_to_group(0, destination, |id| *id).unwrap();
+        assert_eq!(state.entries, vec![4, 2, 3, 1]);
+        assert_eq!(state.entries[state.active], 3);
+        assert_eq!(state.groups.containing(4).unwrap().id, source);
+        assert_eq!(state.groups.containing(1).unwrap().members, vec![2, 1]);
+        assert!(!state.groups.containing(1).unwrap().collapsed);
+        state.move_to_group(3, destination, |id| *id).unwrap();
+        assert_eq!(state.entries, vec![4, 2, 3, 1]);
+        assert_eq!(state.groups.containing(1).unwrap().members, vec![2, 1]);
+    }
 
     #[test]
     fn group_edits_preserve_selection_and_promoted_anchor_slot() {

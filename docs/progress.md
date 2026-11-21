@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Workspace-to-group moves now run through shared `State::move_to_group`; native
+host retains availability checks and UI notice/focus handling. Consolidated
+anchor-slot capture/restoration into shared state for native group operations,
+group creation, member edits and moves. Nine focused lifecycle tests pass,
+including invalid destination nonmutation, moving an anchor between groups,
+retaining another selected workspace, revealing the destination and repeated
+same-group moves. Native and WASM checks pass. Browser group-target selection UI
+is still missing, so this does not claim that browser move-to-group is exposed.
+CI run 44942148273 remained pending when checked; tooling speedup is unmeasured.
+
 Sidebar group collapse controls and pin indicators now use shared presentation
 functions in both hosts. Browser groups use native SVG chevrons, hover treatment,
 tooltip and standard-click guard; pinned groups now visibly show their pin. Native

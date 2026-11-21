@@ -722,21 +722,10 @@ impl WorkspaceWindow {
     }
 
     fn group_anchor_slot(&self, member: EntityId) -> Option<(u64, EntityId, usize)> {
-        let group = self.workspace_state.groups.containing(member)?;
-        let anchor = *group.members.first()?;
-        let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == anchor)?;
-        Some((group.id, anchor, index))
+        self.workspace_state.group_anchor_slot(member, |entry| entry.workspace.entity_id())
     }
-
     fn preserve_group_slot(&mut self, slot: Option<(u64, EntityId, usize)>, selected: Option<EntityId>) {
-        if let Some((id, previous, index)) = slot {
-            if let Some(anchor) = self.workspace_state.groups.entries().iter().find(|group| group.id == id).and_then(|group| group.members.first()).copied() {
-                workspace_groups::preserve_anchor_slot(&mut self.workspace_state.entries, |entry| entry.workspace.entity_id(), previous, index, anchor);
-            }
-        }
-        if let Some(index) = selected.and_then(|id| self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)) {
-            self.workspace_state.active = index;
-        }
+        self.workspace_state.preserve_group_slot(slot, selected, |entry| entry.workspace.entity_id());
     }
 
     fn top_level_pinned(&self, index: usize) -> bool {
@@ -837,15 +826,9 @@ impl WorkspaceWindow {
 
     fn move_workspace_to_group(&mut self, group: u64, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
-        let Some(entry) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let selected = entry.workspace.entity_id();
-        let slot = self.group_anchor_slot(selected);
-        match self.workspace_state.groups.add(group, selected, None) {
-            Ok(()) => {
-                self.preserve_group_slot(slot, Some(selected));
-                self.workspace_state.groups.get_mut(group).unwrap().collapsed = false;
-                self.scroll_to_workspace(self.workspace_state.active);
-            }
+        if self.workspace_state.entries.get(self.workspace_state.active).is_none() { return; }
+        match self.workspace_state.move_to_group(self.workspace_state.active, group, |entry| entry.workspace.entity_id()) {
+            Ok(()) => self.scroll_to_workspace(self.workspace_state.active),
             Err(error) => self.notice = Some(format!("Move workspace to group: {error}")),
         }
         cx.notify();
