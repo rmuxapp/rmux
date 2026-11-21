@@ -62,7 +62,7 @@ mod tests {
         input.clear();
         assert_eq!(input.display(1), "\r\x1b[2K");
         assert_eq!(input.display(2), "\r\x1b[2K$");
-        assert!(input.append("bad", |_| Some(vec![])).is_err());
+        assert!(input.append("界", |_| Some(vec![])).is_err());
         assert_eq!(input.text(), "");
         Ok(())
     }

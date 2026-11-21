@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+ASCII sample typing now appends one-cell graphemes directly in Rust, avoiding
+whole-draft clones and native-engine/JSON measurement calls for the common path.
+Non-ASCII drafts still remeasure through Ghostty so cross-event combining and
+ZWJ clusters remain correct. A focused test fills the 4 KiB input cap without
+invoking the engine callback, checks rejection/clear/backspace behavior, and the
+existing engine-backed Unicode editing test still passes. WASM check passes.
+This removes a known per-keystroke boundary cost; no input-to-display timing or
+allocation-total improvement has been measured. Not deployed yet.
+
 Optional font loading now supports independent CJK and emoji requests. Reused
 Rustable's licensed, unmodified 1,982,596-byte Noto Emoji outline font, outside
 WASM and only fetched on emoji input/preedit. The shared loader rejects unknown

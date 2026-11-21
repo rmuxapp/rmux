@@ -68,7 +68,7 @@ Closing the last terminal focuses the empty workspace, allowing keyboard or
 palette creation of a replacement terminal.
 
 Sample sessions accept a bounded 4 KiB single-line Unicode draft. Ghostty supplies
-cluster widths and segmentation; backspace removes whole graphemes. Narrow panes
+cluster widths and segmentation; printable ASCII stays in Rust without engine/JSON measurement calls, and backspace removes whole graphemes. Narrow panes
 show the draft suffix without wrapping; submitting restores the full command to
 history. `echo <text>` is a bundled sample operation, not a real shell command.
 Actual IME event verification and multiline paste remain open.
