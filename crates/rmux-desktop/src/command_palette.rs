@@ -274,7 +274,8 @@ impl CommandPalette {
             ($action:ident) => {
                 commands.push(Command {
                     title: rmux_core::commands::CommandId::$action.title().into(),
-                    target: PaletteEvent::Run(Box::new($action)),
+                    target: PaletteEvent::Run(crate::pane_actions::action(rmux_core::commands::CommandId::$action)
+                        .unwrap_or_else(|| Box::new($action))),
                     shortcut: None,
                 subtitle: None,
                 });

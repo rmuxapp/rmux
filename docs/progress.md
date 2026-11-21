@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Pane keyboard/action routing now uses one shared GPUI module in both hosts for
+19 split/focus/zoom/resize/swap commands plus next/previous pane. Both palettes
+use its action factory; the browser restores focus and dispatches pane actions
+through the same event handlers instead of running a separate palette path.
+Added browser Split Left and Split Above with shared insertion policy. Desktop
+check and local WASM build pass. Browser smoke verified left/above placement,
+keyboard zoom and palette equalize restoring all three panes with their output.
+Screenshot: target/shared-pane-routing.jpg. Native runtime routing was not
+re-tested; workspace orchestration/platform services remain separate. Not deployed.
+
 ASCII sample typing now appends one-cell graphemes directly in Rust, avoiding
 whole-draft clones and native-engine/JSON measurement calls for the common path.
 Non-ASCII drafts still remeasure through Ghostty so cross-event combining and

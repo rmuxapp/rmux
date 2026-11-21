@@ -19,6 +19,8 @@ mod edit_history;
 mod text_field;
 mod text_layout;
 mod fonts;
+#[path = "../../../crates/rmux-desktop/src/pane_actions.rs"]
+mod pane_actions;
 #[path = "../../../crates/rmux-desktop/src/palette_view.rs"]
 mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
@@ -29,7 +31,7 @@ const COMMANDS: &[CommandId] = &[
     CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
     CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
-    CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
+    CommandId::Split, CommandId::SplitBelow, CommandId::SplitLeft, CommandId::SplitAbove, CommandId::TogglePaneZoom,
     CommandId::SwapPaneNext, CommandId::SwapPaneLeft, CommandId::SwapPaneRight,
     CommandId::SwapPaneUp, CommandId::SwapPaneDown,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
@@ -43,7 +45,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown]);
 fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
     Some(match command {
         CommandId::NewTab => Box::new(NewTab),
@@ -162,20 +164,13 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            if let Some(action) = tab_action(*command) { action } else { match command {
+            if let Some(action) = tab_action(*command).or_else(|| pane_actions::action(*command)) { action } else { match command {
                 CommandId::ToggleSidebar => Box::new(ToggleSidebar),
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
                 CommandId::LastWorkspace => Box::new(LastWorkspace),
                 CommandId::NextWorkspace => Box::new(NextWorkspace),
                 CommandId::PreviousWorkspace => Box::new(PreviousWorkspace),
-                CommandId::Split => Box::new(Split),
-                CommandId::SplitBelow => Box::new(SplitBelow),
-                CommandId::TogglePaneZoom => Box::new(TogglePaneZoom),
-                CommandId::FocusLeft => Box::new(FocusLeft),
-                CommandId::FocusRight => Box::new(FocusRight),
-                CommandId::FocusUp => Box::new(FocusUp),
-                CommandId::FocusDown => Box::new(FocusDown),
                 _ => return None,
             } }
         } else {
@@ -213,7 +208,11 @@ impl InputProbe {
             cx.emit(PaletteRequest::SelectWorkspace(id));
             return;
         }
-        self.execute(COMMANDS[index], window, cx);
+        let command = COMMANDS[index];
+        if let Some(action) = pane_actions::action(command) {
+            self.close_palette(window, cx);
+            window.dispatch_action(action, cx);
+        } else { self.execute(command, window, cx); }
     }
     fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
@@ -233,11 +232,12 @@ impl InputProbe {
                 let scroll = if command == CommandId::ScrollToTop { rmux_core::scroll::Scroll::Top } else { rmux_core::scroll::Scroll::Bottom };
                 if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.scroll(scroll,cx)); }
             }
-            CommandId::Split | CommandId::SplitBelow => {
-                if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
-                let axis = if command == CommandId::Split { Axis::Columns } else { Axis::Rows };
+            CommandId::Split | CommandId::SplitBelow | CommandId::SplitLeft | CommandId::SplitAbove => {
+                if self.samples.len() >= 16 { self.feedback = Some("Demo limit: 16 panes".into()); cx.notify(); return; }
+                let axis = if matches!(command, CommandId::Split | CommandId::SplitLeft) { Axis::Columns } else { Axis::Rows };
+                let before = matches!(command, CommandId::SplitLeft | CommandId::SplitAbove);
                 if self.tree.is_none() { self.start_terminal(window, cx); return; }
-                if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), self.next_pane, axis, false).is_some() {
+                if rmux_core::pane_commands::insert(&mut self.tree, Some(&self.focused), self.next_pane, axis, before).is_some() {
                     self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
@@ -306,6 +306,14 @@ impl InputProbe {
     }
 
 }
+impl pane_actions::PaneCommandHost for InputProbe {
+    fn run_pane_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        self.execute(command, window, cx);
+    }
+    fn cycle_pane_command(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
+        self.cycle_pane(direction, window, cx);
+    }
+}
 impl Render for InputProbe {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let height = f32::from(window.viewport_size().height);
@@ -321,15 +329,7 @@ impl Render for InputProbe {
             .on_action(cx.listener(|this, _: &NewTab, window, cx| {
                 if this.tree.is_none() { this.start_terminal(window,cx); }
             }))
-            .on_action(cx.listener(|this, _: &Split, window, cx| this.execute(CommandId::Split, window, cx)))
-            .on_action(cx.listener(|this, _: &SplitBelow, window, cx| this.execute(CommandId::SplitBelow, window, cx)))
-            .on_action(cx.listener(|this, _: &TogglePaneZoom, window, cx| this.execute(CommandId::TogglePaneZoom, window, cx)))
-            .on_action(cx.listener(|this, _: &FocusLeft, window, cx| this.focus_direction(rmux_core::layout::Direction::Left, window, cx)))
-            .on_action(cx.listener(|this, _: &FocusRight, window, cx| this.focus_direction(rmux_core::layout::Direction::Right, window, cx)))
-            .on_action(cx.listener(|this, _: &FocusUp, window, cx| this.focus_direction(rmux_core::layout::Direction::Up, window, cx)))
-            .on_action(cx.listener(|this, _: &FocusDown, window, cx| this.focus_direction(rmux_core::layout::Direction::Down, window, cx)))
-            .on_action(cx.listener(|this, _: &NextPane, window, cx| this.cycle_pane(1, window, cx)))
-            .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
+            .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(workspace_presentation::toolbar()
                 .child(workspace_presentation::sidebar_toggle())

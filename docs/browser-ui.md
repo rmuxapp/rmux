@@ -49,7 +49,7 @@ views and core policies are useful migration steps, not completion evidence.
   recursive split layout and interaction, sidebar resize/reset, icons, row cache/painter, cell metrics,
   cursor geometry, IME preedit overlay/range bounds/hit testing and draggable
   scrollback indicator.
-- **Input:** shared composition model, workspace/pane/tab shortcut definitions,
+- **Input:** shared pane action factory and keyboard/palette event routing, composition model, workspace/pane/tab shortcut definitions,
   tab action dispatch, fractional wheel accumulation and Shift+PageUp/Down/Home/End.
   Delivered-key tracking is shared too: shifted aliases pair with their original
   press, and repeats do not replace it. The browser routes release events for

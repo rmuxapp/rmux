@@ -63,6 +63,7 @@ mod row_cache;
 mod row_host;
 mod cursor_view;
 mod pane_shortcuts;
+mod pane_actions;
 mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;
@@ -3157,6 +3158,36 @@ impl Workspace {
         created
     }
 }
+impl pane_actions::PaneCommandHost for Workspace {
+    fn run_pane_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
+        use rmux_core::commands::CommandId;
+        match command {
+            CommandId::Split => self.add(SplitAxis::Columns, window, cx),
+            CommandId::SplitBelow => self.add(SplitAxis::Rows, window, cx),
+            CommandId::SplitLeft => self.add_positioned(SplitAxis::Columns, true, window, cx),
+            CommandId::SplitAbove => self.add_positioned(SplitAxis::Rows, true, window, cx),
+            CommandId::TogglePaneZoom => self.toggle_zoom(window, cx),
+            CommandId::EqualizePanes => self.equalize_panes(cx),
+            CommandId::SwapPaneNext => self.swap_pane_next(window, cx),
+            CommandId::ResizePaneLeft => self.resize_pane(layout::Direction::Left, window, cx),
+            CommandId::ResizePaneRight => self.resize_pane(layout::Direction::Right, window, cx),
+            CommandId::ResizePaneUp => self.resize_pane(layout::Direction::Up, window, cx),
+            CommandId::ResizePaneDown => self.resize_pane(layout::Direction::Down, window, cx),
+            CommandId::SwapPaneLeft => self.swap_pane_direction(layout::Direction::Left, window, cx),
+            CommandId::SwapPaneRight => self.swap_pane_direction(layout::Direction::Right, window, cx),
+            CommandId::SwapPaneUp => self.swap_pane_direction(layout::Direction::Up, window, cx),
+            CommandId::SwapPaneDown => self.swap_pane_direction(layout::Direction::Down, window, cx),
+            CommandId::FocusLeft => self.focus_direction(layout::Direction::Left, window, cx),
+            CommandId::FocusRight => self.focus_direction(layout::Direction::Right, window, cx),
+            CommandId::FocusUp => self.focus_direction(layout::Direction::Up, window, cx),
+            CommandId::FocusDown => self.focus_direction(layout::Direction::Down, window, cx),
+            _ => {},
+        }
+    }
+    fn cycle_pane_command(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
+        self.cycle(direction, window, cx);
+    }
+}
 impl Render for Workspace {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if let Some(zoomed) = self.zoomed {
@@ -3173,30 +3204,8 @@ impl Render for Workspace {
             .text_color(rgb(0xdcdfe6))
             .flex()
             .flex_col()
+            .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CancelSplit, _, cx| this.cancel_split(cx)))
-            .on_action(
-                cx.listener(|view, _: &TogglePaneZoom, window, cx| view.toggle_zoom(window, cx)),
-            )
-            .on_action(cx.listener(|view, _: &EqualizePanes, _, cx| view.equalize_panes(cx)))
-            .on_action(cx.listener(|view, _: &ResizePaneLeft, window, cx| view.resize_pane(layout::Direction::Left, window, cx)))
-            .on_action(cx.listener(|view, _: &ResizePaneRight, window, cx| view.resize_pane(layout::Direction::Right, window, cx)))
-            .on_action(cx.listener(|view, _: &ResizePaneUp, window, cx| view.resize_pane(layout::Direction::Up, window, cx)))
-            .on_action(cx.listener(|view, _: &ResizePaneDown, window, cx| view.resize_pane(layout::Direction::Down, window, cx)))
-            .on_action(
-                cx.listener(|view, _: &SwapPaneNext, window, cx| view.swap_pane_next(window, cx)),
-            )
-            .on_action(cx.listener(|view, _: &SwapPaneLeft, window, cx| {
-                view.swap_pane_direction(layout::Direction::Left, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &SwapPaneRight, window, cx| {
-                view.swap_pane_direction(layout::Direction::Right, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &SwapPaneUp, window, cx| {
-                view.swap_pane_direction(layout::Direction::Up, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &SwapPaneDown, window, cx| {
-                view.swap_pane_direction(layout::Direction::Down, window, cx)
-            }))
             .on_action(
                 cx.listener(|view, _: &JoinPaneNext, window, cx| view.join_pane_next(window, cx)),
             )
@@ -3224,38 +3233,14 @@ impl Render for Workspace {
             .on_action(cx.listener(|view, _: &BreakTabBelow, window, cx| {
                 view.break_tab(SplitAxis::Rows, false, window, cx)
             }))
-            .on_action(cx.listener(|view, _: &SplitLeft, window, cx| view.add_positioned(SplitAxis::Columns, true, window, cx)))
-            .on_action(cx.listener(|view, _: &SplitAbove, window, cx| view.add_positioned(SplitAxis::Rows, true, window, cx)))
-            .on_action(
-                cx.listener(|view, _: &Split, window, cx| view.add(SplitAxis::Columns, window, cx)),
-            )
-            .on_action(
-                cx.listener(|view, _: &SplitBelow, window, cx| {
-                    view.add(SplitAxis::Rows, window, cx)
-                }),
-            )
             .on_action(
                 cx.listener(|view, _: &DumpRenderMetrics, window, cx| {
                     view.dump_metrics(window, cx)
                 }),
             )
-            .on_action(cx.listener(|view, _: &NextPane, window, cx| view.cycle(1, window, cx)))
-            .on_action(cx.listener(|view, _: &FocusLeft, window, cx| {
-                view.focus_direction(layout::Direction::Left, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &FocusRight, window, cx| {
-                view.focus_direction(layout::Direction::Right, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &FocusUp, window, cx| {
-                view.focus_direction(layout::Direction::Up, window, cx)
-            }))
             .on_action(cx.listener(|view, action: &SelectPaneNumber, window, cx| {
                 view.select_pane_number(action.number, window, cx);
             }))
-            .on_action(cx.listener(|view, _: &FocusDown, window, cx| {
-                view.focus_direction(layout::Direction::Down, window, cx)
-            }))
-            .on_action(cx.listener(|view, _: &PreviousPane, window, cx| view.cycle(-1, window, cx)))
             .when(self.zoomed.is_some(), |root| {
                 let focus = self.panes.iter().find(|pane| Some(pane.entity_id()) == self.zoomed)
                     .and_then(|pane| {
