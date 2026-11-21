@@ -210,3 +210,9 @@ Palette hints now resolve actual key bindings against the terminal that opened
 it and format them with native shortcut_label code. Unbound actions omit hints;
 workspace results use their numbered navigation bindings. All 15 native shortcut
 tests and WASM build pass; browser visual check confirms macOS labels.
+
+Close Workspace is available in the palette. It removes the workspace entity,
+selects the shared logical neighbor, and preserves a surviving group anchor's
+position. Closing all workspaces shows a New Workspace empty state; Cmd+N works
+there too. WASM build and browser close/empty/recreate/input checks pass. Grouped
+close interactions and memory measurements remain pending.

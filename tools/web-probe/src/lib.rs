@@ -20,7 +20,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
-    CommandId::NewWorkspace, CommandId::NewWorkspaceGroup,
+    CommandId::NewWorkspace, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
@@ -225,7 +225,7 @@ impl InputProbe {
                 if let Some(tree) = &mut self.tree { tree.resize_direction(&self.focused, direction); }
             }
             CommandId::TogglePaneZoom => self.zoomed = !self.zoomed,
-            command @ (CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
+            command @ (CommandId::CloseWorkspace | CommandId::NewWorkspace | CommandId::NewWorkspaceGroup
                 | CommandId::NextWorkspace | CommandId::PreviousWorkspace | CommandId::UngroupWorkspaces) => {
                 self.close_palette(window, cx);
                 cx.emit(WorkspaceCommand(command));

@@ -4,13 +4,14 @@ use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_pre
 pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
+    empty_focus: FocusHandle,
     groups: rmux_core::workspace_groups::Groups<EntityId>,
 }
 impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, groups: Default::default() };
+        let mut host = Self { workspaces, active: 0, empty_focus: cx.focus_handle(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -18,6 +19,7 @@ impl BrowserHost {
         let entity = cx.new(|cx| InputProbe::new(window, cx));
         cx.subscribe_in(&entity, window, |this, _, command: &WorkspaceCommand, window, cx| {
             match command.0 {
+                CommandId::CloseWorkspace => this.close_workspace(window, cx),
                 CommandId::NewWorkspace => this.add(window, cx),
                 CommandId::NewWorkspaceGroup => this.new_group(window, cx),
                 CommandId::NextWorkspace => this.cycle(1, window, cx),
@@ -43,6 +45,26 @@ impl BrowserHost {
             }
         }).detach();
         entity
+    }
+    fn close_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        use rmux_core::workspace_groups::{neighbor_after_removal, preserve_anchor_slot};
+        let Some((_, current)) = self.workspaces.get(self.active) else { return; };
+        let removed = current.entity_id();
+        let order: Vec<_> = self.workspace_order(true).into_iter()
+            .map(|index| self.workspaces[index].1.entity_id()).collect();
+        let next = neighbor_after_removal(&order, removed);
+        let anchor_group = self.groups.containing(removed)
+            .filter(|group| group.members.first() == Some(&removed)).map(|group| group.id);
+        let previous_index = self.active;
+        self.groups.remove(removed);
+        self.workspaces.remove(previous_index);
+        if let Some(anchor) = anchor_group.and_then(|id| self.groups.entries().iter().find(|group| group.id == id))
+            .and_then(|group| group.members.first()).copied() {
+            preserve_anchor_slot(&mut self.workspaces, |(_, entity)| entity.entity_id(), removed, previous_index, anchor);
+        }
+        self.active = next.and_then(|id| self.workspaces.iter().position(|(_, entity)| entity.entity_id() == id)).unwrap_or(0);
+        if self.workspaces.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
+        else { self.select(self.active, window, cx); }
     }
     fn ungroup(&mut self, cx: &mut Context<Self>) {
         let selected = self.workspaces[self.active].1.entity_id();
@@ -88,12 +110,13 @@ impl BrowserHost {
     }
     fn add_workspace(&mut self, inherit_group: bool, window: &mut Window, cx: &mut Context<Self>) -> bool {
         if self.workspaces.len() >= 16 { return false; }
-        let current = self.workspaces[self.active].1.entity_id();
-        let group = inherit_group.then(|| self.groups.containing(current).map(|group| group.id)).flatten();
-        let name = format!("Workspace {}", self.workspaces.len()+1);
+        let current = self.workspaces.get(self.active).map(|(_, entity)| entity.entity_id());
+        let group = current.filter(|_| inherit_group).and_then(|id| self.groups.containing(id)).map(|group| group.id);
+        let name = (1..).map(|number| format!("Workspace {number}"))
+            .find(|name| !self.workspaces.iter().any(|(existing, _)| existing == name)).unwrap();
         let entity = Self::new_workspace_view(window, cx);
         if let Some(group) = group {
-            self.groups.add_new(group, entity.entity_id(), Some(current), rmux_core::workspace_groups::Placement::AfterCurrent)
+            self.groups.add_new(group, entity.entity_id(), current, rmux_core::workspace_groups::Placement::AfterCurrent)
                 .expect("current group exists");
         }
         self.workspaces.push((name,entity));
@@ -112,7 +135,7 @@ impl BrowserHost {
 }
 impl Render for BrowserHost {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().flex().font_family("Inter").text_color(rgb(0xe2e3e7))
+        div().size_full().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
             .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.new_group(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.add(window, cx)))
             .on_action(cx.listener(|this, _: &NextWorkspace, window, cx| this.cycle(1, window, cx)))
@@ -153,6 +176,15 @@ impl Render for BrowserHost {
                             .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx)))
                     })) ))
 
-            .child(div().flex_1().min_w_0().h_full().child(self.workspaces[self.active].1.clone()))
+             .child(div().flex_1().min_w_0().h_full().child(
+                if let Some((_, workspace)) = self.workspaces.get(self.active) {
+                    workspace.clone().into_any_element()
+                } else {
+                    div().size_full().bg(rgb(0x151517)).flex().flex_col().items_center().justify_center().gap_3()
+                        .child("No workspaces open")
+                        .child(div().id("empty-new-workspace").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
+                            .child("New Workspace").on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
+                        .into_any_element()
+                }))
     }
 }

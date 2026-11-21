@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser Close Workspace command removes its workspace entity/panes/sessions and
+uses shared neighbor_after_removal plus group anchor preservation. The last close
+shows an empty state with a New Workspace button and focused host for keyboard
+creation. Names avoid collisions with existing workspaces. WASM build passes;
+browser verified first close selects website, last close shows empty state, then
+Cmd+N creates a fresh terminal accepting ls. Evidence:
+target/shared-workspace-recreation-wasm.png. Group-anchor close interaction and
+measured engine/memory disposal remain unverified; no native process-close prompts
+are needed for these bundled sample sessions.
+
+
 Browser palette displays shortcut hints resolved from the active keymap against
 the originating terminal's focus handle, using the extracted native key-label
 formatter. Unsupported/unbound actions show no invented hint; numbered workspace
