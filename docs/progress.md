@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Completed the browser palette's basic tab lifecycle commands using native
+CommandIds and existing keyboard action handlers. Palette execution restores
+terminal focus before dispatch, rather than implementing another path for tab
+movement. Closing the last terminal now focuses the empty workspace, allowing
+Cmd+P / New Terminal Tab and Cmd+T to recreate a terminal. WASM build and browser
+checks pass for creation, previous-tab selection, palette close, final-tab close
+and recovery through both palette and shortcut. Evidence:
+target/shared-tab-palette-recovery.jpg. The published demo is unchanged.
+
 Both hosts now consume shared tab-reorder transitions and keyboard bindings.
 Move Tab Left/Right are shared command identities and available in both palettes.
 Browser terminal titles are stable per session rather than position-derived;

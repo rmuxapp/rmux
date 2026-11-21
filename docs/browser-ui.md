@@ -4,6 +4,13 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+The browser palette now includes New Terminal Tab, Next/Previous Tab and Close
+Terminal Tab with native command identities and binding hints. All six tab
+commands (including movement) restore terminal focus and dispatch the existing
+keyboard actions. Empty panes receive a dedicated focus target so Cmd+P and
+Cmd+T remain usable after the last terminal closes. Browser checks verify
+creation, selection, closing and empty-pane recovery; the WASM build passes.
+
 Tab movement now uses `Tabs::move_active` in both hosts and shares
 Ctrl+Shift+PageUp/PageDown bindings. Both palettes expose Move Tab Left/Right.
 Browser tab titles stay attached to session identities across movement/removal,

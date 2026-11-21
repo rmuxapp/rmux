@@ -22,8 +22,9 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
-    CommandId::MoveTabLeft, CommandId::MoveTabRight,
-    CommandId::NewWorkspace, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
+    CommandId::NewWorkspace, CommandId::NewTab,
+    CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
+    CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::CloseWorkspace,
     CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::UngroupWorkspaces,
     CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom,
     CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
@@ -38,6 +39,17 @@ impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
 actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
+fn tab_action(command: CommandId) -> Option<Box<dyn Action>> {
+    Some(match command {
+        CommandId::NewTab => Box::new(NewTab),
+        CommandId::NextTab => Box::new(NextTab),
+        CommandId::PreviousTab => Box::new(PreviousTab),
+        CommandId::MoveTabLeft => Box::new(MoveTabLeft),
+        CommandId::MoveTabRight => Box::new(MoveTabRight),
+        CommandId::ClosePane => Box::new(ClosePane),
+        _ => return None,
+    })
+}
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -47,6 +59,7 @@ mod clipboard {
     }
 }
 struct InputProbe {
+    empty_focus: FocusHandle,
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
     workspace_results: Vec<(EntityId, String)>,
@@ -78,7 +91,7 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
+            let mut host = InputProbe { empty_focus: cx.focus_handle(), palette_origin: None, split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -91,6 +104,7 @@ impl InputProbe {
             let old_index = this.tree.as_ref().and_then(|tree| tree.pane_index(&id)).unwrap_or(0);
             this.tree = this.tree.take().and_then(|tree| tree.remove(&id));
             this.samples.remove(&id);
+            if this.tree.is_none() { this.empty_focus.focus(window,cx); }
             this.zoomed = false;
             if this.focused == id {
                 let mut ordered: Vec<_> = this.samples.keys().copied().collect();
@@ -134,6 +148,7 @@ impl InputProbe {
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
+        else { self.empty_focus.focus(window,cx); }
         cx.notify();
     }
     fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, cx: &mut Context<Self>) {
@@ -146,9 +161,7 @@ impl InputProbe {
     }
     fn result_hint(&self, index: usize, window: &Window, _cx: &App) -> Option<String> {
         let action: Box<dyn Action> = if let Some(command) = COMMANDS.get(index) {
-            match command {
-                CommandId::MoveTabLeft => Box::new(MoveTabLeft),
-                CommandId::MoveTabRight => Box::new(MoveTabRight),
+            if let Some(action) = tab_action(*command) { action } else { match command {
                 CommandId::NewWorkspace => Box::new(NewWorkspace),
                 CommandId::NewWorkspaceGroup => Box::new(NewWorkspaceGroup),
                 CommandId::NextWorkspace => Box::new(NextWorkspace),
@@ -161,7 +174,7 @@ impl InputProbe {
                 CommandId::FocusUp => Box::new(FocusUp),
                 CommandId::FocusDown => Box::new(FocusDown),
                 _ => return None,
-            }
+            } }
         } else {
             let position = index.checked_sub(COMMANDS.len())?;
             let number = if position < 8 { position + 1 }
@@ -201,11 +214,18 @@ impl InputProbe {
     }
     fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
-        match command {
-            CommandId::MoveTabLeft | CommandId::MoveTabRight => {
-                let delta = if command == CommandId::MoveTabLeft { -1 } else { 1 };
-                if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.reorder(delta,cx)); }
+        if let Some(action) = tab_action(command) {
+            // Restore terminal focus before dispatching, just like the native
+            // palette. Actions then use the same handlers as keyboard input.
+            self.close_palette(window, cx);
+            if command == CommandId::NewTab && self.tree.is_none() {
+                self.start_terminal(window, cx);
+            } else {
+                window.dispatch_action(action, cx);
             }
+            return;
+        }
+        match command {
             CommandId::ScrollToTop | CommandId::ScrollToBottom => {
                 let scroll = if command == CommandId::ScrollToTop { rmux_core::scroll::Scroll::Top } else { rmux_core::scroll::Scroll::Bottom };
                 if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |pane,cx| pane.scroll(scroll,cx)); }
@@ -266,12 +286,15 @@ impl Render for InputProbe {
         let panes = if let Some(tree) = &self.tree {
             if self.zoomed { self.panes(&PaneTree::Pane(self.focused), vec![], cx) } else { self.panes(tree, vec![], cx) }
         } else {
-            div().size_full().flex().items_center().justify_center()
+            div().size_full().flex().items_center().justify_center().track_focus(&self.empty_focus).key_context("Terminal")
                 .child(div().id("restart-terminal").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
                     .child("New Terminal").on_click(cx.listener(|this,_,window,cx| this.start_terminal(window,cx))))
                 .into_any_element()
         };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
+            .on_action(cx.listener(|this, _: &NewTab, window, cx| {
+                if this.tree.is_none() { this.start_terminal(window,cx); }
+            }))
             .on_action(cx.listener(|this, _: &Split, window, cx| this.execute(CommandId::Split, window, cx)))
             .on_action(cx.listener(|this, _: &SplitBelow, window, cx| this.execute(CommandId::SplitBelow, window, cx)))
             .on_action(cx.listener(|this, _: &TogglePaneZoom, window, cx| this.execute(CommandId::TogglePaneZoom, window, cx)))
