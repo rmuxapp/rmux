@@ -22,3 +22,12 @@ pub(crate) fn directions(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new(if mac { "cmd-ctrl-down" } else { "alt-shift-down" }, FocusDown, None),
     ]
 }
+
+pub(crate) fn splits(mac: bool) -> Vec<KeyBinding> {
+    use crate::{Split, SplitBelow, TogglePaneZoom};
+    vec![
+        KeyBinding::new(if mac { "cmd-d" } else { "ctrl-shift-d" }, Split, None),
+        KeyBinding::new(if mac { "cmd-shift-d" } else { "ctrl-shift-e" }, SplitBelow, None),
+        KeyBinding::new(if mac { "cmd-shift-enter" } else { "ctrl-shift-enter" }, TogglePaneZoom, None),
+    ]
+}

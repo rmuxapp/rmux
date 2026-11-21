@@ -33,7 +33,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane, NewWorkspaceGroup, NewWorkspace, NextWorkspace, PreviousWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -159,11 +159,14 @@ impl InputProbe {
             cx.emit(PaletteRequest::SelectWorkspace(id));
             return;
         }
+        self.execute(COMMANDS[index], window, cx);
+    }
+    fn execute(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
-        match COMMANDS[index] {
+        match command {
             CommandId::Split | CommandId::SplitBelow => {
                 if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
-                let axis = if COMMANDS[index] == CommandId::Split { Axis::Columns } else { Axis::Rows };
+                let axis = if command == CommandId::Split { Axis::Columns } else { Axis::Rows };
                 if self.tree.is_none() { self.start_terminal(window, cx); return; }
                 if self.tree.as_mut().is_some_and(|tree| tree.split_positioned(&self.focused, self.next_pane, axis, false)) {
                     self.add_pane(self.next_pane, window, cx);
@@ -225,6 +228,9 @@ impl Render for InputProbe {
                 .into_any_element()
         };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
+            .on_action(cx.listener(|this, _: &Split, window, cx| this.execute(CommandId::Split, window, cx)))
+            .on_action(cx.listener(|this, _: &SplitBelow, window, cx| this.execute(CommandId::SplitBelow, window, cx)))
+            .on_action(cx.listener(|this, _: &TogglePaneZoom, window, cx| this.execute(CommandId::TogglePaneZoom, window, cx)))
             .on_action(cx.listener(|this, _: &FocusLeft, window, cx| this.focus_direction(rmux_core::layout::Direction::Left, window, cx)))
             .on_action(cx.listener(|this, _: &FocusRight, window, cx| this.focus_direction(rmux_core::layout::Direction::Right, window, cx)))
             .on_action(cx.listener(|this, _: &FocusUp, window, cx| this.focus_direction(rmux_core::layout::Direction::Up, window, cx)))
@@ -285,23 +291,38 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/Inter-Regular.ttf").as_slice()),
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
-        cx.bind_keys(workspace_shortcuts::bindings(true));
-        cx.bind_keys(pane_shortcuts::directions(true));
-        cx.bind_keys(pane_shortcuts::brackets());
-        cx.bind_keys(pane_shortcuts::tabs());
+        let mac = terminal_engine::is_mac();
+        cx.bind_keys(workspace_shortcuts::bindings(mac));
+        cx.bind_keys(pane_shortcuts::directions(mac));
+        cx.bind_keys(pane_shortcuts::splits(mac));
         cx.bind_keys([
-            KeyBinding::new("cmd-p", CommandPalette, None),
-            KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
-            KeyBinding::new("cmd-w", ClosePane, Some("Terminal")),
-            // Browser KeyboardEvent retains Shift on the resulting brace key.
-            KeyBinding::new("cmd-shift-{", PreviousTab, Some("Terminal")),
-            KeyBinding::new("cmd-shift-}", NextTab, Some("Terminal")),
-            KeyBinding::new("cmd-a", EditorSelectAll, Some("TextInput")),
-            KeyBinding::new("cmd-z", EditorUndo, Some("TextInput")),
-            KeyBinding::new("cmd-shift-z", EditorRedo, Some("TextInput")),
-            KeyBinding::new("cmd-v", Paste, Some("TextInput")),
-            KeyBinding::new("cmd-c", CopySelection, Some("TextInput")),
-            KeyBinding::new("cmd-x", EditorCut, Some("TextInput")),
+            KeyBinding::new("ctrl-tab", NextPane, Some("Terminal")),
+            KeyBinding::new("ctrl-shift-tab", PreviousPane, Some("Terminal")),
+        ]);
+        if mac {
+            cx.bind_keys(pane_shortcuts::brackets());
+            cx.bind_keys(pane_shortcuts::tabs());
+            cx.bind_keys([
+                KeyBinding::new("cmd-shift-{", PreviousTab, Some("Terminal")),
+                KeyBinding::new("cmd-shift-}", NextTab, Some("Terminal")),
+            ]);
+        } else {
+            cx.bind_keys([
+                KeyBinding::new("ctrl-pageup", PreviousTab, Some("Terminal")),
+                KeyBinding::new("ctrl-pagedown", NextTab, Some("Terminal")),
+                KeyBinding::new("ctrl-y", EditorRedo, Some("TextInput")),
+            ]);
+        }
+        cx.bind_keys([
+            KeyBinding::new(if mac { "cmd-p" } else { "ctrl-shift-p" }, CommandPalette, None),
+            KeyBinding::new(if mac { "cmd-t" } else { "ctrl-shift-t" }, NewTab, Some("Terminal")),
+            KeyBinding::new(if mac { "cmd-w" } else { "ctrl-shift-w" }, ClosePane, Some("Terminal")),
+            KeyBinding::new(if mac { "cmd-a" } else { "ctrl-a" }, EditorSelectAll, Some("TextInput")),
+            KeyBinding::new(if mac { "cmd-z" } else { "ctrl-z" }, EditorUndo, Some("TextInput")),
+            KeyBinding::new(if mac { "cmd-shift-z" } else { "ctrl-shift-z" }, EditorRedo, Some("TextInput")),
+            KeyBinding::new(if mac { "cmd-v" } else { "ctrl-v" }, Paste, Some("TextInput")),
+            KeyBinding::new(if mac { "cmd-c" } else { "ctrl-c" }, CopySelection, Some("TextInput")),
+            KeyBinding::new(if mac { "cmd-x" } else { "ctrl-x" }, EditorCut, Some("TextInput")),
         ]);
         cx.open_window(WindowOptions::default(), |window, cx| cx.new(|cx| browser_host::BrowserHost::new(window, cx))).expect("open probe window");
     });

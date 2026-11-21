@@ -198,3 +198,10 @@ Directional focus uses native PaneTree::neighbor and shared shortcut definitions
 Cmd+Ctrl+arrows or Focus Pane commands choose geometrically adjacent panes, retaining
 zoom state. Native check/WASM build pass; browser nested Up/Left checks confirmed
 subsequent input reaches the intended terminal and other sessions remain intact.
+
+Platform metadata now selects native macOS or Windows/Linux defaults. Split/Below/
+Zoom bindings are shared with desktop, alongside workspace and directional focus
+bindings. Available-browser macOS checks cover Cmd+D, Cmd+Shift+D and
+Cmd+Shift+Enter zoom/unzoom. Native check, WASM build and engine/platform selector
+checks pass; Windows/Linux browser interaction and reserved shortcut behavior
+remain separate acceptance work.

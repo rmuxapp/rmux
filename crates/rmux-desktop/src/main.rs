@@ -3698,9 +3698,6 @@ fn main() {
                 KeyBinding::new("cmd-shift-f", ShowTerminalSearch, None),
                 KeyBinding::new("cmd-shift-n", NewWindow, None),
                 KeyBinding::new("cmd-shift-w", CloseWindow, None),
-                KeyBinding::new("cmd-d", Split, None),
-                KeyBinding::new("cmd-shift-d", SplitBelow, None),
-                KeyBinding::new("cmd-shift-enter", TogglePaneZoom, None),
                 KeyBinding::new("cmd-shift-g", GroupSelectedWorkspaces, None),
                 KeyBinding::new("cmd-shift-r", RenameWorkspace, None),
                 KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
@@ -3743,9 +3740,6 @@ fn main() {
                 KeyBinding::new("ctrl-alt-shift-f", ShowTerminalSearch, None),
                 KeyBinding::new("ctrl-alt-n", NewWindow, None),
                 KeyBinding::new("ctrl-alt-w", CloseWindow, None),
-                KeyBinding::new("ctrl-shift-d", Split, None),
-                KeyBinding::new("ctrl-shift-e", SplitBelow, None),
-                KeyBinding::new("ctrl-shift-enter", TogglePaneZoom, None),
                 KeyBinding::new("ctrl-alt-shift-g", GroupSelectedWorkspaces, None),
                 KeyBinding::new("ctrl-shift-r", RenameWorkspace, None),
                 KeyBinding::new("ctrl-shift-t", NewTab, Some("Terminal")),
@@ -3785,6 +3779,7 @@ fn main() {
                 KeyBinding::new("ctrl-shift-w", ClosePane, Some("Terminal")),
             ]);
         }
+        cx.bind_keys(pane_shortcuts::splits(cfg!(target_os = "macos")));
         cx.bind_keys(pane_shortcuts::directions(cfg!(target_os = "macos")));
         cx.bind_keys(workspace_shortcuts::bindings(cfg!(target_os = "macos")));
         cx.bind_keys((1..=9).map(|number| {

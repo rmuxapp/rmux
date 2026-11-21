@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {Ghostty} from '../dist/ghostty-web.js';
-import {createHost} from '../dist/engine.js';
+import {createHost, isMacPlatform} from '../dist/engine.js';
 const wasm = await readFile(new URL('../dist/ghostty-vt.wasm',import.meta.url));
 const host = createHost(await Ghostty.load('data:application/wasm;base64,'+wasm.toString('base64')));
 const first = host.create(20,4), second = host.create(20,4);
@@ -51,3 +51,7 @@ host.write(input,'\x1b[?1h');
 assert.equal(host.encode(input,keyCode('ArrowUp'),0,false,''),'\x1bOA');
 host.free(input);
 console.log('Key encoding, control bytes and application cursor mode passed.');
+
+for (const platform of ['MacIntel', 'macOS', 'iPad']) assert.equal(isMacPlatform(platform), true);
+for (const platform of ['Win32', 'Windows', 'Linux x86_64', 'Linux', '']) assert.equal(isMacPlatform(platform), false);
+console.log('Browser platform keymap selection passed.');

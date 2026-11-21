@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Browser now selects macOS or Windows/Linux keymaps from browser platform metadata
+instead of hard-coding macOS. Workspace/directional/split definitions are shared
+native sources; editor, tab and pane-cycle defaults match desktop equivalents.
+Split/Below/Zoom actions invoke the same browser command execution as the palette.
+Native check, WASM build and engine/platform selector checks pass. Available browser
+selected macOS; Cmd+D, Cmd+Shift+D and Cmd+Shift+Enter split/zoom/unzoom verified
+with restored nested layout. Windows/Linux interaction is not validated here and
+reserved browser shortcuts can still require the Commands button. Evidence:
+target/shared-split-shortcuts-wasm.png.
+
+
 Browser directional focus now uses the same PaneTree::neighbor geometry as native,
 with shared macOS Cmd+Ctrl+arrow / desktop non-macOS Alt+Shift+arrow definitions.
 The browser currently selects macOS bindings; automatic platform selection remains

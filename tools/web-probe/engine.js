@@ -1,10 +1,14 @@
 // Browser VT host only: all layout and terminal drawing remain in Rust.
 import {Ghostty, CellFlags as F, KeyEncoderOption as O} from './ghostty-web.js';
+export function isMacPlatform(platform = globalThis.navigator?.userAgentData?.platform ?? globalThis.navigator?.platform ?? '') {
+  return /^(Mac|iPhone|iPad|iPod)/i.test(platform);
+}
 export function createHost(engine) {
   const sessions = new Map();
   let next = 0;
   const rgb = c => [c.r, c.g, c.b];
   return {
+    isMac: () => isMacPlatform(),
     create(columns, rows) {
       const id = next++;
       const terminal = engine.createTerminal(columns, rows);

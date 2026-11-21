@@ -4,6 +4,8 @@ use std::sync::Arc;
 use wasm_bindgen::prelude::*;
 #[wasm_bindgen]
 extern "C" {
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = isMac)]
+    pub fn is_mac() -> bool;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = create)]
     fn create(columns: u16, rows: u16) -> u32;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = write)]
