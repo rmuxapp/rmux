@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Browser workspace/group icon editing now shares native actions and the existing
+Unicode grapheme validator (one symbol, up to 64 bytes). Empty input clears;
+invalid input keeps the editor open with guidance. Group rows use the native
+default symbol when no custom icon is set. Metadata edits now request optional
+fonts on demand, and sidebar text uses the same CJK/emoji fallback list as the
+terminal. This fixes missing glyphs for sidebar metadata without eagerly
+loading optional fonts. UI checks cover invalid multi-character input, a
+lightning symbol, clearing and a joined woman-technologist group emoji.
+Screenshot: `target/browser-workspace-icons.jpg`. WASM build and native check
+pass; this change is not deployed. Preset pickers and context-menu parity are
+still separate browser gaps.
+
 Browser workspace/group colors now route through the shared desktop actions
 and use the same six-digit hex parser. Sidebar markers match native geometry;
 empty input clears the color, invalid input retains the draft with guidance.

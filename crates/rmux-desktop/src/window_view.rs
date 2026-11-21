@@ -3961,6 +3961,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         use rmux_core::commands::CommandId;
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
+            CommandId::EditWorkspaceIcon => self.edit_metadata(MetadataField::Icon, window, cx),
+            CommandId::EditGroupIcon => self.edit_metadata(MetadataField::GroupIcon, window, cx),
             CommandId::EditWorkspaceColor => self.edit_metadata(MetadataField::Color, window, cx),
             CommandId::EditGroupColor => self.edit_metadata(MetadataField::GroupColor, window, cx),
             CommandId::EditWorkspaceDescription => self.edit_metadata(MetadataField::Description, window, cx),
@@ -4253,7 +4255,6 @@ impl Render for WorkspaceWindow {
                     this.show_workspace_menu(target, None, point(bounds.left(), bounds.top()), window, cx);
                 }
             }))
-            .on_action(cx.listener(|this, _: &EditWorkspaceIcon, window, cx| this.edit_metadata(MetadataField::Icon, window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))
             .on_action(cx.listener(|this, _: &RefreshTerminalMemory, window, cx| this.refresh_memory(window, cx)))
             .on_action(cx.listener(|this, _: &CycleTerminalMemorySort, _, cx| this.sort_memory(cx)))
@@ -4263,7 +4264,6 @@ impl Render for WorkspaceWindow {
                 if let Some(rows) = &this.memory_rows { clipboard::write(ClipboardItem::new_string(memory_view::report(rows, this.memory_application, this.memory_sort, this.memory_sampled_at)), cx); }
             }))
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
-            .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))
             .on_action(cx.listener(|this, _: &LastTerminal, window, cx| this.last_terminal(window, cx)))

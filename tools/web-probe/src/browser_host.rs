@@ -2,9 +2,9 @@
 use gpui::{prelude::*, *};
 use crate::{InputProbe, WorkspaceCommand, PaletteRequest, CommandId, sidebar_presentation};
 #[derive(Clone, Copy)]
-enum WorkspaceField { Name, GroupName, Description, Color, GroupColor }
+enum WorkspaceField { Name, GroupName, Description, Color, GroupColor, Icon, GroupIcon }
 #[derive(Default)]
-struct WorkspaceMetadata { description: String, color: Option<u32> }
+struct WorkspaceMetadata { description: String, color: Option<u32>, icon: Option<String> }
 pub(crate) struct BrowserHost {
     rename: Option<(EntityId, Entity<crate::text_field::TextField>)>,
     workspace_state: rmux_core::workspace_lifecycle::State<(String, Entity<InputProbe>, bool, WorkspaceMetadata), EntityId>,
@@ -58,13 +58,14 @@ impl BrowserHost {
             return;
         }
         let Some((name, workspace, _, metadata)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
-        let group = if matches!(field, WorkspaceField::GroupName | WorkspaceField::GroupColor) {
+        let group = if matches!(field, WorkspaceField::GroupName | WorkspaceField::GroupColor | WorkspaceField::GroupIcon) {
             let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
             Some(group)
         } else { None };
         let target = group.map_or(workspace.entity_id(), |group| group.members[0]);
         let name = match field {
             WorkspaceField::Description => metadata.description.clone(),
+            WorkspaceField::Icon | WorkspaceField::GroupIcon => group.map_or(metadata.icon.as_ref(), |group| group.icon.as_ref()).cloned().unwrap_or_default(),
             WorkspaceField::Color | WorkspaceField::GroupColor => group.map_or(metadata.color, |group| group.color).map(|color| format!("#{color:06X}")).unwrap_or_default(),
             _ => group.map_or(name, |group| &group.name).clone(),
         };
@@ -73,7 +74,18 @@ impl BrowserHost {
         cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
             match event {
                 crate::text_field::EditEvent::Submitted { text, .. } => {
-                    if matches!(field, WorkspaceField::Color | WorkspaceField::GroupColor) {
+                    if matches!(field, WorkspaceField::Icon | WorkspaceField::GroupIcon) {
+                        let text = text.trim();
+                        if !text.is_empty() && !rmux_core::workspace_groups::valid_workspace_icon(text) {
+                            this.editor_hint = "Use one symbol or emoji (up to 64 bytes), or leave it empty to clear.".into();
+                            cx.notify();
+                            return;
+                        }
+                        let icon = (!text.is_empty()).then(|| text.to_owned());
+                        if let Some(id) = group_id {
+                            if let Some(group) = this.workspace_state.groups.get_mut(id) { group.icon = icon; }
+                        } else if let Some(entry) = this.workspace_state.entries.iter_mut().find(|(_, workspace, _, _)| workspace.entity_id() == target) { entry.3.icon = icon; }
+                    } else if matches!(field, WorkspaceField::Color | WorkspaceField::GroupColor) {
                         let color = match rmux_core::workspace_lifecycle::parse_workspace_color(text) {
                             Ok(color) => color,
                             Err(error) => { this.editor_hint = error.into(); cx.notify(); return; }
@@ -95,7 +107,7 @@ impl BrowserHost {
                     }
                 }
                 crate::text_field::EditEvent::Cancelled => {},
-                crate::text_field::EditEvent::Changed(_) => return,
+                crate::text_field::EditEvent::Changed(text) => { crate::fonts::ensure(text, cx); return; },
             }
             this.rename = None;
             this.select(this.workspace_state.active, window, cx);
@@ -105,6 +117,7 @@ impl BrowserHost {
         self.scroll_to_workspace();
         input.read(cx).focus.clone().focus(window, cx);
         self.editor_hint = match field {
+            WorkspaceField::Icon | WorkspaceField::GroupIcon => "Icon: one symbol or emoji; empty clears",
             WorkspaceField::Color | WorkspaceField::GroupColor => "Color: #RRGGBB; empty clears",
             _ => "Enter to save · Esc to cancel",
         }.into();
@@ -231,6 +244,8 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
                     cx.notify();
                 }
             }
+            CommandId::EditWorkspaceIcon => self.rename_workspace(WorkspaceField::Icon, window, cx),
+            CommandId::EditGroupIcon => self.rename_workspace(WorkspaceField::GroupIcon, window, cx),
             CommandId::EditWorkspaceColor => self.rename_workspace(WorkspaceField::Color, window, cx),
             CommandId::EditGroupColor => self.rename_workspace(WorkspaceField::GroupColor, window, cx),
             CommandId::EditWorkspaceDescription => self.rename_workspace(WorkspaceField::Description, window, cx),
@@ -282,7 +297,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
 impl Render for BrowserHost {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let width = crate::sidebar_interaction::visible_width(self.sidebar_width, window);
-        div().size_full().relative().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
+        div().size_full().relative().flex().track_focus(&self.empty_focus).font(crate::fonts::fallback(font("Inter"))).text_color(rgb(0xe2e3e7))
             .child(crate::sidebar_interaction::drag_capture(cx))
             .map(|root| crate::workspace_actions::bind(root, cx))
             // Sidebar clicks focus this host, outside the workspace action path.
@@ -322,6 +337,7 @@ impl Render for BrowserHost {
                                         })))
                                 })
                                 .when_some(header.map_or(metadata.color, |group| group.color), |row, color| row.child(div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
+                                .when_some(header.map(|group| group.icon.clone().or_else(|| Some("▰".into()))).unwrap_or_else(|| metadata.icon.clone()), |row, icon| row.child(div().w(px(16.)).flex_shrink_0().text_center().text_color(rgb(0xaaaaaa)).child(icon)))
                                 .child(div().min_w_0().flex_1().truncate().font_weight(FontWeight::SEMIBOLD)
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(

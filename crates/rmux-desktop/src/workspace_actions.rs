@@ -1,7 +1,7 @@
 //! Workspace action routing shared by native and browser application hosts.
 use gpui::{prelude::*, *};
 use rmux_core::commands::CommandId;
-use crate::{EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, CloseWorkspace, UngroupWorkspaces,
+use crate::{EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, CloseWorkspace, UngroupWorkspaces,
     NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar, SelectWorkspaceNumber, MoveWorkspaceToGroup};
 
 pub(crate) trait WorkspaceCommandHost: Sized + 'static {
@@ -25,5 +25,5 @@ macro_rules! workspace_commands {
         }
     };
 }
-workspace_commands! { EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, CloseWorkspace, UngroupWorkspaces,
+workspace_commands! { EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, NewWorkspace, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, CloseWorkspace, UngroupWorkspaces,
     NextWorkspace, PreviousWorkspace, LastWorkspace, ToggleSidebar }
