@@ -22,7 +22,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab]);
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -38,7 +38,7 @@ struct InputProbe {
     next_pane: usize,
     zoomed: bool,
     palette_open: bool,
-    samples: std::collections::HashMap<usize, Entity<terminal_sample::TerminalSample>>,
+    samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
     fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
@@ -70,7 +70,7 @@ impl InputProbe {
                 if self.next_pane >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if COMMANDS[index] == CommandId::Split { Axis::Columns } else { Axis::Rows };
                 if self.tree.split_positioned(&self.focused, self.next_pane, axis, false) {
-                    self.samples.insert(self.next_pane, cx.new(terminal_sample::TerminalSample::new));
+                    self.samples.insert(self.next_pane, cx.new(sample_pane::SamplePane::new));
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
             }
@@ -150,8 +150,13 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
         cx.bind_keys(pane_shortcuts::brackets());
+        cx.bind_keys(pane_shortcuts::tabs());
         cx.bind_keys([
             KeyBinding::new("cmd-p", CommandPalette, None),
+            KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
+            // Browser KeyboardEvent retains Shift on the resulting brace key.
+            KeyBinding::new("cmd-shift-{", PreviousTab, Some("Terminal")),
+            KeyBinding::new("cmd-shift-}", NextTab, Some("Terminal")),
             KeyBinding::new("cmd-a", EditorSelectAll, Some("TextInput")),
             KeyBinding::new("cmd-z", EditorUndo, Some("TextInput")),
             KeyBinding::new("cmd-shift-z", EditorRedo, Some("TextInput")),
@@ -173,7 +178,7 @@ pub fn start() {
                 }
                 cx.notify();
             }).detach();
-            let samples = std::collections::HashMap::from([(0, cx.new(terminal_sample::TerminalSample::new))]);
+            let samples = std::collections::HashMap::from([(0, cx.new(sample_pane::SamplePane::new))]);
             InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: PaneTree::Pane(0), focused: 0, next_pane: 1, zoomed: false, palette_open: true }
         })).expect("open probe window");
     });
@@ -192,3 +197,7 @@ mod cursor_view;
 
 #[path = "../../../crates/rmux-desktop/src/pane_shortcuts.rs"]
 mod pane_shortcuts;
+
+#[path = "../../../crates/rmux-desktop/src/tab_presentation.rs"]
+mod tab_presentation;
+mod sample_pane;

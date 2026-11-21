@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Added multiple live terminal tabs per browser pane using extracted native
+30px tab-strip and active/inactive tab presentation. Native retains its existing
+handlers, badges and drag/drop behavior. Both hosts share shifted-bracket tab
+bindings and core cycle calculation; browser adds aliases for retained Shift on
+brace key events. Cmd+T/plus creates a session, clicking or cycling switches it,
+and hidden tabs release shaped caches while retaining engine state. Native check
+and WASM build pass; browser verified distinct tab output and Cmd+Shift+[ return
+to retained ls output. Closing/reordering tabs, metadata, workspace integration
+and native input sharing remain pending. Public demo remains unchanged.
+
 Fixed first-pane prompt/cursor displacement in the browser. A temporary resize
 trace showed the initial zero-space canvas resized the live engine 52×16 → 1×1
 → 150×30; reflow moved the prompt cursor from column 2 to column 1. Skip engine

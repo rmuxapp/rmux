@@ -101,3 +101,11 @@ tab navigation remains pending until tabs are connected.
 Initial or hidden layouts smaller than one full terminal cell do not resize the
 engine. This avoids a destructive intermediate 1×1 reflow before the canvas has
 its real dimensions. Fresh-load/split/input verification preserves prompt spacing.
+
+Each pane now hosts up to 16 live terminal tabs. Cmd+T or the plus control adds a
+sample session. Click tabs or use Cmd+Shift+[ / Cmd+Shift+] to switch. Tab strip
+and active/inactive appearance are shared native sources, as are bracket binding
+definitions and wraparound calculation. Browser brace-key aliases retain Shift.
+Hidden tabs release row/cursor shaping caches while keeping engine state. Browser
+verification covered independent outputs and return to a prior tab. Closing,
+reordering, badges and full native tab services remain pending.

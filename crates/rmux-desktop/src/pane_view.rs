@@ -850,7 +850,7 @@ impl PaneView {
             return;
         }
         self.select(
-            (self.active as isize + delta).rem_euclid(self.terminals.len() as isize) as usize,
+            rmux_core::layout::cycle_index(self.active, self.terminals.len(), delta).unwrap(),
             window,
             cx,
         );
@@ -1223,14 +1223,7 @@ impl Render for PaneView {
             )
             .when(!self.benchmark, |root| {
                 root.child(
-                    div()
-                        .flex()
-                        .h(px(30.))
-                        .flex_shrink_0()
-                        .items_center()
-                        .border_b_1()
-                        .border_color(rgb(0x383838))
-                        .bg(rgb(0x242424))
+                    crate::tab_presentation::strip()
                         .child(
                             div()
                                 .id("tabs")
@@ -1248,18 +1241,7 @@ impl Render for PaneView {
                                         let label: SharedString = self.tab_title(index, cx).into();
                                         let title_hint: SharedString = self.terminal_search_title(index, cx).into();
                                         let display_title = label.clone();
-                                        div()
-                                            .id(("tab", terminal.entity_id()))
-                                            .flex()
-                                            .items_center()
-                                            .flex_shrink_0()
-                                            .px_2()
-                                            .gap_2()
-                                            .text_size(px(12.))
-                                            .border_t_1()
-                                            .border_l_2()
-                                            .border_color(gpui::transparent_black())
-                                            .cursor_pointer()
+                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.active, focused)
                                             .on_drag(drag_item::DragItem { scope, container, item: target, label }, |item, _, _, cx| cx.new(|_| item.clone()))
                                             .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope && item.item != target))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, _| {
@@ -1272,11 +1254,6 @@ impl Render for PaneView {
                                                 this.show_tab_menu(target, event.position, window, cx);
                                                 cx.stop_propagation();
                                             }))
-                                            .text_color(rgb(0x9b9b9b))
-                                            .when(index == self.active, |tab| tab
-                                                .bg(rgb(if focused { 0x303030 } else { 0x292929 }))
-                                                .text_color(rgb(if focused { 0xe5e5e5 } else { 0xb8bfcb }))
-                                                .border_color(rgb(if focused { 0x4599ef } else { 0x4a5362 })))
                                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                                 if !event.standard_click() { return; }
                                                 let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; };

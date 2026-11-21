@@ -6,12 +6,7 @@ use anyhow::{Result, ensure};
 #[cfg(target_os = "macos")]
 pub(super) fn bracket_navigation() -> Vec<KeyBinding> {
     let mut bindings = crate::pane_shortcuts::brackets();
-    bindings.extend([
-        KeyBinding::new("cmd-{", PreviousTab, Some("Terminal")),
-        KeyBinding::new("cmd-}", NextTab, Some("Terminal")),
-        KeyBinding::new("cmd-shift-[", PreviousTab, Some("Terminal")),
-        KeyBinding::new("cmd-shift-]", NextTab, Some("Terminal")),
-    ]);
+    bindings.extend(crate::pane_shortcuts::tabs());
     bindings
 }
 

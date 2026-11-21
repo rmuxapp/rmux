@@ -11,6 +11,11 @@ pub(crate) struct TerminalSample {
     command: String,
 }
 impl TerminalSample {
+    pub fn is_focused(&self, window: &Window) -> bool { self.focus.is_focused(window) }
+    pub fn release_render_cache(&mut self) {
+        self.rows.release();
+        self.cursor_cache = Default::default();
+    }
     pub fn focus(&self, window: &mut Window, cx: &mut App) { self.focus.focus(window, cx); }
     pub fn new(cx: &mut Context<Self>) -> Self {
         let engine = TerminalEngine::new(52, 16);

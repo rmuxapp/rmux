@@ -59,6 +59,7 @@ mod row_cache;
 mod row_host;
 mod cursor_view;
 mod pane_shortcuts;
+mod tab_presentation;
 mod list_navigation;
 mod menu_navigation;
 mod snapshot;
