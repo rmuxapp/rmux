@@ -2,13 +2,22 @@
 
 ## Current implementation focus
 
+Deployed cc15502 from successful GitHub Shared WASM run 44962351505 to
+Cloudflare ece559ce. The live rmux.app embed references that source. Verified
+Option-Left word motion, Command-Backspace deletion and Close-button focus
+restoration in the embedded production demo; screenshot:
+`target/live-palette-cc15502.jpg`. Native CI run 44962351552 also succeeded,
+including the new queued input/paste/close/scroll checks. Native visual
+acceptance remains pending while the Mac is locked; downloads remain v0.1.4.
+
 Shared text fields now use browser platform detection for macOS editing keys
 instead of treating the WASM compilation target as a non-Mac OS. Local browser
 interaction verified `alpha beta` → Option-Left + `X` → `alpha Xbeta`, then
 Command-Backspace → `beta`. The shared palette Close control also restored
 terminal input focus. Screenshot: `target/palette-mac-editing.jpg`. This fixes
 palette, rename and other shared-field editing rules; native macOS rules are
-unchanged. Optimized GitHub artifact deployment remains pending.
+unchanged. Optimized GitHub artifact deployment and the live browser check are
+recorded above.
 
 Native palettes now expose the same visible Close control as the browser demo
 through a shared header/button implementation, with vertical padding on the hit
