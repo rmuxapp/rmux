@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Published successful GitHub demo run 44939199824 (source a18ec98) to rmux.app,
+Cloudflare deployment b6c3a2a9. The live demo now includes shared workspace
+insertion/selection/removal/ungrouping, workspace/tab action routing, numbered
+pane/tab shortcuts and the desktop zoom status/restore control. Browser smoke
+verified splitting, direct pane selection, sample input, zoom and click-to-restore
+on the production page. Screenshot: target/live-demo-a18ec98.jpg. Website source
+remains local/off GitHub. Native process shutdown fixes are newer and remain
+unreleased; desktop download links still point to v0.1.4.
+
 Extended explicit process shutdown to window-close paths. Closing without a
 prompt, accepting the close prompt, and allowing the OS window-close callback
 now request shutdown for currently owned workspace/pane sessions before removal.
