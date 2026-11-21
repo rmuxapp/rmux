@@ -2,9 +2,12 @@
 use gpui::{prelude::*, *};
 use crate::{terminal_sample::TerminalSample, tab_presentation};
 pub(crate) struct PaneEmpty;
+pub(crate) struct TabDrop { pub source: EntityId, pub terminal: EntityId, pub target: Option<EntityId> }
+impl EventEmitter<TabDrop> for SamplePane {}
 impl EventEmitter<PaneEmpty> for SamplePane {}
 include!("sample_tab_menu.rs");
 pub(crate) struct SamplePane {
+    pub scope: Option<EntityId>,
     menu: Option<SampleTabMenu>,
     menu_blur: Option<Subscription>,
     rename: Option<Entity<crate::text_field::TextField>>,
@@ -57,10 +60,32 @@ impl SamplePane {
             active: 0, next_number: self.next_number })
     }
     pub fn from_transfer(transfer: TabTransfer) -> Self {
-        Self { menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
+        Self { scope: None, menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
             labels: transfer.labels, next_number: transfer.next_number, tab_scroll: ScrollHandle::new() }
     }
     pub fn tab_count(&self) -> usize { self.terminals.len() }
+    pub fn insertion_index(&self, target: Option<EntityId>) -> Option<usize> {
+        if self.rename.is_some() || self.terminals.len() >= 16 { return None; }
+        match target { Some(id) => self.terminals.iter().position(|terminal| terminal.entity_id() == id), None => Some(self.terminals.len()) }
+    }
+    pub fn take_tab(&mut self, id: EntityId, cx: &mut Context<Self>) -> Option<TabTransfer> {
+        if self.rename.is_some() { return None; }
+        let index = self.terminals.iter().position(|terminal| terminal.entity_id() == id)?;
+        let terminal = self.terminals.remove(index);
+        let label = self.labels.remove(&id).expect("tab label follows terminal ownership");
+        self.menu = None;
+        self.menu_blur = None;
+        self.tab_scroll.scroll_to_item(self.terminals.active_index());
+        cx.notify();
+        Some(TabTransfer { terminals: vec![terminal], labels: [(id, label)].into_iter().collect(), active: 0, next_number: self.next_number })
+    }
+    pub fn insert_tab(&mut self, mut transfer: TabTransfer, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.labels.extend(transfer.labels);
+        self.next_number = self.next_number.max(transfer.next_number);
+        self.terminals.insert(index, transfer.terminals.remove(0));
+        self.select(index, window, cx);
+    }
+
     pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> TabTransfer {
         self.rename = None;
         let active = self.terminals.active_index();
@@ -111,7 +136,7 @@ impl SamplePane {
     pub fn new(font_size: f32, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let terminal = cx.new(|cx| TerminalSample::new(font_size, window,cx));
         let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
-        Self { menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
+        Self { scope: None, menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
         if let Some(terminal) = self.terminals.active() {
@@ -145,7 +170,11 @@ impl SamplePane {
         }
     }
     fn drop_tab(&mut self, item: &crate::drag_item::DragItem, target: Option<EntityId>, window: &mut Window, cx: &mut Context<Self>) {
-        if item.container != cx.entity_id() || Some(item.item) == target || self.rename.is_some() { return; }
+        if Some(item.scope) != self.scope || Some(item.item) == target || self.rename.is_some() { return; }
+        if item.container != cx.entity_id() {
+            cx.emit(TabDrop { source: item.container, terminal: item.item, target });
+            return;
+        }
         let Some(from) = self.terminals.iter().position(|terminal| terminal.entity_id() == item.item) else { return; };
         let target = match target {
             Some(target) => { let Some(index) = self.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; }; index }
@@ -190,11 +219,13 @@ impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.active().is_some_and(|terminal| terminal.read(cx).is_focused(window));
         let container = cx.entity_id();
+        let scope = self.scope.unwrap_or(container);
+        let accepts_incoming = self.terminals.len() < 16 && self.rename.is_none();
         crate::pane_presentation::frame(false, false)
             .map(|root| crate::tab_actions::bind(root, cx))
             .child(tab_presentation::strip()
                 .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
-                    .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container))
+                    .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.scope == scope && (item.container == container || accepts_incoming)))
                     .on_drop(cx.listener(|this, item, window, cx| this.drop_tab(item, None, window, cx)))
                     .children(self.terminals.iter().enumerate().map(|(index, terminal)| {
                         let target = terminal.entity_id();
@@ -203,8 +234,8 @@ impl Render for SamplePane {
                             .unwrap_or_else(|| self.labels[&target].clone()).into();
                         tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused)
                             .when(self.rename.is_none(), |tab| tab
-                                .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: title.clone() }, |item, _, _, cx| cx.new(|_| item.clone()))
-                                .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.container == container && item.item != target))
+                                .on_drag(crate::drag_item::DragItem { scope, container, item: target, label: title.clone() }, |item, _, _, cx| cx.new(|_| item.clone()))
+                                .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.scope == scope && (item.container == container || accepts_incoming) && item.item != target))
                                 .drag_over(|style, _: &crate::drag_item::DragItem, _, _| style.bg(rgb(0x435a7b)))
                                 .on_drop(cx.listener(move |this, item, window, cx| this.drop_tab(item, Some(target), window, cx))))
                             .child(tab_presentation::title(("tab-title", target), title.clone(), title))

@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Browser tab dragging now transfers existing terminal entities between panes in
+the same workspace, inserting before a target tab or appending in empty strip
+space. The workspace validates source/destination identities, rename state and
+the 16-tab destination limit before mutation. Empty source panes are removed;
+remaining source tabs stay alive. Local pointer checks covered sole-tab pane
+cleanup and multi-tab source retention, with earlier output and subsequent
+typing preserved. Browser build passed. Screenshot:
+`target/browser-cross-pane-tab.jpg`. Not yet deployed; dragging between browser
+workspaces remains pending.
+
 Deployed palette dismissal and tab-reordering source ef467b6 from successful
 GitHub Shared WASM run 44957843451 to Cloudflare 7ea03ba2. Live rmux.app uses
 the new artifact. Verified the embedded palette's visible Close button and

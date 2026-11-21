@@ -128,6 +128,25 @@ impl InputProbe {
         self.register_pane(id, pane, window, cx);
     }
     fn register_pane(&mut self, id: usize, pane: Entity<sample_pane::SamplePane>, window: &mut Window, cx: &mut Context<Self>) {
+        let scope = cx.entity_id();
+        pane.update(cx, |pane, _| pane.scope = Some(scope));
+        cx.subscribe_in(&pane, window, move |this, destination, event: &sample_pane::TabDrop, window, cx| {
+            let Some((&source_id, source)) = this.samples.iter().find(|(_, pane)| pane.entity_id() == event.source) else { return; };
+            if source_id == id || this.samples.get(&id).map(Entity::entity_id) != Some(destination.entity_id()) { return; }
+            let source = source.clone();
+            let Some(index) = destination.read(cx).insertion_index(event.target) else { return; };
+            // Validate both owners before mutation, then transfer without yielding.
+            let Some(transfer) = source.update(cx, |pane, cx| pane.take_tab(event.terminal, cx)) else { return; };
+            destination.update(cx, |pane, cx| pane.insert_tab(transfer, index, window, cx));
+            if source.read(cx).tab_count() == 0 {
+                this.pane_state.remove(&source_id);
+                this.samples.remove(&source_id);
+            }
+            this.split_drag = None;
+            this.focused = id;
+            this.pane_state.focus_changed(id);
+            cx.notify();
+        }).detach();
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
             this.split_drag = None;
             let next = this.pane_state.layout.as_ref().and_then(|tree|
