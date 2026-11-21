@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Deployed source 374b4c5 from successful GitHub Shared WASM run 44959331001
+to Cloudflare 67b13589. Live rmux.app references it. Verified dragging the last
+rmux terminal onto website preserves output, accepts further input and removes
+the emptied rmux workspace. Screenshot:
+`target/live-workspace-transfer-374b4c5.jpg`. Native snapshot optimizations are
+separate from this browser artifact and have not been released in downloads.
+
 Native snapshot extraction also reuses width metadata for consecutive equal
 raw cells. Grapheme text is deliberately fetched per cell because packed base
 values do not identify combining extensions. Existing snapshot tests and a new
