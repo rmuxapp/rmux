@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Numbered-pane shortcuts now share bindings/action routing: Cmd+Option+1–9 on
+macOS, Ctrl+Alt+Shift+1–9 elsewhere. Browser resolves visual leaf positions and
+moves terminal focus, retaining zoom on the chosen pane as desktop does. Invalid
+positions do nothing. Browser smoke split two panes, selected/typed in pane 1,
+zoomed it, then selected/typed in pane 2 while retaining zoom. Screenshot:
+target/shared-pane-numbers.jpg. Desktop check and WASM build pass. Native runtime
+and non-mac/alternative-layout input were not tested. Not deployed.
+
 Numbered-tab selection now shares bindings and action routing on desktop/browser:
 Cmd+Shift+1–9 on macOS and Ctrl+Shift+1–9 elsewhere select exact tab positions.
 Bindings retain numeric keys and add shifted-symbol aliases because browser GPUI

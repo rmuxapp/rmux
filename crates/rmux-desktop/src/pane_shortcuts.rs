@@ -49,3 +49,16 @@ pub(crate) fn tab_numbers(mac: bool) -> Vec<KeyBinding> {
         KeyBinding::new(&format!("{modifier}-{symbol}"), crate::SelectTabNumber { number: index + 1 }, Some("Terminal"))));
     bindings
 }
+
+/// Select a pane by its position in the visual split layout.
+pub(crate) fn pane_numbers(mac: bool) -> Vec<KeyBinding> {
+    let modifier = if mac { "cmd-alt" } else { "ctrl-alt-shift" };
+    let mut bindings: Vec<_> = (1..=9).map(|number| KeyBinding::new(
+        &format!("{modifier}-{number}"), crate::SelectPaneNumber { number }, Some("Terminal"),
+    )).collect();
+    if !mac {
+        bindings.extend(['!', '@', '#', '$', '%', '^', '&', '*', '('].into_iter().enumerate().map(|(index, symbol)|
+            KeyBinding::new(&format!("{modifier}-{symbol}"), crate::SelectPaneNumber { number: index + 1 }, Some("Terminal"))));
+    }
+    bindings
+}

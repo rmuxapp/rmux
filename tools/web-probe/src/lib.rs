@@ -58,6 +58,9 @@ struct SelectWorkspaceNumber { number: usize }
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectTabNumber { number: usize }
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct SelectPaneNumber { number: usize }
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -380,6 +383,12 @@ impl InputProbe {
 
 }
 impl pane_actions::PaneCommandHost for InputProbe {
+    fn select_pane_command(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(target) = number.checked_sub(1).and_then(|index| self.tree.as_ref()?.pane_at(index)).copied() else { return; };
+        self.focused = target;
+        self.samples[&target].update(cx, |pane, cx| pane.focus(window, cx));
+        cx.notify();
+    }
     fn run_pane_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         self.execute(command, window, cx);
     }
@@ -466,6 +475,7 @@ pub fn start() {
         let mac = terminal_engine::is_mac();
         cx.bind_keys(workspace_shortcuts::bindings(mac));
         cx.bind_keys(pane_shortcuts::tab_numbers(mac));
+        cx.bind_keys(pane_shortcuts::pane_numbers(mac));
         cx.bind_keys(pane_shortcuts::directions(mac));
         cx.bind_keys(pane_shortcuts::splits(mac));
         cx.bind_keys(pane_shortcuts::tab_reordering());

@@ -3155,6 +3155,9 @@ impl Workspace {
     }
 }
 impl pane_actions::PaneCommandHost for Workspace {
+    fn select_pane_command(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>) {
+        self.select_pane_number(number, window, cx);
+    }
     fn run_pane_command(&mut self, command: rmux_core::commands::CommandId, window: &mut Window, cx: &mut Context<Self>) {
         use rmux_core::commands::CommandId;
         match command {
@@ -3218,9 +3221,6 @@ impl Render for Workspace {
                     view.dump_metrics(window, cx)
                 }),
             )
-            .on_action(cx.listener(|view, action: &SelectPaneNumber, window, cx| {
-                view.select_pane_number(action.number, window, cx);
-            }))
             .when(self.zoomed.is_some(), |root| {
                 let focus = self.panes.iter().find(|pane| Some(pane.entity_id()) == self.zoomed)
                     .and_then(|pane| {
@@ -3662,18 +3662,7 @@ fn main() {
         cx.bind_keys(pane_shortcuts::splits(cfg!(target_os = "macos")));
         cx.bind_keys(pane_shortcuts::directions(cfg!(target_os = "macos")));
         cx.bind_keys(workspace_shortcuts::bindings(cfg!(target_os = "macos")));
-        cx.bind_keys((1..=9).map(|number| {
-            let modifier = if cfg!(target_os = "macos") {
-                "cmd-alt"
-            } else {
-                "ctrl-alt-shift"
-            };
-            KeyBinding::new(
-                &format!("{modifier}-{number}"),
-                SelectPaneNumber { number },
-                Some("Terminal"),
-            )
-        }));
+        cx.bind_keys(pane_shortcuts::pane_numbers(cfg!(target_os = "macos")));
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-," } else { "ctrl-," }, ToggleSettings, None)]);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-s" } else { "ctrl-s" }, SaveAppearanceSettings, Some("Settings"))]);
         cx.bind_keys(pane_shortcuts::tab_reordering());
