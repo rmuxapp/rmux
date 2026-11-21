@@ -31,10 +31,45 @@ pub fn equalize<T: Clone + PartialEq, Z>(tree: &mut Option<PaneTree<T>>, zoomed:
     }
 }
 
+/// Cycle in visual layout order, independent of host entity storage order.
+pub fn cycle<T: Clone + PartialEq>(tree: &PaneTree<T>, focused: Option<&T>, direction: isize) -> Option<T> {
+    let current = focused.and_then(|pane| tree.pane_index(pane)).unwrap_or(0);
+    tree.pane_at(crate::layout::cycle_index(current, tree.pane_count(), direction)?).cloned()
+}
+
+/// Decide focus before removing ownership. Closing an inactive pane preserves
+/// focus; closing the active pane selects the following pane, or the previous
+/// pane when the last leaf closes. The final pane has no successor.
+pub fn focus_after_close<T: Clone + PartialEq>(tree: &PaneTree<T>, removed: &T, focused: Option<&T>) -> Option<T> {
+    if let Some(focused) = focused.filter(|pane| *pane != removed && tree.pane_index(pane).is_some()) {
+        return Some(focused.clone());
+    }
+    let index = tree.pane_index(removed)?;
+    tree.pane_at(index + 1).or_else(|| index.checked_sub(1).and_then(|index| tree.pane_at(index))).cloned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::layout::Axis;
+
+    #[test]
+    fn nested_layout_controls_cycle_and_close_focus() {
+        let tree = PaneTree::Split { axis: Axis::Columns, weights: vec![1., 1.], children: vec![
+            PaneTree::Pane(30), PaneTree::Split { axis: Axis::Rows, weights: vec![1., 1.],
+                children: vec![PaneTree::Pane(10), PaneTree::Pane(20)] },
+        ] };
+        assert_eq!(tree.pane_count(), 3);
+        assert_eq!(cycle(&tree, Some(&30), 1), Some(10));
+        assert_eq!(cycle(&tree, Some(&30), -1), Some(20));
+        assert_eq!(cycle(&tree, Some(&20), 1), Some(30));
+        assert_eq!(focus_after_close(&tree, &10, Some(&10)), Some(20));
+        assert_eq!(focus_after_close(&tree, &20, Some(&20)), Some(10));
+        assert_eq!(focus_after_close(&tree, &10, Some(&30)), Some(30));
+        assert_eq!(focus_after_close(&tree, &10, None), Some(20));
+        assert_eq!(focus_after_close(&PaneTree::Pane(10), &10, Some(&10)), None);
+        assert_eq!(tree.pane_at(3), None);
+    }
 
     #[test]
     fn zoom_requires_multiple_panes_and_focus() {

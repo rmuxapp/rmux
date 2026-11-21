@@ -104,18 +104,15 @@ impl InputProbe {
         let pane = cx.new(|cx| sample_pane::SamplePane::new(window,cx));
         cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
             this.split_drag = None;
-            let old_index = this.tree.as_ref().and_then(|tree| tree.pane_index(&id)).unwrap_or(0);
+            let next = this.tree.as_ref().and_then(|tree|
+                rmux_core::pane_commands::focus_after_close(tree, &id, Some(&this.focused)));
             this.tree = this.tree.take().and_then(|tree| tree.remove(&id));
             this.samples.remove(&id);
             if this.tree.is_none() { this.empty_focus.focus(window,cx); }
             this.zoomed = false;
-            if this.focused == id {
-                let mut ordered: Vec<_> = this.samples.keys().copied().collect();
-                ordered.sort_by_key(|id| this.tree.as_ref().and_then(|tree| tree.pane_index(id)));
-                if let Some(next) = ordered.get(old_index.min(ordered.len().saturating_sub(1))) {
-                    this.focused = *next;
-                    this.samples[next].update(cx, |pane, cx| pane.focus(window, cx));
-                }
+            if let Some(next) = next.filter(|next| *next != this.focused) {
+                this.focused = next;
+                this.samples[&next].update(cx, |pane, cx| pane.focus(window, cx));
             }
             cx.notify();
         }).detach();
@@ -131,12 +128,10 @@ impl InputProbe {
     }
 
     fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        let mut ordered: Vec<_> = self.samples.keys().copied().collect();
-        ordered.sort_by_key(|id| self.tree.as_ref().and_then(|tree| tree.pane_index(id)));
-        let current = ordered.iter().position(|id| *id == self.focused).unwrap_or(0);
-        if let Some(next) = rmux_core::layout::cycle_index(current, ordered.len(), direction) {
-            self.focused = ordered[next];
-            self.samples[&self.focused].update(cx, |sample, cx| sample.focus(window, cx));
+        if let Some(next) = self.tree.as_ref().and_then(|tree|
+            rmux_core::pane_commands::cycle(tree, Some(&self.focused), direction)) {
+            self.focused = next;
+            self.samples[&next].update(cx, |sample, cx| sample.focus(window, cx));
             cx.notify();
         }
     }

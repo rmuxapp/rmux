@@ -2927,30 +2927,25 @@ impl Workspace {
         self.panes.iter().position(|pane| *pane == next)
     }
     fn cycle(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
-        if self.panes.is_empty() {
-            return;
-        }
-        let current = self.focused_index(window, cx).unwrap_or(0);
-        let Some(next) = layout::cycle_index(current, self.panes.len(), direction) else { return; };
+        let focused = self.focused_index(window, cx).and_then(|index| self.panes.get(index));
+        let Some(next) = self.layout.as_ref().and_then(|tree|
+            rmux_core::pane_commands::cycle(tree, focused, direction)) else { return; };
         if self.zoomed.is_some() {
-            self.zoomed = Some(self.panes[next].entity_id());
+            self.zoomed = Some(next.entity_id());
         }
-        self.panes[next].read(cx).focus(window, cx);
+        next.read(cx).focus(window, cx);
         cx.notify();
     }
     fn close(&mut self, pane: &Entity<PaneView>, window: &mut Window, cx: &mut Context<Self>) {
-        // The emptied pane has already dropped its tab. Any other focused pane
-        // is still valid and should keep its focus when this split disappears.
-        let preserve_focus = self.panes.iter().any(|candidate| {
-            candidate != pane && candidate.read(cx).is_focused(window, cx)
-        });
-        let Some(index) = self.remove_pane(pane, cx) else {
-            return;
-        };
-        if !preserve_focus && let Some(survivor) = self
-            .panes
-            .get(index.min(self.panes.len().saturating_sub(1)))
-        {
+        // An emptied pane has already dropped its tab; preserve any other
+        // focused pane without re-focusing it and acknowledging unread output.
+        let focused = self.panes.iter().find(|candidate|
+            *candidate != pane && candidate.read(cx).is_focused(window, cx));
+        let preserve_focus = focused.is_some();
+        let next = self.layout.as_ref().and_then(|tree|
+            rmux_core::pane_commands::focus_after_close(tree, pane, focused));
+        if self.remove_pane(pane, cx).is_none() { return; }
+        if !preserve_focus && let Some(survivor) = next {
             survivor.read(cx).focus(window, cx);
         }
     }

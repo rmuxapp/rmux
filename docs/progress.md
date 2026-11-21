@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Pane cycling and focus-after-close now use shared core transitions in both hosts.
+They follow depth-first layout order, preserve focus when an inactive pane closes,
+and choose the next/previous survivor when the active pane closes. Browser no
+longer allocates/sorts its pane map for cycling. Nested-layout focused tests and
+both host checks pass. A local development WASM build passed nested split cycle
+wraparound and active-pane close/input recovery; surviving output remained intact.
+Screenshot: target/shared-pane-lifecycle.jpg. This is not native runtime or
+optimized performance validation; full application orchestration is still separate.
+
 Desktop and browser now invoke shared pane-command transitions for zoom, resize
 and equalize. This fixes browser-only single-pane zoom, resizing hidden splits
 while zoomed, and equalize leaving zoom active. Two focused policy tests and both

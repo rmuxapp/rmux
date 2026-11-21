@@ -138,6 +138,27 @@ impl<T: Clone + PartialEq> PaneTree<T> {
         }
         fits(self, 1) && fits(other, 1)
     }
+    /// Resolve an ordinal directly, without allocating or sorting pane handles.
+    pub fn pane_at(&self, mut index: usize) -> Option<&T> {
+        fn visit<'a, T>(tree: &'a PaneTree<T>, remaining: &mut usize) -> Option<&'a T> {
+            match tree {
+                PaneTree::Pane(pane) => {
+                    if *remaining == 0 { Some(pane) }
+                    else { *remaining -= 1; None }
+                }
+                PaneTree::Split { children, .. } => children.iter().find_map(|child| visit(child, remaining)),
+            }
+        }
+        visit(self, &mut index)
+    }
+
+    pub fn pane_count(&self) -> usize {
+        match self {
+            Self::Pane(_) => 1,
+            Self::Split { children, .. } => children.iter().map(Self::pane_count).sum(),
+        }
+    }
+
     /// Position in the depth-first order used by layout serialization.
     pub fn pane_index(&self, target: &T) -> Option<usize> {
         fn visit<T: PartialEq>(tree: &PaneTree<T>, target: &T, index: &mut usize) -> Option<usize> {
