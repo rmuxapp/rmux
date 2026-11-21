@@ -187,3 +187,25 @@ copyTerminalSelection(copyEvent,{copySelection(){return null}},()=>reported++);
 assert.deepEqual([prevented,clipboardWrites,reported],[1,0,1]);
 copyTerminalSelection(copyEvent,{copySelection(){return 'copied'}},()=>reported++);
 assert.deepEqual([prevented,clipboardWrites,reported],[2,1,1]);
+
+// Releasing presentation state must preserve the terminal and regenerate a full
+// snapshot, even when there has been no new output since the last sparse patch.
+const reclaimed = bridge.create(20, 4);
+try {
+  bridge.write(reclaimed, 'retained界\r\nsecond');
+  bridge.selectAll(reclaimed);
+  const before = JSON.parse(bridge.snapshot(reclaimed));
+  assert.equal(JSON.parse(bridge.snapshot(reclaimed)).rows.length, 0);
+  const selection = bridge.selectedText(reclaimed);
+  for (let cycle = 0; cycle < 3; cycle++) {
+    bridge.releaseRenderState(reclaimed);
+    bridge.releaseRenderState(reclaimed); // idempotent hidden-workspace cleanup
+    const restored = JSON.parse(bridge.snapshot(reclaimed));
+    assert.deepEqual(restored.rows, before.rows);
+    assert.deepEqual(restored.selections, before.selections);
+    assert.deepEqual(restored.cursor, before.cursor);
+    assert.equal(bridge.selectedText(reclaimed), selection);
+  }
+  bridge.write(reclaimed, '-after');
+  assert.ok(JSON.parse(bridge.snapshot(reclaimed)).rows.length > 0);
+} finally { bridge.free(reclaimed); }

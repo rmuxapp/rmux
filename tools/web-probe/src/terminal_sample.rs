@@ -14,6 +14,7 @@ pub(crate) struct TerminalSample {
     find_history: rmux_core::search_state::QueryHistory,
     last_find_query: String,
     frame: Frame,
+    frame_released: bool,
     font_revision: u64,
     measured_cells: Option<CellMetrics>,
     pub(crate) font_size: f32,
@@ -35,8 +36,13 @@ pub(crate) struct TerminalSample {
 pub(crate) struct SearchChanged;
 impl EventEmitter<SearchChanged> for TerminalSample {}
 impl TerminalSample {
+    fn refresh_frame(&mut self) {
+        self.frame = self.engine.frame((!self.frame_released).then_some(&self.frame));
+        self.frame_released = false;
+    }
+
     pub(crate) fn refresh_search_selection(&mut self, cx: &mut Context<Self>) {
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         cx.notify();
     }
     fn open_find(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -92,7 +98,7 @@ impl TerminalSample {
             }
         };
         self.engine.scroll(kind,delta as i32);
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         self.scroll_remainder = 0.;
         cx.notify();
     }
@@ -105,6 +111,10 @@ impl TerminalSample {
         self.scrollbar_drag = None;
         self.engine.focus(false);
         self.release_pressed(cx);
+        self.engine.release_render_state();
+        row_cache::release_frame_cells(&mut self.frame);
+        self.frame_released = true;
+        self.selection_geometry = None;
         self.rows.release();
         self.cursor_cache = Default::default();
     }
@@ -122,7 +132,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, font_revision: 0, measured_cells: None, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, frame_released: false, font_revision: 0, measured_cells: None, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -143,7 +153,7 @@ impl TerminalSample {
                 }));
             }
         } else { self.selection_scroll = None; }
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         cx.notify();
     }
     fn mouse_up(&mut self, event: &MouseUpEvent, _: &mut Window, cx: &mut Context<Self>) {
@@ -215,7 +225,7 @@ impl TerminalSample {
             }
         }
         self.input_error = None;
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         cx.emit(SearchChanged);
         cx.notify();
     }
@@ -282,13 +292,14 @@ impl Render for TerminalSample {
                         f32::from(event.delta.pixel_delta(px(cells.height)).y), cells.height);
                     if lines != 0 {
                         this.engine.scroll("DELTA", lines as i32);
-                        this.frame = this.engine.frame(Some(&this.frame));
+                        this.refresh_frame();
                         cx.notify();
                     }
                     cx.stop_propagation();
                 }
             }))
             .child(canvas(move |bounds, window, cx| entity.update(cx, |this, cx| {
+                if this.frame_released { this.refresh_frame(); }
                 let revision = cx.global::<crate::fonts::Fonts>().revision;
                 if this.font_revision != revision {
                     this.rows.release(); this.cursor_cache = Default::default();
@@ -313,7 +324,7 @@ impl Render for TerminalSample {
                     this.engine.write("\r\x1b[2K");
                     this.engine.resize(columns, height);
                     this.engine.write(&this.session.display(columns));
-                    this.frame = this.engine.frame(Some(&this.frame));
+                    this.refresh_frame();
                     cx.emit(SearchChanged);
                 }
                 let (cursor_x, cursor_y) = this.frame.cursor.unwrap_or_default();
@@ -371,7 +382,7 @@ impl EntityInputHandler for TerminalSample {
                     if !output.is_empty() {
                         self.engine.scroll("BOTTOM", 0);
                         self.engine.write(&output);
-                        self.frame = self.engine.frame(Some(&self.frame));
+                        self.refresh_frame();
                         cx.emit(SearchChanged);
                     }
                 }
@@ -440,7 +451,7 @@ impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
         self.selecting = false;
         self.selection_pointer = None;
         self.input_error = self.engine.select_all().err().map(|_| "Could not select terminal text.".into());
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         cx.notify();
     }
     fn clear_terminal_history(&mut self, _: &mut Window, cx: &mut Context<Self>) {
@@ -448,7 +459,7 @@ impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
         self.selecting = false;
         self.selection_pointer = None;
         self.input_error = self.engine.clear_scrollback().err().map(|_| "Could not clear scrollback.".into());
-        self.frame = self.engine.frame(Some(&self.frame));
+        self.refresh_frame();
         cx.emit(SearchChanged);
         cx.notify();
     }

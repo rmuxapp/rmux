@@ -135,6 +135,10 @@ export async function loadNativeVt(bytes) {
           selection ??= createSelectionAdapter(api,manifest,terminal,{buffer,handle,check,value});
           return selection.select(...args);
         },
+        releaseRenderState() {
+          alive();
+          renderer?.dispose(); renderer = undefined;
+        },
         snapshot() {
           alive();
           renderer ??= createRenderAdapter(api,manifest,terminal,{buffer,handle,check,value});
@@ -292,6 +296,7 @@ export function createNativeHost(engine, isMac) {
     },
     write(id,text) { sessions.get(id).write(text); },
     resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
+    releaseRenderState(id) { sessions.get(id).releaseRenderState(); },
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },
     searchQuery(id,text) { return JSON.stringify(sessions.get(id).searchQuery(text)); },
     searchStep(id) { return JSON.stringify(sessions.get(id).searchStep()); },

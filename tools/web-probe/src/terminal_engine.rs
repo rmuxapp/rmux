@@ -26,6 +26,8 @@ extern "C" {
     fn write(id: u32, text: &str);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = resize)]
     fn resize(id: u32, columns: u16, rows: u16);
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = releaseRenderState)]
+    fn release_render_state(id: u32);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = snapshot)]
     fn snapshot(id: u32) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
@@ -102,6 +104,7 @@ impl TerminalEngine {
         encode(self.0, &crate::key_adapter::name(key), bits, action, text)
     }
     pub fn resize(&self, columns: u16, rows: u16) { resize(self.0, columns, rows); }
+    pub fn release_render_state(&self) { release_render_state(self.0); }
     pub fn frame(&self, previous: Option<&Frame>) -> Frame {
         let patch: Patch = serde_json::from_str(&snapshot(self.0)).expect("browser Ghostty frame");
         let mut rows = previous.map(|f| f.rows.as_ref().clone()).unwrap_or_default();

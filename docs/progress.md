@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Hidden browser terminals now release Rust cell snapshots and the Ghostty render
+adapter, in addition to shaped rows/cursor caches. Terminal state, history, input
+draft and selection remain owned by the session. A released frame is rebuilt
+fully before paint or the next snapshot update, avoiding sparse patches against
+empty rows. The shared desktop frame-release helper preserves viewport dimensions.
+Adapter checks pass for repeated/idempotent reclamation, full row/selection/cursor
+restoration and subsequent output. WASM build passes; browser smoke verifies tab
+and workspace round trips with unchanged output and a draft that executes after
+return. Screenshot: target/browser-frame-reclamation.jpg. Allocations are freed
+for reuse; no browser RSS or linear-memory shrink claim. Not deployed.
+
 Browser terminal rendering now reuses measured cell metrics across ordinary
 redraws, pane resizing and workspace switches. The small cached value invalidates
 on terminal font-size changes or optional-font registration; glyph/row caches
