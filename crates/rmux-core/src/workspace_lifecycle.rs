@@ -93,6 +93,12 @@ impl<T, W: Copy + Eq + std::hash::Hash> State<T, W> {
         self.active = next;
         true
     }
+    /// Resolve a captured member immediately before closing it. Membership may
+    /// change while a native confirmation prompt is open.
+    pub fn group_close_index(&self, group: u64, member: W, key: impl Fn(&T) -> W) -> Option<usize> {
+        if !self.groups.containing(member).is_some_and(|current| current.id == group) { return None; }
+        self.entries.iter().position(|entry| key(entry) == member)
+    }
     pub fn group_anchor_slot(&self, member: W, key: impl Fn(&T) -> W) -> Option<(u64, W, usize)> {
         let group = self.groups.containing(member)?;
         let anchor = *group.members.first()?;
@@ -584,4 +590,22 @@ mod tests {
         assert_eq!(active, 0);
         assert_eq!(previous.target(), None);
     }
+    #[test]
+    fn captured_group_close_skips_moved_members_and_keeps_unrelated_workspaces() {
+        let mut state = State { entries: vec![(1, false), (2, false), (3, false), (4, false)], ..Default::default() };
+        let group = state.groups.create("original".into(), vec![1, 3], false).unwrap();
+        let members = state.groups.containing(1).unwrap().members.clone();
+        let other = state.groups.create("other".into(), vec![2], false).unwrap();
+        state.move_to_group(2, other, |entry| entry.0).unwrap();
+        for member in members.into_iter().rev() {
+            if let Some(index) = state.group_close_index(group, member, |entry| entry.0) {
+                state.close(index, |entry| *entry).unwrap();
+            }
+        }
+        assert_eq!(state.entries.iter().map(|entry| entry.0).collect::<Vec<_>>(), vec![2, 3, 4]);
+        assert!(state.groups.containing(1).is_none());
+        assert_eq!(state.groups.containing(3).unwrap().id, other);
+        assert_eq!(state.group_close_index(group, 3, |entry| entry.0), None);
+    }
+
 }

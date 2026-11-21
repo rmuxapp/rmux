@@ -86,6 +86,22 @@ impl BrowserHost {
         if self.workspace_state.entries.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
         else { self.select(self.workspace_state.active, window, cx); }
     }
+    fn close_group(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some((_, workspace, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
+        let Some(group) = self.workspace_state.groups.containing(workspace.entity_id()) else { return; };
+        let id = group.id;
+        let members = group.members.clone();
+        self.rename = None;
+        // Sample sessions have no external processes or unsaved local files.
+        // Resolve each captured identity after the preceding close changes slots.
+        for member in members.into_iter().rev() {
+            if let Some(index) = self.workspace_state.group_close_index(id, member, |(_, entity, _)| entity.entity_id()) {
+                self.workspace_state.close(index, |(_, entity, pinned)| (entity.entity_id(), *pinned));
+            }
+        }
+        if self.workspace_state.entries.is_empty() { self.empty_focus.focus(window, cx); cx.notify(); }
+        else { self.select(self.workspace_state.active, window, cx); }
+    }
     fn ungroup(&mut self, cx: &mut Context<Self>) {
         let Some((_, selected, _)) = self.workspace_state.entries.get(self.workspace_state.active) else { return; };
         let Some(group) = self.workspace_state.groups.containing(selected.entity_id()).map(|group| group.id) else { return; };
@@ -173,6 +189,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for BrowserHost {
     }
     fn run_workspace_command(&mut self, command: CommandId, window: &mut Window, cx: &mut Context<Self>) {
         match command {
+            CommandId::CloseWorkspaceGroup => self.close_group(window, cx),
             CommandId::CloseWorkspace => self.close_workspace(window, cx),
             CommandId::ToggleWorkspacePin => {
                 if let Some((_, _, pinned)) = self.workspace_state.entries.get_mut(self.workspace_state.active) {

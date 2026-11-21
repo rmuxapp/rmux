@@ -767,8 +767,7 @@ impl WorkspaceWindow {
                         // Close only the members named by the original prompt
                         // which still belong to this group. Anchor goes last.
                         for member in members.into_iter().rev() {
-                            if !this.workspace_state.groups.containing(member).is_some_and(|group| group.id == id) { continue; }
-                            if let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == member) {
+                            if let Some(index) = this.workspace_state.group_close_index(id, member, |entry| entry.workspace.entity_id()) {
                                 this.close_workspace(index, window, cx);
                             }
                         }
@@ -3967,6 +3966,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
         match command {
             CommandId::CloseWorkspace => self.request_close_workspace(self.workspace_state.active, window, cx),
             CommandId::RenameWorkspace => self.edit_metadata(MetadataField::Name, window, cx),
+            CommandId::CloseWorkspaceGroup => self.request_close_group(window, cx),
             CommandId::ToggleWorkspacePin => self.toggle_workspace_pin(cx),
             CommandId::RenameWorkspaceGroup => self.edit_metadata(MetadataField::GroupName, window, cx),
             CommandId::NewWorkspace => self.start_workspace(None, window, cx),
@@ -4268,7 +4268,6 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &CloseTerminalMemory, window, cx| this.close_memory(window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupColor, window, cx| this.edit_metadata(MetadataField::GroupColor, window, cx)))
             .on_action(cx.listener(|this, _: &EditGroupIcon, window, cx| this.edit_metadata(MetadataField::GroupIcon, window, cx)))
-            .on_action(cx.listener(|this, _: &CloseWorkspaceGroup, window, cx| this.request_close_group(window, cx)))
             .on_action(cx.listener(|this, _: &UseCurrentDirectoryForGroup, window, cx| this.set_group_directory(false, window, cx)))
             .on_action(cx.listener(|this, _: &ResetGroupDirectory, window, cx| this.set_group_directory(true, window, cx)))
             .on_action(cx.listener(|this, _: &LastTerminal, window, cx| this.last_terminal(window, cx)))

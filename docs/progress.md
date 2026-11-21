@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser Close Workspace Group now shares native action routing and captured-member
+resolution. Each member is resolved immediately before removal; moved members and
+unrelated workspaces are preserved. Native confirmation and process-close policy
+remain unchanged; browser sample sessions close directly. A focused model test
+passes for moved-member exclusion. Native check and WASM build pass. Browser smoke
+verified two-member closure, unrelated workspace survival, final-group empty state,
+and Cmd+N recovery with working input. Screenshot: target/browser-close-group.jpg.
+Not yet deployed.
+
 Native browser CI now saves compiled caches per source revision, preferring the
 latest cache with matching dependency/tool pins. Previously its immutable cache
 key prevented successful later builds from updating compiled application code.
