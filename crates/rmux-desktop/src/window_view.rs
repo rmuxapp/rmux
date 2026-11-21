@@ -1716,7 +1716,7 @@ impl WorkspaceWindow {
             Ok(())
         });
         result.and_then(|result| result)?;
-        self.close_workspace(index, window, cx);
+        self.remove_workspace_entry(index, window, cx);
         if activate { let _ = target.update(cx, |_, window, _| window.activate_window()); }
         Ok(())
     }
@@ -1768,7 +1768,7 @@ impl WorkspaceWindow {
         );
         match result {
             Ok(_) => {
-                self.close_workspace(self.active, window, cx);
+                self.remove_workspace_entry(self.active, window, cx);
                 cx.activate(true);
             }
             Err(error) => {
@@ -2413,6 +2413,15 @@ impl WorkspaceWindow {
         .detach();
     }
     fn close_workspace(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(entry) = self.entries.get(index) else { return; };
+        let workspace = entry.workspace.read(cx);
+        if let Some(cancel) = &workspace.split_launch_canceled { cancel.store(true, Ordering::Relaxed); }
+        for pane in &workspace.panes { pane.read(cx).request_process_close(cx); }
+        self.remove_workspace_entry(index, window, cx);
+    }
+
+    /// Remove window ownership only: move/detach keeps the same live workspace.
+    fn remove_workspace_entry(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         let Some(closed) = rmux_core::workspace_lifecycle::close(
             &mut self.entries, &mut self.active, &mut self.groups, &mut self.previous_workspace,
             index, |entry| (entry.workspace.entity_id(), entry.pinned),

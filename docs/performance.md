@@ -1,5 +1,21 @@
 # rmux performance acceptance plan
 
+## Explicit process shutdown on close
+
+Current debug source reproduced the lingering-child observation at eight panes.
+Confirmed tab and workspace closure now request process shutdown immediately,
+rather than relying on UI entity destruction to drop the session. Pending tab
+and split launches are canceled when their workspace closes. Workspace move and
+detach remove only window ownership and preserve the live sessions.
+
+The matched two-second post-close sample changed from **one original child still
+alive** to **none**, leaving only the app and survivor shell. Normal app quit left
+no original children in either run. [Before/after evidence and binary hashes](benchmarks/rpc-process-close-current.jsonl).
+A focused terminal test confirms shutdown completes while the Session remains
+owned and its output readable; the existing live-shell RPC smoke passed transfer
+and shell-state checks. These are bounded macOS observations, not a cross-platform
+teardown or memory acceptance result.
+
 ## v0.1.4 process-tree observation
 
 The optional `--process-tree` harness mode records PID/parent/start-time, RSS and

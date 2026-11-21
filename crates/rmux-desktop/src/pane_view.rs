@@ -483,6 +483,10 @@ impl PaneView {
             })
         }).collect()
     }
+    pub fn request_process_close(&self, cx: &App) {
+        if let Some(cancel) = &self.tab_launch_canceled { cancel.store(true, Ordering::Relaxed); }
+        for terminal in self.terminals.iter() { terminal.read(cx).request_process_close(); }
+    }
     pub fn reset_window_editors(&mut self) {
         if let Some(cancel) = self.tab_launch_canceled.take() { cancel.store(true, Ordering::Relaxed); }
         self.spawning_tab = None;
@@ -1056,6 +1060,7 @@ impl PaneView {
             self.terminals[*index].read(cx).focus.contains_focused(window, cx)
         });
         for index in indices {
+            self.terminals[index].read(cx).request_process_close();
             let removed = self.terminals.remove(index);
             self.titles.remove(&removed.entity_id());
             self.labels.remove(index);
@@ -1131,6 +1136,7 @@ impl PaneView {
             .read(cx)
             .focus
             .contains_focused(window, cx);
+        self.terminals[index].read(cx).request_process_close();
         let removed = self.terminals.remove(index);
         self.titles.remove(&removed.entity_id());
         self.labels.remove(index);

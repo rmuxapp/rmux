@@ -645,6 +645,13 @@ struct PreparedTerminal {
 struct TabMetadataChanged;
 impl EventEmitter<TabMetadataChanged> for TerminalView {}
 impl TerminalView {
+    /// Closing ownership must stop the process even if GPUI retains a rendered
+    /// entity or event callback until a later frame. Transfers never call this.
+    fn request_process_close(&self) {
+        if let Err(error) = self.session.shutdown_handle().request() {
+            eprintln!("terminal close: {error}");
+        }
+    }
     fn refresh_input_mode(&mut self, cx: &mut Context<Self>) {
         let hidden = self.input_focused && self.session.local_input_mode()
             .is_some_and(|mode| mode.canonical && !mode.echo);

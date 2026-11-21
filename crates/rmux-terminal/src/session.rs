@@ -1594,6 +1594,27 @@ trap - EXIT HUP TERM
 
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     #[test]
+    fn explicit_close_reaps_child_while_session_is_retained() -> Result<()> {
+        let session = Session::spawn(shell_command("printf ready; while :; do read line || exit; done"), 40, 4)?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        while !session.frame()?.text().contains("ready") {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "readiness timeout");
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        let shutdown = session.shutdown_handle();
+        shutdown.request()?;
+        shutdown.request()?; // Repeated close and later Drop remain safe.
+        while !shutdown.is_finished() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "retained session kept child alive");
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert!(session.process_exited());
+        assert!(session.frame()?.text().contains("ready"));
+        Ok(())
+    }
+
+    #[cfg(any(target_os = "macos", target_os = "linux"))]
+    #[test]
     fn closing_session_terminates_a_shell_that_ignores_hangup() -> Result<()> {
         let session = Session::spawn(
             shell_command("trap '' HUP; printf 'ready'; while :; do read line || exit; done"),

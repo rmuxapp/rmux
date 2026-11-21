@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Fixed process shutdown being delayed by retained UI entities. Current debug
+source reproduced one original child surviving workspace close; explicit shutdown
+requests in confirmed single/batch tab close and workspace close now leave none
+in the two-second eight-pane sample. Workspace closure cancels pending split/tab
+launches. Move/detach now use a separate entry-removal path to retain live sessions;
+merge sources have already surrendered their panes. A focused retained-Session
+shutdown test passes, desktop builds, and live-shell RPC transfer/state smoke
+passes. Final sample retains only app + survivor shell after close and no original
+children after quit. Evidence: docs/benchmarks/rpc-process-close-current.jsonl.
+Not released; native Windows and Linux teardown runtime remain unverified.
+
 Added optional process-tree accounting to the native split benchmark. It records
 app/descendant RSS, identity-matched CPU deltas, appeared/disappeared processes,
 and original child survival after workspace close and app quit; no command-line
