@@ -2,7 +2,7 @@ use gpui::*;
 use rmux_core::terminal_frame::{Cell, Color, Frame};
 use std::{cell::RefCell, sync::{Arc, Weak}};
 
-use crate::{CellMetrics, color, preferences::CellColor};
+use crate::row_host::{self, CellMetrics, CellColor, Metrics, ShapedLine, color};
 
 /// Drop desktop-owned cell snapshots for an unmounted terminal. Keep viewport
 /// dimensions for input/navigation metadata; the next prepaint fetches a fresh
@@ -20,7 +20,7 @@ pub struct CursorCache {
     entry: Option<(Cell, CellMetrics, SharedString, f32, Color, ShapedLine)>,
 }
 impl CursorCache {
-    pub fn shape(&mut self, cell: &Cell, foreground: Color, cells: CellMetrics, family: &SharedString, window: &Window, metrics: Option<&mut crate::diagnostics::Metrics>) -> ShapedLine {
+    pub fn shape(&mut self, cell: &Cell, foreground: Color, cells: CellMetrics, family: &SharedString, window: &Window, metrics: Option<&mut Metrics>) -> ShapedLine {
         if let Some((previous, cell_metrics, font_family, scale, previous_foreground, line)) = &self.entry
             && previous == cell && *cell_metrics == cells && font_family == family
             && *scale == window.scale_factor() && *previous_foreground == foreground
@@ -32,13 +32,8 @@ impl CursorCache {
         let mut cursor_font = font(family.clone());
         if cell.bold { cursor_font.weight = FontWeight::BOLD; }
         if cell.italic { cursor_font.style = FontStyle::Italic; }
-        let run = TextRun {
-            len: cell.text.len(), font: cursor_font, color: color(foreground),
-            background_color: None, underline: None, strikethrough: None,
-        };
-        let line = window.text_system().shape_line(
-            cell.text.to_string().into(), px(cells.font_size), &[run], Some(px(cells.width)),
-        );
+        let run = row_host::run(cell.text.len(), cursor_font, color(foreground), None, None);
+        let line = row_host::shape(window, cell.text.to_string().into(), cells, run);
         self.entry = Some((cell.clone(), cells, family.clone(), window.scale_factor(), foreground, line.clone()));
         line
     }
@@ -112,7 +107,7 @@ impl RowCache {
         cells: CellMetrics,
         family: &SharedString,
         window: &Window,
-        mut metrics: Option<&mut crate::diagnostics::Metrics>,
+        mut metrics: Option<&mut Metrics>,
     ) -> Arc<Vec<Arc<ShapedRow>>> {
         let environment = (
             frame.background,
@@ -241,28 +236,19 @@ fn shape_texts(source: &[Cell], cells: CellMetrics, family: &SharedString, windo
             if cell.italic {
                 run_font.style = FontStyle::Italic;
             }
-            let run = TextRun {
-                len: text.len(),
-                font: run_font,
-                color: color(foreground.map(|setting| setting.resolve(cell.foreground, cell.background)).unwrap_or(cell.foreground)),
-                background_color: None,
-                underline: cell.underline.then_some(UnderlineStyle {
+            let run = row_host::run(text.len(), run_font, color(foreground.map(|setting| setting.resolve(cell.foreground, cell.background)).unwrap_or(cell.foreground)),
+                cell.underline.then_some(UnderlineStyle {
                     thickness: px(1.),
                     color: Some(color(foreground.map(|setting| setting.resolve(cell.foreground, cell.background)).unwrap_or(cell.underline_color))),
                     wavy: cell.underline_curly,
                 }),
-                strikethrough: cell.strikethrough.then_some(StrikethroughStyle {
+                cell.strikethrough.then_some(StrikethroughStyle {
                     thickness: px(1.),
                     color: None,
                 }),
-            };
+            );
             texts.push(RowText {
-                line: window.text_system().shape_line(
-                    text.into(),
-                    px(cells.font_size),
-                    &[run],
-                    Some(px(cells.width)),
-                ),
+                line: row_host::shape(window, text.into(), cells, run),
                 x: px(cell.column as f32 * cells.width),
             });
         }
@@ -302,7 +288,6 @@ mod tests {
     #[test]
     fn dynamic_selection_background_runs_follow_cells_and_clip() -> anyhow::Result<()> {
         use super::*;
-        use crate::preferences::CellColor;
         let mut terminal = rmux_terminal::Terminal::new(6, 1)?;
         terminal.write(b"\x1b[31;44mab\x1b[32mcd\x1b[45mef");
         let frame = terminal.frame()?;
@@ -439,14 +424,14 @@ mod tests {
 }
 
 // Emit half-open runs without allocating a second cell/background buffer.
-fn selection_spans(source: &[Cell], selection: (u16, u16), setting: Option<crate::preferences::CellColor>, mut emit: impl FnMut(usize, usize, Option<Color>)) {
+fn selection_spans(source: &[Cell], selection: (u16, u16), setting: Option<CellColor>, mut emit: impl FnMut(usize, usize, Option<Color>)) {
     let start = usize::from(selection.0).min(source.len());
     let end = (usize::from(selection.1) + 1).min(source.len());
     if start >= end { return; }
     let resolve = |cell: &Cell| setting.map(|setting| setting.resolve(cell.foreground, cell.background));
     let mut run_start = start;
     let mut background = resolve(&source[start]);
-    if matches!(setting, None | Some(crate::preferences::CellColor::Literal(_))) {
+    if matches!(setting, None | Some(CellColor::Literal(_))) {
         emit(start, end, background);
         return;
     }
@@ -465,7 +450,7 @@ pub fn paint_row(
     row: &ShapedRow,
     origin: Point<Pixels>,
     selection: Option<(u16, u16)>,
-    selection_background: Option<crate::preferences::CellColor>,
+    selection_background: Option<CellColor>,
     cells: CellMetrics,
     window: &mut Window,
     cx: &mut App,
@@ -486,7 +471,7 @@ pub fn paint_row(
                     origin + point(px(start as f32 * cells.width), px(0.)),
                     size(px((end - start) as f32 * cells.width), px(cells.height)),
                 ),
-                background.map(color).unwrap_or_else(|| rgba(0x668fca80).into()),
+                background.map(color).unwrap_or_else(|| row_host::selection_color()),
             ));
         });
     }
@@ -510,10 +495,10 @@ pub fn paint_row(
         let width = row.source.len() as f32 * cells.width;
         for (x, width) in [(0., left), (right, (width - right).max(0.))] {
             if width > 0. {
-                window.with_content_mask(Some(ContentMask { bounds: Bounds::new(origin + point(px(x), px(0.)), size(px(width), px(cells.height))) }), |window| paint(&row.texts, &row.overlines, window, cx));
+                window.with_content_mask(Some(row_host::mask(Bounds::new(origin + point(px(x), px(0.)), size(px(width), px(cells.height))))), |window| paint(&row.texts, &row.overlines, window, cx));
             }
         }
-        window.with_content_mask(Some(ContentMask { bounds: Bounds::new(origin + point(px(left), px(0.)), size(px(right - left), px(cells.height))) }), |window| paint(texts, overlines, window, cx));
+        window.with_content_mask(Some(row_host::mask(Bounds::new(origin + point(px(left), px(0.)), size(px(right - left), px(cells.height))))), |window| paint(texts, overlines, window, cx));
     } else {
         paint(&row.texts, &row.overlines, window, cx);
     }

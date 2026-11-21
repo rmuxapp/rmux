@@ -1150,3 +1150,13 @@ mod tests {
         Ok(())
     }
 }
+
+impl From<CellColor> for rmux_core::terminal_frame::CellPaint {
+    fn from(value: CellColor) -> Self {
+        match value {
+            CellColor::Literal(color) => Self::Literal(color.rgb()),
+            CellColor::CellForeground => Self::CellForeground,
+            CellColor::CellBackground => Self::CellBackground,
+        }
+    }
+}

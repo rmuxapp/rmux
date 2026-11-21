@@ -3,7 +3,7 @@
 //! retain Arc identity so the renderer can reuse shaping without copying cells.
 use std::sync::Arc;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum CursorShape {
     Bar,
     Block,
@@ -11,13 +11,13 @@ pub enum CursorShape {
     Hollow,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Color(pub u8, pub u8, pub u8);
 pub const DEFAULT_FOREGROUND: Color = Color(220, 223, 230);
 pub const DEFAULT_BACKGROUND: Color = Color(18, 20, 26);
 pub const DEFAULT_CURSOR: Color = Color(140, 180, 255);
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Cell {
     pub text: smol_str::SmolStr,
     pub column: u16,
@@ -33,7 +33,7 @@ pub struct Cell {
     pub overline: bool,
     pub hidden: bool,
 }
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct Frame {
     pub revision: u64,
     pub selections: Arc<Vec<Option<(u16, u16)>>>,
@@ -100,4 +100,13 @@ pub struct FrameStorage {
     pub inline_cells: usize,
     pub heap_cells: usize,
     pub heap_text_payload_bytes: usize,
+}
+
+/// Selection paint policy, without preference-file parsing or platform services.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CellPaint { Literal(Color), CellForeground, CellBackground }
+impl CellPaint {
+    pub fn resolve(self, foreground: Color, background: Color) -> Color {
+        match self { Self::Literal(color) => color, Self::CellForeground => foreground, Self::CellBackground => background }
+    }
 }

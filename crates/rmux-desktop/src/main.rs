@@ -56,6 +56,7 @@ use preferences::Preferences;
 mod restore;
 mod recovery;
 mod row_cache;
+mod row_host;
 mod list_navigation;
 mod menu_navigation;
 mod snapshot;
@@ -2410,7 +2411,7 @@ impl Element for TerminalElement {
         let selection_foreground = cx.global::<Preferences>().selection_foreground();
         let shaped_rows = self.view.update(cx, |view, _| {
             let rows = view.row_cache.update(&frame, cells, &family, window, view.metrics.as_mut());
-            view.row_cache.prepare_selection(&frame, selection_foreground, cells, &family, window);
+            view.row_cache.prepare_selection(&frame, selection_foreground.map(Into::into), cells, &family, window);
             rows
         });
         let mut cursor_text = None;
@@ -2568,7 +2569,7 @@ impl Element for TerminalElement {
                     row,
                     state.content_bounds.origin + point(px(0.), px(y as f32 * cells.height)),
                     state.selections.get(y).copied().flatten(),
-                    selection_background,
+                    selection_background.map(Into::into),
                     cells,
                     window,
                     cx,

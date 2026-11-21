@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Connected the actual native row_cache and paint_row sources to the isolated
+GPUI CE browser host through small host adapters. Native keeps its existing
+fixed-width shaping call; browser currently places ASCII glyphs individually
+using measured Fira Mono columns. Frame serialization supports a reproducible,
+synthetic native Ghostty capture. Browser rendering verified two panes with
+colors, bold, underline, strikethrough and concealed-text suppression. Eight
+native row-cache tests and the WASM build pass. Live browser VT parsing, cursor
+and selection interaction, wide/combining-font coverage and performance are
+still pending. This is a shared renderer milestone, not full app parity; the
+public demo remains unchanged.
+
 Moved the native renderer's terminal style-run grouping into
 rmux-core::terminal_runs and routed row_cache through it. This preserves exact
 column/style boundaries, hidden-text suppression, wide/non-ASCII isolation,

@@ -38,3 +38,11 @@ GPUI CE 0.3.0's shape_line signature does not accept that argument. Verify fixed
 column placement with a bundled monospace font, wide/combining cells and styled
 ASCII runs before calling the renderer compatible. Do not silently replace the
 native cache or advertise a plain text widget as the terminal renderer.
+
+The isolated host now compiles that same row_cache.rs and cell_metrics.rs with
+host-specific shaping/paint API adapters. A captured native Ghostty fixture
+renders through paint_row in split panes with a bundled monospace font. ASCII
+columns are explicitly placed because CE lacks fixed-width shaping; this is
+correctness-first and has not passed performance acceptance. The fixture does
+not substitute for browser VT parsing, live input, cursor/selection interaction
+or wide/combining-character acceptance.
