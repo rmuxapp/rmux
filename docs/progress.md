@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Added and ran a render-reclamation benchmark at 1/4/8/16 panes. Full engine/JSON
+reconstruction medians are 0.325/1.285/2.601/5.264 ms; engine linear-memory capacity
+is unchanged over 120 cycles per pane count. The benchmark validates full row
+counts and rejects unknown scenario names. Raw results and scope limits are in
+performance.md and benchmarks/browser-render-reclamation.jsonl. This is engine
+boundary cost, not browser switching latency or a quantified live-memory saving.
+
 Hidden browser terminals now release Rust cell snapshots and the Ghostty render
 adapter, in addition to shaped rows/cursor caches. Terminal state, history, input
 draft and selection remain owned by the session. A released frame is rebuilt

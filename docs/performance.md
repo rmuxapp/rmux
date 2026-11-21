@@ -508,3 +508,32 @@ This establishes a shipped-binary readiness baseline with the same polling and
 fixture limitations. It is not a release-versus-debug speed comparison: the
 product revisions differ, and OS caches/background load were not controlled.
 Cold-start and first-presented-frame acceptance still need dedicated measurement.
+
+
+## Browser render-state reclamation cost
+
+The Node/Ghostty WASM boundary benchmark now includes `reclaimed-snapshot`:
+release the render adapter, recreate it and serialize a full populated 80×24
+viewport, without new terminal output. Each pane count uses a fresh process,
+20 warmup cycles and 100 measured cycles. Timings cover all panes in the row.
+
+| Panes | Median | p95 | Engine linear-memory capacity, before → after |
+| --- | ---: | ---: | ---: |
+| 1 | 0.325 ms | 0.528 ms | 1,441,792 → 1,441,792 bytes |
+| 4 | 1.285 ms | 1.562 ms | 2,949,120 → 2,949,120 bytes |
+| 8 | 2.601 ms | 3.195 ms | 4,980,736 → 4,980,736 bytes |
+| 16 | 5.264 ms | 6.078 ms | 8,978,432 → 8,978,432 bytes |
+
+[Raw results and environment](benchmarks/browser-render-reclamation.jsonl).
+Reproduce from `tools/web-probe` with
+`mise exec -- node --expose-gc scripts/bench-native-vt.mjs 8 reclaimed-snapshot`.
+The full `bench-native-vt` task also includes this scenario at 1/4/16 panes.
+Unknown scenario names now fail instead of silently running the full-output case.
+
+This measures the cost paid when discarded render state is needed again. It
+excludes Rust deserialization, shaping, GPU work and browser presentation, so it
+is not workspace-switch latency. Flat linear-memory capacity supports allocation
+reuse during this workload, not a live-allocation or browser-RSS reduction claim.
+Snapshots still transfer every visible row after reclamation; sixteen panes
+produce roughly 1.8 MB of JSON per full reconstruction. Native/browser end-to-end
+frame and memory acceptance remain open.

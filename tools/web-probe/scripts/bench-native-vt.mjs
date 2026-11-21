@@ -9,7 +9,7 @@ if (!countArg) {
   console.log(JSON.stringify({kind:'environment',date:new Date().toISOString(),node:process.version,
     platform:process.platform,arch:process.arch,cpu:cpus()[0].model,libghosttyVt:'1.0.1',
     scope:'Node Ghostty WASM write + sparse JSON serialization; excludes Rust, shaping, GPU and presentation'}));
-  for (const panes of [1,4,16]) for (const mode of ['clean-snapshot','one-row','full-viewport']) {
+  for (const panes of [1,4,16]) for (const mode of ['clean-snapshot','one-row','full-viewport','reclaimed-snapshot']) {
     const result=spawnSync(process.execPath,['--expose-gc',import.meta.filename,String(panes),mode],{encoding:'utf8'});
     if(result.status!==0)throw new Error(result.stderr||result.error||`child exit ${result.status}`);
     process.stdout.write(result.stdout);
@@ -19,16 +19,22 @@ if (!countArg) {
   const wasm=await readFile(new URL('../../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm',import.meta.url));
   const host=createNativeHost(await loadNativeVt(wasm),()=>false);
   const ids=Array.from({length:panes},()=>host.create(columns,height));
-  for(const id of ids)host.snapshot(id);
+  assert.ok(['clean-snapshot','one-row','full-viewport','reclaimed-snapshot'].includes(scenario), 'known scenario');
+  for(const id of ids) {
+    if(scenario==='reclaimed-snapshot')host.write(id,
+      Array.from({length:height},(_,i)=>`row ${i}: retained terminal output ${'x'.repeat(40)}`).join('\r\n'));
+    host.snapshot(id);
+  }
+  const engineBefore=host.memoryStats();
   global.gc?.();
   const before=process.memoryUsage(),samples=[],payloads=[];
   let transferredRows=0;
   for(let i=0;i<warmup+iterations;i++) {
     const row=String(i%10).repeat(columns);
-    const update=scenario==='clean-snapshot'?'':scenario==='one-row'?'\x1b[H'+row
+    const update=['clean-snapshot','reclaimed-snapshot'].includes(scenario)?'':scenario==='one-row'?'\x1b[H'+row
       :'\x1b[H'+Array.from({length:height},()=>row).join('\r\n');
     const start=performance.now();
-    const frames=ids.map(id=>{if(update)host.write(id,update);return host.snapshot(id);});
+    const frames=ids.map(id=>{if(scenario==='reclaimed-snapshot')host.releaseRenderState(id);if(update)host.write(id,update);return host.snapshot(id);});
     const duration=performance.now()-start;
     const patches=frames.map(text=>JSON.parse(text));
     const expected=scenario==='clean-snapshot'?0:scenario==='one-row'?1:height;
@@ -43,6 +49,7 @@ if (!countArg) {
   console.log(JSON.stringify({kind:'result',panes,scenario,columns,height,iterations,warmup,
     median_ms:samples[Math.floor(iterations*.5)],p95_ms:samples[Math.ceil(iterations*.95)-1],
     mean_payload_bytes:payloads.reduce((a,b)=>a+b,0)/iterations,mean_transferred_rows:transferredRows/iterations,
+    engine_before:engineBefore,engine_after:host.memoryStats(),
     process_before_bytes:before,process_after_gc_bytes:after,
     memory_note:'whole isolated Node process; not per-pane/browser memory or transient allocation peak'}));
   ids.forEach(id=>host.free(id));
