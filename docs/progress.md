@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Extracted ordered pane tabs and selection into `rmux-core::tabs::Tabs<T>` and
+migrated native PaneView and browser SamplePane to it. Hosts no longer maintain
+independent active indices. The collection reconciles removal/insertion/reorder
+and drain transitions, clamps restored indices, and shares wraparound navigation.
+Native labels, title subscriptions, process launch, focus and persistence stay in
+their platform adapter. Two focused lifecycle tests cover surviving selection,
+right/last close fallback, empty/recreated panes, transfer insertion, swaps,
+invalid restore and wraparound. Native check and WASM build pass. This is shared
+application state, but full workspace orchestration and browser parity remain
+unfinished; the published demo is unchanged.
+
 Browser text selection now schedules native AUTOSCROLL_TICK events while dragging
 beyond the viewport. The browser and desktop share the 30 ms cadence; native
 gesture state and 64-bit scrollbar bounds determine whether to continue. The

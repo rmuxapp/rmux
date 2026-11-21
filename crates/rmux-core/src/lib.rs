@@ -9,3 +9,4 @@ pub mod terminal_runs;
 pub mod keyboard;
 pub mod workspace_groups;
 pub mod scroll;
+pub mod tabs;

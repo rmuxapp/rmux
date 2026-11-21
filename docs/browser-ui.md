@@ -4,6 +4,15 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Pane tab order and selection now belong to `rmux-core::tabs::Tabs<T>` in both
+hosts. The model owns its collection and selected index; read-only slice access
+cannot bypass reconciliation. Removal keeps a surviving selected tab, closing
+the active tab chooses its right neighbor or the last tab, insertion and swaps
+preserve selected identity, and restore clamps invalid indices. Native transfer,
+batch-close and persistence paths consume this model too. This removes duplicate
+tab state ownership; platform focus, process launch and view orchestration remain
+separate.
+
 Selection edge autoscroll is now wired into the browser host. The adapter returns
 the native gesture's continuation request, checking 64-bit scrollbar bounds;
 the host schedules one cancellable tick at the shared desktop 30 ms interval.

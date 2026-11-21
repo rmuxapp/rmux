@@ -180,8 +180,7 @@ pub(super) struct PaneView {
     tab_launch_canceled: Option<Arc<AtomicBool>>,
     workspace: EntityId,
     titles: std::collections::HashMap<EntityId, Subscription>,
-    pub terminals: Vec<Entity<TerminalView>>,
-    active: usize,
+    pub terminals: rmux_core::tabs::Tabs<Entity<TerminalView>>,
     next_number: usize,
     labels: Vec<String>,
     benchmark: bool,
@@ -367,7 +366,7 @@ impl PaneView {
             }
         }));
         let scroll = ListState::new(self.terminals.len(), ListAlignment::Top, px(96.));
-        scroll.scroll_to(ListOffset { item_ix: self.active, offset_in_item: px(0.) });
+        scroll.scroll_to(ListOffset { item_ix: self.terminals.active_index(), offset_in_item: px(0.) });
         focus.focus(window);
         cx.subscribe_in(&input, window, |this, _, event: &text_field::EditEvent, window, cx| {
             match event {
@@ -389,7 +388,7 @@ impl PaneView {
             cx.notify();
         }).detach();
         self.tab_picker = Some((input, self.active_terminal_id(), scroll));
-        self.tab_picker_selected_row = self.active;
+        self.tab_picker_selected_row = self.terminals.active_index();
         cx.notify();
     }
     fn render_tab_picker_row(&mut self, index: usize, selected: Option<EntityId>, cx: &mut Context<Self>) -> AnyElement {
@@ -403,7 +402,7 @@ impl PaneView {
             .tooltip(move |_, cx| cx.new(|_| ControlHint(hint.clone())).into())
             .when(Some(id) == selected, |row| row.bg(rgb(0x354969)))
             .hover(|row| row.bg(rgb(0x40516c)))
-            .child(div().w(px(16.)).flex_shrink_0().child(if index == self.active { "✓" } else { "" }))
+            .child(div().w(px(16.)).flex_shrink_0().child(if index == self.terminals.active_index() { "✓" } else { "" }))
             .child(div().w(px(24.)).flex_shrink_0().text_xs().text_color(rgb(0xaaaaaa)).child((index + 1).to_string()))
             .child(div().flex_1().min_w_0().flex().flex_col().gap_1()
                 .child(div().truncate().child(title))
@@ -468,7 +467,7 @@ impl PaneView {
                 "id":entity.entity_id().to_string(), "window_id":window_id,
                 "workspace_id":workspace_id, "pane_id":pane_id,
                 "index":index, "type":"terminal", "title":self.tab_title(index, cx),
-                "selected":index == self.active, "attention":terminal.attention.any(),
+                "selected":index == self.terminals.active_index(), "attention":terminal.attention.any(),
                 "directory_label":terminal.directory_label,
                 "remote_directory":terminal.remote_directory_label,
                 "git_branch":terminal.git_branch,
@@ -529,7 +528,7 @@ impl PaneView {
             input.read(cx).focus.focus(window);
             return;
         }
-        let Some(terminal) = self.terminals.get(self.active) else {
+        let Some(terminal) = self.terminals.active() else {
             return;
         };
         let id = terminal.entity_id();
@@ -573,23 +572,21 @@ impl PaneView {
         cx.notify();
     }
     pub fn active_cell_metrics(&self, cx: &App) -> CellMetrics {
-        self.terminals
-            .get(self.active)
+        self.terminals.active()
             .map(|terminal| terminal.read(cx).cells)
             .unwrap_or_else(|| CellMetrics::new(cx.global::<Preferences>().font_size))
     }
     pub fn active_font_family(&self, cx: &App) -> SharedString {
-        self.terminals
-            .get(self.active)
+        self.terminals.active()
             .map(|terminal| terminal.read(cx).font_family.clone())
             .unwrap_or_else(|| cx.global::<Preferences>().font_family.clone().into())
     }
     pub fn active_terminal_id(&self) -> Option<EntityId> {
-        self.terminals.get(self.active).map(Entity::entity_id)
+        self.terminals.active().map(Entity::entity_id)
     }
 
     pub fn pending_palette_operations(&self, cx: &App) -> (bool, bool) {
-        let paste = self.terminals.get(self.active).is_some_and(|terminal| {
+        let paste = self.terminals.active().is_some_and(|terminal| {
             let terminal = terminal.read(cx);
             terminal.image_paste_pending() || terminal.session.paste_pending()
         });
@@ -605,15 +602,14 @@ impl PaneView {
     }
 
     pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> (Vec<TabTransfer>, usize) {
-        let active = self.active;
+        let active = self.terminals.active_index();
         self.titles.clear();
         let tabs = self
             .terminals
-            .drain(..)
+            .take_all().into_iter()
             .zip(self.labels.drain(..))
             .map(|(terminal, label)| TabTransfer { terminal, label })
             .collect();
-        self.active = 0;
         cx.emit(PaneMetadataChanged);
         cx.notify();
         (tabs, active)
@@ -669,7 +665,7 @@ impl PaneView {
     }
 
     pub fn context_label(&self, cx: &App) -> Option<(Option<String>, Option<String>)> {
-        let terminal = self.terminals.get(self.active)?.read(cx);
+        let terminal = self.terminals.active()?.read(cx);
         if let Some(destination) = terminal.session.remote_destination() {
             let ended = terminal.process_exit.is_some();
             let status = if ended { "SSH ended" } else { "SSH" };
@@ -726,9 +722,8 @@ impl PaneView {
             workspace,
             titles,
             next_number: terminals.len() + 1,
-            terminals,
+            terminals: rmux_core::tabs::Tabs::new(terminals, active),
             labels,
-            active,
             benchmark: false,
             error: None,
             rename: None,
@@ -737,7 +732,7 @@ impl PaneView {
     }
     pub fn snapshot(&self, cx: &App) -> snapshot::Node {
         snapshot::Node::Pane {
-            active_tab: self.active,
+            active_tab: self.terminals.active_index(),
             tabs: self
                 .terminals
                 .iter()
@@ -780,8 +775,7 @@ impl PaneView {
             tab_launch_canceled: None,
             workspace,
             titles: [(terminal.entity_id(), title)].into_iter().collect(),
-            terminals: vec![terminal],
-            active: 0,
+            terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0),
             next_number: 2,
             labels: vec![label.unwrap_or_else(|| "Terminal 1".into())],
             benchmark,
@@ -792,27 +786,26 @@ impl PaneView {
     }
 
     pub fn focus(&self, window: &mut Window, cx: &App) {
-        if let Some(terminal) = self.terminals.get(self.active) {
+        if let Some(terminal) = self.terminals.active() {
             terminal.read(cx).focus.focus(window);
         }
     }
 
     pub fn is_focused(&self, window: &Window, cx: &App) -> bool {
-        self.terminals
-            .get(self.active)
+        self.terminals.active()
             .is_some_and(|terminal| terminal.read(cx).focus.contains_focused(window, cx))
     }
 
     /// Cached OSC directory, or explicit launch directory before the first report.
     /// New-workspace creation must not wait for the terminal parser mutex.
     pub fn cached_directory(&self, cx: &App) -> Option<std::path::PathBuf> {
-        self.terminals.get(self.active)?.read(cx).snapshot_directory.clone()
+        self.terminals.active()?.read(cx).snapshot_directory.clone()
     }
     pub fn live_ssh_destination(&self, cx: &App) -> Option<String> {
-        self.terminals.get(self.active)?.read(cx).session.remote_destination().map(str::to_owned)
+        self.terminals.active()?.read(cx).session.remote_destination().map(str::to_owned)
     }
     pub fn ssh_destination(&self, cx: &App) -> Option<String> {
-        let terminal = self.terminals.get(self.active)?.read(cx);
+        let terminal = self.terminals.active()?.read(cx);
         terminal.session.remote_destination().map(str::to_owned).or_else(|| terminal.saved_ssh_destination.clone())
     }
 
@@ -820,7 +813,7 @@ impl PaneView {
         if index >= self.terminals.len() {
             return;
         }
-        self.active = index;
+        self.terminals.select(index);
         self.rename = None;
         self.tab_picker = None;
         self.tab_picker_blur = None;
@@ -836,7 +829,7 @@ impl PaneView {
             return;
         }
         self.select(
-            rmux_core::layout::cycle_index(self.active, self.terminals.len(), delta).unwrap(),
+            self.terminals.cycle_target(delta).unwrap(),
             window,
             cx,
         );
@@ -929,14 +922,13 @@ impl PaneView {
     }
 
     fn reorder(&mut self, delta: isize, cx: &mut Context<Self>) {
-        let next = self.active as isize + delta;
+        let next = self.terminals.active_index() as isize + delta;
         if next < 0 || next >= self.terminals.len() as isize {
             return;
         }
         let next = next as usize;
-        self.terminals.swap(self.active, next);
-        self.labels.swap(self.active, next);
-        self.active = next;
+        self.labels.swap(self.terminals.active_index(), next);
+        self.terminals.swap(self.terminals.active_index(), next);
         self.tab_scroll.scroll_to_item(next);
         cx.emit(PaneMetadataChanged);
         cx.notify();
@@ -992,11 +984,7 @@ impl PaneView {
         self.titles.remove(&id);
         let terminal = self.terminals.remove(index);
         let label = self.labels.remove(index);
-        if index < self.active {
-            self.active -= 1;
-        }
-        self.active = self.active.min(self.terminals.len().saturating_sub(1));
-        self.tab_scroll.scroll_to_item(self.active);
+        self.tab_scroll.scroll_to_item(self.terminals.active_index());
         cx.emit(PaneMetadataChanged);
         cx.notify();
         Some(TabTransfer { terminal, label })
@@ -1026,7 +1014,7 @@ impl PaneView {
         if self.automation_busy(cx) || cx.global::<Shutdowns>().quitting { return; }
         let Some(keep) = self.active_terminal_id() else { return; };
         let targets: Vec<_> = self.terminals.iter().enumerate()
-            .filter(|(index, terminal)| scope.includes(*index, self.active, terminal.read(cx).process_exit.is_some()))
+            .filter(|(index, terminal)| scope.includes(*index, self.terminals.active_index(), terminal.read(cx).process_exit.is_some()))
             .map(|(_, terminal)| terminal.entity_id()).collect();
         if targets.is_empty() { return; }
         let confirms = cx.global::<ClosePolicy>().confirms(true, || {
@@ -1078,10 +1066,11 @@ impl PaneView {
         }
         // The keeper guarantees a nonempty pane. Preserve a newer surviving
         // selection, otherwise return to the terminal retained by the command.
-        self.active = self.terminals.iter().position(|terminal| Some(terminal.entity_id()) == selected)
+        let selected_index = self.terminals.iter().position(|terminal| Some(terminal.entity_id()) == selected)
             .or_else(|| self.terminals.iter().position(|terminal| terminal.entity_id() == keep))
             .expect("batch close preserves its keeper");
-        self.tab_scroll.scroll_to_item(self.active);
+        self.terminals.select(selected_index);
+        self.tab_scroll.scroll_to_item(self.terminals.active_index());
         if replace_focus { self.focus(window, cx); }
         cx.emit(PaneMetadataChanged);
         cx.notify();
@@ -1153,11 +1142,7 @@ impl PaneView {
         if self.terminals.is_empty() {
             cx.emit(PaneEmpty);
         } else {
-            if index < self.active {
-                self.active -= 1;
-            }
-            self.active = self.active.min(self.terminals.len() - 1);
-            self.tab_scroll.scroll_to_item(self.active);
+            self.tab_scroll.scroll_to_item(self.terminals.active_index());
             if replace_focus {
                 self.focus(window, cx);
             }
@@ -1168,11 +1153,11 @@ impl PaneView {
 
 impl Render for PaneView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        let control_focus = self.terminals.get(self.active).map(|terminal| terminal.read(cx).focus.clone());
+        let control_focus = self.terminals.active().map(|terminal| terminal.read(cx).focus.clone());
         // Hidden tabs keep their engines, but need not retain shaped glyph rows.
         // Do not notify: releasing a cache cannot change visible output.
         for (index, terminal) in self.terminals.iter().enumerate() {
-            if index != self.active && terminal.read(cx).has_render_cache() {
+            if index != self.terminals.active_index() && terminal.read(cx).has_render_cache() {
                 terminal.update(cx, |terminal, _| terminal.release_render_cache());
             }
         }
@@ -1198,7 +1183,7 @@ impl Render for PaneView {
             .on_action(cx.listener(|this, _: &MoveTabLeft, _, cx| this.reorder(-1, cx)))
             .on_action(cx.listener(|this, _: &MoveTabRight, _, cx| this.reorder(1, cx)))
             .on_action(
-                cx.listener(|this, _: &ClosePane, window, cx| this.close(this.active, window, cx)),
+                cx.listener(|this, _: &ClosePane, window, cx| this.close(this.terminals.active_index(), window, cx)),
             )
             .when(!self.benchmark, |root| {
                 root.child(
@@ -1220,7 +1205,7 @@ impl Render for PaneView {
                                         let label: SharedString = self.tab_title(index, cx).into();
                                         let title_hint: SharedString = self.terminal_search_title(index, cx).into();
                                         let display_title = label.clone();
-                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.active, focused)
+                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused)
                                             .on_drag(drag_item::DragItem { scope, container, item: target, label }, |item, _, _, cx| cx.new(|_| item.clone()))
                                             .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope && item.item != target))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, _| {
@@ -1343,7 +1328,7 @@ impl Render for PaneView {
                                     })).child(icons::icon("close")))
                         ))
                         .child(
-                            action_control("new-tab", if self.spawning_tab.is_some() { "Starting terminal…" } else if self.terminals.get(self.active).is_some_and(|terminal| terminal.read(cx).session.remote_destination().is_some()) { "New SSH Tab" } else { "New Terminal Tab" }, NewTab, control_focus.clone())
+                            action_control("new-tab", if self.spawning_tab.is_some() { "Starting terminal…" } else if self.terminals.active().is_some_and(|terminal| terminal.read(cx).session.remote_destination().is_some()) { "New SSH Tab" } else { "New Terminal Tab" }, NewTab, control_focus.clone())
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if event.standard_click() { this.add(window, cx); }
                                 }))
@@ -1383,7 +1368,7 @@ impl Render for PaneView {
                     .flex_1()
                     .min_h_0()
                     .overflow_hidden()
-                    .when_some(self.terminals.get(self.active), |body, terminal| {
+                    .when_some(self.terminals.active(), |body, terminal| {
                         body.child(terminal.clone())
                     }),
             )
