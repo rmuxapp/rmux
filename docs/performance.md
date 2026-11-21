@@ -432,3 +432,32 @@ This is one local engine-boundary observation, not browser frame/input latency
 or a general speedup guarantee. Existing real-WASM checks cover copy contents,
 wrapped/unwrapped text, oversized-copy rejection, selection gestures, Unicode
 search seeds, exact-limit seeds, multiline/oversized rejection and disposal.
+
+### Browser engine lifecycle capacity (2026-11-21)
+
+`mise run bench-memory` in `tools/web-probe` now measures both output-only and
+search/copy workloads at 1, 4 and 16 panes over five create/write/close cycles.
+Each pane is 80×24 with a 4 MiB scrollback limit and receives 164,890 bytes
+(2,000 log lines). Search scans for `Sample`, selects and copies a match, and
+exports the selection as a search seed. Alternating cycles explicitly close
+search or destroy the terminal with its search handle still live. Each
+pane-count/workload combination starts with a fresh engine instance.
+
+On an Apple M4 Max, Node 24.22.0, engine/adapter source 04df7ba, retained linear
+memory capacity after the fifth close was:
+
+| Panes | Output only | Search and copy |
+| --- | ---: | ---: |
+| 1 | 3.50 MiB | 6.625 MiB |
+| 4 | 10.5625 MiB | 19.25 MiB |
+| 16 | 38.8125 MiB | 69.8125 MiB |
+
+Every cycle ended with zero registered sessions. Output-only capacity stayed
+constant after cycle one. Search/copy capacity increased by at most 128 KiB
+across subsequent cycles and was constant for cycles three through five.
+WASM linear memory does not shrink when allocations are freed; this measures
+retained allocator capacity, not live allocation bytes. Stable capacity over
+five cycles is not proof of no leaks. This harness excludes GPUI entities, JS
+heap, fonts, GPU resources and browser overhead, so it does not validate UI
+pane destruction or whole-app memory targets. Results and the exact engine
+WASM hash are in [the raw measurements](benchmarks/browser-engine-memory-search-copy.jsonl).

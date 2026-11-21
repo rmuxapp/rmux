@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Extended the browser engine memory harness to five output and search/copy
+create/write/close cycles at 1/4/16 panes, including destruction with live search
+handles and explicit search closure. Recorded source and WASM hash with raw data
+in docs/benchmarks/browser-engine-memory-search-copy.jsonl. All cycles ended with
+zero registered sessions; retained linear capacity plateaued by cycle three.
+At 16 panes the fifth-close capacities were 38.8125 MiB output-only and
+69.8125 MiB search/copy. These are retained WASM capacities, not live allocation,
+UI/process memory or a leak-free claim. Method and limits are in performance.md;
+whole-app lifecycle memory and latency acceptance remain open. No product change
+or deployment in this measurement cycle.
+
 Pane State now commits insertion/removal for both native and browser hosts,
 revealing the layout on success and preserving zoom/tree for rejected or stale
 requests. Native split creation/tab-to-pane transfer and ownership removal use
