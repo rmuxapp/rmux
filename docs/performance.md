@@ -627,3 +627,20 @@ run excludes the GUI, shaping and presentation; it is neither key-to-pixel
 latency nor a matched before/after regression comparison. The throughput fall
 at larger pane counts warrants profiling, not an attribution from this run.
 [Raw results and provenance](benchmarks/pty-post-queued-input.jsonl).
+
+### Repeated-cell style reuse
+
+Native snapshots now reuse the resolved style/color tuple for consecutive
+identical raw cells within one row. This removes repeated style queries and
+color calculations for blank padding and repeated glyphs without allocating a
+cache or retaining it across frames. Full raw-cell equality includes packed
+background colors; row-local lifetime avoids page-local style-ID collisions.
+
+Three alternating 16-pane runs per release binary, 128 requests each, yielded
+median per-run snapshot-batch p99 of 4.77 ms before and 4.20 ms after. Median
+aggregate flood throughput was 102.47 versus 102.13 MiB/s, effectively unchanged
+in this small sample. Snapshot p99 ranges overlapped (4.65–5.71 ms before,
+4.01–4.75 ms after), so these are observations rather than a guaranteed speedup.
+All runs completed and reaped their workloads. The comparison excludes GUI
+rendering/presentation and does not control other host activity.
+[Alternating runs and binary/source hashes](benchmarks/pty-row-style-cache.jsonl).

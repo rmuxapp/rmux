@@ -923,6 +923,9 @@ impl Terminal {
                 ))?;
                 let previous = &self.frame.rows[y as usize];
                 let mut row: Option<Vec<Cell>> = None;
+                // Raw-cell equality includes packed background colors. Keep
+                // this cache row-local because style IDs are page-local.
+                let mut last_style = None;
                 let mut x = 0;
                 while ghostty_render_state_row_cells_next(self.cells) {
                     let mut raw = GhosttyCell::default();
@@ -942,12 +945,6 @@ impl Terminal {
                         GHOSTTY_CELL_WIDE_SPACER_TAIL | GHOSTTY_CELL_WIDE_SPACER_HEAD => 0,
                         _ => 1,
                     };
-                    let mut style = GhosttyStyle::default();
-                    check(ghostty_render_state_row_cells_get(
-                        self.cells,
-                        GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_STYLE,
-                        out(&mut style),
-                    ))?;
                     let scratch = if overflow_glyph.is_empty() { &mut inline_glyph[..] } else { &mut overflow_glyph[..] };
                     let mut buf = GhosttyBuffer {
                         ptr: scratch.as_mut_ptr(),
@@ -971,20 +968,33 @@ impl Terminal {
                     } else {
                         check(result)?;
                     }
-                    let mut fg = resolve_color(style.fg_color, &colors, colors.foreground);
-                    let mut bg = resolve_color(style.bg_color, &colors, colors.background);
-                    if style.flags & 16 != 0 {
-                        std::mem::swap(&mut fg, &mut bg);
-                    }
-                    let mut underline_color = resolve_color(style.underline_color, &colors, fg);
-                    if style.flags & 4 != 0 {
-                        fg = dim_color(fg, bg);
-                        underline_color = dim_color(underline_color, bg);
-                    }
-                    if style.flags & 32 != 0 {
-                        fg = bg;
-                        underline_color = bg;
-                    }
+                    let (style, fg, bg, underline_color) = match last_style {
+                        Some((previous, style, fg, bg, underline)) if previous == raw => (style, fg, bg, underline),
+                        _ => {
+                            let mut style = GhosttyStyle::default();
+                            check(ghostty_render_state_row_cells_get(
+                                self.cells,
+                                GHOSTTY_RENDER_STATE_ROW_CELLS_DATA_STYLE,
+                                out(&mut style),
+                            ))?;
+                            let mut fg = resolve_color(style.fg_color, &colors, colors.foreground);
+                            let mut bg = resolve_color(style.bg_color, &colors, colors.background);
+                            if style.flags & 16 != 0 {
+                                std::mem::swap(&mut fg, &mut bg);
+                            }
+                            let mut underline_color = resolve_color(style.underline_color, &colors, fg);
+                            if style.flags & 4 != 0 {
+                                fg = dim_color(fg, bg);
+                                underline_color = dim_color(underline_color, bg);
+                            }
+                            if style.flags & 32 != 0 {
+                                fg = bg;
+                                underline_color = bg;
+                            }
+                            last_style = Some((raw, style, fg, bg, underline_color));
+                            (style, fg, bg, underline_color)
+                        }
+                    };
                     let glyph_bytes = if overflow_glyph.is_empty() { &inline_glyph[..] } else { &overflow_glyph[..] };
                     let text = String::from_utf8_lossy(&glyph_bytes[..buf.len]);
                     let previous_cell = previous.get(x as usize);
@@ -1123,6 +1133,21 @@ mod tests {
         assert!(terminal.render_delay().is_none());
         terminal.write(b"\x1b[?2026h\x1bc");
         assert!(terminal.render_delay().is_none());
+        Ok(())
+    }
+    #[test]
+    fn snapshot_repeated_cells_keep_packed_backgrounds_and_row_styles() -> Result<()> {
+        let mut terminal = Terminal::new(12, 3)?;
+        terminal.write(b"\x1b[48;2;10;20;30m    \x1b[48;2;40;50;60m    \x1b[0m\r\n\x1b[1;38;2;70;80;90mxxxx\x1b[0mxxxx");
+        let frame = terminal.frame()?;
+        for cell in &frame.rows[0][..4] { assert_eq!(cell.background, Color(10, 20, 30)); }
+        for cell in &frame.rows[0][4..8] { assert_eq!(cell.background, Color(40, 50, 60)); }
+        for cell in &frame.rows[1][..4] { assert!(cell.bold); assert_eq!(cell.foreground, Color(70, 80, 90)); }
+        for cell in &frame.rows[1][4..8] { assert!(!cell.bold); }
+        terminal.write(b"\x1b[1;1H\x1b[48;2;90;80;70m    ");
+        let changed = terminal.frame()?;
+        assert_eq!(changed.rows[0][0].background, Color(90, 80, 70));
+        assert_eq!(frame.rows[0][0].background, Color(10, 20, 30));
         Ok(())
     }
     #[test]

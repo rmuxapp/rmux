@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Native snapshot extraction reuses resolved styles/colors for consecutive
+identical raw cells within each row, avoiding redundant FFI queries and color
+work without heap allocation. Five focused snapshot tests passed, including a
+new packed-background/style-transition case. Three alternating before/after
+16-pane release runs completed: median snapshot-batch p99 4.77 → 4.20 ms;
+throughput approximately unchanged at 102 MiB/s. Small uncontrolled sample,
+not a guaranteed speedup or GUI latency result. Details and raw provenance:
+performance.md and `benchmarks/pty-row-style-cache.jsonl`.
+
 Refreshed native release PTY pressure measurements after queued-input changes.
 Fixed the responder harness to await asynchronous workload shutdown before the
 next pane count. All 512 requests completed at 1/4/8/16 panes, output advanced
