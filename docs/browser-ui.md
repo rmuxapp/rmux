@@ -79,6 +79,10 @@ Use `mise run build` inside `tools/web-probe` for fast development output in
 The **Shared WASM demo** GitHub workflow builds the release artifact, checks the
 engine adapter and uploads `rmux-shared-demo`. It does not publish the site.
 
+The loader overlaps UI WASM download/compilation with engine initialization and
+starts the UI only after both succeed. `rmux-initialization` Performance entries
+measure this initialization interval, not first paint or input latency.
+
 `build-sizes.json` records raw/gzip/Brotli WASM payload sizes and SHA-256 hashes.
 The retired ghostty-web npm package is prepared only for legacy benchmarks; it
 is not part of the replacement runtime or optimized artifact.

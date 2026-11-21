@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Demo startup now downloads/compiles UI WASM alongside terminal-engine loading,
+then instantiates UI only after the engine host is ready. Streaming compilation
+uses application/wasm responses; other MIME types use the same downloaded bytes.
+Three startup-order/failure tests pass and run in CI. Development WASM build and
+browser help-input smoke pass (target/shared-parallel-startup.jpg). Initialization
+marks are exposed through browser Performance entries; no measured startup speedup
+or first-paint claim yet. Loading/title/error copy now says demo rather than probe.
+
 Native sidebar drag capture, width constraints, divider and double-click reset
 now live in shared sidebar_interaction used by both hosts. Browser starts at the
 native 200px width and cancels a drag when hiding its sidebar. Native check and

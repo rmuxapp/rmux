@@ -44,6 +44,8 @@ jobs:
           restore-keys: shared-demo-${{ runner.os }}-
       - name: Build optimized shared UI
         run: mise run build-release
+      - name: Check startup ordering
+        run: mise run check-startup
       - name: Check native engine adapter
         run: mise run check-native-vt
       - name: Cache compiled dependencies
