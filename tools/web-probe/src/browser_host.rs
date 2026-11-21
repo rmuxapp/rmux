@@ -63,14 +63,13 @@ impl BrowserHost {
         else { self.select(self.active, window, cx); }
     }
     fn ungroup(&mut self, cx: &mut Context<Self>) {
-        let selected = self.workspaces[self.active].1.entity_id();
-        let Some(group) = self.groups.containing(selected).map(|group| group.id) else { return; };
-        // Materialize logical order before removing the group, as native does.
-        let ranks: std::collections::HashMap<_, _> = self.workspace_order(true).into_iter().enumerate()
-            .map(|(rank, index)| (self.workspaces[index].1.entity_id(), rank)).collect();
-        self.groups.ungroup(group);
-        self.workspaces.sort_by_key(|(_, entity)| ranks[&entity.entity_id()]);
-        self.active = self.workspaces.iter().position(|(_, entity)| entity.entity_id() == selected).unwrap();
+        let Some((_, selected)) = self.workspaces.get(self.active) else { return; };
+        let Some(group) = self.groups.containing(selected.entity_id()).map(|group| group.id) else { return; };
+        if !rmux_core::workspace_lifecycle::ungroup(
+            &mut self.workspaces, &mut self.active, &mut self.groups, group,
+            |(_, entity)| (entity.entity_id(), false),
+        ) { return; }
+        self.scroll_to_workspace();
         cx.notify();
     }
     fn select(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {

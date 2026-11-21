@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Ungrouping now uses the shared workspace lifecycle in both hosts. It materializes
+logical order including collapsed members, removes group ownership without
+recreating sessions, preserves individual pin flags and restores selection by
+identity. Invalid group requests leave state unchanged. Browser ungrouping also
+scrolls to the retained selection and safely ignores an empty workspace list.
+Three lifecycle tests pass, including hidden member order differing from storage,
+selection and individual pins after dissolution; desktop and WASM checks pass.
+No runtime UI verification this cycle; not deployed. Workspace creation, selection
+orchestration and a unified application entry point remain migration work.
+
 Published GitHub shared-demo run 44937216212 (source 33a210d) to Cloudflare
 44619191 and rmux.app. This brings Unicode sample editing, optional CJK/monochrome
 emoji fonts, shared pane command routing, pane joining and tab-to-split actions

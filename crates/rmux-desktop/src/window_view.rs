@@ -753,16 +753,10 @@ impl WorkspaceWindow {
     }
 
     fn ungroup_preserving_order(&mut self, id: u64) {
-        // Materialize logical member order before removing its container. Pins
-        // remain workspace-owned and still determine their resulting top tier.
-        let selected = self.entries.get(self.active).map(|entry| entry.workspace.entity_id());
-        let ranks: std::collections::HashMap<_, _> = self.workspace_order(true).into_iter().enumerate()
-            .map(|(rank, index)| (self.entries[index].workspace.entity_id(), rank)).collect();
-        if self.groups.ungroup(id).is_none() { return; }
-        self.entries.sort_by_key(|entry| ranks[&entry.workspace.entity_id()]);
-        if let Some(index) = selected.and_then(|id| self.entries.iter().position(|entry| entry.workspace.entity_id() == id)) {
-            self.active = index;
-        }
+        if !rmux_core::workspace_lifecycle::ungroup(
+            &mut self.entries, &mut self.active, &mut self.groups, id,
+            |entry| (entry.workspace.entity_id(), entry.pinned),
+        ) { return; }
         self.scroll_to_workspace(self.active);
     }
 

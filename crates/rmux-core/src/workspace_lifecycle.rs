@@ -48,9 +48,49 @@ pub fn close<T, W: Copy + Eq>(
     Some(ClosedWorkspace { removed, was_active })
 }
 
+/// Materialize the complete logical order before dissolving a group, including
+/// collapsed members. Keep workspace-owned pin flags and selected identity.
+/// This moves existing entries; it never clones/restarts their sessions.
+pub fn ungroup<T, W: Copy + Eq + std::hash::Hash>(
+    entries: &mut [T], active: &mut usize, groups: &mut Groups<W>, id: u64,
+    metadata: impl Fn(&T) -> (W, bool),
+) -> bool {
+    if !groups.entries().iter().any(|group| group.id == id) { return false; }
+    let selected = entries.get(*active).map(|entry| metadata(entry).0);
+    let identities: Vec<_> = entries.iter().map(&metadata).collect();
+    let ranks: std::collections::HashMap<_, _> = groups.ordered_indices(&identities, true)
+        .into_iter().enumerate().map(|(rank, index)| (identities[index].0, rank)).collect();
+    groups.ungroup(id);
+    entries.sort_by_key(|entry| ranks[&metadata(entry).0]);
+    if let Some(index) = selected.and_then(|id| entries.iter().position(|entry| metadata(entry).0 == id)) {
+        *active = index;
+    }
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ungroup_preserves_hidden_member_order_selection_and_individual_pins() {
+        // Member order intentionally differs from entity storage order.
+        let mut entries = vec![(1, false), (2, false), (3, true), (4, false)];
+        let mut active = 3;
+        let mut groups = Groups::default();
+        let id = groups.create("group".into(), vec![1, 4, 3], false).unwrap();
+        groups.get_mut(id).unwrap().collapsed = true;
+        assert!(ungroup(&mut entries, &mut active, &mut groups, id, |entry| *entry));
+        assert_eq!(entries, vec![(1, false), (4, false), (3, true), (2, false)]);
+        assert_eq!(entries[active].0, 4);
+        assert!(groups.entries().is_empty());
+        let visible: Vec<_> = groups.ordered_indices(&entries, false).into_iter().map(|index| entries[index].0).collect();
+        assert_eq!(visible, vec![3, 1, 4, 2]); // Individual pin survives dissolution.
+        let before = entries.clone();
+        assert!(!ungroup(&mut entries, &mut active, &mut groups, id, |entry| *entry));
+        assert_eq!(entries, before);
+        assert_eq!(entries[active].0, 4);
+    }
 
     #[test]
     fn closing_anchor_promotes_member_without_moving_group_or_losing_other_focus() {
