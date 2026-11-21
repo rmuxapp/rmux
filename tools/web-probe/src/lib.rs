@@ -22,7 +22,7 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[CommandId::Split, CommandId::SplitBelow, CommandId::TogglePaneZoom];
 
 
-actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab]);
+actions!(rmux, [EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, NextTab, PreviousTab, ClosePane]);
 mod clipboard {
     pub fn write(item: gpui::ClipboardItem, cx: &mut gpui::App) {
         cx.write_to_clipboard(item);
@@ -33,7 +33,7 @@ struct InputProbe {
     search: palette_match::RankedSearch,
     selected: usize,
     feedback: Option<String>,
-    tree: PaneTree<usize>,
+    tree: Option<PaneTree<usize>>,
     focused: usize,
     next_pane: usize,
     zoomed: bool,
@@ -41,9 +41,37 @@ struct InputProbe {
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
 }
 impl InputProbe {
+    fn add_pane(&mut self, id: usize, window: &Window, cx: &mut Context<Self>) {
+        let pane = cx.new(sample_pane::SamplePane::new);
+        cx.subscribe_in(&pane, window, move |this, _, _: &sample_pane::PaneEmpty, window, cx| {
+            let old_index = this.tree.as_ref().and_then(|tree| tree.pane_index(&id)).unwrap_or(0);
+            this.tree = this.tree.take().and_then(|tree| tree.remove(&id));
+            this.samples.remove(&id);
+            this.zoomed = false;
+            if this.focused == id {
+                let mut ordered: Vec<_> = this.samples.keys().copied().collect();
+                ordered.sort_by_key(|id| this.tree.as_ref().and_then(|tree| tree.pane_index(id)));
+                if let Some(next) = ordered.get(old_index.min(ordered.len().saturating_sub(1))) {
+                    this.focused = *next;
+                    this.samples[next].update(cx, |pane, cx| pane.focus(window, cx));
+                }
+            }
+            cx.notify();
+        }).detach();
+        self.samples.insert(id, pane);
+    }
+    fn start_terminal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let id = self.next_pane;
+        self.next_pane += 1;
+        self.add_pane(id, window, cx);
+        self.tree = Some(PaneTree::Pane(id));
+        self.focused = id;
+        self.close_palette(window, cx);
+    }
+
     fn cycle_pane(&mut self, direction: isize, window: &mut Window, cx: &mut Context<Self>) {
         let mut ordered: Vec<_> = self.samples.keys().copied().collect();
-        ordered.sort_by_key(|id| self.tree.pane_index(id));
+        ordered.sort_by_key(|id| self.tree.as_ref().and_then(|tree| tree.pane_index(id)));
         let current = ordered.iter().position(|id| *id == self.focused).unwrap_or(0);
         if let Some(next) = rmux_core::layout::cycle_index(current, ordered.len(), direction) {
             self.focused = ordered[next];
@@ -54,7 +82,7 @@ impl InputProbe {
 
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.palette_open = false;
-        self.samples[&self.focused].update(cx, |sample, cx| sample.focus(window, cx));
+        if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         cx.notify();
     }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -67,10 +95,11 @@ impl InputProbe {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
         match COMMANDS[index] {
             CommandId::Split | CommandId::SplitBelow => {
-                if self.next_pane >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
+                if self.samples.len() >= 16 { self.feedback = Some("Probe limit: 16 panes".into()); cx.notify(); return; }
                 let axis = if COMMANDS[index] == CommandId::Split { Axis::Columns } else { Axis::Rows };
-                if self.tree.split_positioned(&self.focused, self.next_pane, axis, false) {
-                    self.samples.insert(self.next_pane, cx.new(sample_pane::SamplePane::new));
+                if self.tree.is_none() { self.start_terminal(window, cx); return; }
+                if self.tree.as_mut().is_some_and(|tree| tree.split_positioned(&self.focused, self.next_pane, axis, false)) {
+                    self.add_pane(self.next_pane, window, cx);
                     self.focused = self.next_pane; self.next_pane += 1; self.zoomed = false;
                 }
             }
@@ -105,7 +134,14 @@ impl InputProbe {
 impl Render for InputProbe {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let height = f32::from(window.viewport_size().height);
-        let panes = if self.zoomed { self.panes(&PaneTree::Pane(self.focused), "root".into(), cx) } else { self.panes(&self.tree, "root".into(), cx) };
+        let panes = if let Some(tree) = &self.tree {
+            if self.zoomed { self.panes(&PaneTree::Pane(self.focused), "root".into(), cx) } else { self.panes(tree, "root".into(), cx) }
+        } else {
+            div().size_full().flex().items_center().justify_center()
+                .child(div().id("restart-terminal").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
+                    .child("New Terminal").on_click(cx.listener(|this,_,window,cx| this.start_terminal(window,cx))))
+                .into_any_element()
+        };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
             .on_action(cx.listener(|this, _: &NextPane, window, cx| this.cycle_pane(1, window, cx)))
             .on_action(cx.listener(|this, _: &PreviousPane, window, cx| this.cycle_pane(-1, window, cx)))
@@ -154,6 +190,7 @@ pub fn start() {
         cx.bind_keys([
             KeyBinding::new("cmd-p", CommandPalette, None),
             KeyBinding::new("cmd-t", NewTab, Some("Terminal")),
+            KeyBinding::new("cmd-w", ClosePane, Some("Terminal")),
             // Browser KeyboardEvent retains Shift on the resulting brace key.
             KeyBinding::new("cmd-shift-{", PreviousTab, Some("Terminal")),
             KeyBinding::new("cmd-shift-}", NextTab, Some("Terminal")),
@@ -178,8 +215,10 @@ pub fn start() {
                 }
                 cx.notify();
             }).detach();
-            let samples = std::collections::HashMap::from([(0, cx.new(sample_pane::SamplePane::new))]);
-            InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: PaneTree::Pane(0), focused: 0, next_pane: 1, zoomed: false, palette_open: true }
+            let samples = std::collections::HashMap::new();
+            let mut host = InputProbe { samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, tree: Some(PaneTree::Pane(0)), focused: 0, next_pane: 1, zoomed: false, palette_open: true };
+            host.add_pane(0, window, cx);
+            host
         })).expect("open probe window");
     });
 }

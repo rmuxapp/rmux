@@ -109,3 +109,9 @@ definitions and wraparound calculation. Browser brace-key aliases retain Shift.
 Hidden tabs release row/cursor shaping caches while keeping engine state. Browser
 verification covered independent outputs and return to a prior tab. Closing,
 reordering, badges and full native tab services remain pending.
+
+Close a tab with ×, middle-click or Cmd+W. The last tab removes its pane through
+the shared pane tree; closing all panes exposes New Terminal. Removed terminal
+entities drop their Ghostty engine. Browser verification covered active-tab close,
+split removal, final empty state and fresh session creation/input. Background-tab
+close and middle-click interaction coverage remain pending.

@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added browser tab close controls, middle-click and Cmd+W. Closing a tab drops
+its terminal entity/engine; selection adjustment follows native behavior and
+only replaces keyboard focus when the closed terminal held it. Empty panes emit
+an event and are removed through shared PaneTree::remove; the final pane leaves
+a New Terminal empty state. Pane limits now count live panes, allowing repeated
+close/recreate cycles. WASM build passes; browser verified close active tab →
+remove split → close final pane → recreate → type ls. Background-tab close focus
+and middle-click still need interaction coverage. Public demo remains unchanged.
+
 Added multiple live terminal tabs per browser pane using extracted native
 30px tab-strip and active/inactive tab presentation. Native retains its existing
 handlers, badges and drag/drop behavior. Both hosts share shifted-bracket tab
