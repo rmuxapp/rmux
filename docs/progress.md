@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Added a guarded batched ASCII shaping path to the browser adapter. It shapes a
+run once, verifies every caret boundary and trailing width against terminal
+columns, then retains the full run if aligned. Unsupported shaping falls back
+to exact per-character placement. Native shaping is unchanged. WASM build passes;
+browser split/typing rendered correctly with 22 batched runs and zero fallback
+runs in the sample. This reduces shaping calls there, not a measured latency or
+memory claim. Wide/combining glyph coverage and performance acceptance remain.
+
 Fixed browser focus routing after palette actions and dismissal. Executing a
 split focuses the new terminal; Escape returns focus to the selected terminal;
 pane headers focus their terminal as well. Cmd+P opens the shared palette.

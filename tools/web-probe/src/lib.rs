@@ -99,6 +99,7 @@ impl Render for InputProbe {
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(div().h(px(44.)).flex_shrink_0().px_3().flex().items_center().justify_between()
                 .child("Shared rmux layout · development probe")
+                .child(div().text_xs().text_color(rgb(0x9b9ba3)).child(row_host::shaping_summary()))
                 .child(div().id("open-commands").px_3().py_1().cursor_pointer().child("Commands")
                     .on_click(cx.listener(|this, _, window, cx| {
                         this.open_palette(window, cx);

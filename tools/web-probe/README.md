@@ -41,10 +41,13 @@ The older synthetic native frame remains available for renderer comparisons:
 `mise exec -- cargo run -q -p rmux-desktop --example web_frame > tools/web-probe/assets/terminal-frame.json`
 from the repository root.
 
-GPUI CE lacks the native fixed-cell-width shaping parameter. Its host adapter
-places ASCII glyphs individually at measured terminal columns and caches the
-result through the shared row cache. This adds cold shaping work compared with
-native batching; performance and wide/combining-character coverage remain open.
+GPUI CE lacks the native fixed-cell-width shaping parameter. The host shapes an
+ASCII run once and checks every caret boundary plus trailing width against the
+measured terminal grid. Aligned runs use one shaped line; mismatches fall back to
+per-character placement. The shared row cache retains either representation.
+The development toolbar reports cumulative batched/fallback run counts on its
+next render, without timers. Browser sample checks reported 22 batched runs and
+zero fallbacks. Latency/memory measurement and wide/combining coverage remain.
 
 ## Verified
 
