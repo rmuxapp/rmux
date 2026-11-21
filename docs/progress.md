@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Aligned browser terminal initialization with desktop: shared Rust foreground
+(220,223,230), background (18,20,26), and 4 MiB scrollback limit are passed through
+the WASM adapter. Native initialization now also reads the existing shared color
+constants; session constructors use the extracted history default. No duplicate
+browser color literals are needed. Adapter tests verify configuration validation,
+OSC color overrides/reset and zero-history behavior. Native check and WASM build
+pass. Browser rendering confirms the shared colors; evidence:
+target/shared-terminal-defaults.jpg. This bounds retained history, not total
+per-pane memory. The replacement demo remains local.
+
 Completed the browser palette's basic tab lifecycle commands using native
 CommandIds and existing keyboard action handlers. Palette execution restores
 terminal focus before dispatch, rather than implementing another path for tab

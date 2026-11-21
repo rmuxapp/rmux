@@ -1,4 +1,5 @@
 //! Shared terminal wheel accumulation in logical pixels.
+pub const DEFAULT_SCROLLBACK_BYTES: usize = 4 * 1024 * 1024;
 /// Schedule only while the native gesture requests another edge-scroll tick.
 pub const SELECTION_INTERVAL: std::time::Duration = std::time::Duration::from_millis(30);
 

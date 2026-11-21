@@ -26,8 +26,26 @@ export async function loadNativeVt(bytes) {
   }
   return {
     manifest,
-    create(columns, rows) {
+    create(columns, rows, options = {}) {
       let terminal = handle(slot => api.ghostty_terminal_new(0, slot, columns, rows));
+      try {
+        for (const [name, color] of [['COLOR_FOREGROUND', options.foreground], ['COLOR_BACKGROUND', options.background]]) {
+          if (color===undefined) continue;
+          if (!Number.isInteger(color) || color<0 || color>0xffffff) throw new RangeError('Invalid terminal color');
+          buffer(manifest.types.GhosttyColorRgb.size,p=>{
+            const bytes=new Uint8Array(api.memory.buffer);
+            for (const [channel,shift] of [['r',16],['g',8],['b',0]]) bytes[p+manifest.types.GhosttyColorRgb.fields[channel].offset]=(color>>>shift)&255;
+            check(api.ghostty_terminal_set(terminal,value('GhosttyTerminalOption',name),p));
+          });
+        }
+        if (options.scrollback!==undefined) {
+          if (!Number.isInteger(options.scrollback) || options.scrollback<0 || options.scrollback>0xffffffff) throw new RangeError('Invalid scrollback limit');
+          buffer(4,p=>{
+            new DataView(api.memory.buffer).setUint32(p,options.scrollback,true);
+            check(api.ghostty_terminal_set(terminal,value('GhosttyTerminalOption','SCROLLBACK_MAX_BYTES'),p));
+          });
+        }
+      } catch (error) { api.ghostty_terminal_free(terminal); throw error; }
       let encoder = 0, event = 0, renderer, selection;
       const alive = () => { if (!terminal) throw new Error('Terminal disposed'); };
       return {
@@ -160,7 +178,10 @@ export function createNativeHost(engine, isMac) {
   let next = 0, focused = null;
   return {
     isMac,
-    create(columns,rows) { const id=next++; sessions.set(id,engine.create(columns,rows)); return id; },
+    create(columns,rows,foreground,background,scrollback) {
+      const terminal=engine.create(columns,rows,{foreground,background,scrollback});
+      const id=next++; sessions.set(id,terminal); return id;
+    },
     write(id,text) { sessions.get(id).write(text); },
     resize(id,columns,rows) { sessions.get(id).resize(columns,rows); },
     snapshot(id) { return JSON.stringify(sessions.get(id).snapshot()); },

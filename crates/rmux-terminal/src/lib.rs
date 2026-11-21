@@ -529,21 +529,21 @@ impl Terminal {
                 GHOSTTY_TERMINAL_OPT_RESET,
                 metadata_reset as *const c_void,
             ))?;
-            let limit: usize = 4 * 1024 * 1024;
+            let limit = rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES;
             check(ghostty_terminal_set(
                 this.terminal,
                 GHOSTTY_TERMINAL_OPT_SCROLLBACK_MAX_BYTES,
                 input(&limit),
             ))?;
             let fg = GhosttyColorRgb {
-                r: 220,
-                g: 223,
-                b: 230,
+                r: DEFAULT_FOREGROUND.0,
+                g: DEFAULT_FOREGROUND.1,
+                b: DEFAULT_FOREGROUND.2,
             };
             let bg = GhosttyColorRgb {
-                r: 18,
-                g: 20,
-                b: 26,
+                r: DEFAULT_BACKGROUND.0,
+                g: DEFAULT_BACKGROUND.1,
+                b: DEFAULT_BACKGROUND.2,
             };
             check(ghostty_terminal_set(
                 this.terminal,

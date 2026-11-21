@@ -9,7 +9,7 @@ extern "C" {
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = isMac)]
     pub fn is_mac() -> bool;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = create)]
-    fn create(columns: u16, rows: u16) -> u32;
+    fn create(columns: u16, rows: u16, foreground: u32, background: u32, scrollback: u32) -> u32;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = write)]
     fn write(id: u32, text: &str);
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = resize)]
@@ -47,7 +47,11 @@ struct Patch {
 }
 pub struct TerminalEngine(u32);
 impl TerminalEngine {
-    pub fn new(columns: u16, rows: u16) -> Self { Self(create(columns, rows)) }
+    pub fn new(columns: u16, rows: u16) -> Self {
+        use rmux_core::terminal_frame::{DEFAULT_FOREGROUND, DEFAULT_BACKGROUND};
+        let rgb = |Color(r,g,b)| (u32::from(r)<<16) | (u32::from(g)<<8) | u32::from(b);
+        Self(create(columns, rows, rgb(DEFAULT_FOREGROUND), rgb(DEFAULT_BACKGROUND), rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES as u32))
+    }
     pub fn write(&self, text: &str) { write(self.0, text); }
     pub fn selected_text(&self) -> Option<String> { selected_text(self.0) }
     pub fn focus(&self, active: bool) { focus(self.0, active); }

@@ -216,7 +216,7 @@ impl Session {
         crate::search_worker::SearchWorker::new(self.terminal.clone())
     }
     pub fn spawn(command: CommandBuilder, columns: u16, rows: u16) -> Result<Self> {
-        Self::spawn_with_scrollback(command, columns, rows, 4 * 1024 * 1024)
+        Self::spawn_with_scrollback(command, columns, rows, rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES)
     }
     pub fn spawn_with_scrollback(
         command: CommandBuilder,
@@ -385,7 +385,7 @@ impl Session {
         Self::shell_in(columns, rows, None)
     }
     pub fn shell_in(columns: u16, rows: u16, directory: Option<&std::path::Path>) -> Result<Self> {
-        Self::shell_in_with_scrollback(columns, rows, directory, 4 * 1024 * 1024)
+        Self::shell_in_with_scrollback(columns, rows, directory, rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES)
     }
     pub fn shell_in_with_scrollback(
         columns: u16,
@@ -461,7 +461,7 @@ impl Session {
         rows: u16,
         directory: Option<&std::path::Path>,
     ) -> Result<Self> {
-        Self::command_in_with_scrollback(argv, columns, rows, directory, 4 * 1024 * 1024)
+        Self::command_in_with_scrollback(argv, columns, rows, directory, rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES)
     }
     pub fn command_in_with_scrollback(
         argv: &[std::ffi::OsString],

@@ -3,6 +3,21 @@ import {readFile} from 'node:fs/promises';
 import {loadNativeVt} from '../native-vt.js';
 const bytes = await readFile(new URL('../../../.deps/ghostty-vt-wasm32-freestanding/bin/ghostty-vt.wasm', import.meta.url));
 const host = await loadNativeVt(bytes);
+assert.throws(()=>host.create(20,3,{foreground:-1}),RangeError);
+assert.throws(()=>host.create(20,3,{scrollback:2**32}),RangeError);
+const configured=host.create(20,3,{foreground:0xdcdfe6,background:0x12141a,scrollback:0});
+try {
+  configured.write('configured');
+  const frame=configured.snapshot();
+  assert.deepEqual(frame.background,[18,20,26]);
+  assert.deepEqual(frame.rows[0][1][0][2],[220,223,230]);
+  configured.write('\x1b]11;#223344\x07');
+  assert.deepEqual(configured.snapshot().background,[34,51,68]);
+  configured.write('\x1b]111\x07');
+  assert.deepEqual(configured.snapshot().background,[18,20,26],'OSC reset restores configured defaults');
+  configured.write('\r\n'.repeat(100));
+  assert.equal(configured.snapshot().scrollback_lines,0,'zero limit disables retained history');
+} finally { configured.dispose(); }
 const first = host.create(5,4), second = host.create(20,4);
 try {
   first.write('abcdefghij\r\nnext');

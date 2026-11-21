@@ -4,6 +4,13 @@ The browser demo must converge on the actual rmux application, not a separately 
 
 ## Current state
 
+Browser terminal creation now receives rmux's shared Rust foreground/background
+defaults and 4 MiB scrollback limit, matching desktop initialization instead of
+Ghostty's raw defaults. The direct adapter validates options and frees a newly
+created terminal if configuration fails. Engine checks cover configured colors,
+OSC override/reset and disabled-history behavior. The history bound is not a
+total engine or browser memory limit.
+
 The browser palette now includes New Terminal Tab, Next/Previous Tab and Close
 Terminal Tab with native command identities and binding hints. All six tab
 commands (including movement) restore terminal focus and dispatch the existing
