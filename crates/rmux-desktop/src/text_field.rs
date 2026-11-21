@@ -90,7 +90,12 @@ impl TextField {
             return;
         }
         let key = &event.keystroke;
-        let word = if cfg!(target_os = "macos") {
+        // WASM's compilation target is not the user's keyboard platform.
+        #[cfg(target_arch = "wasm32")]
+        let mac = crate::terminal_engine::is_mac();
+        #[cfg(not(target_arch = "wasm32"))]
+        let mac = cfg!(target_os = "macos");
+        let word = if mac {
             key.modifiers.alt
         } else {
             key.modifiers.control
@@ -102,7 +107,7 @@ impl TextField {
                 reverse: key.modifiers.shift,
             }),
             "backspace" | "delete" => {
-                let range = if cfg!(target_os = "macos") && key.modifiers.platform {
+                let range = if mac && key.modifiers.platform {
                     self.text.edge_deletion_range(key.key == "backspace")
                 } else if word {
                     self.text.word_deletion_range(key.key == "backspace")

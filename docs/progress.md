@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Shared text fields now use browser platform detection for macOS editing keys
+instead of treating the WASM compilation target as a non-Mac OS. Local browser
+interaction verified `alpha beta` → Option-Left + `X` → `alpha Xbeta`, then
+Command-Backspace → `beta`. The shared palette Close control also restored
+terminal input focus. Screenshot: `target/palette-mac-editing.jpg`. This fixes
+palette, rename and other shared-field editing rules; native macOS rules are
+unchanged. Optimized GitHub artifact deployment remains pending.
+
 Native palettes now expose the same visible Close control as the browser demo
 through a shared header/button implementation, with vertical padding on the hit
 target. Native dismissal uses the existing focus-restoration event; browser
