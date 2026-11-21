@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Browser keyboard copy catches Ghostty/JS errors at the wasm-bindgen boundary and
+reports a terminal notice instead of letting an exception escape; successful copy
+clears that notice. Browser menu/OS copy now catches failures, prevents fallback
+copying from hidden inputs/document selection, leaves clipboard data untouched,
+and emits a console warning. Menu-copy failures do not yet display a terminal
+notice when no keyboard action occurs. Focused handler checks cover failure,
+no-selection and success; real-WASM selection/copy checks and browser build pass.
+Oversized keyboard-copy notice was not visually exercised. Not deployed.
+
 Browser clipboard extraction now uses the bounded streaming formatter introduced
 for search seeds, preserving OUT_OF_SPACE on oversized copy without a full
 selection sizing retry. A focused 10,000-line/4 KiB-limit local engine comparison

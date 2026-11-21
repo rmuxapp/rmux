@@ -154,3 +154,14 @@ try {
   assert.equal(select('RELEASE',90),false);
 } finally { history.dispose(); }
 console.log('Pinned native VT WASM: selection gestures/copy, keyboard modes and sparse styled snapshots passed.');
+
+// Browser menu copy failure must neither escape nor overwrite clipboard data.
+const {copyTerminalSelection} = await import('../engine.js');
+let prevented=0, clipboardWrites=0, reported=0;
+const copyEvent={preventDefault(){prevented++},clipboardData:{setData(){clipboardWrites++}}};
+copyTerminalSelection(copyEvent,{copySelection(){throw new Error('limit')}},()=>reported++);
+assert.deepEqual([prevented,clipboardWrites,reported],[1,0,1]);
+copyTerminalSelection(copyEvent,{copySelection(){return null}},()=>reported++);
+assert.deepEqual([prevented,clipboardWrites,reported],[1,0,1]);
+copyTerminalSelection(copyEvent,{copySelection(){return 'copied'}},()=>reported++);
+assert.deepEqual([prevented,clipboardWrites,reported],[2,1,1]);

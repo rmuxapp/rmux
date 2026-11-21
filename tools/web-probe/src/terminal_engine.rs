@@ -36,8 +36,8 @@ extern "C" {
     fn encode(id: u32, key: &str, mods: u8, action: &str, text: &str) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = select)]
     fn select(id: u32, action: &str, x: f32, y: f32, cell_width: f32, cell_height: f32, columns: u16, rows: usize, rectangle: bool, clicks: usize) -> bool;
-    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedText)]
-    fn selected_text(id: u32) -> Option<String>;
+    #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedText, catch)]
+    fn selected_text(id: u32) -> Result<Option<String>, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = selectedSearchQuery, catch)]
     fn selected_search_query(id: u32) -> Result<Option<String>, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = scroll)]
@@ -83,7 +83,7 @@ impl TerminalEngine {
     pub fn encode_paste(&self, text: &str) -> Result<String, JsValue> { encode_paste(self.0, text) }
     pub fn write(&self, text: &str) { write(self.0, text); }
     pub fn selected_search_query(&self) -> Option<String> { selected_search_query(self.0).ok().flatten() }
-    pub fn selected_text(&self) -> Option<String> { selected_text(self.0) }
+    pub fn selected_text(&self) -> Result<Option<String>, JsValue> { selected_text(self.0) }
     pub fn focus(&self, active: bool) { focus(self.0, active); }
     pub fn scroll(&self, kind: &str, delta: i32) { scroll(self.0, kind, delta); }
     pub fn select(&self, action: &str, x: f32, y: f32, cells: crate::cell_metrics::CellMetrics, frame: &Frame, rectangle: bool, clicks: usize) -> bool {

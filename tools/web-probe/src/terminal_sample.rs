@@ -294,9 +294,15 @@ impl Render for TerminalSample {
             .on_mouse_up(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_mouse_up_out(MouseButton::Left, cx.listener(Self::mouse_up))
             .on_action(cx.listener(|this, _: &crate::CopySelection, _, cx| {
-                if let Some(text) = this.engine.selected_text() {
-                    crate::clipboard::write(ClipboardItem::new_string(text), cx);
+                match this.engine.selected_text() {
+                    Ok(Some(text)) => {
+                        this.input_error = None;
+                        crate::clipboard::write(ClipboardItem::new_string(text), cx);
+                    }
+                    Ok(None) => {}
+                    Err(_) => this.input_error = Some("Could not copy selection. Try selecting less text (maximum 1 MiB).".into()),
                 }
+                cx.notify();
             }))
             .on_key_down(cx.listener(Self::key))
             .on_key_up(cx.listener(Self::key_up))

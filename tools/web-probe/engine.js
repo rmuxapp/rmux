@@ -11,10 +11,18 @@ export async function initializeEngine() {
   globalThis.rmuxEngine = createNativeHost(await loadNativeVt(await response.arrayBuffer()),isMacPlatform);
   // Browser menu/OS copy commands can arrive without a keydown. Populate the
   // trusted clipboard event synchronously, only while a terminal has UI focus.
-  document.addEventListener('copy',event=>{
-    const text=globalThis.rmuxEngine.copySelection();
+  document.addEventListener('copy',event=>copyTerminalSelection(event,globalThis.rmuxEngine));
+}
+// A failed terminal copy must not fall through to copying the hidden input or
+// unrelated document selection. Leave clipboard contents untouched on failure.
+export function copyTerminalSelection(event,engine,report = message=>console.warn(message)) {
+  try {
+    const text=engine.copySelection();
     if (text===null || !event.clipboardData) return;
     event.clipboardData.setData('text/plain',text);
     event.preventDefault();
-  });
+  } catch {
+    event.preventDefault();
+    report('Could not copy terminal selection. Maximum size is 1 MiB.');
+  }
 }
