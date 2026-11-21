@@ -4161,44 +4161,14 @@ impl Render for WorkspaceWindow {
             self.close_handler_installed = true;
         }
 
-        let sidebar_width = self
-            .sidebar_width
-            .min((f32::from(window.viewport_size().width) - 165.).max(0.));
-        let entity = cx.weak_entity();
+        let sidebar_width = crate::sidebar_interaction::visible_width(self.sidebar_width, window);
         div()
             .size_full()
             .relative()
             .flex()
             .when(background == WindowBackgroundAppearance::Opaque, |root| root.bg(rgb(0x12141a)))
             .text_color(rgb(0xdcdfe6))
-            .child(canvas(|_, _, _| (), move |_, _, window, _| {
-                let moving = entity.clone();
-                window.on_mouse_event(move |event: &MouseMoveEvent, phase, window, cx| {
-                    if phase != DispatchPhase::Capture { return; }
-                    let _ = moving.update(cx, |this, cx| {
-                        let Some((origin, width)) = this.sidebar_drag else { return; };
-                        if !event.dragging() {
-                            this.sidebar_drag = None;
-                            return;
-                        }
-                        let maximum = (f32::from(window.viewport_size().width) - 165.).clamp(160., 480.);
-                        let next = (width + f32::from(event.position.x - origin)).clamp(160., maximum);
-                        if this.sidebar_width != next {
-                            this.sidebar_width = next;
-                            cx.notify();
-                        }
-                        cx.stop_propagation();
-                    });
-                });
-                let released = entity.clone();
-                window.on_mouse_event(move |event: &MouseUpEvent, phase, _, cx| {
-                    if phase == DispatchPhase::Capture && event.button == MouseButton::Left {
-                        let _ = released.update(cx, |this, cx| {
-                            if this.sidebar_drag.take().is_some() { cx.stop_propagation(); }
-                        });
-                    }
-                });
-            }).absolute().size_full())
+            .child(crate::sidebar_interaction::drag_capture(cx))
             .on_action(cx.listener(|this, _: &CloseWindow, window, cx| this.request_close_window(window, cx)))
             .on_action(cx.listener(|this, _: &CloseWorkspace, window, cx| this.request_close_workspace(this.active, window, cx)))
             .on_action(cx.listener(|this, _: &ShowBufferPicker, window, cx| this.show_buffer_picker(command_palette::BufferMode::Paste, window, cx)))
@@ -4644,19 +4614,7 @@ impl Render for WorkspaceWindow {
                                         )
                                 })),
                         ),
-                ).child(gpui::div().id("sidebar-divider").w(px(5.)).h_full().flex_shrink_0()
-                    .bg(rgb(0x242424)).border_l_1().border_color(rgb(0x383838)).cursor(CursorStyle::ResizeLeftRight)
-                    .hover(|style| style.bg(rgb(0x7795c8)))
-                    .on_mouse_down(MouseButton::Left, cx.listener(move |this, event: &MouseDownEvent, _, cx| {
-                        if event.click_count == 2 {
-                            this.sidebar_width = 200.;
-                            this.sidebar_drag = None;
-                            cx.notify();
-                        } else {
-                            this.sidebar_drag = Some((event.position.x, sidebar_width));
-                        }
-                        cx.stop_propagation();
-                    })))
+                ).child(crate::sidebar_interaction::divider(sidebar_width, cx))
             })
             .child(
                 div()
@@ -4732,5 +4690,11 @@ impl Render for WorkspaceWindow {
                     }))
                     .child(palette.clone())
             ))
+    }
+}
+
+impl crate::sidebar_interaction::SidebarHost for WorkspaceWindow {
+    fn sidebar_state(&mut self) -> (&mut f32, &mut Option<(Pixels, f32)>) {
+        (&mut self.sidebar_width, &mut self.sidebar_drag)
     }
 }

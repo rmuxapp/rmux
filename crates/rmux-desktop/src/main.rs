@@ -66,6 +66,7 @@ mod pane_shortcuts;
 mod workspace_shortcuts;
 mod tab_presentation;
 mod sidebar_presentation;
+mod sidebar_interaction;
 mod workspace_presentation;
 mod list_navigation;
 mod menu_navigation;

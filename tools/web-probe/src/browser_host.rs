@@ -5,6 +5,8 @@ pub(crate) struct BrowserHost {
     workspaces: Vec<(String, Entity<InputProbe>)>,
     active: usize,
     sidebar: bool,
+    sidebar_width: f32,
+    sidebar_drag: Option<(Pixels, f32)>,
     previous_workspace: rmux_core::focus_trail::PreviousSelection<EntityId>,
     empty_focus: FocusHandle,
     workspace_scroll: ScrollHandle,
@@ -14,7 +16,7 @@ impl BrowserHost {
     pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let workspaces = ["rmux", "website"].into_iter().map(|name|
             (name.to_owned(), Self::new_workspace_view(name.to_owned(), window, cx))).collect();
-        let mut host = Self { workspaces, active: 0, sidebar: true, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
+        let mut host = Self { workspaces, active: 0, sidebar: true, sidebar_width: crate::sidebar_interaction::DEFAULT_WIDTH, sidebar_drag: None, previous_workspace: Default::default(), empty_focus: cx.focus_handle(), workspace_scroll: ScrollHandle::new(), groups: Default::default() };
         host.select(0,window,cx);
         host
     }
@@ -104,6 +106,7 @@ impl BrowserHost {
     }
     fn toggle_sidebar(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.sidebar = !self.sidebar;
+        self.sidebar_drag = None;
         if let Some((_, workspace)) = self.workspaces.get(self.active) {
             workspace.update(cx, |workspace, cx| workspace.close_palette(window, cx));
         } else { self.empty_focus.focus(window, cx); }
@@ -167,8 +170,10 @@ impl BrowserHost {
 
 }
 impl Render for BrowserHost {
-    fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        div().size_full().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let width = crate::sidebar_interaction::visible_width(self.sidebar_width, window);
+        div().size_full().relative().flex().track_focus(&self.empty_focus).font_family("Inter").text_color(rgb(0xe2e3e7))
+            .child(crate::sidebar_interaction::drag_capture(cx))
             .on_action(cx.listener(|this, _: &ToggleSidebar, window, cx| this.toggle_sidebar(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspaceGroup, window, cx| this.new_group(window, cx)))
             .on_action(cx.listener(|this, _: &NewWorkspace, window, cx| this.add(window, cx)))
@@ -180,7 +185,7 @@ impl Render for BrowserHost {
                     this.select(index, window, cx);
                 }
             }))
-            .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(220.)
+            .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(width)
                 .child(sidebar_presentation::header()
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child("Workspaces"))
                     .child(div().id("new-workspace").px_2().cursor_pointer().child("+")
@@ -209,7 +214,7 @@ impl Render for BrowserHost {
                                 })
                                 .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                             .on_click(cx.listener(move |this,_,window,cx| this.select(index,window,cx)))
-                    })) )))
+                    })) )).child(crate::sidebar_interaction::divider(width, cx)))
 
              .child(div().flex_1().min_w_0().h_full().child(
                 if let Some((_, workspace)) = self.workspaces.get(self.active) {
@@ -221,5 +226,11 @@ impl Render for BrowserHost {
                             .child("New Workspace").on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
                         .into_any_element()
                 }))
+    }
+}
+
+impl crate::sidebar_interaction::SidebarHost for BrowserHost {
+    fn sidebar_state(&mut self) -> (&mut f32, &mut Option<(Pixels, f32)>) {
+        (&mut self.sidebar_width, &mut self.sidebar_drag)
     }
 }

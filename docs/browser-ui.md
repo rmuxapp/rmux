@@ -23,7 +23,7 @@ platform services are still separate. Do not describe it as full parity yet.
   previous-workspace identity tracking, tab ownership/selection/reordering,
   command identities, palette matching, terminal frames and style runs.
 - **Views:** native palette and text field, sidebar/workspace-toolbar/tab/pane presentation,
-  recursive split layout and interaction, icons, row cache/painter, cell metrics,
+  recursive split layout and interaction, sidebar resize/reset, icons, row cache/painter, cell metrics,
   cursor geometry, IME preedit overlay/range bounds/hit testing and draggable
   scrollback indicator.
 - **Input:** shared composition model, workspace/pane/tab shortcut definitions,

@@ -427,6 +427,8 @@ mod key_adapter;
 
 #[path = "../../../crates/rmux-desktop/src/sidebar_presentation.rs"]
 mod sidebar_presentation;
+#[path = "../../../crates/rmux-desktop/src/sidebar_interaction.rs"]
+mod sidebar_interaction;
 #[path = "../../../crates/rmux-desktop/src/workspace_presentation.rs"]
 mod workspace_presentation;
 mod browser_host;

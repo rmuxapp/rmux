@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Native sidebar drag capture, width constraints, divider and double-click reset
+now live in shared sidebar_interaction used by both hosts. Browser starts at the
+native 200px width and cancels a drag when hiding its sidebar. Native check and
+WASM build pass. Browser verified drag to 320px, double-click reset to 200px and
+continued help input without losing focus. Evidence: target/shared-sidebar-resize.jpg.
+
 Sidebar toggle control and default shortcut are now shared by both hosts. Browser
 supports the toolbar icon, palette command and Cmd+B (Ctrl+Shift+B off macOS).
 A mouse smoke check caught lost terminal focus after collapsing; browser now
