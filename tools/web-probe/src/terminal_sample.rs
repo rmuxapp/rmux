@@ -10,6 +10,7 @@ pub(crate) struct TerminalSample {
     cursor_cache: row_cache::CursorCache,
     focus: FocusHandle,
     command: String,
+    input_error: Option<String>,
     pressed_keys: rmux_core::keyboard::PressedKeys,
     composition: crate::composition::Composition,
     cursor_bounds: Bounds<Pixels>,
@@ -65,7 +66,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("rmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: String::new(), pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { engine, frame, rows: Default::default(), cursor_cache: Default::default(), focus, command: String::new(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };
@@ -187,7 +188,7 @@ impl Render for TerminalSample {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
         let input = entity.clone();
-        div().size_full().key_context("Terminal").track_focus(&self.focus)
+        div().size_full().flex().flex_col().key_context("Terminal").track_focus(&self.focus)
             .on_mouse_down(MouseButton::Left, cx.listener(|this, event: &MouseDownEvent, window, cx| {
                 this.focus.focus(window, cx);
                 if let Some((bounds,_)) = this.selection_geometry {
@@ -293,13 +294,22 @@ impl Render for TerminalSample {
                     }
                     if let Some(scrollbar) = scrollbar { window.paint_quad(scrollbar); }
                 });
-            }).size_full())
+            }).flex_1().min_h_0().w_full())
+            .when_some(self.input_error.clone(), |root, message| root.child(div().px_2().py_1().text_xs().text_color(rgb(0xf0b85b)).child(message)))
     }
 }
 
 // The same committed-text/composition boundary as the desktop terminal. Keydown
 // handles encoded control keys; platform text events own printable input.
 impl EntityInputHandler for TerminalSample {
+    fn paste(&mut self, item: ClipboardItem, _: &mut Window, cx: &mut Context<Self>) {
+        let Some(text) = item.text() else { return; };
+        match self.engine.encode_paste(&text) {
+            Ok(encoded) => { self.input_error = None; self.accept(&encoded, cx); }
+            Err(_) => { self.input_error = Some("Could not paste text. Maximum size is 1 MiB.".into()); }
+        }
+        cx.notify();
+    }
     fn text_for_range(&mut self, range: Range<usize>, actual: &mut Option<Range<usize>>, _: &mut Window, _: &mut Context<Self>) -> Option<String> {
         let (text, adjusted) = self.composition.substring(range);
         *actual = Some(adjusted);

@@ -11,6 +11,17 @@ try {
   assert.equal(bridge.encode(inputSession,'A',0,'REPEAT','a'),'\x1b[97;1:2u');
   assert.equal(bridge.encode(inputSession,'A',0,'RELEASE','a'),'\x1b[97;1:3u');
 } finally { bridge.free(inputSession); }
+const pasteSession = bridge.create(20, 4);
+try {
+  assert.equal(bridge.encodePaste(pasteSession, 'hello'), 'hello');
+  assert.equal(bridge.encodePaste(pasteSession, '界é🙂'), '界é🙂');
+  bridge.write(pasteSession, '\x1b[?2004h');
+  assert.equal(bridge.encodePaste(pasteSession, '界é🙂'), '\x1b[200~界é🙂\x1b[201~');
+  assert.equal(bridge.encodePaste(pasteSession, ''), '\x1b[200~\x1b[201~');
+  assert.throws(() => bridge.encodePaste(pasteSession, 'é'.repeat(524289)), RangeError);
+  bridge.write(pasteSession, '\x1b[?2004l');
+  assert.equal(bridge.encodePaste(pasteSession, 'plain'), 'plain');
+} finally { bridge.free(pasteSession); }
 assert.throws(()=>host.create(20,3,{foreground:-1}),RangeError);
 assert.throws(()=>host.create(20,3,{scrollback:2**32}),RangeError);
 const configured=host.create(20,3,{foreground:0xdcdfe6,background:0x12141a,scrollback:0});

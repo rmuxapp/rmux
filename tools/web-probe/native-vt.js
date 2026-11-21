@@ -76,6 +76,28 @@ export async function loadNativeVt(bytes) {
           alive();
           check(api.ghostty_terminal_resize(terminal,columns,rows,0,0));
         },
+        encodePaste(text) {
+          alive();
+          if (text.length > 1024 * 1024) throw new RangeError('Paste exceeds 1 MiB input limit');
+          const utf8 = new TextEncoder().encode(text);
+          if (utf8.length > 1024 * 1024) throw new RangeError('Paste exceeds 1 MiB input limit');
+          const type = manifest.types.GhosttyTerminalModeConfig;
+          const bracketed = buffer(type.size, ptr => {
+            new Uint8Array(api.memory.buffer, ptr, type.size).fill(0);
+            new DataView(api.memory.buffer).setUint16(ptr + type.fields.mode.offset, 2004, true);
+            check(api.ghostty_terminal_get(terminal, value('GhosttyTerminalData', 'MODE'), ptr));
+            return !!memory()[ptr + type.fields.value.offset];
+          });
+          return buffer(Math.max(1, utf8.length), input => {
+            memory().set(utf8, input);
+            return buffer(utf8.length + 12, output => buffer(4, written => {
+              check(api.ghostty_paste_encode(input, utf8.length, bracketed, output, utf8.length + 12, written));
+              const length = new DataView(api.memory.buffer).getUint32(written, true);
+              if (length > utf8.length + 12) throw new Error('Invalid encoded paste length');
+              return memory().slice(output, output + length);
+            }));
+          });
+        },
         encode(key, {shift = false, control = false, alt = false, action = 'PRESS', text = ''} = {}) {
           alive();
           const keyCode = value('GhosttyKey', key), actionCode = value('GhosttyKeyAction', action);
@@ -190,6 +212,7 @@ export function createNativeHost(engine, isMac) {
     scroll(id,kind,delta) { sessions.get(id).scroll(kind,delta); },
     focus(id,active) { if (active) focused=id; else if (focused===id) focused=null; },
     copySelection() { return focused===null ? null : sessions.get(focused)?.selectedText() ?? null; },
+    encodePaste(id,text) { return new TextDecoder().decode(sessions.get(id).encodePaste(text)); },
     encode(id,key,mods,action,text) {
       return new TextDecoder().decode(sessions.get(id).encode(key,{shift:!!(mods&1),control:!!(mods&2),alt:!!(mods&4),action,text}));
     },

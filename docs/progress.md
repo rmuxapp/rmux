@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Browser terminal paste now uses pinned Ghostty paste encoding with current mode
+2004 and the same 1 MiB UTF-8 byte limit as desktop. ABI fields come from the
+manifest, temporary buffers are released in finally, and encoding errors show
+a terminal message. Adapter checks cover Unicode, bracketed on/off, empty input
+and over-limit multibyte input; WASM build and browser clipboard help smoke pass.
+Evidence: target/shared-native-paste.jpg. The sample interpreter still rejects
+Unicode/multiline command input; these adapter checks do not establish shell parity.
+
 Demo startup now downloads/compiles UI WASM alongside terminal-engine loading,
 then instantiates UI only after the engine host is ready. Streaming compilation
 uses application/wasm responses; other MIME types use the same downloaded bytes.

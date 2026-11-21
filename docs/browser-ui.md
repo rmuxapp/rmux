@@ -33,7 +33,8 @@ platform services are still separate. Do not describe it as full parity yet.
   encoded control/non-text keys and drains held keys on terminal focus loss.
 - **Terminal engine:** the same pinned libghostty-vt 1.0.1, compiled to WASM with
   its C API manifest. Sparse row patches preserve unchanged Rust row identities.
-  Native key encoding, gesture selection, bounded text export and viewport APIs
+  Native key/paste encoding (including bracketed mode and a 1 MiB paste limit),
+  gesture selection, bounded text export and viewport APIs
   drive browser behavior. The historical ghostty-web adapter is benchmark-only.
 - **Defaults:** Rust supplies desktop foreground/background and a 4 MiB history
   limit. This is a history limit, not a bound on total browser memory.

@@ -18,6 +18,8 @@ extern "C" {
     fn snapshot(id: u32) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = free)]
     fn free(id: u32);
+    #[wasm_bindgen(catch, js_namespace = rmuxEngine, js_name = encodePaste)]
+    fn encode_paste(id: u32, text: &str) -> Result<String, JsValue>;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = encode)]
     fn encode(id: u32, key: &str, mods: u8, action: &str, text: &str) -> String;
     #[wasm_bindgen(js_namespace = rmuxEngine, js_name = select)]
@@ -52,6 +54,7 @@ impl TerminalEngine {
         let rgb = |Color(r,g,b)| (u32::from(r)<<16) | (u32::from(g)<<8) | u32::from(b);
         Self(create(columns, rows, rgb(DEFAULT_FOREGROUND), rgb(DEFAULT_BACKGROUND), rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES as u32))
     }
+    pub fn encode_paste(&self, text: &str) -> Result<String, JsValue> { encode_paste(self.0, text) }
     pub fn write(&self, text: &str) { write(self.0, text); }
     pub fn selected_text(&self) -> Option<String> { selected_text(self.0) }
     pub fn focus(&self, active: bool) { focus(self.0, active); }
