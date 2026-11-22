@@ -3451,11 +3451,11 @@ fn main() {
         startup::Command::Launch { live_rpc_stdio, .. } | startup::Command::Layout { live_rpc_stdio, .. } | startup::Command::Session { live_rpc_stdio, .. } | startup::Command::Preset { live_rpc_stdio, .. } | startup::Command::CustomCommand { live_rpc_stdio, .. } => *live_rpc_stdio,
         _ => false,
     };
-    let preferences = if matches!(
+    let (preferences, editor_notice) = if matches!(
         &command,
         startup::Command::Help | startup::Command::Version | startup::Command::CheckLayout(_) | startup::Command::CheckSession(_) | startup::Command::RpcStdio
     ) {
-        Preferences::default()
+        (Preferences::default(), None)
     } else {
         Preferences::load().unwrap_or_else(|error| {
             eprintln!("rmux: {error:#}");
@@ -4089,6 +4089,13 @@ fn main() {
             let handle = open_window_with_activation(benchmark_panes, true, cx).expect("open rmux window");
             if let Some(notice) = recovery_notice.take() {
                 let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice, cx));
+            }
+        }
+        if let Some(notice) = editor_notice {
+            for handle in cx.windows() {
+                if let Some(handle) = handle.downcast::<window_view::WorkspaceWindow>() {
+                    let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice.clone(), cx));
+                }
             }
         }
         open_project::listen(project_receiver, cx);

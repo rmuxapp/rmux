@@ -832,7 +832,10 @@ impl WorkspaceWindow {
     }
 
     pub(super) fn show_startup_notice(&mut self, notice: String, cx: &mut Context<Self>) {
-        self.notice = Some(notice);
+        self.notice = Some(match self.notice.take() {
+            Some(previous) => format!("{previous}\n{notice}"),
+            None => notice,
+        });
         cx.notify();
     }
 

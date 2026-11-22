@@ -10754,3 +10754,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 
 - The WASM palette now uses the shared field-aware matcher for both ordinary and shortcut-only searches. Command abbreviations remain fuzzy; workspace descriptions and paths match literal words, avoiding the noisy cross-field matches fixed in native 0.1.13.
 - Added matching subtitle highlights and consolidated duplicated search construction so both modes stay aligned. The existing shared matcher regression tests cover these semantics; WASM target compilation and diff checks passed. Browser visual acceptance and deployment of this follow-up remain pending.
+
+### Invalid external-editor startup recovery
+
+- Diagnosed the installed 0.1.13 launch failure: file_editor.program was the relative name code, rejected by absolute-path validation. Backed up the user's config, changed only the editor value to the existing VS Code executable path, and confirmed the installed process/window opened. The user confirmed normal operation.
+- Development startup now disables an invalid optional file_editor while retaining other validated settings and shows a repair notice. It preserves the on-disk file, keeps the default settings opener available, and retains strict reload validation. Startup notices append so editor guidance does not replace recovery errors. Other configuration errors remain fatal.
+- The targeted regression test passed for relative paths, malformed editor fields, missing file placeholders, preservation of other settings and file bytes, strict reload rejection, and successful reload after repair. Native test compilation passed; the recovery notice still needs runtime visual acceptance. This change is not in installed 0.1.13.

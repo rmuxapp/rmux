@@ -714,22 +714,41 @@ impl Preferences {
         crate::shortcuts::compile(&value)?;
         Ok(value)
     }
-    fn read_config(path: &Path, required: bool) -> Result<Self> {
+    fn config_bytes(path: &Path, required: bool) -> Result<Option<Vec<u8>>> {
         let file = match std::fs::File::open(path) {
-            Err(error) if !required && error.kind() == std::io::ErrorKind::NotFound => {
-                return Ok(Self::default());
-            }
+            Err(error) if !required && error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
             result => result.with_context(|| format!("configuration {}", path.display()))?,
         };
         let mut bytes = Vec::new();
         file.take(64 * 1024 + 1).read_to_end(&mut bytes)?;
-        Self::decode(&bytes).with_context(|| format!("configuration {}", path.display()))
+        ensure!(bytes.len() <= 64 * 1024, "configuration exceeds 64 KiB");
+        Ok(Some(bytes))
+    }
+    fn read_config(path: &Path, required: bool) -> Result<Self> {
+        match Self::config_bytes(path, required)? {
+            Some(bytes) => Self::decode(&bytes).with_context(|| format!("configuration {}", path.display())),
+            None => Ok(Self::default()),
+        }
+    }
+    /// Only this optional integration may be disabled during startup. Other
+    /// configuration errors and explicit reloads retain strict validation.
+    fn decode_startup(bytes: &[u8]) -> Result<(Self, Option<String>)> {
+        ensure!(bytes.len() <= 64 * 1024, "configuration exceeds 64 KiB");
+        let mut json: serde_json::Value = serde_json::from_slice(bytes)?;
+        let invalid = json.get("file_editor").filter(|value| !value.is_null()).and_then(|value| {
+            serde_json::from_value::<crate::external_editor::Editor>(value.clone())
+                .map_err(anyhow::Error::from).and_then(|editor| editor.validate()).err()
+        });
+        let Some(error) = invalid else { return Self::decode(bytes).map(|value| (value, None)); };
+        json.as_object_mut().context("configuration must be an object")?.remove("file_editor");
+        let value = Self::decode(&serde_json::to_vec(&json)?)?;
+        Ok((value, Some(format!("External editor disabled: {error}. Open Settings → Edit settings without configured editor to repair file_editor, then Reload Settings. Your configuration file was not changed."))))
     }
     fn read(path: &Path, required: bool) -> Result<Self> {
         let value = Self::read_config(path, required)?;
         if let Some(path) = value.theme_file.clone() { value.import_theme(path) } else { Ok(value) }
     }
-    pub fn load() -> Result<Self> {
+    pub fn load() -> Result<(Self, Option<String>)> {
         let explicit = std::env::var_os("RMUX_CONFIG");
         let path = if let Some(path) = &explicit {
             ensure!(!path.is_empty(), "RMUX_CONFIG must not be empty");
@@ -754,12 +773,49 @@ impl Preferences {
                     .map_err(anyhow::Error::msg)?,
             );
         }
-        preferences.reload()
+        let (mut next, notice) = match &preferences.source {
+            Some(path) => match Self::config_bytes(path, preferences.required)? {
+                Some(bytes) => Self::decode_startup(&bytes).with_context(|| format!("configuration {}", path.display()))?,
+                None => (Self::default(), None),
+            },
+            None => (Self::default(), None),
+        };
+        if let Some(path) = next.theme_file.clone() { next = next.import_theme(path)?; }
+        if let Some(policy) = preferences.policy_override { next.confirm_close = policy; }
+        next.source = preferences.source;
+        next.required = preferences.required;
+        next.policy_override = preferences.policy_override;
+        Ok((next, notice))
     }
 }
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn startup_disables_only_invalid_editor_without_changing_config() -> anyhow::Result<()> {
+        use super::Preferences;
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        for editor in [serde_json::json!({"program":"code","args":["{file}"]}),
+            serde_json::json!({"program":12}), serde_json::json!({"program":"/bin/echo","args":[]})] {
+            let bytes = serde_json::to_vec(&serde_json::json!({"font_size":19,"file_editor":editor}))?;
+            std::fs::write(&path, &bytes)?;
+            let (mut loaded, notice) = Preferences::decode_startup(&bytes)?;
+            assert_eq!(loaded.font_size, 19.);
+            assert!(loaded.file_editor.is_none());
+            assert!(notice.unwrap().contains("External editor disabled"));
+            loaded.source = Some(path.clone());
+            assert_eq!(loaded.prepare_file()?, path);
+            assert_eq!(std::fs::read(&path)?, bytes);
+            assert!(loaded.reload().is_err());
+            std::fs::write(&path, b"{\"font_size\":20}")?;
+            assert_eq!(loaded.reload()?.font_size, 20.);
+        }
+        assert!(Preferences::decode_startup(br#"{"font_size":0,"file_editor":{"program":"code","args":[]}}"#).is_err());
+        assert!(Preferences::decode_startup(b"invalid json").is_err());
+        assert!(Preferences::decode_startup(b"{}").unwrap().1.is_none());
+        Ok(())
+    }
     #[test]
     fn socket_restart_notice_survives_reloads_and_clears_on_revert() {
         let original = Some(std::env::temp_dir().join("rmux-original-socket"));
