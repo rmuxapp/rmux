@@ -1,0 +1,4 @@
+# Keep GitHub's language summary focused on Rust application code.
+# Supporting scripts retain their actual syntax highlighting and normal diffs.
+* linguist-detectable=false
+*.rs linguist-detectable=true
