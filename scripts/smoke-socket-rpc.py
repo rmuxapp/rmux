@@ -12,20 +12,28 @@ import time
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--app", type=Path, default=Path("target/debug/rmux"))
 parser.add_argument("--client", type=Path, default=Path("target/debug/rmuxctl"))
+parser.add_argument("--config-socket", action="store_true", help="Enable the app endpoint through Settings JSON, without RMUX_SOCKET_DIR")
+parser.add_argument("--endpoint-only", action="store_true", help="Check endpoint discovery and normal-quit cleanup only")
 options = parser.parse_args()
 
 with tempfile.TemporaryDirectory(prefix="rmux-socket-") as tmp:
     root = Path(tmp)
     endpoint = root / "endpoint"
     config = root / "config.json"
-    config.write_text('{"confirm_close":"never"}')
+    settings = {"confirm_close": "never"}
+    if options.config_socket:
+        settings["socket_directory"] = str(endpoint)
+    config.write_text(json.dumps(settings))
     env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}
     shell = root / "fixture-shell"
     shell.write_text('#!/bin/sh\nprintf "fixture-dir:%s\\n" "${PWD##*/}"\ntrap "exit 0" HUP TERM\nwhile IFS= read -r line; do\n  case "$line" in\n    notify) printf "\\033]777;notify;Shell;After\\007" ;;\n    burst) printf "\\033]9;First burst\\007\\033]99;;Second burst\\007" ;;\n    ping) printf "ordinary output\\n" ;;\n  esac\ndone\n')
     shell.chmod(0o700)
     env.update(RMUX_SOCKET_DIR=str(endpoint), RMUX_CONFIG=str(config), RMUX_SHELL=str(shell))
     with tempfile.TemporaryFile() as log:
-        app = subprocess.Popen([str(options.app.resolve())], env=env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log)
+        app_env = dict(env)
+        if options.config_socket:
+            app_env.pop("RMUX_SOCKET_DIR")
+        app = subprocess.Popen([str(options.app.resolve())], env=app_env, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=log)
         clients = []
         try:
             deadline = time.monotonic() + 5
@@ -47,6 +55,15 @@ with tempfile.TemporaryDirectory(prefix="rmux-socket-") as tmp:
             cli = str(options.client.resolve())
             discovery = subprocess.run([cli, "system.capabilities"], env=env, capture_output=True, text=True, timeout=8)
             assert discovery.returncode == 0, discovery.stderr
+            if options.endpoint_only:
+                stream = connect()
+                assert call(stream, "window.list")["windows"]
+                stream.write(b'{"jsonrpc":"2.0","id":2,"method":"system.quit"}\n')
+                app.wait(timeout=5)
+                stream.close()
+                assert not endpoint.exists(), "normal quit left socket directory behind"
+                print("PASS: endpoint startup, CLI discovery, window lookup and normal-quit cleanup")
+                raise SystemExit(0)
             assert json.loads(discovery.stdout)["result"]["mode"] == "live"
             rejected = subprocess.run([cli, "--socket", str(endpoint / "rpc.sock"), "nonexistent.method"], capture_output=True, text=True, timeout=8)
             assert rejected.returncode == 1, rejected.stderr

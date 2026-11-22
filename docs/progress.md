@@ -1,3 +1,18 @@
+Editor automation startup: optional absolute `socket_directory` in Settings
+JSON now enables the existing private Unix endpoint on normal app launch.
+RMUX_SOCKET_DIR wins when present; omission keeps automation opt-in. Reload
+reports that endpoint changes require restart, and attach failures are visible
+in normal app windows as well as stderr. Configuration read/save never creates
+an endpoint. The guide includes a process-based VS Code task for named workspace
+reuse with literal project paths; CLI socket selection remains explicit.
+One desktop/client build, the focused validation/persistence test, and an
+isolated config-only endpoint smoke passed (CLI discovery, window lookup, normal
+quit cleanup, app launched without RMUX_SOCKET_DIR). The broader socket smoke
+reached notification checks but failed because retained notifications were read
+rather than unread; that focus-dependent assertion is unresolved and the suite
+is not reported as passing. Startup-error UI and VS Code task invocation remain
+unverified. No user configuration was changed and nothing was released.
+
 Tab-picker live-update polish: when the selected terminal disappears or no
 longer matches after metadata changes, replacement selection stays at the
 nearest surviving result row rather than jumping to the first. Enter no longer

@@ -3947,10 +3947,17 @@ fn main() {
                 let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice, cx));
             }
         }
-        let socket_directory = std::env::var_os("RMUX_SOCKET_DIR").map(std::path::PathBuf::from);
+        let socket_directory = std::env::var_os("RMUX_SOCKET_DIR").map(std::path::PathBuf::from)
+            .or_else(|| cx.global::<Preferences>().socket_directory.clone());
         if live_rpc_stdio || socket_directory.is_some() {
             if let Err(error) = automation::attach_live(cx, live_rpc_stdio, socket_directory) {
                 eprintln!("rmux: RPC stream: {error}");
+                let notice = format!("Automation could not start: {error}. Check socket_directory or RMUX_SOCKET_DIR, then restart rmux.");
+                for handle in cx.windows() {
+                    if let Some(handle) = handle.downcast::<window_view::WorkspaceWindow>() {
+                        let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice.clone(), cx));
+                    }
+                }
             }
         }
     });

@@ -43,6 +43,33 @@ rmuxctl --socket /absolute/path/to/rpc.sock open-workspace \
 rmux must already be running with [socket automation](#unix-socket-automation)
 enabled. You can omit `--socket` when the caller has `RMUX_SOCKET_DIR` set.
 
+For a VS Code task, add an entry like this to `.vscode/tasks.json` after enabling
+the socket below. Set `--socket` to your actual endpoint and ensure `rmuxctl` is
+on the editor's PATH (or use its absolute path). On macOS, the bundled client is
+`/Applications/rmux.app/Contents/MacOS/rmuxctl`.
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [{
+    "label": "Open project in rmux",
+    "type": "process",
+    "command": "rmuxctl",
+    "args": [
+      "--socket", "/absolute/path/to/automation/rpc.sock",
+      "open-workspace", "--name", "${workspaceFolderBasename}",
+      "--cwd", "${workspaceFolder}", "--activate"
+    ],
+    "problemMatcher": []
+  }]
+}
+```
+
+A process task passes project paths literally, including spaces. Run it through
+**Tasks: Run Task**, or bind VS Code's `workbench.action.tasks.runTask` command to
+`"args": "Open project in rmux"` in your keyboard shortcuts. Projects with the
+same folder basename share a name; use a unique literal name when needed.
+
 The command selects an existing workspace with the same name, preserving its
 terminals, running processes, layout and directory. If none exists, it creates
 one with the supplied `--cwd`. Creation options never modify a reused workspace.
@@ -143,7 +170,21 @@ workspace and workspace-merge transfers, including closure of emptied windows.
 
 ## Unix socket automation
 
-For opt-in Unix socket automation, launch with
+To enable automation when launching rmux normally from Finder or a desktop
+launcher, add an absolute path to Settings JSON and restart rmux:
+
+```json
+{"socket_directory": "/absolute/existing/parent/automation"}
+```
+
+This is opt-in: `null` or omission leaves the socket disabled unless the environment
+variable is set. `RMUX_SOCKET_DIR` takes precedence over the file. Reloading
+settings does not replace a live endpoint; changing this setting requires a
+restart. The CLI still needs `--socket PATH/rpc.sock` or its own `RMUX_SOCKET_DIR`.
+It does not read rmux's settings automatically. Do not create the endpoint directory
+in advance; rmux creates it privately and removes it on normal quit.
+
+Alternatively, for opt-in Unix socket automation, launch with
 `RMUX_SOCKET_DIR=/absolute/new-directory mise run run`. The parent must exist;
 the endpoint directory must not. Connect to `rpc.sock` inside it using the same
 newline-delimited JSON-RPC protocol and live methods. This also works alongside
@@ -153,7 +194,7 @@ connections are served, with ten-second read and five-second write timeouts;
 idle clients should reconnect. No idle polling or network listener is added.
 Normal quit removes the endpoint if its identity still matches. After a crash,
 choose a new directory or manually inspect/remove the stale one. Startup failures
-are logged and leave the GUI running without the socket. Windows named pipes and
+appear in the app and are logged, leaving the GUI running without the socket. Windows named pipes and
 caller-scoped permissions remain pending. `mise run smoke-socket` checks two live
 clients, shared mutations, reconnection and normal-quit cleanup on macOS/Unix.
 

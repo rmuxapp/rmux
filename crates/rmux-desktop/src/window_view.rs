@@ -1421,11 +1421,16 @@ impl WorkspaceWindow {
                         "Settings changed while reloading. Your newer edits were kept; reload again to replace them with the file settings.".into()
                     }
                     Ok(next) => {
+                        let socket_changed = next.socket_directory != current.socket_directory;
                         cx.set_global(preferences::AppearanceBaseline(next.clone()));
                         cx.set_global(next.confirm_close);
                         cx.set_global(next);
                         shortcuts::install(cx);
-                        "Settings reloaded. Fonts using previous defaults updated; per-terminal overrides retained.".into()
+                        if socket_changed {
+                            "Settings reloaded. Restart rmux to apply the socket directory change; the current automation endpoint is unchanged.".into()
+                        } else {
+                            "Settings reloaded. Fonts using previous defaults updated; per-terminal overrides retained.".into()
+                        }
                     }
                     Err(error) => format!("Settings unchanged: {error:#}"),
                 };
