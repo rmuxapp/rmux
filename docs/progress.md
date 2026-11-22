@@ -1,3 +1,14 @@
+Browser help acceptance (d863079): an isolated sandboxed iframe without
+allow-popups reproduced blocked tab creation. The labelled fallback rendered
+correctly, focused its guide link, and Escape removed the dialog and restored
+terminal input. A subsequent `echo focus-restored` executed exactly once in the
+sample shell. Screenshot: `target/help-fallback.png`. No rebuild was needed for
+this browser review. A combined native bundle passed, but native automation
+reported the debug/release bundle-ID collision and retained the old ID after an
+ephemeral debug-only identity change. The experiment was reverted and both
+synthetic preview processes quit cleanly; native interaction acceptance remains
+pending. Installed user app and release configuration were untouched.
+
 Browser help resilience: help commands now use an opener-isolated new tab and
 show a native HTML link dialog when tab creation returns null or throws. The
 fallback has a labelled heading, keyboard-accessible link/Close control, native
