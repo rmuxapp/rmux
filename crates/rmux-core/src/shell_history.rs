@@ -10,6 +10,12 @@ pub struct History {
     bytes: usize,
 }
 impl History {
+    pub fn clear(&mut self) -> bool {
+        let changed = !self.entries.is_empty();
+        self.entries.clear();
+        self.bytes = 0;
+        changed
+    }
     pub fn text_bytes(&self) -> usize { self.bytes }
     pub fn entries(&self) -> impl DoubleEndedIterator<Item = &str> + ExactSizeIterator { self.entries.iter().map(String::as_str) }
     pub fn record(&mut self, command: &str) -> bool {

@@ -31,20 +31,32 @@ _rmux_zsh_history_report() {
     (( ${SAVEHIST:-0} > 0 )) || return 0
     local listing sequence command encoded='' character hex byte
     local -i index
-    listing=$(builtin fc -l -1 2>/dev/null)
-    [[ $listing =~ '^ *([0-9]+)' ]] || return 0
-    sequence=$match[1]
-    if [[ -z ${_rmux_history_sequence+x} ]]; then
-        typeset -g _rmux_history_sequence=$sequence
+    zmodload -F zsh/parameter p:history 2>/dev/null || return 0
+    # fc prints a numbered blank row for an empty history stack.
+    if (( ${#history} == 0 )); then listing=''
+    else listing=$(builtin fc -l -1 2>/dev/null); fi
+    if [[ -z $listing ]]; then
+        if [[ -n ${_rmux_history_sequence-} && $_rmux_history_sequence != 0 ]]; then
+            builtin printf '\e]9999;rmux-history;clear\a'
+        fi
+        typeset -g _rmux_history_sequence=0
+        typeset -g _rmux_history_command=''
         return 0
     fi
-    [[ $sequence != $_rmux_history_sequence ]] || return 0
-    zmodload -F zsh/parameter p:history 2>/dev/null || return 0
+    [[ $listing =~ '^ *([0-9]+)' ]] || return 0
+    sequence=$match[1]
     command=${history[$sequence]}
+    local LC_ALL=C
+    if [[ -z ${_rmux_history_sequence+x} ]]; then
+        typeset -g _rmux_history_sequence=$sequence
+        (( ${#command} <= 8192 )) && typeset -g _rmux_history_command=$command
+        return 0
+    fi
+    [[ $sequence != $_rmux_history_sequence || $command != ${_rmux_history_command-} ]] || return 0
     [[ -o hist_ignore_space && $command == ' '* ]] && return 0
     typeset -g _rmux_history_sequence=$sequence
-    local LC_ALL=C
-    (( ${#command} > 0 && ${#command} <= 8192 )) || return 0
+    (( ${#command} > 0 && ${#command} <= 8192 )) || { typeset -g _rmux_history_command=''; return 0; }
+    typeset -g _rmux_history_command=$command
     for (( index=1; index<=${#command}; index++ )); do
         character=${command[index]}
         builtin printf -v byte '%d' "'$character"

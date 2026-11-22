@@ -59,3 +59,28 @@ for shell in ('bash', 'zsh'):
     capture(shell)
     capture(shell, False)
 print('shell history capture: exclusions, Unicode, initial/global history, opt-out and exit status passed')
+
+# An explicit empty shell-history list invalidates rmux's retained copy, and
+# numbering can restart without hiding the next accepted command.
+for shell in ('bash', 'zsh'):
+    with tempfile.TemporaryDirectory(prefix='rmux-history-clear-') as temporary:
+        history = Path(temporary) / 'history'
+        history.touch()
+        script = repo / f'shell-integration/{shell}/rmux.{"bash" if shell == "bash" else "zsh"}'
+        if shell == 'bash':
+            argv = ['/bin/bash', '--noprofile', '--norc', '--noediting', '-i']
+            setup, reset = 'set -o history; HISTCONTROL=ignorespace', 'history -c'
+        else:
+            argv = ['/bin/zsh', '-d', '-f', '-i']
+            setup, reset = 'SAVEHIST=100; setopt hist_ignore_space', 'fc -p "$HISTFILE" 200 100'
+        lines = [f'HISTFILE={shlex.quote(str(history))}; HISTSIZE=200; {setup}',
+                 f'source {shlex.quote(str(script))}', 'echo BEFORE_CLEAR', reset,
+                 'echo AFTER_CLEAR', 'exit 0']
+        env = {**os.environ, 'TERM_PROGRAM':'rmux', 'RMUX_SHELL_INTEGRATION':'1', 'RMUX_SESSION_HISTORY':'1'}
+        env.pop('BASH_ENV', None)
+        output = subprocess.run(argv, input=('\n'.join(lines)+'\n').encode(), env=env,
+                                stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=15, check=True).stdout
+        reports = re.findall(rb'\x1b\]9999;rmux-history;([^\x07]*)\x07',output)
+        decoded = [None if entry == b'clear' else bytes.fromhex(entry.decode()).decode() for entry in reports]
+        assert decoded == ['echo BEFORE_CLEAR', None, 'echo AFTER_CLEAR'], (shell, decoded)
+print('shell history clearing: explicit reset and resumed capture passed')

@@ -76,6 +76,9 @@ mod tests {
         store.save(FIRST, &history)?;
         assert_eq!(store.load(FIRST)?, history);
         assert_eq!(store.load(SECOND)?, History::default());
+        assert!(history.clear());
+        store.save(FIRST, &history)?;
+        assert_eq!(store.load(FIRST)?, History::default());
         #[cfg(unix)] {
             use std::os::unix::fs::PermissionsExt;
             assert_eq!(std::fs::metadata(&store.directory)?.permissions().mode() & 0o077, 0);

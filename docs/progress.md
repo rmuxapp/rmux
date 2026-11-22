@@ -10142,3 +10142,22 @@ Still required before activation: persistent terminal identity, asynchronous
 save lifecycle, shell-native history import without global duplication, explicit
 history-clear/reset semantics, retention cleanup, and restored-shell acceptance.
 The application does not yet set the opt-in flag or save these records.
+
+
+### Explicit history reset handling — 2026-11-22
+
+The opt-in capture pipeline recognizes an emptied shell history and emits a
+private `9999;rmux-history;clear` report. Bash `history -c` and zsh switching to
+an empty history stack clear retained records; capture resumes after history
+numbers restart. Matching both event number and command avoids skipping a new
+command when shells reuse numbers. zsh's empty stack is detected through the
+history parameter because `fc -l` prints a numbered blank row in that state.
+
+The engine drops retained entries and text accounting, advances the revision
+only when contents change, and accepts the same command again afterward. The
+private store can atomically replace a saved nonempty history with an empty one.
+Isolated Bash/zsh capture checks, three engine history tests (including every
+clear-message split), and the private-store tests passed. This does not implement
+arbitrary deletion of individual shell history entries or stack merge semantics.
+Capture remains disabled by default; persistent identity, asynchronous saving,
+shell-native import and cleanup remain the next integration work.

@@ -610,8 +610,12 @@ impl Terminal {
             }
             if end {
                 if !self.osc_discard && matches!(stop.end, GHOSTTY_TERMINAL_STRING_END_ST_ESC | GHOSTTY_TERMINAL_STRING_END_BEL) {
-                    if let Some(command) = self.osc_capture.as_deref().and_then(shell_history::decode) {
-                        if self.callbacks.shell_history.record(&command) {
+                    if let Some(report) = self.osc_capture.as_deref().and_then(shell_history::decode) {
+                        let changed = match report {
+                            shell_history::Report::Command(command) => self.callbacks.shell_history.record(&command),
+                            shell_history::Report::Clear => self.callbacks.shell_history.clear(),
+                        };
+                        if changed {
                             self.callbacks.shell_history_revision = self.callbacks.shell_history_revision.wrapping_add(1);
                         }
                     }

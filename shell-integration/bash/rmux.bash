@@ -26,16 +26,26 @@ _rmux_bash_history_report() {
     [[ -o history ]] || return 0
     local listing sequence command LC_ALL=C encoded='' character hex byte index
     listing=$(HISTTIMEFORMAT= builtin history 1)
+    if [[ -z $listing ]]; then
+        if [[ -n ${_rmux_history_sequence-} && $_rmux_history_sequence != 0 ]]; then
+            builtin printf '\e]9999;rmux-history;clear\a'
+        fi
+        _rmux_history_sequence=0
+        _rmux_history_command=''
+        return 0
+    fi
     [[ $listing =~ ^[[:space:]]*([0-9]+)[*]?[[:space:]][[:space:]](.*)$ ]] || return 0
     sequence=${BASH_REMATCH[1]}
     command=${BASH_REMATCH[2]}
     if [[ -z ${_rmux_history_sequence+x} ]]; then
         _rmux_history_sequence=$sequence
+        (( ${#command} <= 8192 )) && _rmux_history_command=$command
         return 0
     fi
-    [[ $sequence != $_rmux_history_sequence ]] || return 0
+    [[ $sequence != $_rmux_history_sequence || $command != ${_rmux_history_command-} ]] || return 0
     _rmux_history_sequence=$sequence
-    (( ${#command} > 0 && ${#command} <= 8192 )) || return 0
+    (( ${#command} > 0 && ${#command} <= 8192 )) || { _rmux_history_command=''; return 0; }
+    _rmux_history_command=$command
     for (( index=0; index<${#command}; index++ )); do
         character=${command:index:1}
         builtin printf -v byte '%d' "'$character"
@@ -53,7 +63,7 @@ _rmux_bash_precmd() {
     fi
     _rmux_bash_prompt_seen=1
     local LC_ALL=C
-    local encoded='' character hex byte byte index
+    local encoded='' character hex byte index
     for (( index = 0; index < ${#PWD}; index++ )); do
         character=${PWD:index:1}
         case $character in
