@@ -109,7 +109,8 @@ pub fn candidates(args: &[OsString]) -> Vec<&'static str> {
         if word == "--" { return Vec::new(); }
         if options.contains(&word) {
             used.push(word);
-            if !matches!(word, "--activate" | "--paste" | "--scrollback" | "--selection") {
+            if !matches!(word, "--activate" | "--paste" | "--scrollback" | "--selection"
+                | "--follow" | "--json" | "--preserve-wraps" | "--bracketed") {
                 value_for = Some(word);
             }
         }
@@ -121,7 +122,7 @@ pub fn candidates(args: &[OsString]) -> Vec<&'static str> {
             ["left", "right", "up", "down"].into_iter().filter(|value| value.starts_with(current)).collect()
         } else { Vec::new() };
     }
-    options.iter().copied().chain(["--help"].into_iter().filter(|_| initial)).filter(|flag| flag.starts_with(current) && !used.contains(flag)
+    options.iter().copied().chain(["--help"].into_iter().filter(|_| initial)).filter(|flag| flag.starts_with(current) && (*flag == "--kind" || !used.contains(flag))
         && !(matches!(*flag, "--scrollback" | "--selection") && used.iter().any(|used| matches!(*used, "--scrollback" | "--selection"))))
         .collect()
 }
@@ -131,6 +132,23 @@ mod tests {
     use super::*;
     fn complete(args: &[&str]) -> Vec<&'static str> {
         candidates(&args.iter().map(OsString::from).collect::<Vec<_>>())
+    }
+    #[test]
+    fn switches_do_not_consume_values_and_event_kinds_remain_repeatable() {
+        for (command, switch, next) in [
+            ("read-events", "--follow", "--workspace"),
+            ("pipe-pane", "--json", "--command"),
+            ("read-screen", "--preserve-wraps", "--selection"),
+            ("paste-buffer", "--bracketed", "--name"),
+        ] {
+            let candidates = complete(&[command, switch, ""]);
+            assert!(candidates.contains(&next), "{command} {switch}");
+            assert!(!candidates.contains(&switch));
+        }
+        assert!(complete(&["read-events", "--follow", "--workspace", "42", ""]).contains(&"--kind"));
+        assert!(!complete(&["read-events", "--follow", "--workspace", "42", ""]).contains(&"--workspace"));
+        assert!(complete(&["read-events", "--kind", "workspace.created", "--k"]).contains(&"--kind"));
+        assert!(complete(&["read-events", "--kind", ""]).is_empty());
     }
     #[test]
     fn completion_respects_command_values_and_literal_text() {

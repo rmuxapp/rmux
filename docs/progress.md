@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+CLI completion now recognizes --follow, --json, --preserve-wraps and --bracketed
+as switches instead of swallowing the following word as their value. Repeatable
+event --kind remains offered after a prior kind, while single-use options stay
+hidden once supplied. Both focused completion tests pass, including subsequent
+value-taking options and literal payload handling. GitHub native run 44970793838
+also passed its live replay/cross-window ownership step, closing the initial CI
+runner evidence gap. Native graphical acceptance remains blocked by the locked Mac.
+
 rmuxctl read-events --follow now writes flushed JSON-RPC batches continuously,
 advancing the cursor only after successful output. Default waiting is 3 seconds;
 zero-wait following is rejected. Empty batches remain checkpoints and restart/
