@@ -10648,3 +10648,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Palette construction now reflects the originating terminal: Refresh becomes Cancel Pull Request Lookup while its task is pending; Open Current Pull Request appears only with a cached PR. Actions still recheck live state when invoked, and the explicit cancel shortcut safely does nothing after completion.
 - Cancellation drops the owned lookup task, invoking the existing child cleanup and leaving a clear canceled status. Retry clears only errors owned by the PR workflow; unrelated terminal errors remain visible. Standardized PR prerequisite errors carry the same prefix for this ownership check.
 - Desktop cargo check passed. Native cancel/retry/palette runtime acceptance remains pending; no network lookup, release build or deployment performed.
+
+### Shell-history initialization I/O and failure handling
+
+- New/restored terminal histories now serialize their final initial contents into one private temporary file, sync once, acquire the writer lease, and publish without clobbering. Removed the previous blank-file publication followed by a second atomic save/fsync. Existing snapshot histories are still read-only sources and each restore gets a new identity.
+- Lock/write failure before publication removes the temporary JSON instead of leaving an allocated blank history. Stable lock sidecars are deliberately not unlinked, preserving locking identity; a failed publication can still leave an empty lock sidecar. This is not automatic retention cleanup: exported layouts can reference old histories outside rmux's known state, so age alone cannot prove a file unused.
+- Nine focused shell-history tests passed, including isolated shell import/restore, independent leases, corruption/missing-source behavior and failed-save retry. One child-only helper test is intentionally invoked through its isolated parent. No release build or native UI action performed.
