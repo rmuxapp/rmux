@@ -16,6 +16,9 @@ pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
 pub fn control_index(key: &str) -> Option<usize> {
     KEYS.iter().chain(FOOTER_KEYS).position(|candidate| *candidate == key)
 }
+pub fn footer_enabled(index: usize, busy: bool, unsaved: bool, can_undo: bool) -> bool {
+    index < FOOTER_COUNT && !busy && (index != 4 || unsaved) && (index != 5 || can_undo)
+}
 pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
     Some(match index {
         0 => Box::new(SaveAppearanceSettings),
@@ -285,8 +288,8 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                 (4, "settings-revert", "Revert unsaved changes", "Restore the last loaded or saved panel values without changing the settings file"),
                 (5, "settings-undo-save", "Undo last save", "Restore saved values only where the file still matches the last save; preserve later edits"),
             ].into_iter().map(|(index, id, label, hint)| {
-                let enabled = !busy && (index != 4 || unsaved)
-                    && (index != 5 || cx.global::<preferences::LastSettingsSave>().0.is_some());
+                let enabled = footer_enabled(index, busy, unsaved,
+                    cx.global::<preferences::LastSettingsSave>().0.is_some());
                 div().id(id).px_2().py_1().rounded_sm().text_xs().border_1()
                     .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
                     .text_color(rgb(if enabled { chrome_style::ACCENT } else { 0x777777 }))

@@ -1339,9 +1339,14 @@ impl WorkspaceWindow {
                     cx.set_global(settings);
                 }
                 cx.notify();
-            } else if !cx.global::<preferences::ReloadState>().0 {
-                if let Some(action) = settings_view::footer_action(selected - settings_view::KEYS.len()) {
-                    window.dispatch_action(action, cx);
+            } else {
+                let index = selected - settings_view::KEYS.len();
+                let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(cx.global::<Preferences>());
+                if settings_view::footer_enabled(index, cx.global::<preferences::ReloadState>().0,
+                    unsaved, cx.global::<preferences::LastSettingsSave>().0.is_some()) {
+                    if let Some(action) = settings_view::footer_action(index) {
+                        window.dispatch_action(action, cx);
+                    }
                 }
             }
         }
