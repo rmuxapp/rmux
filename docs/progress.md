@@ -1,3 +1,12 @@
+Native tab hover cost: status-message and detailed title formatting now runs
+when a tooltip is requested rather than for every tab on every pane redraw.
+Callbacks hold weak pane/terminal references, resolve titles by stable identity,
+and read the current report; an exited process is labeled Last reported status.
+Visible title/status badges retain their existing presentation. This removes
+unhovered detailed-title and up-to-2-KiB status-message formatting from the render
+path, without adding a cache or retaining sessions. Desktop cargo check passed.
+No measured frame-time claim, app rebuild, visual acceptance or deployment.
+
 Shared-demo tab discovery: multi-tab pane headers now expose Choose Terminal
 Tab, also reachable through the command palette. The bounded sample-host chooser
 uses native tab_score ranking, palette search/clear/header/row/footer controls,

@@ -1,6 +1,17 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
+fn task_badge(record: &rmux_terminal::program_status::Record) -> (&'static str, u32) {
+    use rmux_terminal::program_status::{Kind, State};
+    match record.state {
+        State::Idle => ("Idle", 0xa0a0a0),
+        State::Working => ("Working", 0x86b8f5),
+        State::Done => ("Done", 0x8dd6a1),
+        State::Error => ("Error", 0xf18a8a),
+        State::Blocked => (match record.kind { Kind::Permission => "Approval", Kind::Question => "Question", Kind::Auth => "Login", Kind::None => "Blocked" }, 0xf0b85b),
+    }
+}
+
 pub(super) fn prepare_terminal_launch(
     canceled: &AtomicBool,
     launch: impl FnOnce() -> Result<Session>,
@@ -1225,7 +1236,7 @@ impl Render for PaneView {
                                         let scope = self.workspace;
                                         let target = terminal.entity_id();
                                         let label: SharedString = self.tab_title(index, cx).into();
-                                        let title_hint: SharedString = self.terminal_search_title(index, cx).into();
+                                        let hint_pane = cx.entity().downgrade();
                                         let display_title = label.clone();
                                         crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused)
                                             .on_drag(drag_item::DragItem { scope, container, item: target, label }, |item, _, _, cx| cx.new(|_| item.clone()))
@@ -1258,21 +1269,24 @@ impl Render for PaneView {
                                                 div().w(px(6.)).h(px(6.)).flex_shrink_0().rounded_full().bg(rgb(0xf0b85b))
                                             ))
                                             .when_some(terminal.read(cx).program_status.as_ref().filter(|_| terminal.read(cx).process_exit.is_none()), |tab, status| {
-                                                use rmux_terminal::program_status::{Kind, State};
                                                 let record = &status.record;
-                                                let (label, tint) = match record.state {
-                                                    State::Idle => ("Idle", 0xa0a0a0),
-                                                    State::Working => ("Working", 0x86b8f5),
-                                                    State::Done => ("Done", 0x8dd6a1),
-                                                    State::Error => ("Error", 0xf18a8a),
-                                                    State::Blocked => (match record.kind { Kind::Permission => "Approval", Kind::Question => "Question", Kind::Auth => "Login", Kind::None => "Blocked" }, 0xf0b85b),
-                                                };
+                                                let (label, tint) = task_badge(record);
                                                 let mut text = label.to_owned();
                                                 if let Some(percent) = record.progress { text.push_str(&format!(" {percent}%")); }
                                                 if status.count > 1 { text.push_str(&format!(" +{}", status.count - 1)); }
-                                                let detail: SharedString = format!("{label} · {} · {}\n{}", record.app, record.title, record.message).into();
+                                                // A report can contain a 2 KiB message. Read and format it
+                                                // only on hover, without retaining the terminal/session.
+                                                let source = terminal.downgrade();
                                                 tab.child(div().id(("program-status", terminal.entity_id())).text_xs().flex_shrink_0().text_color(rgb(tint))
-                                                    .tooltip(move |_, cx| cx.new(|_| ControlHint(detail.clone())).into()).child(text))
+                                                    .tooltip(move |_, cx| {
+                                                        let detail = source.upgrade().and_then(|terminal| {
+                                                            let terminal = terminal.read(cx);
+                                                            let record = &terminal.program_status.as_ref()?.record;
+                                                            let label = if terminal.process_exit.is_some() { "Last reported status" } else { task_badge(record).0 };
+                                                            Some(format!("{label} · {} · {}\n{}", record.app, record.title, record.message))
+                                                        }).unwrap_or_else(|| "Task status unavailable".to_owned());
+                                                        cx.new(|_| ControlHint(detail.into())).into()
+                                                    }).child(text))
                                             })
                                             .when_some(terminal.read(cx).progress.filter(|_| terminal.read(cx).process_exit.is_none()), |tab, progress| {
                                                 use rmux_terminal::ProgressState;
@@ -1293,7 +1307,16 @@ impl Render for PaneView {
                                                 tab.child(div().text_xs().flex_shrink_0().text_color(rgb(0xa0a0a0)).child("Finished"))
                                             })
                                             .child({
-                                                crate::tab_presentation::title(("tab-title", target), display_title, title_hint)
+                                                let fallback = display_title.clone();
+                                                crate::tab_presentation::title(("tab-title", target), display_title, fallback.clone())
+                                                    .tooltip(move |_, cx| {
+                                                        let detail = hint_pane.upgrade().and_then(|pane| {
+                                                            let pane = pane.read(cx);
+                                                            pane.terminals.iter().position(|terminal| terminal.entity_id() == target)
+                                                                .map(|index| pane.terminal_search_title(index, cx))
+                                                        }).map(SharedString::from).unwrap_or_else(|| fallback.clone());
+                                                        cx.new(|_| ControlHint(detail)).into()
+                                                    })
                                             })
                                             .child(
                                                 crate::tab_presentation::close_button(("close-tab", terminal.entity_id()))
