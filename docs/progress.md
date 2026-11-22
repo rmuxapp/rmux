@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Palette redraw cost: result-area measurement now stops when the 320 px panel
+is filled instead of scanning every matching command/file-preview line on each
+redraw. The production renderer now uses the bounded helper previously present
+only in tests. A 100,000-row regression verifies only nine ordinary rows are
+measured, with mixed/wrapped-row sizes preserved. Unused preview link, wrapping
+and excerpt-copy shortcut hints are no longer resolved in ordinary palettes.
+All six focused palette navigation tests pass. This is an operation-count
+improvement; no end-to-end latency or memory benchmark is claimed.
+
+
 Notification panel polish: pointer-down on a card now selects its stable message
 identity, including when interacting with More/Copy/Mark read controls, so later
 keyboard actions target that card. Home/End selects the first/last message.

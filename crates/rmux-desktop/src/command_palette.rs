@@ -90,11 +90,11 @@ fn literal_highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
     text.to_ascii_lowercase().match_indices(&query.to_ascii_lowercase())
         .map(|(start, matched)| start..start + matched.len()).collect()
 }
-#[cfg(test)]
-fn result_area_height(rows: impl IntoIterator<Item = bool>) -> f32 {
+// Stop measuring once the visible panel is full, including for large previews.
+fn result_area_height(rows: impl IntoIterator<Item = f32>) -> f32 {
     let mut height = 0.;
-    for subtitle in rows {
-        height += result_row_height(subtitle);
+    for row_height in rows {
+        height += row_height;
         if height >= 320. { return 320.; }
     }
     height
@@ -162,10 +162,15 @@ mod navigation_tests {
     #[test]
     fn palette_result_height_is_stable_and_bounded() {
         assert_eq!(result_area_height([]), 0.);
-        assert_eq!(result_area_height([false]), 36.);
-        assert_eq!(result_area_height([false, true]), 92.);
-        assert_eq!(result_area_height(std::iter::repeat(false)), 320.);
-        assert_eq!(result_area_height(std::iter::repeat(true)), 320.);
+        assert_eq!(result_area_height([36.]), 36.);
+        assert_eq!(result_area_height([36., 56.]), 92.);
+        assert_eq!(result_area_height(std::iter::repeat(36.)), 320.);
+        assert_eq!(result_area_height(std::iter::repeat(56.)), 320.);
+        assert_eq!(result_area_height([84., 116., 36.]), 236.);
+        let mut measured = 0;
+        let rows = (0..100_000).map(|_| { measured += 1; 36. });
+        assert_eq!(result_area_height(rows), 320.);
+        assert_eq!(measured, 9, "redraw work must stop at the viewport boundary");
     }
     #[test]
     fn arrows_wrap_and_page_keys_clamp() {
@@ -1282,10 +1287,12 @@ impl Render for CommandPalette {
                 .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!("{key} {label}")))
                 .collect::<Vec<_>>().join(" · ")
         } else { String::new() };
-        let link_hints = [(&NextPreviewLink as &dyn Action, "next"), (&PreviousPreviewLink as &dyn Action, "previous"), (&OpenPreviewLink as &dyn Action, "open")]
-            .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!(" · {key} {label}"))).collect::<String>();
-        let wrap_hint = shortcuts::hint(&TogglePreviewWrap, &self.input.read(cx).focus, window);
-        let copy_hint = shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window);
+        let link_hints = if self.preview_navigation.is_some() { [(&NextPreviewLink as &dyn Action, "next"), (&PreviousPreviewLink as &dyn Action, "previous"), (&OpenPreviewLink as &dyn Action, "open")]
+            .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!(" · {key} {label}"))).collect::<String>() } else { String::new() };
+        let wrap_hint = (self.preview_navigation.is_some() && !self.hex_preview)
+            .then(|| shortcuts::hint(&TogglePreviewWrap, &self.input.read(cx).focus, window)).flatten();
+        let copy_hint = has_search_excerpt
+            .then(|| shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window)).flatten();
         palette_view::panel(height)
             .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
             .on_action(cx.listener(|this, _: &OpenPreviewLink, _, cx| this.open_preview_link(cx)))
@@ -1390,7 +1397,7 @@ impl Render for CommandPalette {
                 })
                 .with_sizing_behavior(ListSizingBehavior::Auto)
                 .w_full().min_h_0()
-                .h(px(self.search.matches.iter().map(|index| self.command_height(*index)).sum::<f32>().min(320.)))
+                .h(px(result_area_height(self.search.matches.iter().map(|index| self.command_height(*index)))))
                 .into_any_element()
             })
             .when(self.buffer_rename.is_some() || self.directory_input || self.terminal_search_input || self.ssh_input, |palette| palette.child(
