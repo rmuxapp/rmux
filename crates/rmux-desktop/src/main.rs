@@ -790,6 +790,7 @@ impl TerminalView {
         )
     }
     fn rebind_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        events::publish("surface.location_invalidated", cx.entity_id(), None, cx);
         self.clear_link_hover(cx);
         self.set_input_focus(false, cx);
         self.terminal_menu = None;

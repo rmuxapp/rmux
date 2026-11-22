@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Surface location invalidations now cover attachment to existing/new panes,
+workspace owner changes and window rebinding. Clients can refresh current
+window/workspace/pane IDs without restarting or polling the terminal. Events
+retain the stable surface ID; duplicate/rollback invalidations are explicitly
+allowed, and in-pane tab reorder is outside this contract. Native replay smoke
+passes a live transfer, filtered invalidation, updated workspace snapshot and
+absence of false create/close events. Native pointer transfers and cross-window
+interaction acceptance remain pending.
+
 Code viewports now prepare their display lines once, share the resulting strings
 with render elements, and recompute highlight ranges only when the query changes.
 The cache belongs to the preview and is discarded on close/refresh; source limits

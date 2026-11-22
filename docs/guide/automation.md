@@ -385,6 +385,15 @@ Repeated reports of the same focus state do not emit events. Fetch
 `selected` only means the selected tab within its pane, even in an inactive window.
 The event is an invalidation, not a historical focus value.
 
+`surface.location_invalidated` asks clients to refresh a surface's `window_id`,
+`workspace_id` and `pane_id` from `surface.list`. It is emitted when a live terminal
+is attached to another pane, its pane changes workspace, or its window bindings
+are rebuilt. Transfers preserve the surface ID and running process. A transfer
+can emit multiple invalidations; rollback/rebinding can invalidate an unchanged
+final location. These records do not carry historical source/destination IDs and
+do not report tab reordering within the same pane. Fetch current state after the
+event, and tolerate a surface being closed before that fetch.
+
 `surface.list` includes `program_status` (null or the current summary with `id`,
 `count`, `state`, `kind`, `progress`, `app`, `title`, and `message`) and `progress`
 (null or `state` and nullable `percent`). Program status states are `idle`,
@@ -395,7 +404,7 @@ full program-status history. These reports come from terminal programs and are
 not authenticated agent identities.
 
 This is a replay API with bounded long polling. Push subscriptions, resource
-workspace/pane lifecycle and movement events and the full cmux event contract are not implemented.
+workspace/pane lifecycle and historical movement events and the full cmux event contract are not implemented.
 Readers use the existing bounded RPC queue; publishing never waits for clients.
 
 ## Create and close workspaces

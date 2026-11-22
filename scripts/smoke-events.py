@@ -60,6 +60,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert event_api["max_wait_ms"] == 3000 and not event_api["push_subscriptions"]
             assert "surface.directory_changed" in event_api["kinds"]
             assert "surface.focus_changed" in event_api["kinds"]
+            assert "surface.location_invalidated" in event_api["kinds"]
             surfaces = call("surface.list")["surfaces"]
             assert all(isinstance(item["input_focused"], bool) for item in surfaces)
             surface = surfaces[0]["id"]
@@ -153,6 +154,10 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             call("surface.move_to_workspace", {"surface_id": created_surface, "workspace_id": original_workspace})
             moved = call("events.read", {"after": created["cursor"]})
             assert not any(e["kind"] in ("surface.created", "surface.closed") and e["surface_id"] == created_surface for e in moved["events"])
+            locations = call("events.read", {"after": created["cursor"], "surface_id": created_surface, "kinds": ["surface.location_invalidated"]})
+            assert locations["events"], moved
+            moved_surface = next(s for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
+            assert moved_surface["workspace_id"] == original_workspace, moved_surface
             # Keep another workspace alive so the application can answer after
             # closing both original terminal entities.
             call("workspace.create", {"window_id": window, "name": "Survivor"})

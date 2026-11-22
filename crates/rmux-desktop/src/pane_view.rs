@@ -427,7 +427,11 @@ impl PaneView {
     }
 
     pub(super) fn set_workspace_owner(&mut self, workspace: EntityId, cx: &mut Context<Self>) {
+        if self.workspace == workspace { return; }
         self.workspace = workspace;
+        for terminal in self.terminals.iter() {
+            events::publish("surface.location_invalidated", terminal.entity_id(), None, cx);
+        }
         cx.notify();
     }
     pub(super) fn automation_busy(&self, cx: &App) -> bool {
@@ -618,6 +622,7 @@ impl PaneView {
         }
         let mut incoming = Vec::with_capacity(tabs.len());
         for tab in tabs {
+            events::publish("surface.location_invalidated", tab.terminal.entity_id(), None, cx);
             let title = cx.subscribe(&tab.terminal, |this, _, _: &TabMetadataChanged, cx| {
                 this.reconcile_tab_picker(cx);
                 cx.emit(PaneMetadataChanged);
@@ -654,6 +659,7 @@ impl PaneView {
         ))
     }
     pub fn from_transfer(tab: TabTransfer, workspace: EntityId, cx: &mut Context<Self>) -> Self {
+        events::publish("surface.location_invalidated", tab.terminal.entity_id(), None, cx);
         Self::restored(vec![tab.terminal], vec![tab.label], 0, workspace, cx)
     }
 
@@ -986,6 +992,7 @@ impl PaneView {
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        events::publish("surface.location_invalidated", tab.terminal.entity_id(), None, cx);
         let title = cx.subscribe(&tab.terminal, |this, _, _: &TabMetadataChanged, cx| {
             this.reconcile_tab_picker(cx);
             cx.emit(PaneMetadataChanged);
