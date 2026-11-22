@@ -410,7 +410,7 @@ impl Render for BrowserHost {
                                     .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some()))))
-                            .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
+                            .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 div().flex().flex_col().gap_1().child(input.clone())
                                     .when_some(self.editor_presets, |editor, icons| editor.child(crate::metadata_presets::render(input, icons, cx)))

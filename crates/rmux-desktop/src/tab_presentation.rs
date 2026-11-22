@@ -19,9 +19,10 @@ pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stat
     div().id(id).flex().items_center().flex_shrink_0().px_2().gap_2()
         .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())
         .cursor_pointer().text_color(rgb(0x9b9b9b))
+        .hover(move |style| style.bg(rgb(if active { 0x353239 } else { 0x2e2e2e })))
         .when(active, |tab| tab.bg(rgb(if focused {0x303030} else {0x292929}))
             .text_color(rgb(if focused {0xe5e5e5} else {0xb8bfcb}))
-            .border_color(rgb(if focused {0x4599ef} else {0x4a5362})))
+            .border_color(rgb(if focused {crate::sidebar_presentation::ACCENT} else {0x575260})))
 }
 
 pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div {

@@ -4337,7 +4337,7 @@ impl Render for WorkspaceWindow {
                                                     .when(unread_count > 0, |row| row.child(
                                                         gpui::div().min_w(px(16.)).h(px(16.)).px_1().flex_shrink_0().rounded_full()
                                                             .flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::SEMIBOLD)
-                                                            .bg(rgb(if selected { 0xffffff } else { 0x007aff })).text_color(rgb(if selected { 0x007aff } else { 0xffffff }))
+                                                            .bg(rgb(crate::sidebar_presentation::ACCENT)).text_color(rgb(0x211d2c))
                                                             .child(unread_count.to_string())
                                                     ))
                                                     .child(gpui::div().flex_1().min_w_0().flex().flex_col().gap_1()
@@ -4349,8 +4349,8 @@ impl Render for WorkspaceWindow {
                                                                 .font_weight(FontWeight::SEMIBOLD).child(display_name))
                                                             .when(header.map(|group| group.pinned).unwrap_or(entry.pinned), |row| row.child(
                                                                 sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
-                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { 0xdcecff } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
-                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
+                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
+                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
                                                         .when_some(preview, |column, message| {
                                                             let text: SharedString = if message.title.is_empty() { message.body.clone() } else if message.body.is_empty() { message.title.clone() } else { format!("{} — {}", message.title, message.body) }.into();
                                                             let hint = text.clone();
@@ -4362,7 +4362,7 @@ impl Render for WorkspaceWindow {
                                                         .when_some(Self::entry_directory(entry, window, cx), |column, (branch, directory)| {
                                                             let hint: SharedString = [branch.as_deref(), directory.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n").into();
                                                             column.child(gpui::div().id(("workspace-context", target)).flex().items_center().gap_1().min_w_0().text_size(px(11.))
-                                                                .text_color(rgb(if selected { 0xdcecff } else { 0x969696 }))
+                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
                                                                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
                                                                 .when_some(branch, |row, branch| row
                                                                     .child(icons::icon("branch"))
@@ -4386,7 +4386,7 @@ impl Render for WorkspaceWindow {
                                                     .when(position < 8 || position + 1 == self.workspace_state.entries.len(), |row| {
                                                         let number = if position < 8 { position + 1 } else { 9 };
                                                         let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl+Alt+" };
-                                                        row.child(gpui::div().flex_shrink_0().text_xs().text_color(rgb(if selected { 0xdcecff } else { 0x969696 })).child(format!("{modifier}{number}")))
+                                                        row.child(gpui::div().flex_shrink_0().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 })).child(format!("{modifier}{number}")))
                                                     })
                                                     .into_any_element()
                                             },

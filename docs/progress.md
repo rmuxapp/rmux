@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Local sidebar/tab polish batch: selected workspaces now use a subdued lavender-gray
+fill with a visible outline instead of saturated blue. Shared accent/detail
+colors coordinate native/browser icons, metadata, shortcuts and native unread
+badges. All rows reserve the same border space, avoiding selection size changes.
+Focused tab accents use the same accent; inactive tabs retain a muted outline,
+and tab hover feedback is explicit. Desktop check and one WASM build pass. Browser
+inspection covers two panes with multiple tabs and active/inactive focus styling;
+screenshot: target/sidebar-tab-polish.jpg. Native graphical review remains pending.
+Held locally for a larger polish push; no release/deployment triggered.
+
 Next-release quality batch: the macOS packaging script supplies the existing
 Markdown release notes to Sparkle's pinned generate_appcast tool with
 --embed-release-notes and a version-specific full-history link. Publication now
