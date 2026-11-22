@@ -97,6 +97,7 @@ struct InputProbe {
     search: palette_match::RankedSearch,
     workspace_results: Vec<(EntityId, String)>,
     group_results: Vec<(u64, String)>,
+    group_context: (bool, usize),
     selected: usize,
     scroll: ListState,
     feedback: Option<String>,
@@ -154,14 +155,14 @@ impl InputProbe {
             });
             cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
                 match event {
-                    text_field::EditEvent::Changed(query) => { if this.shortcuts_only { this.filter_shortcuts(query); } else { this.search.update(query); } this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Changed(query) => { this.filter_shortcuts(query); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
                     text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
                     text_field::EditEvent::Cancelled => this.dismiss_palette(window, cx),
                 }
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, shortcuts_only: false, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), group_context: (false, 0), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, shortcuts_only: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -313,9 +314,10 @@ impl InputProbe {
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         else { self.empty_focus.focus(window,cx); }
     }
-    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, window: &Window, cx: &mut Context<Self>) {
+    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, group_context: (bool, usize), window: &Window, cx: &mut Context<Self>) {
         self.workspace_results = workspaces;
         self.group_results = groups;
+        self.group_context = group_context;
         // Like the native palette, resolve bindings once from the originating
         // focus path, before later frames replace it with the palette input.
         self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
@@ -371,9 +373,16 @@ impl InputProbe {
     }
 
     fn filter_shortcuts(&mut self, query: &str) {
-        if !self.shortcuts_only { return; }
+        if !self.shortcuts_only {
+            let (grouped, selected) = self.group_context;
+            self.search.update_filtered(query, |index| COMMANDS.get(index)
+                .is_none_or(|command| workspace_actions::palette_available(*command, grouped, selected)));
+            return;
+        }
         let filter = shortcut_label::ShortcutQuery::new(query);
-        self.search.update_filtered(query, |index| index < COMMANDS.len() && self.result_hints.get(index)
+        let (grouped, selected) = self.group_context;
+        self.search.update_filtered(query, |index| COMMANDS.get(index)
+            .is_some_and(|command| workspace_actions::palette_available(*command, grouped, selected)) && self.result_hints.get(index)
             .and_then(|hint| hint.as_deref()).is_some_and(|hint| filter.matches(hint)));
         if query.trim().is_empty() { self.search.matches.sort_by_key(|index| COMMANDS[*index].title()); }
     }

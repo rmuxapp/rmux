@@ -62,9 +62,11 @@ impl BrowserHost {
                         let (name, entity, _, _) = &this.workspace_state.entries[index];
                         (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
                     }).collect();
-                    let groups = this.workspace_state.groups.entries().iter().map(|group|
+                    let active_group = this.workspace_state.groups.containing(source.entity_id()).map(|group| group.id);
+                    let group_context = (active_group.is_some(), this.workspace_state.sidebar_selection.len());
+                    let groups = this.workspace_state.groups.entries().iter().filter(|group| Some(group.id) != active_group).map(|group|
                         (group.id, format!("Move Workspace to Group: {} (#{})", group.name, group.id))).collect();
-                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, window, cx));
+                    source.update(cx, |workspace, cx| workspace.set_workspace_results(workspaces, groups, group_context, window, cx));
                 }
                 PaletteRequest::SelectWorkspace(id) => {
                     if let Some(index) = this.workspace_state.entries.iter().position(|(_, entity, _, _)| entity.entity_id() == *id) {

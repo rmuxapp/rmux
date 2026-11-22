@@ -10,6 +10,18 @@ pub(crate) trait WorkspaceCommandHost: Sized + 'static {
     fn select_workspace_number(&mut self, number: usize, window: &mut Window, cx: &mut Context<Self>);
 }
 
+/// Group-only palette entries should describe actions available at the origin.
+pub(crate) fn palette_available(command: CommandId, grouped: bool, selected: usize) -> bool {
+    match command {
+        CommandId::GroupSelectedWorkspaces => selected > 1,
+        CommandId::UseCurrentDirectoryForGroup | CommandId::ResetGroupDirectory
+        | CommandId::RenameWorkspaceGroup | CommandId::EditGroupColor | CommandId::EditGroupIcon
+        | CommandId::UngroupWorkspaces | CommandId::CloseWorkspaceGroup | CommandId::ToggleGroupPin
+        | CommandId::RemoveWorkspaceFromGroup | CommandId::SetGroupAnchor => grouped,
+        _ => true,
+    }
+}
+
 macro_rules! workspace_commands {
     ($($command:ident),* $(,)?) => {
         pub(crate) fn action(command: CommandId) -> Option<Box<dyn Action>> {

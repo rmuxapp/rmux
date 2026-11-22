@@ -1,3 +1,14 @@
+Contextual palette commands: both native and WASM hosts share group-action
+availability rules. Group-only actions require a grouped origin workspace;
+Group Selected Workspaces requires multiple sidebar selections, and move-to-group
+results omit the current group. Native cancellation entries now also require an
+active file-loading or restore job. These are palette-discovery rules; existing
+action handlers still revalidate their targets. Native compilation and the WASM
+build passed. Browser review created a group from the palette, verified group
+actions appeared, then ungrouped and verified they disappeared on reopening.
+Screenshot: `target/palette-group-context.png`. Native job-cancellation interaction
+and multiselect acceptance remain unverified. Nothing published.
+
 Shared palette search polish: native palettes, the tab picker and WASM command
 palette now show an inline clear control for nonempty search text. Clearing uses
 the text editor's undo path, restores input focus and updates results through

@@ -2453,9 +2453,13 @@ impl WorkspaceWindow {
         let (tab, paste) = workspace.focused_index(window, cx)
             .map(|index| workspace.panes[index].read(cx).pending_palette_operations(cx))
             .unwrap_or_default();
-        let pending = command_palette::PendingOperations {
+        let pending = command_palette::PaletteContext {
             workspace: self.workspace_launch_cancel.is_some(),
             split: workspace.spawning_split.is_some(), tab, paste,
+            file_loading: self.file_browser_job.is_some(),
+            restore: self.restore_job.is_some(),
+            active_group: self.workspace_state.groups.containing(active_workspace).map(|group| group.id),
+            selected_workspaces: self.workspace_state.sidebar_selection.len(),
         };
         let mut terminals = Vec::new();
         for entry in &self.workspace_state.entries {

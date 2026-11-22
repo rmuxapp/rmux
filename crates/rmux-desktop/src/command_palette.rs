@@ -224,11 +224,15 @@ pub enum PaletteEvent {
 pub enum BufferMode { Paste, Delete, Rename, Copy }
 
 #[derive(Default)]
-pub struct PendingOperations {
+pub struct PaletteContext {
     pub workspace: bool,
     pub tab: bool,
     pub split: bool,
     pub paste: bool,
+    pub file_loading: bool,
+    pub restore: bool,
+    pub active_group: Option<u64>,
+    pub selected_workspaces: usize,
 }
 
 pub struct FolderState {
@@ -310,7 +314,7 @@ impl CommandPalette {
         external_workspaces: Vec<(AnyWindowHandle, EntityId, String)>,
         groups: Vec<(u64, String)>,
         active_workspace: EntityId,
-        pending: PendingOperations,
+        pending: PaletteContext,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) -> Self {
@@ -318,7 +322,8 @@ impl CommandPalette {
         let mut commands = Vec::new();
         macro_rules! command {
             ($action:ident) => {
-                commands.push(Command {
+                if crate::workspace_actions::palette_available(rmux_core::commands::CommandId::$action,
+                    pending.active_group.is_some(), pending.selected_workspaces) { commands.push(Command {
                     title: rmux_core::commands::CommandId::$action.title().into(),
                     target: PaletteEvent::Run(crate::pane_actions::action(rmux_core::commands::CommandId::$action)
                         .or_else(|| crate::workspace_actions::action(rmux_core::commands::CommandId::$action))
@@ -328,7 +333,7 @@ impl CommandPalette {
                         .unwrap_or_else(|| Box::new($action))),
                     shortcut: None,
                 subtitle: None,
-                });
+                }); }
             };
         }
         command!(NewWorkspace);
@@ -366,6 +371,7 @@ impl CommandPalette {
         command!(RemoveWorkspaceFromGroup);
         command!(SetGroupAnchor);
         for (group, name) in groups {
+            if Some(group) == pending.active_group { continue; }
             commands.push(Command {
                 title: format!("Move Workspace to Group: {name} (#{group})"),
                 target: PaletteEvent::Run(Box::new(MoveWorkspaceToGroup { group })),
@@ -456,7 +462,7 @@ impl CommandPalette {
         command!(ShowCopyBufferPicker);
         command!(BrowseTerminalFiles);
         command!(OpenTextPreview);
-        command!(CancelFileLoading);
+        if pending.file_loading { command!(CancelFileLoading); }
         command!(ShowTerminalSearch);
         command!(ShowSshHosts);
         command!(OpenFolderBrowser);
@@ -468,7 +474,7 @@ impl CommandPalette {
         command!(OpenSession);
         command!(ShowLayoutPresetPicker);
         command!(ShowCustomCommandPicker);
-        command!(CancelRestore);
+        if pending.restore { command!(CancelRestore); }
         command!(SaveAppearanceSettings);
         command!(ReloadSettings);
         command!(RevertAppearanceSettings);
