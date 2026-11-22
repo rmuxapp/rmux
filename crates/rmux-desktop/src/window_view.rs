@@ -294,9 +294,12 @@ impl WorkspaceWindow {
     }
     pub(super) fn memory_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let modifiers = event.keystroke.modifiers;
-        if modifiers.control || modifiers.platform || modifiers.alt { return; }
+        if modifiers.control || modifiers.platform || modifiers.alt
+            || (modifiers.shift && event.keystroke.key != "tab") { return; }
         let count = self.memory_rows.as_ref().map_or(0, Vec::len);
-        let key = event.keystroke.key.as_str();
+        let key = if event.keystroke.key == "tab" {
+            if modifiers.shift { "up" } else { "down" }
+        } else { event.keystroke.key.as_str() };
         let navigation = matches!(key, "up" | "down" | "home" | "end" | "pageup" | "pagedown");
         match key {
             "escape" => self.close_memory(window, cx),

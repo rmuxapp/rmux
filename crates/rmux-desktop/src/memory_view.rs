@@ -134,7 +134,7 @@ pub fn panel(rows: &[Row], application: Option<process_metrics::Sample>, sampled
             entity.update(cx, |root, cx| root.render_memory_row(indices[index], index == selected, cx))
         }).with_sizing_behavior(ListSizingBehavior::Auto).flex_1().min_h_0().w_full())
         .child(div().px_3().py_1().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0))
-            .child("↑↓ Select · PgUp/PgDn Page · Enter Focus · R Refresh · S Sort · C Copy · Esc Close"))
+            .child("↑↓ / Tab Select · PgUp/PgDn Page · Enter Focus · R Refresh · S Sort · C Copy · Esc Close"))
         .into_any_element()
 }
 

@@ -43,12 +43,19 @@ impl TerminalView {
             .and_then(|row| ports::http_url(row.address)) { cx.open_url(&url); }
     }
     fn ports_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        let modifiers = event.keystroke.modifiers;
+        if modifiers.control || modifiers.platform || modifiers.alt
+            || (modifiers.shift && event.keystroke.key != "tab") { return; }
+        let key = if event.keystroke.key == "tab" {
+            if modifiers.shift { "up" } else { "down" }
+        } else { event.keystroke.key.as_str() };
+        let navigation = matches!(key, "up" | "down" | "home" | "end" | "pageup" | "pagedown");
         let count = self.ports.report.as_ref().map_or(0, |report| report.listeners.len());
-        match event.keystroke.key.as_str() {
+        match key {
             "escape" => self.close_ports(window, cx),
-            "r" if !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt => self.refresh_ports(window, cx),
+            "r" => self.refresh_ports(window, cx),
             "enter" => self.copy_port(cx),
-            "o" if !event.keystroke.modifiers.control && !event.keystroke.modifiers.platform && !event.keystroke.modifiers.alt => self.open_port_http(cx),
+            "o" => self.open_port_http(cx),
             "up" if count > 0 => self.ports.selected = (self.ports.selected + count - 1) % count,
             "down" if count > 0 => self.ports.selected = (self.ports.selected + 1) % count,
             "home" => self.ports.selected = 0,
@@ -63,7 +70,7 @@ impl TerminalView {
             }
             _ => {},
         }
-        self.reveal_selected_port();
+        if navigation { self.reveal_selected_port(); }
         cx.stop_propagation();
         cx.notify();
     }
@@ -81,19 +88,15 @@ impl TerminalView {
     pub(super) fn refresh_ports(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.ports.focus.get_or_insert_with(|| cx.focus_handle()).focus(window);
         if self.ports.loading { self.ports.visible = true; cx.notify(); return; }
-        let previous = self.ports.report.as_ref()
-            .and_then(|report| report.listeners.get(self.ports.selected)).copied();
         self.ports.visible = true;
         self.ports.error = None;
-        self.ports.report = None;
-        self.ports.selected = 0;
         let prepare = || -> Result<_> {
             anyhow::ensure!(self.session.exit_status().is_none(), "Terminal process has exited");
             let pid = self.session.process_id().ok_or_else(|| anyhow::anyhow!("Terminal has no local process ID"))?;
             Ok((pid, ports::Permit::acquire()?))
         };
         match prepare() {
-            Err(error) => self.ports.error = Some(error.to_string()),
+            Err(error) => { self.ports.report = None; self.ports.selected = 0; self.ports.error = Some(error.to_string()); }
             Ok((pid, permit)) => {
                 self.ports.loading = true;
                 self.ports.generation = self.ports.generation.wrapping_add(1);
@@ -110,6 +113,13 @@ impl TerminalView {
                         this.ports.loading = false;
                         this.ports.canceled = None;
                         if !this.ports.visible { return; }
+                        // Keep the current selection, including navigation while
+                        // the background scan was running, rather than its start value.
+                        let previous = this.ports.report.as_ref()
+                            .and_then(|report| report.listeners.get(this.ports.selected)).copied();
+                        let previous_index = this.ports.selected;
+                        let previous_offset = this.ports.listener_offset();
+                        this.ports.report = None;
                         if this.session.exit_status().is_some() { this.ports.error = Some("Terminal process has exited".into()); }
                         else { match result {
                             Ok(report) => {
@@ -118,7 +128,10 @@ impl TerminalView {
                             }
                             Err(error) => this.ports.error = Some(error.to_string()),
                         } }
-                        this.reveal_selected_port();
+                        if previous.is_none() || previous_index != this.ports.selected
+                            || previous_offset != this.ports.listener_offset() {
+                            this.reveal_selected_port();
+                        }
                         cx.notify();
                     });
                 }).detach();
@@ -162,8 +175,8 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
         .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
         .child(div().h(px(32.)).min_w_0().flex_shrink_0().px_2().flex().items_center().gap_2()
             .child(div().id("ports-heading").flex_1().min_w_0().truncate()
-                .tooltip({ let text: SharedString = if state.loading { "Local TCP listeners · Scanning…" } else { "Local TCP listeners · Snapshot" }.into(); move |_, cx| cx.new(|_| pane_view::ControlHint(text.clone())).into() })
-                .child(if state.loading { "Local TCP listeners · Scanning…" } else { "Local TCP listeners · Snapshot" }))
+                .tooltip({ let text: SharedString = if state.loading && state.report.is_some() { "Refreshing · Previous snapshot shown" } else if state.loading { "Local TCP listeners · Scanning…" } else { "Local TCP listeners · Snapshot" }.into(); move |_, cx| cx.new(|_| pane_view::ControlHint(text.clone())).into() })
+                .child(if state.loading && state.report.is_some() { "Refreshing · Previous snapshot shown" } else if state.loading { "Local TCP listeners · Scanning…" } else { "Local TCP listeners · Snapshot" }))
             .child(pane_view::pane_control("refresh-ports", "Refresh Listening Ports").on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.refresh_ports(window, cx); } })).child(icons::icon("refresh")))
             .child(pane_view::pane_control("close-ports", "Close Listening Ports").on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                 if event.standard_click() { this.close_ports(window, cx); }
@@ -195,6 +208,6 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                             .on_click(move |event, _, cx| { if event.standard_click() { clipboard::write(ClipboardItem::new_string(address.clone()), cx); } })
                             .child(icons::icon("copy")))
                 }))))
-        .child(div().px_2().py_1().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ Select · Enter Copy · O Open HTTP · R Refresh · Esc Close"))
+        .child(div().px_2().py_1().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ / Tab Select · Enter Copy · O Open HTTP · R Refresh · Esc Close"))
         .into_any_element()
 }

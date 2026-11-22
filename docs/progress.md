@@ -1,3 +1,13 @@
+Diagnostic panel interaction batch: Listening Ports keeps its previous snapshot
+visible during refresh with an explicit label, preserves selection made during
+the scan by address/PID, and avoids scrolling on copy/unrelated typing or an
+unchanged refresh. Failed/expired-process scans clear old results. Ports and
+Terminal Memory now support Tab/Shift-Tab and leave modified keys to shortcut
+routing, aligning with Settings and Program Status. The compiled panel-focused
+filter passed 19 tests (including listener identity and existing panel behavior).
+Native pointer/keyboard acceptance remains pending; no extra app bundle or
+release was built for this batch.
+
 Responsive inspector layout: Settings and Notifications now share a 380-point
 panel shell. When the viewport minus the visible sidebar cannot leave 400 points
 for terminals beside the panel, the panel overlays the right edge with occlusion
