@@ -60,6 +60,10 @@ pub(crate) fn search(input: Entity<crate::text_field::TextField>, cx: &App) -> D
                 });
             }).child("×"))))
 }
+pub(crate) fn result_row_height(has_subtitle: bool) -> f32 {
+    if has_subtitle { 56. } else { 36. }
+}
+
 pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {
     div().id(("command", id)).w_full().min_w_0().px_3().h(px(height))
         .text_sm().line_height(px(20.)).flex().items_center().gap_3().cursor_pointer()

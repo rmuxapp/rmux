@@ -124,9 +124,7 @@ mod preview_typography_tests {
 
 pub(super) use crate::palette_view::top_inset;
 
-fn result_row_height(has_subtitle: bool) -> f32 {
-    if has_subtitle { 56. } else { 36. }
-}
+use crate::palette_view::result_row_height;
 fn literal_highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
     if query.is_empty() { return Vec::new(); }
     // ASCII case folding preserves the original UTF-8 byte boundaries.

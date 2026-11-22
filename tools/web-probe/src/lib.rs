@@ -43,28 +43,92 @@ mod palette_view;
 use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
+// Keep supported commands in the same default order as the native palette.
 const COMMANDS: &[CommandId] = &[
-    CommandId::CopySelection, CommandId::Paste, CommandId::NextPane, CommandId::PreviousPane,
+    CommandId::NewWorkspace,
+    CommandId::NewTab,
+    CommandId::CopySelection,
+    CommandId::Paste,
+    CommandId::NextPane,
+    CommandId::PreviousPane,
+    CommandId::MoveTabLeft,
+    CommandId::MoveTabRight,
+    CommandId::Split,
+    CommandId::SplitBelow,
+    CommandId::TogglePaneZoom,
+    CommandId::Find,
     CommandId::ShowKeyboardShortcuts,
     CommandId::OpenUserGuide,
     CommandId::ReportIssue,
     CommandId::OpenWebsite,
-    CommandId::NewWorkspace, CommandId::NewTab, CommandId::RenameTab, CommandId::CloseOtherTabs, CommandId::CloseTabsToRight, CommandId::ToggleSidebar,
-    CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,
-    CommandId::MoveWorkspaceUp, CommandId::MoveWorkspaceDown,
-    CommandId::ShowTabPicker, CommandId::ShowTabMenu, CommandId::NextTab, CommandId::PreviousTab, CommandId::MoveTabLeft, CommandId::MoveTabRight,
-    CommandId::ClosePane, CommandId::NewWorkspaceGroup, CommandId::GroupCurrentWorkspace, CommandId::GroupSelectedWorkspaces, CommandId::ToggleGroupPin, CommandId::RemoveWorkspaceFromGroup, CommandId::SetGroupAnchor, CommandId::CloseWorkspace,
-    CommandId::NextWorkspace, CommandId::PreviousWorkspace, CommandId::LastWorkspace, CommandId::UngroupWorkspaces,
-    CommandId::Split, CommandId::SplitBelow, CommandId::SplitLeft, CommandId::SplitAbove, CommandId::TogglePaneZoom,
-    CommandId::BreakTabRight, CommandId::BreakTabBelow, CommandId::BreakTabLeft, CommandId::BreakTabAbove,
-    CommandId::JoinPaneNext, CommandId::JoinPaneLeft, CommandId::JoinPaneRight, CommandId::JoinPaneUp, CommandId::JoinPaneDown,
-    CommandId::SwapPaneNext, CommandId::SwapPaneLeft, CommandId::SwapPaneRight,
-    CommandId::SwapPaneUp, CommandId::SwapPaneDown,
-    CommandId::EqualizePanes, CommandId::ResizePaneLeft, CommandId::ResizePaneRight,
-    CommandId::ResizePaneUp, CommandId::ResizePaneDown,
-    CommandId::FocusLeft, CommandId::FocusRight, CommandId::FocusUp, CommandId::FocusDown,
-    CommandId::IncreaseFontSize, CommandId::DecreaseFontSize, CommandId::ResetFontSize, CommandId::ShowWorkspaceMenu, CommandId::EditWorkspaceIcon, CommandId::EditGroupIcon, CommandId::EditWorkspaceColor, CommandId::EditGroupColor, CommandId::EditWorkspaceDescription, CommandId::CloseWorkspaceGroup, CommandId::ToggleWorkspacePin, CommandId::RenameWorkspaceGroup, CommandId::RenameWorkspace, CommandId::ShowTerminalMenu, CommandId::CopySelectionWithLineBreaks, CommandId::EditorSelectAll, CommandId::ClearScrollback,
-    CommandId::ScrollToTop, CommandId::ScrollToBottom,
+    CommandId::NewWorkspaceGroup,
+    CommandId::GroupCurrentWorkspace,
+    CommandId::GroupSelectedWorkspaces,
+    CommandId::RenameWorkspaceGroup,
+    CommandId::EditGroupColor,
+    CommandId::EditGroupIcon,
+    CommandId::UngroupWorkspaces,
+    CommandId::CloseWorkspaceGroup,
+    CommandId::ToggleGroupPin,
+    CommandId::RemoveWorkspaceFromGroup,
+    CommandId::SetGroupAnchor,
+    CommandId::SplitLeft,
+    CommandId::SplitAbove,
+    CommandId::EqualizePanes,
+    CommandId::ResizePaneLeft,
+    CommandId::ResizePaneRight,
+    CommandId::ResizePaneUp,
+    CommandId::ResizePaneDown,
+    CommandId::SwapPaneNext,
+    CommandId::SwapPaneLeft,
+    CommandId::SwapPaneRight,
+    CommandId::SwapPaneUp,
+    CommandId::SwapPaneDown,
+    CommandId::BreakTabRight,
+    CommandId::BreakTabBelow,
+    CommandId::BreakTabLeft,
+    CommandId::BreakTabAbove,
+    CommandId::JoinPaneNext,
+    CommandId::JoinPaneLeft,
+    CommandId::JoinPaneRight,
+    CommandId::JoinPaneUp,
+    CommandId::JoinPaneDown,
+    CommandId::ToggleSidebar,
+    CommandId::RenameWorkspace,
+    CommandId::EditWorkspaceIcon,
+    CommandId::EditWorkspaceColor,
+    CommandId::EditWorkspaceDescription,
+    CommandId::NextWorkspace,
+    CommandId::LastWorkspace,
+    CommandId::RenameTab,
+    CommandId::NextTab,
+    CommandId::ShowTabPicker,
+    CommandId::ShowTabMenu,
+    CommandId::ShowWorkspaceMenu,
+    CommandId::PreviousTab,
+    CommandId::ToggleWorkspacePin,
+    CommandId::PreviousWorkspace,
+    CommandId::FindOlder,
+    CommandId::FindNewer,
+    CommandId::EditorSelectAll,
+    CommandId::ShowTerminalMenu,
+    CommandId::CopySelectionWithLineBreaks,
+    CommandId::ClearScrollback,
+    CommandId::ScrollToTop,
+    CommandId::ScrollToBottom,
+    CommandId::IncreaseFontSize,
+    CommandId::DecreaseFontSize,
+    CommandId::ResetFontSize,
+    CommandId::FocusLeft,
+    CommandId::FocusRight,
+    CommandId::FocusUp,
+    CommandId::FocusDown,
+    CommandId::MoveWorkspaceUp,
+    CommandId::MoveWorkspaceDown,
+    CommandId::ClosePane,
+    CommandId::CloseOtherTabs,
+    CommandId::CloseTabsToRight,
+    CommandId::CloseWorkspace,
 ];
 struct WorkspaceCommand(CommandId);
 impl EventEmitter<WorkspaceCommand> for InputProbe {}
@@ -95,7 +159,7 @@ struct InputProbe {
     empty_focus: FocusHandle,
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
-    workspace_results: Vec<(EntityId, String)>,
+    workspace_results: Vec<(EntityId, String, String)>,
     group_results: Vec<(u64, String)>,
     group_context: (bool, usize),
     selected: usize,
@@ -314,7 +378,7 @@ impl InputProbe {
         if let Some(pane) = self.samples.get(&self.focused) { pane.update(cx, |sample, cx| sample.focus(window, cx)); }
         else { self.empty_focus.focus(window,cx); }
     }
-    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String)>, groups: Vec<(u64, String)>, group_context: (bool, usize), window: &Window, cx: &mut Context<Self>) {
+    fn set_workspace_results(&mut self, workspaces: Vec<(EntityId, String, String)>, groups: Vec<(u64, String)>, group_context: (bool, usize), window: &Window, cx: &mut Context<Self>) {
         self.workspace_results = workspaces;
         self.group_results = groups;
         self.group_context = group_context;
@@ -324,7 +388,7 @@ impl InputProbe {
             .map(|index| self.result_hint(index, window, cx)).collect();
         self.search = palette_match::RankedSearch::with_shortcuts(
                 (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_title(index).to_lowercase()).collect(),
+                    .map(|index| self.result_search_text(index)).collect(),
                 (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
                     .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
                         .map(shortcut_label::search_terms).unwrap_or_default()).collect());
@@ -364,6 +428,19 @@ impl InputProbe {
         else if index < COMMANDS.len() + self.workspace_results.len() { &self.workspace_results[index - COMMANDS.len()].1 }
         else { &self.group_results[index - COMMANDS.len() - self.workspace_results.len()].1 }
     }
+    fn result_subtitle(&self, index: usize) -> Option<&str> {
+        index.checked_sub(COMMANDS.len()).and_then(|index| self.workspace_results.get(index))
+            .map(|(_, _, subtitle)| subtitle.as_str()).filter(|subtitle| !subtitle.is_empty())
+    }
+    fn result_search_text(&self, index: usize) -> String {
+        match self.result_subtitle(index) {
+            Some(subtitle) => format!("{} {subtitle}", self.result_title(index)).to_lowercase(),
+            None => self.result_title(index).to_lowercase(),
+        }
+    }
+    fn result_height(&self, index: usize) -> f32 {
+        palette_view::result_row_height(self.result_subtitle(index).is_some())
+    }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette_open { self.dismiss_palette(window, cx); return; }
         self.palette_origin = window.focused(cx);
@@ -399,7 +476,7 @@ impl InputProbe {
             return;
         }
         if index >= COMMANDS.len() {
-            let Some((id, _)) = self.workspace_results.get(index - COMMANDS.len()) else { return; };
+            let Some((id, _, _)) = self.workspace_results.get(index - COMMANDS.len()) else { return; };
             let id = *id;
             self.close_palette(window, cx);
             cx.emit(PaletteRequest::SelectWorkspace(id));
@@ -417,7 +494,7 @@ impl InputProbe {
                 .map(|index| self.result_hint(index, window, cx)).collect();
             self.search = palette_match::RankedSearch::with_shortcuts(
                 (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_title(index).to_lowercase()).collect(),
+                    .map(|index| self.result_search_text(index)).collect(),
                 (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
                     .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
                         .map(shortcut_label::search_terms).unwrap_or_default()).collect());
@@ -616,7 +693,7 @@ impl Render for InputProbe {
                     cx.stop_propagation();
                     let next = if matches!(key, "pageup" | "pagedown") {
                         palette_view::paged_result(this.selected, this.search.matches.len(), key == "pageup",
-                            f32::from(this.scroll.viewport_bounds().size.height), |_| 36.)
+                            f32::from(this.scroll.viewport_bounds().size.height), |row| this.result_height(this.search.matches[row]))
                     } else { palette_view::navigated_result(this.selected, this.search.matches.len(), key) };
                     if let Some(next) = next {
                         this.selected = next;
@@ -635,13 +712,16 @@ impl Render for InputProbe {
                     list(self.scroll.clone(), move |row, _window, cx| {
                         entity.update(cx, |this, cx| {
                             let index = this.search.matches[row];
-                            palette_view::result(index, 36., row == this.selected)
-                                .child(div().flex_1().min_w_0().truncate().child({
+                            palette_view::result(index, this.result_height(index), row == this.selected)
+                                .child(div().flex_1().min_w_0().flex().flex_col()
+                                .child(div().truncate().child({
                                     let title = this.result_title(index).to_owned();
                                     let matches = palette_match::fuzzy_highlights(&title, this.input.read(cx).value());
                                     StyledText::new(title).with_highlights(matches.into_iter().map(|range| (range,
                                         HighlightStyle { color: Some(rgb_to_hsla(rgb(0xffffff))), background_color: Some(rgb_to_hsla(rgb(0x41638c))), ..Default::default() })))
                                 }))
+                                .when_some(this.result_subtitle(index), |column, subtitle| column.child(
+                                    div().truncate().text_xs().line_height(px(16.)).text_color(rgb(0xa0a0a0)).child(subtitle.to_owned()))))
                                 .when_some(this.result_hints.get(index).cloned().flatten(), |row, hint| row.child(
                                     palette_view::shortcut(hint)))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
@@ -649,7 +729,7 @@ impl Render for InputProbe {
                                 })).into_any_element()
                         })
                     }).with_sizing_behavior(ListSizingBehavior::Auto).w_full().min_h_0()
-                        .h(px((self.search.matches.len() as f32 * 36.).min(320.)))
+                        .h(px(self.search.matches.iter().map(|index| self.result_height(*index)).sum::<f32>().min(320.)))
                 })
                 .when(self.search.matches.is_empty(), |panel| panel.child(palette_view::empty_state(if self.shortcuts_only { "No matching bound commands" } else { "No matching commands or workspaces" })))
                 .child(palette_view::footer().child(if let Some(feedback) = self.feedback.clone() {

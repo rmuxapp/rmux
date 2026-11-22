@@ -59,8 +59,14 @@ impl BrowserHost {
             match request {
                 PaletteRequest::Open => {
                     let workspaces = this.workspace_order(true).into_iter().enumerate().map(|(position, index)| {
-                        let (name, entity, _, _) = &this.workspace_state.entries[index];
-                        (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1))
+                        let (name, entity, _, metadata) = &this.workspace_state.entries[index];
+                        let mut context = Vec::new();
+                        if index == this.workspace_state.active { context.push("Current workspace".to_owned()); }
+                        if let Some(group) = this.workspace_state.groups.containing(entity.entity_id()) {
+                            context.push(format!("Group: {}", group.name));
+                        }
+                        if !metadata.description.is_empty() { context.push(metadata.description.clone()); }
+                        (entity.entity_id(), format!("Switch to Workspace {}: {name}", position + 1), context.join(" · "))
                     }).collect();
                     let active_group = this.workspace_state.groups.containing(source.entity_id()).map(|group| group.id);
                     let group_context = (active_group.is_some(), this.workspace_state.sidebar_selection.len());

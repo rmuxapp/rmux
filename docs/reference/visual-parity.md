@@ -115,3 +115,19 @@ The process exited normally through `system.quit`; temporary fixtures were
 removed. Local result: `target/native-project-check.json`. This verifies native
 event routing, identity and process continuity, not cross-Space activation or
 visual focus. The installed application was not used or replaced.
+
+
+### Palette ordering and workspace context (2026-11-22, after v0.1.8)
+
+The browser palette now orders supported commands as the native palette does,
+starting with New Workspace and New Terminal Tab. Workspace results include
+current-workspace, group, and description context when present; that context is
+searchable. Native and browser palettes share 36/56 px result sizing, and browser
+page navigation accounts for the taller contextual rows.
+
+One combined local WASM build and desktop workspace check passed. Browser review
+at 1280×720 confirmed initial ordering, current-workspace subtitle spacing, and
+Down/Enter selecting the other workspace with terminal focus. Group/description
+search was not separately exercised. Screenshots: `target/palette-order-review.png`
+and `target/palette-workspaces-review.png`. These are browser screenshots, not
+native acceptance evidence. Changes remain local for the next polish batch.
