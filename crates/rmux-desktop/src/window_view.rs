@@ -1815,6 +1815,7 @@ impl WorkspaceWindow {
                 if let Some(state) = &mut self.notification_navigation {
                     let index = index.min(targets.len().saturating_sub(1));
                     state.selected = targets.get(index).map(|row| (row.1, row.2));
+                    if state.expanded == Some((id, revision)) { state.expanded = None; }
                     state.scroll.scroll_to_item(index);
                     cx.notify();
                 }
@@ -1875,6 +1876,13 @@ impl WorkspaceWindow {
         for terminal in terminals {
             terminal.update(cx, |view, cx| view.acknowledge_attention(cx));
         }
+        if let Some(state) = &mut self.notification_navigation {
+            if state.unread_only {
+                state.selected = None;
+                state.expanded = None;
+                state.scroll.scroll_to_item(0);
+            }
+        }
         cx.notify();
     }
 
@@ -1898,6 +1906,11 @@ impl WorkspaceWindow {
                 cx.emit(TabMetadataChanged);
                 cx.notify();
             });
+        }
+        if let Some(state) = &mut self.notification_navigation {
+            state.selected = None;
+            state.expanded = None;
+            state.scroll.scroll_to_item(0);
         }
         cx.notify();
     }
@@ -1945,7 +1958,8 @@ impl WorkspaceWindow {
         cx.notify();
     }
     fn notification_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
-        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt { return; }
+        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt
+            || (event.keystroke.modifiers.shift && event.keystroke.key != "tab") { return; }
         if event.keystroke.key == "u" {
             let unread_only = !self.notification_navigation.as_ref().is_some_and(|state| state.unread_only);
             self.set_notification_filter(unread_only, cx);
@@ -2110,7 +2124,12 @@ impl WorkspaceWindow {
                     .track_scroll(&navigation.scroll)
                     .p_2()
                     .when(messages.is_empty(), |list| {
-                        list.child(div().p_3().text_sm().child(if navigation.unread_only { "No unread notifications" } else { "No notifications to show" }))
+                        list.child(div().p_3().text_sm()
+                            .child(if navigation.unread_only { "No unread notifications" } else { "No notifications yet" })
+                            .child(div().mt_2().text_xs().text_color(rgb(0xa0a0a0)).child(
+                                if navigation.unread_only && total_count > 0 { "Choose All to see earlier messages." }
+                                else { "Messages from your terminals appear here." }
+                            )))
                     })
                     .children(messages.into_iter().map(
                         |(workspace, terminal, source_label, unread, message, _)| {
@@ -2122,6 +2141,8 @@ impl WorkspaceWindow {
                                 .p_3()
                                 .mb_2()
                                 .rounded_md()
+                                .border_1()
+                                .border_color(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::ACCENT) } else { rgb(0x383838) })
                                 .text_sm()
                                 .cursor_pointer()
                                 .bg(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::SELECTED) } else { rgb(0x292929) })

@@ -1,3 +1,11 @@
+Notification interaction polish: selected cards now have an accent outline;
+empty filters explain how to return to earlier messages. Clearing history or
+acknowledging all unread messages resets stale selection/expansion and scroll
+state. Modified keys no longer trigger plain notification actions, while
+Shift+Tab still moves backward. One offline desktop cargo check passed; native
+visual and pointer acceptance remains for the combined UI review. No release
+or deployment was triggered.
+
 # Implementation progress
 
 ## Current implementation focus
