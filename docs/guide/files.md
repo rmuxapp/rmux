@@ -122,11 +122,17 @@ that only the first eight are shown. Row copying retains all tab-separated cells
 and Copy Markdown Source retains the original document. Empty cells remain blank.
 Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
 alignment markers; unspecified columns align left. Table horizontal scrolling,
-relative/file links, images and document appearance controls
+same-document anchors, images and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
 
+Relative links resolve from the current document's folder. Links to Markdown
+files open in reading view; other local files open in text preview. Directory
+links ending in `/` open the file browser. Local `file://` links work the same
+way. Missing files show the preview loader's error; they do not launch another
+application. Links containing local anchors or query strings remain plain text.
+
 Web links open in the default browser when clicked. For keyboard use, select a
-reading block, use Tab/Shift+Tab to cycle its web destinations, then Alt+Enter
+reading block, use Tab/Shift+Tab to cycle its destinations, then Alt+Enter
 (Option+Return on macOS) to open the displayed URL. The link bar shows the current
 destination and active shortcut hints. Enter alone still copies the block text.
 Search changes and row movement keep link selection tied to the block identity;

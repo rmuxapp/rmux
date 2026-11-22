@@ -1,6 +1,25 @@
 //! Bounded, inert CommonMark reading blocks. No HTML/web engine or asset loads.
 use pulldown_cmark::{Event, Options, Parser, Tag, TagEnd};
 pub use pulldown_cmark::Alignment;
+
+/// Resolve links without filesystem access. Local targets stay inside rmux's
+/// bounded preview loader; no file URL is handed to the operating system.
+pub fn link_destination(uri: &str, source: &std::path::Path) -> Option<String> {
+    if uri.is_empty() || uri.len() > 8192 || uri.chars().any(char::is_control) { return None; }
+    if super::openable_uri(uri) { return Some(uri.to_owned()); }
+    if uri.starts_with('#') || uri.starts_with("//") || uri.contains('\\') { return None; }
+    let base = url::Url::from_file_path(source).ok()?;
+    let target = base.join(uri).ok()?;
+    super::terminal_link::local_file(target.as_str(), false)?;
+    Some(target.into())
+}
+fn supported_link(uri: &str) -> bool {
+    // The source path is supplied when the preview is assembled. Use a local
+    // absolute base here only to classify and reject unsupported destinations.
+    let base = if cfg!(windows) { "C:/rmux/document.md" } else { "/rmux/document.md" };
+    link_destination(uri, std::path::Path::new(base)).is_some()
+}
+
 pub const TABLE_VISIBLE_COLUMNS: usize = 8;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Kind { #[default] Paragraph, Heading(u8), Code, Quote, Table { header: bool, columns: usize, alignment: [Alignment; TABLE_VISIBLE_COLUMNS] }, List { depth: usize, number: Option<u64>, marker: bool, checked: Option<bool> } }
@@ -84,7 +103,7 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
             Event::End(TagEnd::HtmlBlock | TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock) => { if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); } },
             Event::Start(Tag::Link { dest_url, .. }) => {
                 link = None;
-                if dest_url.len() <= 8192 && super::openable_uri(&dest_url) {
+                if supported_link(&dest_url) {
                     link = links.iter().position(|url| url == dest_url.as_ref());
                     // Reference links can repeat a long destination many times.
                     // Bound retained URLs across the whole document, not only each row.
@@ -212,6 +231,20 @@ pub fn code_match_line(source: &str, query: &str) -> usize {
 mod tests {
     use super::*;
     #[test]
+    fn local_links_resolve_against_the_document_and_reject_remote_or_executable_targets() {
+        let source = std::env::temp_dir().join("rmux docs/sub/guide.md");
+        let resolved = link_destination("../other%20guide.md", &source).unwrap();
+        assert_eq!(super::super::terminal_link::local_file(&resolved, false).unwrap(),
+            std::env::temp_dir().join("rmux docs/other guide.md"));
+        assert!(link_destination("./", &source).unwrap().ends_with('/'));
+        assert_eq!(link_destination("https://example.com/#part", &source).as_deref(), Some("https://example.com/#part"));
+        for uri in ["", "#part", "other.md#part", "other.md?query", "//server/file", "file://server/a", "javascript:alert(1)", "data:text/plain,a", "mailto:a@b", "a%00.md", "a\\b"] {
+            assert!(link_destination(uri, &source).is_none(), "{uri}");
+        }
+        let (rows, _) = blocks("[local](../guide.md) [script](javascript:alert) [anchor](#part)");
+        assert_eq!(rows[0].links, ["../guide.md"]);
+    }
+    #[test]
     fn preview_link_navigation_tracks_identity_and_wraps() {
         assert_eq!(link_index(None, 7, 0, 1), None);
         assert_eq!(link_index(None, 7, 3, 0), Some(0));
@@ -221,15 +254,15 @@ mod tests {
         assert_eq!(link_index(Some((7, 9)), 7, 1, 0), Some(0));
     }
     #[test]
-    fn web_links_preserve_unicode_styles_and_reject_nonweb_targets() {
+    fn links_preserve_unicode_styles_and_keep_images_inert() {
         let (rows, _) = blocks("[**界** code](https://example.com/a) [again](https://example.com/a) [file](file:///tmp/a) ![image](https://example.com/image.png)\n\n[next](https://example.org)");
-        assert_eq!(rows[0].links, ["https://example.com/a"]);
+        assert_eq!(rows[0].links, ["https://example.com/a", "file:///tmp/a"]);
         assert_eq!(rows[1].links, ["https://example.org"]);
         let first = rows[0].spans.first().unwrap();
         assert_eq!(&rows[0].text[first.range.clone()], "界");
         assert!(first.style.bold && first.style.link == Some(0));
         let projected = excerpt_spans(&rows[0].text, "code", &rows[0].spans, "• ".len());
-        assert!(projected.iter().all(|span| span.style.link == Some(0)));
+        assert!(projected.iter().any(|span| span.style.link == Some(0)));
         let (table, _) = blocks("| Link | Other |\n|---|---|\n| [界](https://example.com) | plain |");
         let cells = table_cells(&table[1].text, &table[1].spans, "");
         assert_eq!(cells[0].1[0].range, 0.."界".len());

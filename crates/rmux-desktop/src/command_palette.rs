@@ -1,11 +1,22 @@
 use super::*;
 
+fn local_preview_link(uri: &str, source: Option<&std::path::Path>) -> Option<Box<dyn Action>> {
+    let resolved = markdown_preview::link_destination(uri, source?)?;
+    let uri = resolved.as_str();
+    let path = terminal_link::local_file(uri, false)?;
+    if uri.ends_with('/') { return Some(Box::new(BrowseDirectory { path })); }
+    let markdown = path.extension().and_then(|extension| extension.to_str())
+        .is_some_and(|extension| ["md", "markdown", "mdown", "mkd"].iter().any(|candidate| extension.eq_ignore_ascii_case(candidate)));
+    Some(if markdown { Box::new(PreviewMarkdownFile { path }) } else { Box::new(PreviewLocalFile { path }) })
+}
+
 // Resolve the inherited row style at render time so headings retain their
 // size/weight and only inline-code runs switch to the terminal's monospace font.
 #[derive(IntoElement)]
 struct PreviewStyledText {
     id: SharedString,
     links: Arc<[SharedString]>,
+    source: Option<std::path::PathBuf>,
     text: String,
     styles: Vec<(std::ops::Range<usize>, markdown_preview::InlineStyle, bool)>,
 }
@@ -41,10 +52,11 @@ impl RenderOnce for PreviewStyledText {
         if targets.is_empty() { return styled.into_any_element(); }
         let hints = targets.clone();
         InteractiveText::new(self.id, styled)
-            .on_click(targets.iter().map(|(range, _)| range.clone()).collect(), move |index, _, cx| {
-                if let Some((_, url)) = targets.get(index) && openable_uri(url) {
+            .on_click(targets.iter().map(|(range, _)| range.clone()).collect(), move |index, window, cx| {
+                if let Some((_, url)) = targets.get(index) {
                     cx.stop_propagation();
-                    cx.open_url(url);
+                    if let Some(action) = local_preview_link(url, self.source.as_deref()) { window.dispatch_action(action, cx); }
+                    else if openable_uri(url) { cx.open_url(url); }
                 }
             })
             .tooltip(move |index, _, cx| hints.iter().find(|(range, _)| range.contains(&index))
@@ -60,7 +72,7 @@ mod preview_typography_tests {
         let text = "before 界 after";
         let start = text.find('界').unwrap();
         let element = PreviewStyledText {
-            id: "test".into(), links: Default::default(),
+            id: "test".into(), links: Default::default(), source: None,
             text: text.into(),
             styles: vec![(start..start + '界'.len_utf8(), markdown_preview::InlineStyle { code: true, strike: true, ..Default::default() }, true)],
         };
@@ -1023,7 +1035,10 @@ impl CommandPalette {
     }
     fn open_preview_link(&self, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
-        if let Some((_, _, url)) = self.preview_link_target() && openable_uri(&url) { cx.open_url(&url); }
+        if let Some((_, _, url)) = self.preview_link_target() {
+            if let Some(action) = local_preview_link(&url, self.preview_navigation.as_ref().map(|(path, _)| path.as_path())) { cx.emit(PaletteEvent::Run(action)); }
+            else if openable_uri(&url) { cx.open_url(&url); }
+        }
     }
     fn toggle_preview_wrap(&mut self, cx: &mut Context<Self>) {
         if self.preview_navigation.is_none() || self.hex_preview || self.input.read(cx).is_composing() { return; }
@@ -1071,7 +1086,7 @@ impl CommandPalette {
                                 })
                                 .when(wrapped, |cell| cell.whitespace_normal().line_clamp(4).text_ellipsis())
                                 .when(!wrapped, |cell| cell.truncate())
-                                .child(PreviewStyledText { id: format!("preview-cell-{command}-{column}").into(), links: line.links.clone(), styles: markdown_preview::merge_highlights(&spans, &search), text })
+                                .child(PreviewStyledText { id: format!("preview-cell-{command}-{column}").into(), source: self.preview_navigation.as_ref().map(|(path, _)| path.clone()), links: line.links.clone(), styles: markdown_preview::merge_highlights(&spans, &search), text })
                         })).into_any_element()
                 }),
                 _ => None,
@@ -1104,7 +1119,7 @@ impl CommandPalette {
             PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().map(|line| line.links.clone()).unwrap_or_default(),
             _ => Default::default(),
         };
-        let title = PreviewStyledText { id: format!("preview-text-{command}").into(), links, text: title, styles: markdown_preview::merge_highlights(&inline, &title_ranges) };
+        let title = PreviewStyledText { id: format!("preview-text-{command}").into(), source: self.preview_navigation.as_ref().map(|(path, _)| path.clone()), links, text: title, styles: markdown_preview::merge_highlights(&inline, &title_ranges) };
         let subtitle = self.commands[command].subtitle.as_ref().map(|text| {
             let ranges = match &self.commands[command].target {
                 PaletteEvent::SearchTerminal { query, preview: true, .. } => literal_highlights(text, query),
