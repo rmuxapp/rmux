@@ -3,7 +3,7 @@ use serde_json::{Map, Value};
 use std::ffi::OsString;
 use std::io::Read;
 
-pub const HELP: &str = "Commands (JSON output except pipe-pane; explicit opaque IDs required):
+pub const HELP: &str = "Commands (JSON output except default pipe-pane; explicit opaque IDs required):
   set-buffer [--name NAME] [TEXT|-] | list-buffers
   rename-buffer [--name NAME] NEW_NAME
   paste-buffer --surface ID [--name NAME] [--bracketed]
@@ -34,7 +34,7 @@ pub const HELP: &str = "Commands (JSON output except pipe-pane; explicit opaque 
   send --surface ID [--paste] TEXT
   capture-pane --surface ID [--scrollback] [--lines N]
   read-screen --surface ID [--scrollback | --selection [--preserve-wraps]]
-  pipe-pane --surface ID [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]
+  pipe-pane --surface ID [--json] [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]
 Use -- before positional text beginning with a dash. List commands list the
 whole process unless narrowed with --window (workspaces/panes/panels) or
 --workspace (panes/panels). No implicit target, ref/index lookup or --force yet.
@@ -43,7 +43,7 @@ whole process unless narrowed with --window (workspaces/panes/panels) or
 pub fn help(command: &str) -> Result<String, String> {
     let (arguments, description) = match command {
         "read-events" => ("[--surface ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. Does not automatically retry or stream forever."),
-        "pipe-pane" => ("--surface ID [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]", "Capture retained history (up to 1 MiB), optionally its last 1–65536 logical lines with --lines N or selected text with --selection, and feed it once to a local /bin/sh command via stdin. Truncated captures are rejected. Runs in the CLI working directory, forwards command stdout/stderr and returns its exit status. The CLI waits for the command; use normal shell interruption for long-running commands. Does not stream future output."),
+        "pipe-pane" => ("--surface ID [--json] [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]", "Capture retained history (up to 1 MiB), optionally its last 1–65536 logical lines with --lines N or selected text with --selection, and feed it once to a local /bin/sh command via stdin. Truncated captures are rejected. Runs in the CLI working directory, forwards command stdout/stderr and returns its exit status. The CLI waits for the command; use normal shell interruption for long-running commands. Does not stream future output. --json captures stdout/stderr (1 MiB each) with exit_code and per-stream truncation flags; invalid UTF-8 is replaced. The CLI still returns the child exit status."),
         "paste-buffer" => ("--surface ID [--name NAME] [--bracketed]", "Queue a retained buffer to an explicit terminal without changing focus or scroll position. --bracketed uses terminal paste encoding. The buffer is retained; requests are never retried."),
         "rename-buffer" => ("[--name NAME] NEW_NAME", "Rename a retained buffer without copying its contents. Source defaults to default; an existing destination is never overwritten."),
         "set-buffer" => ("[--name NAME] [TEXT|-]", "Set a process-local copy buffer; name defaults to default. Omitted text or - reads UTF-8 stdin exactly, including trailing newlines. Storage and request size are bounded; buffers are not persisted or copied to the OS clipboard."),
@@ -78,7 +78,7 @@ pub fn help(command: &str) -> Result<String, String> {
         _ => return Err(format!("no local help for {command}; use --help for supported commands or system.capabilities to discover RPC methods")),
     };
     let prefix = if command == "completions" { "rmuxctl" } else { "rmuxctl [--socket PATH]" };
-    Ok(format!("Usage: {prefix} {command} {arguments}\n\n{description}\n\nTargets use explicit opaque IDs from list commands. RPC commands print JSON; pipe-pane forwards child output and status.\nExit 0: success; 1: RPC error; 2: usage/transport failure.\n"))
+    Ok(format!("Usage: {prefix} {command} {arguments}\n\n{description}\n\nTargets use explicit opaque IDs from list commands. RPC commands print JSON; pipe-pane forwards child output and status unless --json captures it.\nExit 0: success; 1: RPC error; 2: usage/transport failure.\n"))
 }
 
 pub fn expand_with_input(command: &str, args: Vec<OsString>, mut input: impl std::io::Read) -> Result<(String, Value), String> {
@@ -336,6 +336,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
                 }
             }
             let (key, value) = match (command, arg.as_str()) {
+                ("pipe-pane", "--json") => ("json", Value::Bool(true)),
                 ("paste-buffer", "--bracketed") => ("bracketed", Value::Bool(true)),
                 ("send", "--paste") => ("paste", Value::Bool(true)),
                 (

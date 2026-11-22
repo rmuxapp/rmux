@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+`rmuxctl pipe-pane --json` captures child stdout/stderr and exit status as a JSON
+object. Two concurrent readers drain output while the captured terminal snapshot
+is written to stdin, retaining at most 1 MiB per output stream and reporting
+truncation. Default inherited output is unchanged. All 28 CLI tests pass, including
+a child that fills both streams before reading a 1 MiB input, literal Unicode
+stdin, nonzero exit status and keeping local execution options off the RPC wire.
+
 The macOS CI job now runs the production AppKit quit bridge in an isolated probe,
 checking cancellation, retry and final approval under a ten-second process timeout.
 It shares the existing browser-feature build cache. The native-only quit module

@@ -10,6 +10,7 @@ struct Request {
     socket: PathBuf,
     body: Vec<u8>,
     pipe_command: Option<String>,
+    pipe_json: bool,
 }
 fn parse(
     args: impl IntoIterator<Item = OsString>,
@@ -42,6 +43,7 @@ fn parse(
     }
     let piping = method == "pipe-pane";
     let (method, mut params) = commands::expand_with_input(&method, args.collect(), std::io::stdin().lock())?;
+    let pipe_json = piping && params.as_object_mut().unwrap().remove("json").is_some();
     let pipe_command = if piping {
         Some(params.as_object_mut().unwrap().remove("command").unwrap().as_str().unwrap().to_owned())
     } else { None };
@@ -52,7 +54,7 @@ fn parse(
         return Err("request exceeds 64 KiB".into());
     }
     body.push(b'\n');
-    Ok(Some(Request { socket, body, pipe_command }))
+    Ok(Some(Request { socket, body, pipe_command, pipe_json }))
 }
 #[cfg(unix)]
 fn exchange(request: Request) -> Result<Value, String> {
@@ -136,6 +138,7 @@ fn run() -> Result<i32, String> {
         return Ok(0);
     };
     let pipe_command = request.pipe_command.take();
+    let pipe_json = request.pipe_json;
     let reply = exchange(request)?;
     if let Some(command) = pipe_command {
         if reply.get("error").is_some() { println!("{reply}"); return Ok(1); }
@@ -144,6 +147,11 @@ fn run() -> Result<i32, String> {
             return Err("pipe-pane capture is truncated or incomplete; shell command was not started".into());
         }
         let text = result.get("text").and_then(Value::as_str).ok_or("pipe-pane capture has no text; shell command was not started")?;
+        if pipe_json {
+            let (code, output) = pipe::run_json(&command, text)?;
+            println!("{output}");
+            return Ok(code);
+        }
         return pipe::run(&command, text);
     }
     println!("{reply}");
@@ -164,8 +172,9 @@ mod tests {
     use super::*;
     #[test]
     fn pipe_pane_keeps_shell_command_out_of_the_rpc_request() {
-        let request = parse(["--socket", "/tmp/test.sock", "pipe-pane", "--surface", "42", "--command", "cat"].map(OsString::from), None).unwrap().unwrap();
+        let request = parse(["--socket", "/tmp/test.sock", "pipe-pane", "--json", "--surface", "42", "--command", "cat"].map(OsString::from), None).unwrap().unwrap();
         assert_eq!(request.pipe_command.as_deref(), Some("cat"));
+        assert!(request.pipe_json);
         let wire: Value = serde_json::from_slice(&request.body).unwrap();
         assert_eq!(wire["method"], "surface.read_text");
         assert_eq!(wire["params"], json!({"surface_id":"42","scope":"history","max_bytes":1048576}));

@@ -594,7 +594,7 @@
       ],
       "acceptance": "Capture own-window/region MP4 and GIF with start/stop/status/list, captions, duration limits and atomic final output replacement; separately pipe selected surface text with bounded queues and child cleanup.",
       "rmux_status": "in_progress",
-      "remaining": "Window capture/encoder backends, recording lifecycle/captions, local-only routing and atomic clip publication; pipe-pane implicit selectors, JSON output mode, Windows execution and broader process/runtime acceptance.",
+      "remaining": "Window capture/encoder backends, recording lifecycle/captions, local-only routing and atomic clip publication; pipe-pane implicit selectors, Windows execution and broader process/runtime acceptance.",
       "implementation": "pipe-pane captures a bounded history snapshot via RPC, optionally limited to the last 1–65536 logical lines with --lines or selected text with --selection and optional --preserve-wraps, then feeds a local CLI shell command; output is inherited and exit status propagated. Truncated captures reject before execution. Focused CLI/process tests passed.",
       "implementation_sources": [
         "crates/rmux-cli/src/pipe.rs",
