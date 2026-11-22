@@ -1,3 +1,18 @@
+Settings recovery batch: Revert Unsaved Settings restores panel-controlled
+values from the shared last-loaded/successfully-saved baseline without file I/O.
+It preserves commands, shortcuts, paths, explicit colors and environment policy,
+including loaded imported-theme data. Footer, menu, palette and custom action
+`revert_settings` use one guarded handler; busy operations cannot be reverted.
+Five appearance persistence/restore tests passed, followed by one native bundle.
+Native compact-window review verified opening Settings, 13→14 pt marking dirty,
+End/Enter reverting to 13 pt and clearing dirty status, and footer activation
+of Keyboard Shortcuts. Escape returned to Settings and another adjustment is
+visible in `target/settings-revert-review.png`. Final terminal-focus review was
+interrupted by the UI tool and is not accepted. The compact view exposes cramped
+terminal/notice space beside Settings; responsive panel layout remains follow-up.
+The disposable fixture was stopped; installed app sessions were untouched.
+This is session reversion, not A09's full receipt-based conditional disk undo.
+
 Finished-terminal status polish: tab strips now suppress live task/progress
 badges once the terminal exits, avoiding contradictory Working/Finished labels.
 The Program Status panel retains its records under Last reported status, and

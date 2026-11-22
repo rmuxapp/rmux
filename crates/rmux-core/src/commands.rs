@@ -145,6 +145,7 @@ commands! {
     CancelRestore => "Cancel Layout / Session Restore",
     SaveAppearanceSettings => "Save Appearance Settings",
     ReloadSettings => "Reload Settings",
+    RevertAppearanceSettings => "Revert Unsaved Settings",
     OpenSettingsFile => "Open Settings File",
     OpenLayout => "Open Layout in New Window…",
     FocusLeft => "Focus Pane Left",

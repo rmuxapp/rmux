@@ -11,7 +11,7 @@ pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "curso
     #[cfg(target_os = "macos")] "option_as_alt",
     "selection_opacity", "import_theme", "file_editor",
 ];
-pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts"];
+pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings"];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
 pub fn control_index(key: &str) -> Option<usize> {
     KEYS.iter().chain(FOOTER_KEYS).position(|candidate| *candidate == key)
@@ -22,6 +22,7 @@ pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
         1 => Box::new(OpenSettingsFile),
         2 => Box::new(ReloadSettings),
         3 => Box::new(ShowKeyboardShortcuts),
+        4 => Box::new(RevertAppearanceSettings),
         _ => return None,
     })
 }
@@ -269,17 +270,19 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 (1, "settings-json", "Open settings file", "Edit all settings in your editor"),
                 (2, "settings-reload", "Reload from file", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
                 (3, "settings-shortcuts", "Keyboard Shortcuts…", "Search command shortcuts available in the current context"),
+                (4, "settings-revert", "Revert unsaved changes", "Restore the last loaded or saved panel values without changing the settings file"),
             ].into_iter().map(|(index, id, label, hint)| {
+                let enabled = !busy && (index != 4 || unsaved);
                 div().id(id).px_2().py_1().rounded_sm().text_xs().border_1()
                     .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
-                    .text_color(rgb(if busy { 0x777777 } else { chrome_style::ACCENT }))
-                    .when(!busy, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
+                    .text_color(rgb(if enabled { chrome_style::ACCENT } else { 0x777777 }))
+                    .when(enabled, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
                     .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
                     .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                        if !busy { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); }
+                        if enabled { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); }
                     })
                     .on_click(move |event, window, cx| {
-                        if !busy && event.standard_click() {
+                        if enabled && event.standard_click() {
                             if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); }
                         }
                     }).child(label)

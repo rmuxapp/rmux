@@ -480,6 +480,31 @@ impl Preferences {
             && (self.close_policy_overridden() || self.confirm_close == other.confirm_close)
     }
 
+    /// Restore panel-controlled values without replacing commands, bindings,
+    /// paths, explicit color overrides, or the environment's close policy.
+    pub fn restore_appearance(&mut self, baseline: &Self) {
+        self.font_size = baseline.font_size;
+        self.font_family = baseline.font_family.clone();
+        self.background_opacity = baseline.background_opacity;
+        self.background_blur = baseline.background_blur;
+        self.terminal_padding = baseline.terminal_padding;
+        self.scrollback_mib = baseline.scrollback_mib;
+        self.terminal_theme = baseline.terminal_theme;
+        self.theme_file = baseline.theme_file.clone();
+        self.unfocused_cursor = baseline.unfocused_cursor;
+        self.focused_cursor = baseline.focused_cursor;
+        self.cursor_opacity = baseline.cursor_opacity;
+        self.selection_opacity = baseline.selection_opacity;
+        self.macos_option_as_alt = baseline.macos_option_as_alt;
+        self.copy_on_select = baseline.copy_on_select;
+        self.native_notifications = baseline.native_notifications;
+        self.notification_focus = baseline.notification_focus;
+        self.new_workspace_placement = baseline.new_workspace_placement;
+        self.group_new_workspace_placement = baseline.group_new_workspace_placement;
+        if !self.close_policy_overridden() && !baseline.close_policy_overridden() { self.confirm_close = baseline.confirm_close; }
+        self.imported_theme = baseline.imported_theme.clone();
+    }
+
     pub fn save_appearance(&self) -> Result<std::path::PathBuf> {
         use std::io::Write;
         let path = self.source.clone().context("No configuration path is available")?;
@@ -491,25 +516,7 @@ impl Preferences {
             Err(error) => return Err(error.into()),
         };
         let mut latest = Self::read_config(&path, false)?;
-        latest.font_size = self.font_size;
-        latest.font_family = self.font_family.clone();
-        latest.background_opacity = self.background_opacity;
-        latest.background_blur = self.background_blur;
-        latest.terminal_padding = self.terminal_padding;
-        latest.scrollback_mib = self.scrollback_mib;
-        latest.terminal_theme = self.terminal_theme;
-        latest.theme_file = self.theme_file.clone();
-        latest.unfocused_cursor = self.unfocused_cursor;
-        latest.focused_cursor = self.focused_cursor;
-        latest.cursor_opacity = self.cursor_opacity;
-        latest.selection_opacity = self.selection_opacity;
-        latest.macos_option_as_alt = self.macos_option_as_alt;
-        latest.copy_on_select = self.copy_on_select;
-        latest.native_notifications = self.native_notifications;
-        latest.notification_focus = self.notification_focus;
-        latest.new_workspace_placement = self.new_workspace_placement;
-        latest.group_new_workspace_placement = self.group_new_workspace_placement;
-        if !self.close_policy_overridden() { latest.confirm_close = self.confirm_close; }
+        latest.restore_appearance(self);
         let bytes = serde_json::to_vec_pretty(&latest)?;
         Self::decode(&bytes)?;
         let parent = path.parent().context("Configuration path has no parent")?;
@@ -850,6 +857,34 @@ mod tests {
         assert_eq!(saved.background_opacity, 75);
         assert!(saved.background_blur);
         assert_eq!(saved.window_background(), Blurred);
+        Ok(())
+    }
+
+    #[test]
+    fn appearance_restore_keeps_unrelated_config_and_policy_override() -> Result<()> {
+        let baseline = Preferences::default();
+        let mut current = Preferences::decode(br##"{
+            "font_size":20,"terminal_padding":16,"copy_on_select":true,
+            "background_opacity":70,"foreground_color":"#abcdef",
+            "commands":[{"name":"Example","argv":["echo","hello"]}],
+            "keybindings":[{"key":"cmd-alt-x","action":"settings"}]
+        }"##)?;
+        current.source = Some("/fixture/settings.json".into());
+        current.policy_override = Some(ClosePolicy::Never);
+        current.confirm_close = ClosePolicy::Never;
+        assert!(AppearanceBaseline(baseline.clone()).has_changes(&current));
+        current.restore_appearance(&baseline);
+        assert!(!AppearanceBaseline(current.clone()).has_changes(&baseline));
+        assert!(current.same_saved_appearance(&baseline));
+        assert_eq!(current.commands[0].name, "Example");
+        assert_eq!(current.keybindings.len(), 1);
+        assert_eq!(current.foreground_color, Some(HexColor(0xabcdef)));
+        assert_eq!(current.source, Some("/fixture/settings.json".into()));
+        assert_eq!(current.confirm_close, ClosePolicy::Never);
+        // Saving an environment override must still retain the on-disk policy.
+        let mut disk = Preferences::default();
+        disk.restore_appearance(&current);
+        assert_eq!(disk.confirm_close, ClosePolicy::Active);
         Ok(())
     }
 

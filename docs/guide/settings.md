@@ -58,6 +58,14 @@ The footer also shows **Unsaved session changes** when appearance controls diffe
 from the last loaded or successfully saved values. This status is shared across
 windows. Edits made while a save is running stay marked as unsaved; a failed save
 does not clear the status. It does not monitor external edits to the JSON file.
+**Revert unsaved changes** restores the panel controls to their last loaded or
+successfully saved values across all windows. It keeps commands, shortcuts,
+explicit color overrides and environment-controlled close policy, and does not
+read or write the settings file. Imported theme colors are restored from the
+loaded snapshot. Revert is unavailable during save/reload operations. The menu
+and palette call this **Revert Unsaved Settings**; custom shortcuts can bind
+`revert_settings`. This does not undo a previous save on disk.
+
 Use Tab or the arrow keys to select controls, then Enter to activate them.
 The side panel adjusts text-size defaults, terminal padding/theme, unfocused
 cursor, copy-on-select and close confirmation. Choose Active tasks, Always or Never

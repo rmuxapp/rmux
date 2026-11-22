@@ -1388,6 +1388,17 @@ impl WorkspaceWindow {
             });
         }).detach();
     }
+    fn revert_appearance_settings(&mut self, cx: &mut Context<Self>) {
+        if cx.global::<preferences::ReloadState>().0 { return; }
+        let mut settings = cx.global::<Preferences>().clone();
+        let baseline = cx.global::<preferences::AppearanceBaseline>();
+        if !baseline.has_changes(&settings) { return; }
+        settings.restore_appearance(&baseline.0);
+        cx.set_global(settings.confirm_close);
+        cx.set_global(settings);
+        self.notice = Some("Unsaved settings reverted. The settings file was not changed.".into());
+        cx.notify();
+    }
     fn reload_settings(&mut self, cx: &mut Context<Self>) {
         if cx.global::<preferences::ReloadState>().0 {
             return;
@@ -4270,6 +4281,7 @@ impl Render for WorkspaceWindow {
             }))
             .on_action(cx.listener(|this, _: &SaveAppearanceSettings, _, cx| this.save_appearance_settings(cx)))
             .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
+            .on_action(cx.listener(|this, _: &RevertAppearanceSettings, _, cx| this.revert_appearance_settings(cx)))
             .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
             .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))

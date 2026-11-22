@@ -471,6 +471,7 @@ impl CommandPalette {
         command!(CancelRestore);
         command!(SaveAppearanceSettings);
         command!(ReloadSettings);
+        command!(RevertAppearanceSettings);
         command!(OpenSettingsFile);
         command!(OpenLayout);
         command!(FocusLeft);

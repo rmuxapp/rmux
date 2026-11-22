@@ -185,6 +185,7 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "use_current_directory_for_group" => Box::new(UseCurrentDirectoryForGroup),
         "reset_group_directory" => Box::new(ResetGroupDirectory),
         "next_unread" => Box::new(NextUnreadTerminal), "find" => Box::new(Find),
+        "revert_settings" => Box::new(RevertAppearanceSettings),
         "reload_settings" => Box::new(ReloadSettings), "disabled" => Box::new(NoAction {}),
         _ => return None,
     })
