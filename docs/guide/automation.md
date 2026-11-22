@@ -33,10 +33,26 @@
 
 ## Open or reuse a named workspace
 
-For direct VS Code switching without the task runner, the source-only
-[rmux extension](../../extensions/vscode/README.md) binds the standard external
-terminal shortcut to this API. Installation and extension-host acceptance are
-still pending; the task recipe below works without an extension.
+On macOS, VS Code's built-in external-terminal command can open a project
+directly. Set this in VS Code User Settings:
+
+```json
+"terminal.external.osxExec": "/Applications/rmux.app"
+```
+
+Use the standard **Cmd+Shift+C** shortcut. Remove any user keybinding that
+redirects it to a task. VS Code passes the project folder to macOS; rmux opens
+or reuses a workspace named after that folder and brings its window forward.
+No extension, extra flags, tasks, or socket configuration are needed. This
+requires the native folder-open support added after v0.1.6.
+
+The same behavior works with `open -a rmux.app /absolute/project/folder`.
+Folder names are matched exactly after normalization; duplicate workspace names
+produce an error. Projects with identical folder names share the same name.
+Creation uses the supplied directory; reusing preserves the existing terminals
+and their working directories. Only local folders are accepted.
+
+For custom workspace names or other callers, use the socket command below.
 
 From an editor terminal or command launcher, use:
 

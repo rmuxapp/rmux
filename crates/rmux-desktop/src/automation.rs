@@ -429,6 +429,66 @@ struct LiveRequest {
     reply: std::sync::mpsc::SyncSender<RpcResult>,
 }
 
+/// Shared native-open/RPC workspace path; preparation never blocks the UI thread.
+pub(super) async fn open_workspace(create: &WorkspaceCreate, cx: &mut gpui::AsyncApp) -> RpcResult {
+    // Keep the caller's scope: resolution fills window_id with the
+    // launch destination, which must not narrow the final name check.
+    let original_scope = create.clone();
+    let mut create = create.clone();
+    let prepared = cx.update(|cx| {
+        if create.reuse {
+            if let Some(workspace) = resolve_open_workspace(&mut create, cx)? { return Ok(Err(workspace)); }
+        }
+        let target = target_id(&create.window_id)?;
+        for handle in cx.windows() {
+            let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
+            let any: gpui::AnyWindowHandle = handle.into();
+            if any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, _| entity.entity_id() == target).unwrap_or(false) {
+                let job = handle.update(cx, |view, _, cx| view.automation_prepare_workspace(&create, cx))
+                    .map_err(|_| Failure { code: -32004, message: "Window closed" })??;
+                return Ok(Ok((handle, job)));
+            }
+        }
+        Err(Failure { code: -32004, message: "Window not found" })
+    }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }));
+    let result = match prepared {
+        Ok(Err(workspace)) => Ok(workspace),
+        Ok(Ok((handle, job))) => {
+            let mut prepared = cx.background_executor().spawn(async move { job() }).await;
+            loop {
+                let refresh = cx.update(|cx| {
+                    let prepared = prepared.as_ref().ok()?;
+                    let settings = cx.global::<super::Preferences>();
+                    let current = (settings.terminal_colors(), settings.effective_palette());
+                    ((prepared.colors, prepared.palette) != current).then_some(current)
+                }).ok().flatten();
+                let Some((colors, palette)) = refresh else { break; };
+                let session = prepared.expect("successful preparation checked above").session;
+                prepared = cx.background_executor().spawn(async move {
+                    super::TerminalView::prepare(session, colors, palette)
+                }).await;
+            }
+            cx.update(|cx| {
+                // Manual UI changes can happen while terminal preparation
+                // yields. Recheck all originally eligible windows in the
+                // same foreground turn as publishing the new workspace.
+                handle.update(cx, |view, _, _| view.automation_end_workspace_startup())
+                    .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?;
+                if create.reuse {
+                    let mut scope = original_scope;
+                    if let Some(workspace) = resolve_open_workspace(&mut scope, cx)? {
+                        return Ok(workspace);
+                    }
+                }
+                handle.update(cx, |view, window, cx| view.automation_finish_workspace(&create, prepared, window, cx))
+                    .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?
+            }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }))
+        }
+        Err(error) => Err(error),
+    };
+    result
+}
+
 /// The worker owns blocking pipe IO; GPUI receives bounded, validated requests.
 /// No work is scheduled until a request arrives. Closing stdin detaches RPC only.
 pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std::path::PathBuf>) -> io::Result<()> {
@@ -503,62 +563,9 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                 continue;
             }
             if let Some(create) = request.workspace_create.as_ref() {
-                // Keep the caller's scope: resolution fills window_id with the
-                // launch destination, which must not narrow the final name check.
-                let original_scope = create.clone();
-                let mut create = create.clone();
-                let prepared = cx.update(|cx| {
-                    if !request.pending.start() { return Err(Failure { code: -32001, message: "Request expired before execution" }); }
-                    if create.reuse {
-                        if let Some(workspace) = resolve_open_workspace(&mut create, cx)? { return Ok(Err(workspace)); }
-                    }
-                    let target = target_id(&create.window_id)?;
-                    for handle in cx.windows() {
-                        let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
-                        let any: gpui::AnyWindowHandle = handle.into();
-                        if any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, _| entity.entity_id() == target).unwrap_or(false) {
-                            let job = handle.update(cx, |view, _, cx| view.automation_prepare_workspace(&create, cx))
-                                .map_err(|_| Failure { code: -32004, message: "Window closed" })??;
-                            return Ok(Ok((handle, job)));
-                        }
-                    }
-                    Err(Failure { code: -32004, message: "Window not found" })
-                }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }));
-                let result = match prepared {
-                    Ok(Err(workspace)) => Ok(workspace),
-                    Ok(Ok((handle, job))) => {
-                        let mut prepared = cx.background_executor().spawn(async move { job() }).await;
-                        loop {
-                            let refresh = cx.update(|cx| {
-                                let prepared = prepared.as_ref().ok()?;
-                                let settings = cx.global::<super::Preferences>();
-                                let current = (settings.terminal_colors(), settings.effective_palette());
-                                ((prepared.colors, prepared.palette) != current).then_some(current)
-                            }).ok().flatten();
-                            let Some((colors, palette)) = refresh else { break; };
-                            let session = prepared.expect("successful preparation checked above").session;
-                            prepared = cx.background_executor().spawn(async move {
-                                super::TerminalView::prepare(session, colors, palette)
-                            }).await;
-                        }
-                        cx.update(|cx| {
-                            // Manual UI changes can happen while terminal preparation
-                            // yields. Recheck all originally eligible windows in the
-                            // same foreground turn as publishing the new workspace.
-                            handle.update(cx, |view, _, _| view.automation_end_workspace_startup())
-                                .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?;
-                            if create.reuse {
-                                let mut scope = original_scope;
-                                if let Some(workspace) = resolve_open_workspace(&mut scope, cx)? {
-                                    return Ok(workspace);
-                                }
-                            }
-                            handle.update(cx, |view, window, cx| view.automation_finish_workspace(&create, prepared, window, cx))
-                                .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?
-                        }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }))
-                    }
-                    Err(error) => Err(error),
-                };
+                let result = if request.pending.start() {
+                    open_workspace(create, cx).await
+                } else { Err(Failure { code: -32001, message: "Request expired before execution" }) };
                 let _ = request.reply.try_send(result);
                 continue;
             }

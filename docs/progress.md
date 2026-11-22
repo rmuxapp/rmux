@@ -1,4 +1,19 @@
-Direct VS Code integration: source-only extension at extensions/vscode binds
+Native VS Code external-terminal support supersedes the extension approach below.
+rmux now receives macOS folder-open events through GPUI, validates local folders
+off the UI thread, and shares the existing serialized asynchronous workspace
+open/reuse implementation with RPC. The macOS bundle declares public.folder as
+an alternate viewer. VS Code only needs terminal.external.osxExec set to the app;
+the built-in shortcut passes the directory. No socket or extension is required.
+The unused extension source was removed. One targeted folder-routing test and
+the combined native bundle build pass. A real macOS cold launch using open -a
+with a spaced folder created/selected its named workspace; reopening retained
+the existing Bash environment marker and cwd. Evidence: target/native-folder-open.png.
+The review's accidentally empty RMUX_SOCKET_DIR override prevented socket startup,
+which did not prevent native folder handling; its notice was dismissed. The
+isolated app quit through Cmd+Q. Existing user sessions remained untouched.
+This verifies macOS open events, not a VS Code keyboard latency measurement.
+
+Superseded direct VS Code integration: source-only extension at extensions/vscode binds
 Cmd+Shift+C (Linux Ctrl+Shift+C) to workspace.open over the local socket. It
 chooses the active project or offers a multi-folder picker, coalesces key repeat,
 and rejects remote/virtual/untrusted targets. The socket path is user-level;

@@ -15,6 +15,7 @@ mod file_browser;
 mod markdown_preview;
 mod external_editor;
 mod terminal_link;
+mod open_project;
 mod background_command;
 mod terminal_search;
 #[cfg(unix)]
@@ -3564,7 +3565,16 @@ fn main() {
             }
         }
     };
-    Application::new().with_assets(icons::Assets).run(move |cx: &mut App| {
+    let (project_sender, project_receiver) = async_channel::bounded(32);
+    let application = Application::new().with_assets(icons::Assets);
+    application.on_open_urls(move |urls| {
+        for uri in urls {
+            if uri.len() > 8192 || project_sender.try_send(uri).is_err() {
+                eprintln!("rmux: folder-open request exceeds the size or pending request limit");
+            }
+        }
+    });
+    application.run(move |cx: &mut App| {
         cx.set_global(Shutdowns::default());
         cx.set_global(events::Journal::default());
         cx.set_global(native_notifications::Dispatcher::default());
@@ -3966,6 +3976,7 @@ fn main() {
                 let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice, cx));
             }
         }
+        open_project::listen(project_receiver, cx);
         let socket_directory = std::env::var_os("RMUX_SOCKET_DIR").map(std::path::PathBuf::from)
             .or_else(|| cx.global::<Preferences>().socket_directory.clone());
         if live_rpc_stdio || socket_directory.is_some() {
