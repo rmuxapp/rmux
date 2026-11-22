@@ -203,8 +203,9 @@ Configure `file_editor` as described in the [file guide](files.md). Paths are
 percent-decoded and passed as a literal editor argument. The editor launcher
 requires an existing regular file; directories and symlinks report an error.
 Remote URL hosts, recognized remote terminals, network-share forms, queries and
-fragments are not opened as local files. Bare paths and `path:line` references
-are not detected yet, and the browser demo cannot launch a local editor.
+fragments are not opened as local files. Path-shaped text and `path:line:column` references are also detected, including
+quoted paths with spaces and local `~/` shorthand. See the [file guide](files.md)
+for details. The browser demo cannot launch a local editor.
 
 If a terminal program owns right-click, use Shift-right-click for the local menu.
 If output parsing is busy, rmux reports a retry message instead of waiting; click

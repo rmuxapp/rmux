@@ -38,18 +38,31 @@ fn local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Opti
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub enum LinkError { Remote, MissingDirectory, Unsupported }
+pub enum LinkError { Remote, MissingDirectory, MissingHome, Unsupported }
 impl LinkError {
     pub fn message(self) -> &'static str {
         match self {
             Self::Remote => "Remote files cannot be opened in a local editor",
             Self::MissingDirectory => "Working directory unknown. Enable shell integration or open a terminal with an explicit directory",
+            Self::MissingHome => "Home directory unknown. Use an absolute file path instead",
             Self::Unsupported => "Unsupported file target. Use a local path or file URL",
         }
     }
 }
 
 pub fn resolve_local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Result<Location, LinkError> {
+    let home = if text.starts_with('~') {
+        #[cfg(windows)]
+        let root = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
+        #[cfg(not(windows))]
+        let root = std::env::var_os("HOME");
+        root.map(PathBuf::from)
+    } else { None };
+    resolve_with_home(text, cwd, remote, home.as_deref())
+}
+
+fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
+    home: Option<&std::path::Path>) -> Result<Location, LinkError> {
     use LinkError::*;
     if remote { return Err(Remote); }
     if text.len() > 8192 || text.chars().any(char::is_control) { return Err(Unsupported); }
@@ -71,10 +84,22 @@ pub fn resolve_local_target(text: &str, cwd: Option<&std::path::Path>, remote: b
             path = prefix;
         }
     }
-    if path.is_empty() || path.starts_with('~') { return Err(Unsupported); }
+    if path.is_empty() { return Err(Unsupported); }
     #[cfg(not(windows))]
     if path.contains('\\') || path.contains(':') { return Err(Unsupported); }
-    let path = PathBuf::from(path);
+    let path = if path == "~" || path.starts_with("~/") {
+        let home = home.filter(|path| path.is_absolute()).ok_or(MissingHome)?;
+        let suffix = path.strip_prefix("~/").unwrap_or("").trim_start_matches('/');
+        let suffix = std::path::Path::new(suffix);
+        // A second root/drive must never replace the chosen home directory.
+        if suffix.components().any(|part| matches!(part, std::path::Component::Prefix(_) | std::path::Component::RootDir)) {
+            return Err(Unsupported);
+        }
+        home.join(suffix)
+    } else {
+        if path.starts_with('~') { return Err(Unsupported); }
+        PathBuf::from(path)
+    };
     let path = if path.is_absolute() { path } else { cwd.filter(|p| p.is_absolute()).ok_or(MissingDirectory)?.join(path) };
     (path.as_os_str().len() <= 8192).then_some(Location { path, line, column }).ok_or(Unsupported)
 }
@@ -82,6 +107,20 @@ pub fn resolve_local_target(text: &str, cwd: Option<&std::path::Path>, remote: b
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn home_paths_resolve_without_cwd_or_shell_expansion() {
+        let home = std::env::temp_dir().join("local home 世界");
+        let target = resolve_with_home("~/my project/世界.rs:12:3", None, false, Some(&home)).unwrap();
+        assert_eq!(target.path, home.join("my project/世界.rs"));
+        assert_eq!((target.line, target.column), (Some(12), Some(3)));
+        assert_eq!(resolve_with_home("~//notes.txt", None, false, Some(&home)).unwrap().path, home.join("notes.txt"));
+        assert_eq!(resolve_with_home("~/$(touch nope)/$NAME.rs", None, false, Some(&home)).unwrap().path,
+            home.join("$(touch nope)/$NAME.rs"));
+        assert_eq!(resolve_with_home("~/a", None, true, Some(&home)), Err(LinkError::Remote));
+        assert_eq!(resolve_with_home("~/a", None, false, None), Err(LinkError::MissingHome));
+        assert_eq!(resolve_with_home("~/a", None, false, Some(std::path::Path::new("relative"))), Err(LinkError::MissingHome));
+        assert_eq!(resolve_with_home("~someone/a", None, false, Some(&home)), Err(LinkError::Unsupported));
+    }
     #[test]
     fn unresolved_links_explain_the_missing_requirement() {
         assert_eq!(resolve_local_target("src/main.rs:12", None, false), Err(LinkError::MissingDirectory));
@@ -99,7 +138,7 @@ mod tests {
         assert_eq!(location.label(), format!("{}:42:7", cwd.join("src/世界/main.rs").display()));
         let location = local_target("main.rs:12", Some(&cwd), false).unwrap();
         assert_eq!((location.line, location.column), (Some(12), None));
-        for text in ["src/main.rs:0", "src/main.rs:1:0", "src/main.rs:999999999999", "//server/a", "~/a", "https://example.com/a", "src/a\n"] {
+        for text in ["src/main.rs:0", "src/main.rs:1:0", "src/main.rs:999999999999", "//server/a", "~other/a", "https://example.com/a", "src/a\n"] {
             assert!(local_target(text, Some(&cwd), false).is_none(), "{text}");
         }
         assert!(local_target("src/main.rs:2", None, false).is_none());

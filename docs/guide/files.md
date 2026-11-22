@@ -215,8 +215,10 @@ in a path, such as `"/tmp/my project/main.rs"`; unquoted paths stop at whitespac
 and enclosing punctuation. Line/column suffixes must be inside the quotes.
 Encoded `file://` links also support names containing spaces. Bare names are recognized when they
 have an extension and a numeric location, such as `main.rs:12`; otherwise use a
-path containing a directory separator. Home-directory shorthand (`~/`) is not
-expanded. Missing files report an error when opened; hovering never reads disk.
+path containing a directory separator. Home-directory shorthand such as `~/projects/app/main.rs:12:3` expands to
+the local home directory (`HOME`, or `USERPROFILE` on Windows), even without a
+known terminal working directory. Named-user forms such as `~someone/` are not
+expanded, and `$VARIABLE` or command substitutions stay literal. Missing files report an error when opened; hovering never reads disk.
 Paths in old output use the current reported directory, not a historical one.
 
 Recognized remote sessions and remote file URL hosts do not open local files.

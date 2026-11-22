@@ -10316,3 +10316,17 @@ Nine focused storage/lifecycle tests passed, including missing/corrupt sources
 producing no replacement files and the isolated shell restore roundtrip. The
 child fixture is invoked by that parent test rather than run with user settings.
 No installed application or user histories were modified.
+
+
+### Home-relative terminal file links — 2026-11-22
+
+Local `~/` file links now resolve against HOME (USERPROFILE on Windows), with
+line/column suffixes and no requirement for terminal cwd. Expansion performs no
+filesystem access or shell evaluation; named-user tilde forms remain unsupported,
+missing/nonabsolute homes have an actionable error, and recognized remote
+contexts still reject local routing. A repeated slash after the tilde cannot
+replace the home path with a new filesystem root. Five focused resolver tests
+passed, including Unicode/spaces, literal shell metacharacters and remote denial.
+Updated the terminal/file guides and T10 roadmap to reflect existing plain/quoted
+path support and this addition. Native modifier-click/editor acceptance remains
+pending; no installed app or session was changed.
