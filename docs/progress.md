@@ -1,3 +1,14 @@
+Combined WASM review at 8511c46: one local demo build passed with the accumulated
+shared UI changes. In-browser review verified Cmd+P opens the palette, keyboard
+shortcut discovery and `ctrl tab` filtering, Escape restores terminal typing,
+Cmd+1/2 switches isolated workspace output, Cmd+T adds a tab, Cmd+Shift+[ returns
+to the original tab with its output, and Cmd+D splits. Clicking the palette Close
+control returned input to the originating split, where an echo ran immediately.
+No stale workspace text or long sidebar caret appeared in this sequence.
+Screenshots: `target/wasm-polish-combined.png`, `target/wasm-focus-restored.png`.
+This is local sample-session acceptance, not native OS behavior or full parity.
+The temporary local server was stopped; nothing was deployed.
+
 CLI failure-path polish: connection errors identify the endpoint, explain
 missing/refused/permission-denied cases and explicitly state no request was sent.
 Write/read failures and malformed/incomplete/wrong-ID replies consistently state
