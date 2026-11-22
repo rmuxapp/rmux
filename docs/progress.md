@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+0.1.5 is published from GitHub release run 44972522111 at 61b52a1. All three
+platform builds and publication succeeded; the release includes macOS DMG/ZIP,
+Linux tar.gz, Windows ZIP, checksums and the appcast. The main-branch Sparkle feed
+now advertises the 0.1.5 macOS ZIP with its Ed25519 signature and matching asset
+length. This verifies publication, not a completed in-app upgrade on a user's Mac.
+Cloudflare deployment 7e1422a7 combines the new download links with successful
+GitHub WASM run 44972516518 from the same source commit. Fetching rmux.app confirms
+all three download URLs and the versioned demo path. Website source remains
+off GitHub. Linux/Windows graphical runtime acceptance is still outstanding.
+
 Prepared the 0.1.5 preview release as one batch: workspace/lockfile version bump,
 user-facing notes, and an inexpensive release-workflow preflight before all
 platform builds. Preflight checks note/version agreement, local rmux package
