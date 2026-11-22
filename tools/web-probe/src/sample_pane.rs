@@ -35,12 +35,14 @@ impl SamplePane {
         cx.subscribe_in(&input, window, move |this, _, event: &crate::text_field::EditEvent, window, cx| {
             match event {
                 crate::text_field::EditEvent::Submitted { text, .. } => {
+                        if rmux_core::tabs::custom_title_length(text) > rmux_core::tabs::CUSTOM_TITLE_LIMIT { return; }
+
                     if let Some(terminal) = this.terminals.iter().find(|terminal| terminal.entity_id() == id) {
                         terminal.update(cx, |terminal, cx| { terminal.custom_title = rmux_core::tabs::custom_title(text); cx.notify(); });
                     }
                 }
                 crate::text_field::EditEvent::Cancelled => {}
-                crate::text_field::EditEvent::Changed(_) => return,
+                crate::text_field::EditEvent::Changed(_) => { cx.notify(); return; },
             }
             this.rename = None;
             this.tab_scroll.scroll_to_item(this.terminals.active_index());
@@ -308,6 +310,6 @@ impl Render for SamplePane {
             .child(div().flex_1().min_h_0().children(self.terminals.active().cloned()))
             .when_some(self.picker.clone(), |root, picker| root.child(self.picker_element(picker, cx)))
             .when_some(self.menu.clone(), |root, menu| root.child(self.menu_element(menu, window, cx)))
-            .when_some(self.rename.as_ref(), |root, input| root.child(tab_presentation::rename_editor(input.clone())))
+            .when_some(self.rename.as_ref(), |root, input| root.child(tab_presentation::rename_editor(input.clone(), cx)))
     }
 }

@@ -10594,3 +10594,8 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Search and rename fields now handle only their editing key combinations. Modified Enter/Escape no longer accidentally submit or dismiss, and Control+Option arrows are left for preview actions/system handling instead of moving the text caret.
 - Preserved Shift+Enter, Shift selection, macOS Option word and Command edge editing, Cocoa Control letter editing, and non-macOS Control word movement/deletion. The shared field implementation applies to native and WASM hosts.
 - Validation: focused desktop key-ownership test passed across macOS/non-macOS modifier matrices; WASM cargo check passed. End-to-end native dispatch and platform shortcuts remain runtime acceptance work. No release build/deploy.
+
+### Tab rename limit feedback
+
+- Shared native/demo rename form shows the normalized character count and a correction message above 128 characters. Save is dimmed and ignored while overlong; Enter also preserves the draft instead of silently truncating it. Editing the draft refreshes the feedback immediately. Empty drafts still restore automatic titles.
+- Storage/API normalization remains bounded and compatible. Focused Unicode/count normalization test passed; native and WASM compilation passed for the form and submit guards. Visual and end-to-end correction/focus acceptance remain pending.

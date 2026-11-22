@@ -34,13 +34,18 @@ pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stat
             .border_color(rgb(if focused {crate::sidebar_presentation::ACCENT} else {0x575260})))
 }
 
-pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div {
+pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &App) -> Div {
+    let count = rmux_core::tabs::custom_title_length(input.read(cx).value());
+    let too_long = count > rmux_core::tabs::CUSTOM_TITLE_LIMIT;
     let save = input.clone();
     let cancel = input.clone();
     div().flex().flex_col().gap_2().px_3().py_2().bg(rgb(0x292929)).min_w_0()
         .border_b_1().border_color(rgb(0x383838))
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
-        .child(div().text_xs().text_color(rgb(0xbcbcc4)).child("Rename tab"))
+        .child(div().flex().items_center().justify_between().gap_2().text_xs()
+            .child(div().text_color(rgb(0xbcbcc4)).child("Rename tab"))
+            .child(div().text_color(rgb(if too_long { 0xffa4a4 } else { 0xa0a0a0 }))
+                .child(format!("{count}/{}", rmux_core::tabs::CUSTOM_TITLE_LIMIT))))
         .child(div().flex().flex_wrap().items_center().gap_2().min_w_0()
             .child(div().flex_1().min_w(px(80.)).max_w_full().px_2().py_1().rounded_sm()
                 .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
@@ -50,14 +55,14 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div 
                     cx.stop_propagation();
                     if event.standard_click() { cancel.update(cx, |input, cx| input.cancel(cx)); }
                 }).child("Cancel"))
-            .child(div().id("save-tab-rename").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
+            .child(div().id("save-tab-rename").when(too_long, |button| button.opacity(0.45)).px_2().py_1().rounded_sm().text_xs().cursor_pointer()
                 .bg(rgb(crate::chrome_style::SELECTED)).border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER))
                 .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                 .on_click(move |event, _, cx| {
                     cx.stop_propagation();
-                    if event.standard_click() { save.update(cx, |input, cx| input.submit(false, cx)); }
+                    if event.standard_click() && !too_long { save.update(cx, |input, cx| input.submit(false, cx)); }
                 }).child("Save")))
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Leave empty for automatic title · Enter saves · Esc cancels"))
+        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(if too_long { "Name is too long. Shorten it to 128 characters to save." } else { "Leave empty for automatic title · Enter saves · Esc cancels" }))
 }
 
 pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {

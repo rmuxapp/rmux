@@ -577,6 +577,8 @@ impl PaneView {
             move |this, _, event: &text_field::EditEvent, window, cx| {
                 match event {
                     text_field::EditEvent::Submitted { text, .. } => {
+                        if rmux_core::tabs::custom_title_length(text) > rmux_core::tabs::CUSTOM_TITLE_LIMIT { return; }
+
                         if let Some(terminal) = this
                             .terminals
                             .iter()
@@ -593,7 +595,7 @@ impl PaneView {
                         }
                     }
                     text_field::EditEvent::Cancelled => {}
-                    text_field::EditEvent::Changed(_) => return,
+                    text_field::EditEvent::Changed(_) => { cx.notify(); return; },
                 }
                 this.rename = None;
                 this.focus(window, cx);
@@ -1423,7 +1425,7 @@ impl Render for PaneView {
                     }),
             )
             .when_some(self.rename.as_ref(), |root, input| {
-                root.child(crate::tab_presentation::rename_editor(input.clone()))
+                root.child(crate::tab_presentation::rename_editor(input.clone(), cx))
             })
             .when_some(self.error.clone(), |root, error| {
                 root.child(div_error(error, cx.listener(|this, event: &ClickEvent, _, cx| {

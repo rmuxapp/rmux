@@ -4,10 +4,15 @@
 pub fn drop_index(from: usize, target: usize) -> usize {
     target.saturating_sub(usize::from(from < target))
 }
+pub const CUSTOM_TITLE_LIMIT: usize = 128;
+/// Count the characters that would be saved, before applying the storage cap.
+pub fn custom_title_length(text: &str) -> usize {
+    text.trim().chars().filter(|c| !c.is_control()).count()
+}
 /// User tab titles share the same bounded normalization on every host.
 /// None restores the terminal's automatic title.
 pub fn custom_title(text: &str) -> Option<String> {
-    let title: String = text.trim().chars().filter(|c| !c.is_control()).take(128).collect();
+    let title: String = text.trim().chars().filter(|c| !c.is_control()).take(CUSTOM_TITLE_LIMIT).collect();
     (!title.is_empty()).then_some(title)
 }
 #[derive(Clone, Copy)]
@@ -192,5 +197,18 @@ mod tests {
         assert_eq!(tabs.active_index(),0);
         tabs.insert(0,"restored");
         assert_eq!(tabs.active_index(),0);
+    }
+}
+
+#[cfg(test)]
+mod title_edit_tests {
+    #[test]
+    fn title_length_matches_normalization_without_hiding_truncation() {
+        assert_eq!(super::custom_title_length("  hello\nworld  "), 10);
+        assert_eq!(super::custom_title_length(" \t "), 0);
+        let title = "界".repeat(super::CUSTOM_TITLE_LIMIT);
+        assert_eq!(super::custom_title_length(&title), 128);
+        assert_eq!(super::custom_title(&title).as_deref(), Some(title.as_str()));
+        assert_eq!(super::custom_title_length(&(title + "é")), 129);
     }
 }
