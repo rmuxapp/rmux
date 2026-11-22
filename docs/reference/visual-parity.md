@@ -166,3 +166,21 @@ reported that the Mac remains locked; no native build was performed solely for
 an unavailable visual review. Appearance, remapped/disabled shortcut presentation,
 and cross-window search interaction remain pending. Existing user sessions were
 not touched.
+
+
+### Tab chooser return focus (2026-11-22, after v0.1.8)
+
+Native and browser tab choosers retain the opening focus for cancellation.
+Selecting a result instead focuses the selected terminal. Blur, tab selection,
+and native window-editor reset discard the retained focus. The chooser toolbar
+button stops mouse-down propagation so the parent pane does not replace Find
+focus before it is captured.
+
+Browser review reproduced the parent mouse-down problem during the first pass;
+a corrected combined WASM build passed the same scenario at 1280×720. With Find
+containing `Ghost`, clicking the tab chooser and pressing Escape restored Find;
+typing `ty` produced `Ghostty` in Find and no shell input. Reopening the chooser,
+selecting the other tab with Up/Enter, and entering `echo selected` produced
+`selected` in that terminal. Screenshot: `target/tab-picker-find-focus.png`.
+Desktop compilation passed. Native interaction acceptance remains pending while
+the Mac is locked; no existing user session was changed.

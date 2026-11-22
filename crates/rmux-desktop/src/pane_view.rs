@@ -162,6 +162,7 @@ pub(super) struct PaneView {
     tab_picker: Option<(Entity<text_field::TextField>, Option<EntityId>, ListState)>,
     tab_picker_selected_row: usize,
     tab_picker_blur: Option<Subscription>,
+    tab_picker_origin: Option<FocusHandle>,
     tab_menu: Option<TabMenu>,
     tab_menu_blur: Option<Subscription>,
     spawning_tab: Option<Task<()>>,
@@ -333,9 +334,11 @@ impl PaneView {
     }
 
     fn dismiss_tab_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let origin = self.tab_picker_origin.take();
         self.tab_picker = None;
         self.tab_picker_blur = None;
-        self.focus(window, cx);
+        if let Some(origin) = origin { origin.focus(window); }
+        else { self.focus(window, cx); }
         cx.notify();
     }
 
@@ -352,10 +355,12 @@ impl PaneView {
         self.tab_picker_blur = Some(cx.on_blur(&focus, window, move |this, _, cx| {
             if this.tab_picker.as_ref().is_some_and(|(input, _, _)| input.read(cx).focus == token) {
                 this.tab_picker = None;
+                this.tab_picker_origin = None;
                 this.tab_picker_blur = None;
                 cx.notify();
             }
         }));
+        self.tab_picker_origin = window.focused(cx);
         let scroll = ListState::new(self.terminals.len(), ListAlignment::Top, px(96.));
         scroll.scroll_to(ListOffset { item_ix: self.terminals.active_index(), offset_in_item: px(0.) });
         focus.focus(window);
@@ -516,6 +521,7 @@ impl PaneView {
         self.close_prompt = None;
         self.rename = None;
         self.tab_picker = None;
+        self.tab_picker_origin = None;
         self.tab_picker_blur = None;
         self.tab_menu = None;
         self.tab_menu_blur = None;
@@ -740,6 +746,7 @@ impl PaneView {
         Self {
             tab_scroll,
             tab_picker: None,
+            tab_picker_origin: None,
             tab_picker_selected_row: 0,
             tab_picker_blur: None,
             tab_menu: None,
@@ -794,6 +801,7 @@ impl PaneView {
         Self {
             tab_scroll: ScrollHandle::new(),
             tab_picker: None,
+            tab_picker_origin: None,
             tab_picker_selected_row: 0,
             tab_picker_blur: None,
             tab_menu: None,
@@ -843,6 +851,7 @@ impl PaneView {
         self.terminals.select(index);
         self.rename = None;
         self.tab_picker = None;
+        self.tab_picker_origin = None;
         self.tab_picker_blur = None;
         self.tab_menu = None;
         self.tab_menu_blur = None;
@@ -1345,6 +1354,7 @@ impl Render for PaneView {
                         )
                         .when(self.terminals.len() > 1, |header| header.child(
                             action_control("tab-picker", "Choose Terminal Tab", ShowTabPicker, control_focus.clone())
+                                .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
                                     this.show_tab_picker(window, cx);

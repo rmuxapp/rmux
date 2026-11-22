@@ -4,6 +4,7 @@ struct SampleTabPicker {
     input: Entity<crate::text_field::TextField>,
     selected: Option<EntityId>,
     scroll: ScrollHandle,
+    origin: Option<FocusHandle>,
 }
 impl SamplePane {
     fn tab_name(&self, index: usize, cx: &App) -> String {
@@ -21,9 +22,10 @@ impl SamplePane {
         matches.into_iter().map(|(_, index)| index).collect()
     }
     fn dismiss_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        self.picker = None;
+        let origin = self.picker.take().and_then(|picker| picker.origin);
         self.picker_blur = None;
-        self.focus(window, cx);
+        if let Some(origin) = origin { crate::text_layout::focus(&origin, window, cx); }
+        else { self.focus(window, cx); }
         cx.notify();
     }
     fn show_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -53,7 +55,7 @@ impl SamplePane {
                 crate::text_field::EditEvent::Submitted { .. } => {
                     let selected = this.picker.as_ref().and_then(|picker| picker.selected);
                     if let Some(index) = this.picker_matches(cx).into_iter().find(|index| Some(this.terminals[*index].entity_id()) == selected) {
-                        this.dismiss_picker(window, cx); this.select(index, window, cx);
+                        this.select(index, window, cx);
                     }
                 }
             }
@@ -61,7 +63,7 @@ impl SamplePane {
         }).detach();
         let scroll = ScrollHandle::new();
         scroll.scroll_to_item(self.terminals.active_index());
-        self.picker = Some(SampleTabPicker { input, selected: self.terminals.active().map(Entity::entity_id), scroll });
+        self.picker = Some(SampleTabPicker { input, origin: window.focused(cx), selected: self.terminals.active().map(Entity::entity_id), scroll });
         crate::text_layout::focus(&focus, window, cx);
         cx.notify();
     }
@@ -103,7 +105,7 @@ impl SamplePane {
                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                 if !event.standard_click() { return; }
                                 if let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == id) {
-                                    this.dismiss_picker(window, cx); this.select(index, window, cx);
+                                    this.select(index, window, cx);
                                 }
                             }))
                     })))

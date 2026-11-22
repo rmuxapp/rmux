@@ -289,6 +289,7 @@ impl Render for SamplePane {
                             }))})))
                 .when(self.terminals.len() > 1, |strip| strip.child(crate::pane_presentation::action_control("tab-picker", "Choose Terminal Tab", Box::new(crate::ShowTabPicker), control_focus.clone(), mac)
                     .child(crate::icons::icon("chevron-down"))
+                    .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.show_picker(window, cx); } }))))
                 .child(crate::pane_presentation::action_control("add-tab", "New Terminal Tab", Box::new(crate::NewTab), control_focus.clone(), mac).child(crate::icons::icon("plus"))
                     .on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.add(window,cx); } })))
