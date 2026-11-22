@@ -224,6 +224,7 @@ pub struct Preferences {
     pub new_workspace_placement: crate::workspace_groups::Placement,
     pub group_new_workspace_placement: crate::workspace_groups::Placement,
     pub session_file: Option<std::path::PathBuf>,
+    pub shell_history_directory: Option<std::path::PathBuf>,
     pub socket_directory: Option<std::path::PathBuf>,
     pub font_size: f32,
     pub terminal_padding: u8,
@@ -266,6 +267,7 @@ impl Default for Preferences {
             layout_presets: Vec::new(),
             keybindings: Vec::new(),
             session_file: None,
+            shell_history_directory: None,
             socket_directory: None,
             new_workspace_placement: crate::workspace_groups::Placement::End,
             group_new_workspace_placement: crate::workspace_groups::Placement::default(),
@@ -668,6 +670,7 @@ impl Preferences {
         if let Some(editor) = &value.file_editor { editor.validate().context("file_editor")?; }
         ensure!(value.theme_file.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "theme_file must be an absolute path up to 8192 bytes");
         ensure!(value.terminal_padding <= 32, "terminal_padding must be between 0 and 32");
+        ensure!(value.shell_history_directory.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "shell_history_directory must be an absolute path up to 8192 bytes");
         ensure!(value.session_file.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "session_file must be an absolute path up to 8192 bytes");
         ensure!(value.socket_directory.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "socket_directory must be an absolute path up to 8192 bytes");
         ensure!(

@@ -10254,3 +10254,32 @@ tests passed, including final-owner shutdown flushing. Normal application shell
 creation does not invoke this opt-in path yet. Startup/restore configuration,
 visible save-error presentation, reader-drain-aware app quit, retention cleanup,
 and full restore acceptance remain pending. No GUI bundle or release was built.
+
+
+### Opt-in history activation and output-drain-aware shutdown — 2026-11-22
+
+Connected `shell_history_directory` to normal local-shell creation, sibling
+terminals, saved-session startup, and restore. It is off by default and fixed
+for the process; Settings reload reports that a directory change needs restart.
+Restore preserves the newly forked identity instead of overwriting it with the
+source snapshot reference. SSH and direct command launches remain excluded.
+Background write failures now reach the existing window notice UI.
+
+ShutdownHandle distinguishes process reaping from completed PTY output/sink
+delivery. History-enabled terminal handles stay registered until both finish,
+and app quit waits for those readers before running the final worker flush on
+the background executor, within the existing three-second quit deadline. Normal
+terminals retain their earlier process-only cleanup semantics.
+
+The drain test held a history sink while its child exited and confirmed that
+reaping did not incorrectly mark output delivered. An isolated real-zsh
+roundtrip started a fresh shell, recorded and persisted a command, drained its
+shutdown, emptied the fixture's global history, then restored into an independent
+identity and recalled the command. Both checks passed; desktop compilation
+passed as part of the focused roundtrip test. No user startup files, history,
+installed app, or live sessions were changed.
+
+This remains experimental: zsh and non-login Bash are supported, integration
+must be enabled, automatic old-file cleanup and individual-entry deletion
+synchronization are still pending, and native GUI restore/quit/error-notice
+acceptance has not been performed. Settings documentation records these limits.

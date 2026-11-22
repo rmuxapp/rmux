@@ -1460,7 +1460,8 @@ impl WorkspaceWindow {
                         } else {
                             match loaded {
                                 Ok(next) => {
-                                    let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory);
+                                    let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory)
+                            .or_else(|| shell_history::reload_notice(&next.shell_history_directory));
                                     cx.set_global(preferences::AppearanceBaseline(next.clone()));
                                     cx.set_global(next.confirm_close);
                                     cx.set_global(next);
@@ -1496,7 +1497,8 @@ impl WorkspaceWindow {
                         "Settings changed while reloading. Your newer edits were kept; reload again to replace them with the file settings.".into()
                     }
                     Ok(next) => {
-                        let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory);
+                        let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory)
+                            .or_else(|| shell_history::reload_notice(&next.shell_history_directory));
                         cx.set_global(preferences::AppearanceBaseline(next.clone()));
                         cx.set_global(next.confirm_close);
                         cx.set_global(next);
@@ -3835,7 +3837,7 @@ impl WorkspaceWindow {
         cx.spawn_in(window, async move |entity, cx| {
             let mut result = executor.spawn(async move {
                 pane_view::prepare_terminal_launch(&launch_canceled, || {
-                    Session::shell_in_with_scrollback(80, 24, directory.as_deref(), scrollback)
+                    shell_history::shell(80, 24, directory.as_deref(), scrollback, None)
                 }, colors, palette)
             }).await;
             loop {

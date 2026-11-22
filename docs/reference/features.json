@@ -655,8 +655,8 @@
       ],
       "acceptance": "Preserve user-selected copy policy and restore session history without duplicating prompt execution.",
       "rmux_status": "in_progress",
-      "implementation": "Ordinary Copy unwraps terminal soft wraps. Copy with Line Breaks preserves them through the Edit menu, palette and copy_with_line_breaks shortcut action. Both use bounded background streaming exports; engine tests cover wrap modes, limits and selection/viewport preservation. Per-terminal history storage groundwork is implemented but not activated: bounded Unicode/multiline records, atomic private-file replacement, and corrupt/oversize-file rejection have focused tests.",
-      "remaining": "History-directory ownership and active identity leases, asynchronous persistence, startup restoration without replay/global-history duplication, partial history mutation semantics, retention cleanup, and native lifecycle acceptance. Validated per-terminal identities now roundtrip in sessions and are stripped from standalone layouts; explicit empty-history resets are tested. Opt-in Bash/zsh capture and bounded engine decoding are tested, but the application does not yet enable capture or save records. Broader reflow acceptance remains pending.",
+      "implementation": "Copy modes and bounded streaming exports are implemented. Experimental opt-in per-terminal Bash/zsh history now connects private bounded storage, independent restore identities, event-driven background saves, native history import, session references, visible errors, and reader-drain-aware quit flushing. An isolated real-shell save/restore roundtrip passes with global history emptied before restore.",
+      "remaining": "Retention cleanup, individual history-entry deletion synchronization, broader shell support, native GUI lifecycle acceptance, and broader reflow acceptance remain pending. History is off by default; shell_history_directory enables the supported local-shell path.",
       "implementation_sources": [
         "crates/rmux-terminal/src/selection.rs",
         "crates/rmux-desktop/src/shell_history.rs"

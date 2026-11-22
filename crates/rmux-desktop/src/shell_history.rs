@@ -178,13 +178,14 @@ impl Writes {
 pub(crate) struct Worker {
     writes: std::sync::Arc<Writes>,
     wake: std::sync::mpsc::SyncSender<()>,
-    error: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+    errors: async_channel::Receiver<String>,
 }
 impl Worker {
     pub fn start() -> Result<Self> {
         use std::sync::{Arc, Mutex, mpsc};
         let writes = Arc::new(Writes::default());
         let error = Arc::new(Mutex::new(None));
+        let (report, errors) = async_channel::bounded(1);
         let (wake, receiver) = mpsc::sync_channel(1);
         let pending = writes.clone();
         let failure = error.clone();
@@ -208,13 +209,13 @@ impl Worker {
                 let result = pending.flush().err().map(|error| format!("{error:#}"));
                 let mut previous = failure.lock().unwrap_or_else(|error| error.into_inner());
                 if result != *previous {
-                    if let Some(message) = &result { eprintln!("rmux: {message}"); }
+                    if let Some(message) = &result { eprintln!("rmux: {message}"); let _ = report.try_send(message.clone()); }
                     *previous = result;
                 }
                 if disconnected { break; }
             }
         })?;
-        Ok(Self { writes, wake, error })
+        Ok(Self { writes, wake, errors })
     }
     fn queue(&self, lease: std::sync::Arc<Lease>, revision: u64, history: &History) -> Result<()> {
         let result = self.writes.enqueue(lease, revision, history);
@@ -228,9 +229,6 @@ impl Worker {
     /// Explicit save/quit barriers call this on a background executor after
     /// terminal readers have drained. It serializes with the regular worker.
     pub fn flush(&self) -> Result<()> { self.writes.flush() }
-    pub fn error(&self) -> Option<String> {
-        self.error.lock().unwrap_or_else(|error| error.into_inner()).clone()
-    }
     pub fn shell(&self, store: &Store, source: Option<&str>, columns: u16, rows: u16,
         directory: Option<&std::path::Path>, scrollback_bytes: usize) -> Result<rmux_terminal::session::Session> {
         let (lease, history) = store.fork(source)?;
@@ -256,6 +254,60 @@ mod tests {
     const SECOND: &str = "fedcba9876543210fedcba9876543210";
 
 
+
+    #[test]
+    #[cfg(unix)]
+    fn isolated_shell_history_roundtrip() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let output = std::process::Command::new(std::env::current_exe()?)
+            .args(["--exact", "shell_history::tests::shell_history_roundtrip_child", "--ignored", "--nocapture"])
+            .env("RMUX_HISTORY_TEST_ROOT", temporary.path()).env("HOME", temporary.path())
+            .env("ZDOTDIR", temporary.path()).env("RMUX_SHELL", "/bin/zsh")
+            .env("RMUX_SHELL_LOGIN", "0").env("RMUX_SHELL_INTEGRATION", "1")
+            .output()?;
+        ensure!(output.status.success(), "history roundtrip failed: {} {}",
+            String::from_utf8_lossy(&output.stdout), String::from_utf8_lossy(&output.stderr));
+        Ok(())
+    }
+    #[test]
+    #[ignore = "invoked by isolated parent with private startup/history files"]
+    #[cfg(unix)]
+    fn shell_history_roundtrip_child() -> Result<()> {
+        let root = PathBuf::from(std::env::var_os("RMUX_HISTORY_TEST_ROOT").expect("isolated fixture only"));
+        std::fs::write(root.join(".zshrc"), "HISTFILE=$HOME/global-history; HISTSIZE=200; SAVEHIST=100; PS1='fixture> '\n")?;
+        let store = Store::new(root.join("history"));
+        let worker = Worker::start()?;
+        let session = worker.shell(&store, None, 80, 24, Some(&root), 1024 * 1024)?;
+        let id = session.shell_history_id().unwrap().to_owned();
+        let wait = |condition: &dyn Fn() -> Result<bool>| -> Result<()> {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(8);
+            while !condition()? {
+                ensure!(std::time::Instant::now() < deadline, "history roundtrip timed out");
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Ok(())
+        };
+        wait(&|| Ok(session.frame()?.text().contains("fixture>")))?;
+        session.input(b"echo RESTORED_COMMAND\r")?;
+        wait(&|| Ok(store.load(&id)?.entries().any(|entry| entry == "echo RESTORED_COMMAND")))?;
+        let shutdown = session.shutdown_handle();
+        shutdown.request()?;
+        drop(session);
+        wait(&|| Ok(shutdown.is_finished() && shutdown.is_output_drained()))?;
+        worker.flush()?;
+        std::fs::write(root.join("global-history"), "")?;
+        let restored = worker.shell(&store, Some(&id), 80, 24, Some(&root), 1024 * 1024)?;
+        assert_ne!(restored.shell_history_id(), Some(id.as_str()));
+        wait(&|| Ok(restored.frame()?.text().contains("fixture>")))?;
+        restored.input(b"fc -ln -10\r")?;
+        wait(&|| Ok(restored.frame()?.text().contains("echo RESTORED_COMMAND")))?;
+        let shutdown = restored.shutdown_handle();
+        shutdown.request()?;
+        drop(restored);
+        wait(&|| Ok(shutdown.is_finished() && shutdown.is_output_drained()))?;
+        worker.flush()?;
+        Ok(())
+    }
     #[test]
     fn shared_worker_flushes_when_last_owner_closes() -> Result<()> {
         let temporary = tempfile::tempdir()?;
@@ -410,4 +462,49 @@ mod tests {
         assert!(store.load(FIRST).is_err());
         Ok(())
     }
+}
+
+
+struct Service { store: Store, worker: Worker }
+static SERVICE: std::sync::OnceLock<Service> = std::sync::OnceLock::new();
+/// Fixed for this process; changing the directory requires restarting rmux.
+pub(crate) fn configure(directory: Option<PathBuf>) -> Result<()> {
+    if let Some(directory) = directory {
+        let store = Store::new(directory);
+        store.prepare_directory()?;
+        SERVICE.set(Service { store, worker: Worker::start()? })
+            .map_err(|_| anyhow::anyhow!("terminal history already configured"))?;
+    }
+    Ok(())
+}
+pub(crate) fn worker() -> Option<Worker> { SERVICE.get().map(|service| service.worker.clone()) }
+pub(crate) fn shell(columns: u16, rows: u16, directory: Option<&std::path::Path>,
+    scrollback: usize, source: Option<&str>) -> Result<rmux_terminal::session::Session> {
+    if let Some(service) = SERVICE.get() {
+        service.worker.shell(&service.store, source, columns, rows, directory, scrollback)
+    } else {
+        rmux_terminal::session::Session::shell_in_with_scrollback(columns, rows, directory, scrollback)
+    }
+}
+
+pub(crate) fn install_error_notices(cx: &mut gpui::App) {
+    let Some(worker) = worker() else { return; };
+    let errors = worker.errors.clone();
+    cx.spawn(async move |cx| {
+        while let Ok(error) = errors.recv().await {
+            let _ = cx.update(|cx| {
+                let target = cx.active_window().and_then(|window| window.downcast::<crate::window_view::WorkspaceWindow>())
+                    .or_else(|| cx.windows().into_iter().find_map(|window| window.downcast::<crate::window_view::WorkspaceWindow>()));
+                if let Some(target) = target {
+                    let _ = target.update(cx, |view, _, cx| view.show_startup_notice(
+                        format!("Could not save terminal command history: {error}. Pending changes will retry on the next command or when rmux quits."), cx));
+                }
+            });
+        }
+    }).detach();
+}
+
+pub(crate) fn reload_notice(next: &Option<PathBuf>) -> Option<&'static str> {
+    let running = SERVICE.get().map(|service| &service.store.directory);
+    (running != next.as_ref()).then_some("Restart rmux to apply the shell history directory change.")
 }

@@ -606,3 +606,30 @@ Group actions can be assigned custom shortcuts using `group_current_workspace`,
 `close_group`, `remove_workspace_from_group` and `set_group_anchor`.
 `close_workspace` targets the current workspace and keeps its usual confirmation
 policy. These action names do not add default key bindings.
+
+
+## Restore per-terminal command history (experimental)
+
+To retain shell-approved command history separately for each terminal, set an
+absolute directory in Settings JSON and restart rmux:
+
+```json
+"shell_history_directory": "/Users/you/Library/Application Support/rmux/shell-history"
+```
+
+Use your own home directory in that path. This is off by default. It supports
+zsh and non-login Bash with rmux shell integration enabled. Bash users need
+`RMUX_SHELL_LOGIN=0` for automatic integration. SSH and direct-command terminals
+are excluded. Changing or disabling the directory takes effect after restart.
+
+Save a session (or configure `session_file`) to retain each terminal's history
+reference. Restoring that session makes commands available through normal shell
+history navigation; it does not execute them. Each restored terminal gets its
+own history copy. Reusable layouts exclude history references.
+
+Records follow shell history exclusions and are stored as private, unencrypted
+JSON files, bounded to 512 commands / 128 KiB per terminal. Keep this directory
+with your session backups if you want history on another machine. Automatic
+cleanup of old history files is not implemented yet. Explicit empty-history
+resets are supported; individual history-entry deletion is not synchronized yet.
+Save failures appear in the app and retry on the next command or at quit.

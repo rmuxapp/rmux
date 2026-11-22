@@ -16,8 +16,6 @@ mod markdown_preview;
 mod external_editor;
 mod terminal_link;
 mod open_project;
-// Session-history persistence is prepared independently of shell hook activation.
-#[allow(dead_code)]
 mod shell_history;
 mod background_command;
 mod terminal_search;
@@ -227,9 +225,10 @@ fn register_shutdown(handle: rmux_terminal::session::ShutdownHandle, cx: &mut Ap
     // schedules no timer; prune even when no further tabs are ever created.
     cx.spawn(async move |cx| {
         handle.wait().await;
+        if handle.has_history_sink() { handle.wait_output_drained().await; }
         let _ = cx.update(|cx| {
             let handles = &mut cx.global_mut::<Shutdowns>().handles;
-            handles.retain(|handle| !handle.is_finished());
+            handles.retain(|handle| !handle.is_finished() || (handle.has_history_sink() && !handle.is_output_drained()));
             if handles.is_empty() {
                 *handles = Vec::new();
             }
@@ -351,6 +350,8 @@ fn begin_shutdown(cx: &mut App) -> Option<Vec<rmux_terminal::session::ShutdownHa
 }
 
 fn quit_after_cleanup(cx: &mut App) {
+    let history_worker = shell_history::worker();
+    let executor = cx.background_executor().clone();
     let checkpoint = checkpoint_before_quit(cx);
     let Some(handles) = begin_shutdown(cx) else { return; };
     let timeout = cx
@@ -364,6 +365,12 @@ fn quit_after_cleanup(cx: &mut App) {
                 }
                 for handle in handles {
                     handle.wait().await;
+                    if handle.has_history_sink() { handle.wait_output_drained().await; }
+                }
+                if let Some(worker) = history_worker {
+                    if let Err(error) = executor.spawn(async move { worker.flush() }).await {
+                        eprintln!("rmux: final history save failed: {error:#}");
+                    }
                 }
                 true
             },
@@ -3133,13 +3140,14 @@ impl Workspace {
                 } else if self.benchmark {
                     Session::benchmark_shell(80, 24)
                 } else {
-                    Session::shell_in_with_scrollback(
+                    shell_history::shell(
                         80,
                         24,
                         directory
                             .as_deref()
                             .or(cx.global::<InitialDirectory>().0.as_deref()),
                         cx.global::<Preferences>().scrollback_bytes(),
+                        None,
                     )
                 };
                 let settings = cx.global::<Preferences>();
@@ -3384,6 +3392,14 @@ fn main() {
             std::process::exit(2);
         })
     };
+    if matches!(&command, startup::Command::Launch { .. } | startup::Command::Layout { .. }
+        | startup::Command::Session { .. } | startup::Command::Preset { .. } | startup::Command::CustomCommand { .. })
+        && std::env::var_os("RMUX_BENCH_PANES").is_none() {
+        if let Err(error) = shell_history::configure(preferences.shell_history_directory.clone()) {
+            eprintln!("rmux: terminal history: {error:#}");
+            std::process::exit(2);
+        }
+    }
     // Freeze recovery policy for this launch. Explicit commands/layouts and
     // benchmarks neither restore nor overwrite the normal recovery file.
     let recovery_path = if matches!(&command, startup::Command::Launch { directory: None, argv, .. } if argv.is_empty())
@@ -3602,6 +3618,7 @@ fn main() {
             environment_override: std::env::var_os("RMUX_SOCKET_DIR").is_some(),
         });
         recovery::install(recovery_lease.clone(), cx);
+        shell_history::install_error_notices(cx);
         cx.set_global(preferences::ReloadState::default());
         cx.set_global(preferences::LastSettingsSave::default());
         cx.set_global(diagnostics::ExportState::default());

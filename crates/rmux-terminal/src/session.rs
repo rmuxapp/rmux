@@ -242,6 +242,8 @@ pub struct ShutdownHandle {
     closing: Arc<AtomicBool>,
     paste_generation: Arc<AtomicU64>,
     completed: async_channel::Receiver<()>,
+    output_drained: async_channel::Receiver<()>,
+    history_enabled: bool,
     #[cfg(any(target_os = "macos", target_os = "linux"))]
     process_wakeup: crate::process_wakeup::ProcessWakeup,
     #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -276,6 +278,15 @@ impl ShutdownHandle {
     pub async fn wait(&self) {
         let _ = self.completed.recv().await;
     }
+    /// Process exit does not mean buffered PTY output has reached its sinks.
+    /// Persistence barriers wait here before flushing their background writer.
+    /// This remains separate from process cleanup: descendants may retain a PTY.
+    pub fn has_history_sink(&self) -> bool { self.history_enabled }
+    pub fn is_output_drained(&self) -> bool { self.output_drained.is_closed() }
+    pub async fn wait_output_drained(&self) {
+        let _ = self.output_drained.recv().await;
+    }
+
 }
 // If creating the reaper thread fails, its closure is dropped. Keep ownership
 // armed until that thread starts so a partially constructed session cannot
@@ -400,6 +411,7 @@ impl Session {
         let (input_error, input_errors) = async_channel::bounded(1);
         let input_notify = notify.clone();
         let (completion, completed) = async_channel::bounded(1);
+        let (output_completion, output_drained) = async_channel::bounded::<()>(1);
         let reply_writer = writer.clone();
         let paste_generation = Arc::new(AtomicU64::new(0));
         let session = Self {
@@ -421,6 +433,8 @@ impl Session {
                 closing: Arc::new(AtomicBool::new(false)),
                 paste_generation,
                 completed,
+                output_drained,
+                history_enabled: history_sink.is_some(),
                 #[cfg(not(any(target_os = "macos", target_os = "linux")))]
                 killer: Arc::new(Mutex::new(killer)),
                 #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -527,6 +541,9 @@ impl Session {
                     .unwrap_or_else(|e| e.into_inner())
                     .finish_program_status();
                 let _ = notify.try_send(());
+                // Release the sink first; its last owner may wake a final save.
+                drop(history_sink);
+                drop(output_completion);
             })?;
         Ok(session)
     }
@@ -1347,6 +1364,42 @@ fn select_shell(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[cfg(unix)]
+    fn output_drain_waits_for_history_delivery_after_process_exit() -> Result<()> {
+        struct Sink {
+            entered: std::sync::mpsc::SyncSender<()>,
+            release: Mutex<std::sync::mpsc::Receiver<()>>,
+        }
+        impl HistorySink for Sink {
+            fn changed(&self, _: u64, _: &rmux_core::shell_history::History) -> Result<()> {
+                self.entered.send(())?;
+                self.release.lock().unwrap().recv_timeout(std::time::Duration::from_secs(5))?;
+                Ok(())
+            }
+        }
+        let (entered, observed) = std::sync::mpsc::sync_channel(1);
+        let (release, gate) = std::sync::mpsc::channel();
+        let mut command = CommandBuilder::new("/bin/sh");
+        command.args(["-c", r"printf '\033]9999;rmux-history;6563686f206869\007'"]);
+        let session = Session::spawn_with_history(command, 80, 24, 1024 * 1024,
+            Some(&rmux_core::shell_history::History::default()),
+            Some(Arc::new(Sink { entered, release: Mutex::new(gate) })))?;
+        observed.recv_timeout(std::time::Duration::from_secs(5))?;
+        let shutdown = session.shutdown_handle();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while !shutdown.is_finished() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "process did not exit while sink was held");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        assert!(!shutdown.is_output_drained(), "reaping prematurely completed output delivery");
+        release.send(())?;
+        while !shutdown.is_output_drained() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "output did not drain after sink release");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        Ok(())
+    }
     #[test]
     #[cfg(unix)]
     fn history_sink_receives_pty_commands_and_clears_without_idle_snapshots() -> Result<()> {

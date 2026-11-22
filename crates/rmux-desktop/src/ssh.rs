@@ -234,7 +234,7 @@ fn parse_aliases(text: &str) -> Aliases {
 pub fn launch_sibling(destination: Option<&str>, directory: Option<&std::path::Path>, scrollback: usize) -> anyhow::Result<crate::Session> {
     use crate::Session;
     let Some(destination) = destination else {
-        return Session::shell_in_with_scrollback(80, 24, directory, scrollback);
+        return crate::shell_history::shell(80, 24, directory, scrollback, None);
     };
     let command = command(destination).map_err(anyhow::Error::msg)?;
     let argv = command.argv.iter().map(std::ffi::OsString::from).collect::<Vec<_>>();

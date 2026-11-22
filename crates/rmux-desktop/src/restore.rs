@@ -69,7 +69,7 @@ impl Prepared {
         Self::from_snapshot(snapshot, token, scrollback_bytes)
     }
     fn from_snapshot(snapshot: snapshot::WindowSnapshot, token: &AtomicBool, scrollback_bytes: usize) -> anyhow::Result<Self> {
-        Self::prepare_with(snapshot, token, &mut |tab| Session::shell_in_with_scrollback(80, 24, tab.directory.as_deref(), scrollback_bytes))
+        Self::prepare_with(snapshot, token, &mut |tab| shell_history::shell(80, 24, tab.directory.as_deref(), scrollback_bytes, tab.shell_history_id.as_deref()))
     }
     fn prepare_with(snapshot: snapshot::WindowSnapshot, token: &AtomicBool, spawn: &mut impl FnMut(&snapshot::TabSnapshot) -> anyhow::Result<Session>) -> anyhow::Result<Self> {
         for workspace in &snapshot.workspaces {
@@ -87,7 +87,9 @@ impl Prepared {
                     for tab in tabs {
                         check_cancelled(token)?;
                         sessions.push_back(spawn(tab)?);
-                        sessions.back_mut().unwrap().set_shell_history_id(tab.shell_history_id.clone())?;
+                        if sessions.back().unwrap().shell_history_id().is_none() {
+                            sessions.back_mut().unwrap().set_shell_history_id(tab.shell_history_id.clone())?;
+                        }
                     }
                 }
                 snapshot::Node::Split { children, .. } => {
@@ -162,7 +164,7 @@ impl PreparedSession {
         let mut completed = 0;
         progress(completed, total);
         Self::prepare_with(snapshot, token, &mut |tab| {
-            let session = Session::shell_in_with_scrollback(80, 24, tab.directory.as_deref(), scrollback_bytes)?;
+            let session = shell_history::shell(80, 24, tab.directory.as_deref(), scrollback_bytes, tab.shell_history_id.as_deref())?;
             completed += 1;
             progress(completed, total);
             Ok(session)
@@ -171,7 +173,7 @@ impl PreparedSession {
     pub fn read(path: &std::path::Path, token: &AtomicBool, scrollback_bytes: usize) -> anyhow::Result<Self> {
         check_cancelled(token)?;
         let snapshot = snapshot::SessionSnapshot::load(path)?;
-        Self::prepare_with(snapshot, token, &mut |tab| Session::shell_in_with_scrollback(80, 24, tab.directory.as_deref(), scrollback_bytes))
+        Self::prepare_with(snapshot, token, &mut |tab| shell_history::shell(80, 24, tab.directory.as_deref(), scrollback_bytes, tab.shell_history_id.as_deref()))
     }
     fn prepare_with(snapshot: snapshot::SessionSnapshot, token: &AtomicBool, spawn: &mut impl FnMut(&snapshot::TabSnapshot) -> anyhow::Result<Session>) -> anyhow::Result<Self> {
         // Preflight every window before starting any shell.
