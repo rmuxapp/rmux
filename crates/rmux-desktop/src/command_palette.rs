@@ -253,11 +253,31 @@ impl PreviewState {
     pub fn matches(&self, path: &std::path::Path, hex: bool, markdown: bool) -> bool { self.path == path && self.hex == hex && self.markdown == markdown }
 }
 
+struct CodeViewport {
+    query: Option<String>,
+    scroll: ScrollHandle,
+    lines: Vec<(SharedString, Vec<std::ops::Range<usize>>)>,
+}
+impl CodeViewport {
+    fn new(source: &str) -> Self {
+        Self { query: None, scroll: ScrollHandle::new(), lines: markdown_preview::code_lines(source)
+            .into_iter().map(|line| (line.into(), Vec::new())).collect() }
+    }
+    fn search(&mut self, source: &str, query: &str) {
+        if self.query.as_deref() == Some(query) { return; }
+        self.query = Some(query.to_owned());
+        for (line, ranges) in &mut self.lines {
+            *ranges = file_browser::preview_highlights(line, query);
+        }
+        self.scroll.scroll_to_top_of_item(markdown_preview::code_match_line(source, query));
+    }
+}
+
 pub struct CommandPalette {
     location: Option<SharedString>,
     feedback: Option<&'static str>,
     preview_link: Option<(usize, usize)>,
-    code_scroll: std::collections::HashMap<usize, (String, ScrollHandle)>,
+    code_scroll: std::collections::HashMap<usize, CodeViewport>,
     buffer_rename: Option<(String, u64)>,
     directory_input: bool,
     terminal_search_input: bool,
@@ -1017,21 +1037,13 @@ impl CommandPalette {
         let code_view = if wrapped && markdown == Some(markdown_preview::Kind::Code) {
             let source = self.commands[command].preview_line().unwrap_or("");
             let query = self.input.read(cx).value();
-            let state = self.code_scroll.entry(command).or_insert_with(|| {
-                let scroll = ScrollHandle::new();
-                scroll.scroll_to_top_of_item(markdown_preview::code_match_line(source, query));
-                (query.to_owned(), scroll)
-            });
-            if state.0 != query {
-                state.0 = query.to_owned();
-                state.1.scroll_to_top_of_item(markdown_preview::code_match_line(source, query));
-            }
+            let state = self.code_scroll.entry(command).or_insert_with(|| CodeViewport::new(source));
+            state.search(source, query);
             Some(div().id(("code-scroll", command)).h(px(80.)).w_full()
-                .overflow_scroll().track_scroll(&state.1).flex().flex_col().items_start()
-                .children(markdown_preview::code_lines(source).into_iter().map(|line| {
-                    let ranges = file_browser::preview_highlights(&line, query);
+                .overflow_scroll().track_scroll(&state.scroll).flex().flex_col().items_start()
+                .children(state.lines.iter().map(|(line, ranges)| {
                     div().h(px(20.)).flex_shrink_0().whitespace_nowrap().child(
-                        StyledText::new(line).with_highlights(ranges.into_iter().map(|range| (
+                        StyledText::new(line.clone()).with_highlights(ranges.iter().cloned().map(|range| (
                             range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
                         ))))
                 })).into_any_element())

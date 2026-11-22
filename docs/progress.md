@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Code viewports now prepare their display lines once, share the resulting strings
+with render elements, and recompute highlight ranges only when the query changes.
+The cache belongs to the preview and is discarded on close/refresh; source limits
+still bound its size. Desktop test compilation and the focused typography test
+pass. No measured latency improvement is claimed.
+
 Markdown code blocks now keep all captured source lines in a compact scroll
 viewport instead of clipping to a four-line excerpt. Per-block scroll handles
 retain position across redraws; a changed search reveals the first matching line.
