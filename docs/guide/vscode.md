@@ -29,7 +29,7 @@ from that project to reuse its workspace; rmux keeps the existing processes,
 layout, and working directories. Switching to another project in VS Code opens
 that project's workspace instead.
 
-The next release matches native folder opens by the resolved project path.
+Starting with **rmux 0.1.8**, native folder opens match the resolved project path.
 Different projects with the same folder name get separate workspaces; renaming
 a workspace or changing its shell directory does not change its project identity.
 The command palette shows project paths alongside workspace results, and sidebar
@@ -37,7 +37,8 @@ name tooltips include the associated project path. That identity travels with
 the workspace between windows and is saved in layouts
 and sessions. Symlink aliases resolve to the same project.
 
-v0.1.7 uses folder-name matching. For an older workspace without a stored project identity, rmux can adopt it
+v0.1.7 uses folder-name matching. When upgrading, rmux can adopt an older
+workspace without a stored project identity
 when its name and first terminal's original launch directory both match.
 An existing stored identity takes priority; ambiguous matches are reported
 instead of guessed. Otherwise, a new project workspace is created and the old
