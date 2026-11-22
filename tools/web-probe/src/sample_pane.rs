@@ -248,11 +248,21 @@ impl Render for SamplePane {
                                 .drag_over(|style, _: &crate::drag_item::DragItem, _, _| style.bg(rgb(0x435a7b)))
                                 .on_drop(cx.listener(move |this, item, window, cx| this.drop_tab(item, Some(target), window, cx))))
                             .child(tab_presentation::title(("tab-title", target), title.clone(), title))
-                            .child(div().id(("close-sample-tab",terminal.entity_id())).px_1().child("×")
-                                .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Close Terminal Tab".into())).into())
-                                .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
-                                .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))
-                            .on_mouse_down(MouseButton::Middle, cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); }))
+                            .child(tab_presentation::close_button(("close-sample-tab", target))
+                                .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
+                                    cx.stop_propagation();
+                                    if event.standard_click() {
+                                        if let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) {
+                                            this.close(index,window,cx);
+                                        }
+                                    }
+                                })))
+                            .on_mouse_down(MouseButton::Middle, cx.listener(move |this,_,window,cx| {
+                                cx.stop_propagation();
+                                if let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) {
+                                    this.close(index,window,cx);
+                                }
+                            }))
                             .on_mouse_down(MouseButton::Right, cx.listener(move |this,event: &MouseDownEvent,window,cx| {
                                 cx.stop_propagation(); this.show_menu(index, event.position, window, cx);
                             }))

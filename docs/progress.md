@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Combined sidebar/toolbar/tab polish review passes desktop compilation and one
+WASM build. Tab close buttons now share the native 22 px hit area, vector icon,
+tooltip and hover treatment; left mouse-down does not start a parent tab drag.
+Browser close clicks require a standard click and resolve the stable terminal ID
+instead of using a captured positional index. Browser inspection confirms right
+click opens the menu without closing, Escape dismisses the menu, and a normal
+close removes only the targeted tab. Screenshot: target/tab-close-polish.jpg.
+This batch is pushed together with the previously held sidebar and shortcut
+tooltip changes; no native release is triggered. Hover hint appearance and native
+pointer acceptance remain pending beyond the shared compile check.
+
 Continuing the held polish batch: toolbar action tooltips now share the same
 binding resolver between native and WASM hosts. Sidebar toggle, pane split/zoom
 and browser new-tab controls resolve current shortcuts at hover time; pane

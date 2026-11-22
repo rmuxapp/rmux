@@ -15,6 +15,14 @@ pub(crate) fn strip() -> Div {
     div().flex().h(px(30.)).flex_shrink_0().items_center()
         .border_b_1().border_color(rgb(0x383838)).bg(rgb(0x242424))
 }
+pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {
+    div().id(id).flex().items_center().justify_center().w(px(22.)).h(px(22.))
+        .flex_shrink_0().rounded_sm().cursor_pointer()
+        .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Close Terminal Tab".into())).into())
+        .hover(|style| style.bg(rgb(0x50505c)).text_color(rgb(0xffffff)))
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .child(crate::icons::icon("close"))
+}
 pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stateful<Div> {
     div().id(id).flex().items_center().flex_shrink_0().px_2().gap_2()
         .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())

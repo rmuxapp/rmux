@@ -1269,17 +1269,7 @@ impl Render for PaneView {
                                                 crate::tab_presentation::title(("tab-title", target), display_title, title_hint)
                                             })
                                             .child(
-                                                div()
-                                                    .id(("close-tab", terminal.entity_id()))
-                                                    .flex()
-                                                    .items_center()
-                                                    .justify_center()
-                                                    .w(px(22.))
-                                                    .h(px(22.))
-                                                    .flex_shrink_0()
-                                                    .rounded_sm()
-                                                    .tooltip(|_, cx| cx.new(|_| ControlHint("Close Terminal Tab".into())).into())
-                                                    .hover(|style| style.bg(rgb(0x505867)))
+                                                crate::tab_presentation::close_button(("close-tab", terminal.entity_id()))
                                                     .on_click(cx.listener(
                                                         move |this, event: &ClickEvent, window, cx| {
                                                             cx.stop_propagation();
@@ -1288,8 +1278,7 @@ impl Render for PaneView {
                                                                 this.close(index, window, cx);
                                                             }
                                                         },
-                                                    ))
-                                                    .child(icons::icon("close")),
+                                                    )),
                                             )
                                     },
                                 ))
