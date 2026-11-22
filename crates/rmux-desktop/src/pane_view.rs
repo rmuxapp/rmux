@@ -380,7 +380,11 @@ impl PaneView {
                     if let Some((_, selected, _)) = &this.tab_picker {
                         let matches = this.matching_tabs(cx);
                         if let Some(index) = matches.iter().find(|index| Some(this.terminals[**index].entity_id()) == *selected)
-                            .copied() { this.select(index, window, cx); }
+                            .copied() { if index == this.terminals.active_index() && let Some(input) = &this.rename {
+                                                    input.read(cx).focus.focus(window);
+                                                    return;
+                                                }
+                                                this.select(index, window, cx); }
                     }
                 }
                 text_field::EditEvent::Cancelled => this.dismiss_tab_picker(window, cx)
@@ -639,6 +643,7 @@ impl PaneView {
 
     pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> (Vec<TabTransfer>, usize) {
         let active = self.terminals.active_index();
+        self.rename = None;
         self.titles.clear();
         let tabs = self
             .terminals
@@ -1021,6 +1026,7 @@ impl PaneView {
             .terminals
             .iter()
             .position(|view| view.entity_id() == id)?;
+        if index == self.terminals.active_index() { self.rename = None; }
         self.titles.remove(&id);
         let terminal = self.terminals.remove(index);
         let label = self.labels.remove(index);
@@ -1098,7 +1104,11 @@ impl PaneView {
         let indices = other_tab_close_indices(&current, keep, targets);
         if indices.is_empty() { return; }
         let selected = self.active_terminal_id();
-        let replace_focus = indices.iter().any(|index| {
+        let closing_editor = indices.contains(&self.terminals.active_index()) && self.rename.is_some();
+        let editor_focused = closing_editor && self.rename.as_ref()
+            .is_some_and(|input| input.read(cx).focus.contains_focused(window, cx));
+        if closing_editor { self.rename = None; }
+        let replace_focus = editor_focused || indices.iter().any(|index| {
             self.terminals[*index].read(cx).focus.contains_focused(window, cx)
         });
         for index in indices {
@@ -1175,9 +1185,13 @@ impl PaneView {
         if self.tab_menu.as_ref().is_some_and(|menu| menu.target == self.terminals[index].entity_id()) {
             self.dismiss_tab_menu(window, cx);
         }
+        let closing_editor = index == self.terminals.active_index() && self.rename.is_some();
+        let editor_focused = closing_editor && self.rename.as_ref()
+            .is_some_and(|input| input.read(cx).focus.contains_focused(window, cx));
+        if closing_editor { self.rename = None; }
         // Closing an inactive tab must not steal focus from another terminal,
         // a find field or an editor elsewhere in the window.
-        let replace_focus = self.terminals[index]
+        let replace_focus = editor_focused || self.terminals[index]
             .read(cx)
             .focus
             .contains_focused(window, cx);

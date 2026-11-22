@@ -135,8 +135,11 @@ impl SamplePane {
     }
     fn close(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() { return; }
-        let replace_focus = self.terminals[index].read(cx).is_focused(window) || self.rename.is_some();
-        self.rename = None;
+        let closing_editor = index == self.terminals.active_index() && self.rename.is_some();
+        let editor_focused = closing_editor && self.rename.as_ref()
+            .is_some_and(|input| input.read(cx).focus.is_focused(window));
+        let replace_focus = self.terminals[index].read(cx).is_focused(window) || editor_focused;
+        if closing_editor { self.rename = None; }
         self.picker = None;
         self.picker_blur = None;
         let removed = self.terminals.remove(index);
@@ -286,7 +289,11 @@ impl Render for SamplePane {
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
                                 let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; };
-                                this.select(index,window,cx);
+                                if index == this.terminals.active_index() && let Some(input) = &this.rename {
+                                                    input.read(cx).focus.clone().focus(window, cx);
+                                                    return;
+                                                }
+                                                this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_tab(window,cx); }
                             }))})))
                 .when(self.terminals.len() > 1, |strip| strip.child(crate::pane_presentation::action_control("tab-picker", "Choose Terminal Tab", Box::new(crate::ShowTabPicker), control_focus.clone(), mac)

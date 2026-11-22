@@ -10605,3 +10605,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Reviewed the actual WASM demo at 1280×720: 129-character draft remains open after Enter, counter/error and disabled Save are visible, correction updates the counter, Control+Enter does not submit, Enter saves, and Escape discards a later draft and returns typing to the terminal.
 - Found and fixed stale horizontal field offsets after replacing long text with short text. Scroll now clamps to current shaped content width as well as caret visibility; the shared native/browser field also handles widening without retaining an obsolete offset.
 - One combined WASM build/review plus a rebuild justified by the discovered clipping bug passed. Follow-up screenshot confirms all of “Build logs” is visible after replacing an overlong name. Evidence: target/tab-rename-limit.jpg and target/tab-rename-corrected.jpg. Mac access was rechecked and remains locked; no native visual acceptance or user-session changes claimed.
+
+### Tab rename lifecycle consistency
+
+- Clicking the already-selected tab now refocuses its rename field without discarding the draft, on native and sample hosts. Preservation is restricted to direct clicks, so selection after insertion/transfer cannot attach an old draft to a new active tab.
+- Closing an unrelated demo tab preserves the current rename draft. Closing the edited tab removes its editor and returns focus only if that editor held focus. Native single/batch close now applies the same cleanup; moving the edited native tab or draining its pane also removes the stale editor.
+- Native and WASM cargo checks passed for lifecycle changes; direct-click guard was subsequently scoped away from generic selection after code review. Runtime tab close/move scenarios remain pending; no release or user-session actions performed.
