@@ -4358,7 +4358,9 @@ impl Render for WorkspaceWindow {
                                         else { format!("{count} {label} · {unread_count} unread") }
                                     });
                                     let display_name = header.map(|group| group.name.clone()).unwrap_or_else(|| entry.name.clone());
-                                    let preview = header.and_then(|group| group.members.iter()
+                                    // Expanded members show their own previews. Only a
+                                    // collapsed header needs to summarize hidden members.
+                                    let preview = header.filter(|group| group.collapsed).and_then(|group| group.members.iter()
                                         .filter_map(|member| notification_previews.get(member))
                                         .max_by_key(|(arrival, _)| *arrival))
                                         .or_else(|| notification_previews.get(&entry.workspace.entity_id()))

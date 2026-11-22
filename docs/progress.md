@@ -1,3 +1,14 @@
+Combined native build at c7a4898 passed. A separately signed compact fixture
+launched with temporary configuration and synthetic terminals; installed rmux
+and its sessions were untouched. UI automation could inspect the window/menu
+but keyboard input and selecting Command Palette produced no visible change,
+so native palette/settings/find interaction acceptance remains open. The test
+process exited through the fixture's normal RPC cleanup after interruption.
+The static native view exposed duplicated notification previews in an expanded
+group and its child row. Group headers now aggregate member previews only when
+collapsed; expanded headers retain their anchor's own preview while children
+show theirs. This final presentation-only change awaits the next combined build.
+
 Find feedback polish: completed searches with zero matches now use the shared
 error-colored query border/status and disable match navigation in both hosts.
 Native and WASM navigation handlers reject completed no-match requests; shared
