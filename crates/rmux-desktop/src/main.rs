@@ -740,7 +740,7 @@ impl TerminalView {
                 match result {
                     Ok(Some(pr)) => { this.pull_request = Some(pr); this.pull_request_status = None; },
                     Ok(None) => { this.pull_request_status = Some("No PR found".into()); },
-                    Err(error) => { this.pull_request_status = Some("PR unavailable".into()); this.error = Some(format!("Pull request: {error:#}")); },
+                    Err(error) => { this.pull_request_status = Some(if error.is::<pull_request::Ambiguous>() { "Multiple matching PRs" } else { "PR unavailable" }.into()); this.error = Some(format!("Pull request: {error:#}")); },
                 }
                 cx.emit(TabMetadataChanged); cx.notify();
             });

@@ -64,11 +64,12 @@ While a lookup runs, the palette offers **Cancel Pull Request Lookup** instead
 of Refresh. Open appears once a PR is available. Custom shortcut actions are
 `refresh_pull_request`, `cancel_pull_request` and `open_pull_request`.
 
-Lookup is manual, limited to one request at a time, and times out after ten
-seconds. It uses the repository selected by `gh`, searches matching head branches
-across all PR states, and takes the first result. Forks with identical branch names
-may need repository configuration in `gh`. No result and lookup failure have
-separate sidebar messages. Directory/branch changes clear the cached result;
+Lookup is manual, limited to one lookup at a time, and has a shared ten-second
+budget. It uses the repository selected by `gh` and searches open PRs for the
+current branch first. If none are open, it checks all states for a single past PR.
+Multiple matches show **Multiple matching PRs** instead of choosing one; select
+the intended PR in GitHub. Forks with identical branch names may need repository
+configuration in `gh`. No result and lookup failure have separate sidebar messages. Directory/branch changes clear the cached result;
 refresh again for server-side changes. Remote SSH lookup and automatic PR polling
 are not implemented. Native visual/interaction acceptance remains pending.
 

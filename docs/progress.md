@@ -10667,3 +10667,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 
 - Fixed the release demo review's `/home/demo/proj…` labels hiding the meaningful folder name. Native and WASM context rows now show the final folder component with the full path retained in their tooltip. Root directories remain intact, Windows separators are recognized, and SSH connection/ended summaries retain their host and state instead of being parsed as paths. The branch icon no longer shrinks under width pressure.
 - Desktop compilation and one combined WASM build passed. Browser review at 1280×720 confirms `main · rmux` and `main · website` fit the default sidebar. Screenshot: target/sidebar-project-labels.jpg. Native visual acceptance remains pending; no user sessions changed and no release/deployment performed.
+
+### PR context selection and ambiguity
+
+- Replaced first-result selection across all states with an open-first lookup. Only when no open PR exists does it search all states for one historical result. Each query requests two candidates so multiple matching branches (including fork collisions) produce an explicit `Multiple matching PRs` sidebar status and actionable error rather than an arbitrary clickable PR.
+- Both queries share a ten-second budget and the existing global permit/cancellation cleanup. Failures do not trigger fallback requests; repository Git-directory identity and branch are rechecked before accepting the result. No recurring polling added.
+- Three focused desktop tests passed: selection/fallback/ambiguity/error routing, metadata/URL limits, and subprocess success/failure/timeout cleanup. Test compilation covers the native status rendering change. Live GitHub Enterprise/fork repository selection and native visual acceptance remain pending. No WASM changes, release, or user-session actions.
