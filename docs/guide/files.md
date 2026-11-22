@@ -134,7 +134,11 @@ Images and document appearance controls remain unimplemented. This is a reading 
 Same-document links such as `[Install](#installation)` jump to the matching
 heading. Click the link or select its block and use Tab/Shift+Tab and Alt+Enter.
 The jump clears the search filter so the target is visible and keeps the preview
-open. A missing heading reports “Heading not found in this preview”; it may be
+open. Back and Forward restore heading jumps as well as file navigation,
+including the previous search and selected block. On macOS use Cmd+[ / Cmd+];
+elsewhere use Alt+Left / Alt+Right, or the preview's Back/Forward buttons.
+Same-document history navigation reuses the loaded preview; Refresh reloads it.
+A missing heading reports “Heading not found in this preview”; it may be
 outside a truncated document. A bare `#` returns to the first reading block.
 
 Heading IDs use lowercase text, whitespace replaced with hyphens, and punctuation

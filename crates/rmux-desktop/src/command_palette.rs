@@ -297,7 +297,7 @@ fn folder_target(command: &Command) -> Option<(&std::path::Path, u8)> {
     else { action.as_any().downcast_ref::<CopyLocalPath>().map(|action| (action.path.as_path(), 2)) }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct PreviewState {
     path: std::path::PathBuf,
     hex: bool,
@@ -314,9 +314,23 @@ impl PreviewState {
     pub fn matches(&self, path: &std::path::Path, hex: bool, markdown: bool) -> bool { self.path == path && self.hex == hex && self.markdown == markdown }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+pub struct RecordPreviewJump { pub source: PreviewState, pub target: PreviewState }
+
 #[derive(Default)]
 pub struct PreviewHistory { entries: Vec<PreviewState>, cursor: usize }
 impl PreviewHistory {
+    pub fn record_jump(&mut self, source: PreviewState, target: PreviewState) {
+        self.commit(source.clone(), None);
+        self.update(source.clone());
+        if source == target { return; }
+        self.entries.truncate(self.cursor + 1);
+        self.entries.push(target);
+        if self.entries.len() > 32 { self.entries.remove(0); }
+        self.cursor = self.entries.len() - 1;
+    }
+
     pub fn update(&mut self, state: PreviewState) {
         if let Some(current) = self.entries.get_mut(self.cursor)
             && current.matches(&state.path, state.hex, state.markdown) { *current = state; }
@@ -342,6 +356,28 @@ impl PreviewHistory {
 mod preview_history_tests {
     use super::{PreviewHistory, PreviewState};
     fn state(name: &str) -> PreviewState { PreviewState::new(name.into(), false, true) }
+    #[test]
+    fn heading_jumps_share_document_history_and_restore_search_state() {
+        let mut history = PreviewHistory::default();
+        let mut start = state("a.md"); start.query = "install".into(); start.command = Some(3);
+        let mut heading = state("a.md"); heading.command = Some(20);
+        history.record_jump(start.clone(), heading.clone());
+        let (index, previous) = history.adjacent(false).unwrap();
+        assert_eq!(previous, start);
+        history.commit(previous, Some(index));
+        assert_eq!(history.adjacent(true).unwrap().1, heading);
+        let mut branch = state("a.md"); branch.command = Some(40);
+        history.record_jump(start, branch.clone());
+        assert!(history.adjacent(true).is_none());
+        history.commit(state("b.md"), None);
+        assert_eq!(history.adjacent(false).unwrap().1, branch);
+        for n in 0..80 {
+            let source = history.entries[history.cursor].clone();
+            let mut target = source.clone(); target.command = Some(n);
+            history.record_jump(source, target);
+        }
+        assert_eq!(history.entries.len(), 32);
+    }
     #[test]
     fn navigation_retains_reading_state_and_replaces_forward_branch() {
         let mut history = PreviewHistory::default();
@@ -1141,6 +1177,8 @@ impl CommandPalette {
     }
     pub fn restore_preview(&mut self, state: PreviewState, cx: &mut Context<Self>) {
         if !self.preview_navigation.as_ref().is_some_and(|(path, hex)| state.matches(path, *hex, self.markdown_preview)) { return; }
+        self.feedback = None;
+        self.preview_link = None;
         self.wrap_preview = state.wrapped;
         self.input.update(cx, |input, cx| input.replace_draft(&state.query, cx));
         // The input's Changed event updates ranking and resets selection first.
@@ -1229,10 +1267,12 @@ impl CommandPalette {
             return;
         };
         let Some(mut state) = self.preview_state(cx) else { return; };
+        let source = state.clone();
         state.query.clear();
         state.command = Some(command);
         self.preview_link = None;
         self.feedback = None;
+        cx.emit(PaletteEvent::Run(Box::new(RecordPreviewJump { source, target: state.clone() })));
         self.restore_preview(state, cx);
     }
     fn open_preview_link(&mut self, cx: &mut Context<Self>) {

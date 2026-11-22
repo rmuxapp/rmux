@@ -10416,3 +10416,19 @@ Desktop test compilation and all 16 focused Markdown checks passed, including
 Unicode/duplicate target resolution, malformed escapes and existing rendering
 bounds. Native click/keyboard acceptance and screenshots remain pending while
 the desktop is locked. No app sessions, releases or site deployments changed.
+
+
+### Back and Forward through Markdown headings — 2026-11-22
+
+Heading jumps now enter the existing 32-entry document history, preserving the
+source query, wrapping and selected block. Back/Forward and their toolbar buttons
+navigate same-document entries in place without reopening files or replacing the
+palette. New jumps after Back discard the forward branch. File-to-file navigation
+keeps the existing asynchronous loader/focus path. In-place restoration clears
+stale link selection and feedback; navigation remains unavailable during an
+active file load. Refresh still reloads from disk.
+
+Both focused history tests passed, covering state restoration, forward branching,
+file/heading history interleaving and bounded retention. Desktop compilation
+passed after the focus-path adjustment. Native interaction/screenshots remain
+pending; no installed sessions or published artifacts were modified.

@@ -2990,8 +2990,20 @@ impl WorkspaceWindow {
         self.preview_file_kind(path, hex, false, window, cx);
     }
     fn preview_history(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if self.file_browser_job.is_some() || self.automation_available(cx).is_err() { return; }
         if let Some((index, state)) = self.preview_history.adjacent(forward) {
             let (path, hex, markdown) = state.target();
+            if let Some((palette, _)) = self.palette.as_ref()
+                && let Some(current) = palette.read(cx).preview_state(cx)
+                && current.matches(&path, hex, markdown) {
+                self.preview_history.update(current);
+                self.preview_history.commit(state.clone(), Some(index));
+                palette.update(cx, |palette, cx| {
+                    palette.set_preview_history(&self.preview_history);
+                    palette.restore_preview(state, cx);
+                });
+                return;
+            }
             self.preview_file_at(path, hex, markdown, Some((index, state)), window, cx);
         }
     }
@@ -3085,6 +3097,24 @@ impl WorkspaceWindow {
             &palette,
             window,
             |this, _, event: &command_palette::PaletteEvent, window, cx| {
+                // Heading jumps use the same bounded history as file links without
+                // closing the palette or re-reading the current document.
+                if let command_palette::PaletteEvent::Run(action) = event {
+                    if let Some(jump) = action.as_any().downcast_ref::<command_palette::RecordPreviewJump>() {
+                        this.preview_history.record_jump(jump.source.clone(), jump.target.clone());
+                        if let Some((palette, _)) = &this.palette {
+                            palette.update(cx, |palette, _| palette.set_preview_history(&this.preview_history));
+                        }
+                        return;
+                    }
+                    if (action.as_any().is::<PreviewBack>() || action.as_any().is::<PreviewForward>())
+                        && let Some((_, target)) = this.preview_history.adjacent(action.as_any().is::<PreviewForward>())
+                        && let Some(current) = this.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx))
+                        && { let (path, hex, markdown) = target.target(); current.matches(&path, hex, markdown) } {
+                        this.preview_history(action.as_any().is::<PreviewForward>(), window, cx);
+                        return;
+                    }
+                }
                 // External editing does not navigate the rmux file view. Keep
                 // its query, selection, wrapping, scroll and focus owner intact
                 // so returning from the editor can refresh the same document.
