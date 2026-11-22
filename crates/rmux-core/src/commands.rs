@@ -16,6 +16,10 @@ macro_rules! commands {
 commands! {
     NewWorkspace => "New Workspace",
     NewTab => "New Terminal Tab",
+    CopySelection => "Copy",
+    Paste => "Paste",
+    NextPane => "Next Pane",
+    PreviousPane => "Previous Pane",
     MoveTabLeft => "Move Tab Left",
     MoveTabRight => "Move Tab Right",
     Split => "Split Right",

@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Command coverage polish: Copy, Paste and Previous/Next Pane are now discoverable
+in native and WASM palettes and effective-shortcut lists. Both hosts resolve them
+through shared action adapters; existing clipboard, paste and pane-cycle handlers
+remain responsible for behavior. Native palette terminal commands now use the
+shared terminal adapter too. Native and WASM compile checks pass; new palette
+entry interaction remains for the combined review. W10 implementation ledger
+updated without claiming complete parity or runtime acceptance.
+
+
 Shared tab rename polish: a bordered input, clear title/hint and visible Save /
 Cancel buttons replace the keyboard-only editor strip in native and WASM.
 Buttons use the same TextField submit/cancel methods as Enter/Escape and do not

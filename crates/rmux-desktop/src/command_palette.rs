@@ -323,6 +323,7 @@ impl CommandPalette {
                         .or_else(|| crate::workspace_actions::action(rmux_core::commands::CommandId::$action))
                         .or_else(|| crate::tab_actions::action(rmux_core::commands::CommandId::$action))
                         .or_else(|| crate::find_presentation::action(rmux_core::commands::CommandId::$action))
+                        .or_else(|| crate::terminal_actions::action(rmux_core::commands::CommandId::$action))
                         .unwrap_or_else(|| Box::new($action))),
                     shortcut: None,
                 subtitle: None,
@@ -331,6 +332,10 @@ impl CommandPalette {
         }
         command!(NewWorkspace);
         command!(NewTab);
+        command!(CopySelection);
+        command!(Paste);
+        command!(NextPane);
+        command!(PreviousPane);
         command!(MoveTabLeft);
         command!(MoveTabRight);
         command!(Split);

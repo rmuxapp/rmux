@@ -228,7 +228,7 @@
       ],
       "acceptance": "Search actions and workspaces; execute the same command path used by shortcuts and CLI.",
       "rmux_status": "in_progress",
-      "implementation": "Action palette, named workspace and terminal switching, numeric pane focus and tab-transfer destinations with ranked per-word fuzzy search and stable entity targeting. Terminal entries include workspace/pane/tab identity and custom titles.",
+      "implementation": "Action palette, named workspace and terminal switching, numeric pane focus and tab-transfer destinations with ranked per-word fuzzy search and stable entity targeting. Terminal entries include workspace/pane/tab identity and custom titles. Native and WASM provide searchable effective command shortcuts using resolved bindings and shared key-name aliases. Copy, Paste and Previous/Next Pane are now exposed through the shared command catalog and existing action handlers.",
       "remaining": "Full upstream command configuration semantics, accessibility and complete native search/switching acceptance. Configured commands support named shortcuts, literal argv, cwd and child environment overrides; palette launches use background PTY preparation. rmux --command NAME also launches these definitions with the shared PTY command API. A macOS real-PTY smoke check verifies CLI argv/environment/cwd and missing-name failure; cross-platform runtime acceptance remains pending.",
       "implementation_sources": [
         "crates/rmux-desktop/src/command_palette.rs",

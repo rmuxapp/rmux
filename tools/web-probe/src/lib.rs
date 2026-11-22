@@ -39,6 +39,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
+    CommandId::CopySelection, CommandId::Paste, CommandId::NextPane, CommandId::PreviousPane,
     CommandId::ShowKeyboardShortcuts,
     CommandId::NewWorkspace, CommandId::NewTab, CommandId::RenameTab, CommandId::CloseOtherTabs, CommandId::CloseTabsToRight, CommandId::ToggleSidebar,
     CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,

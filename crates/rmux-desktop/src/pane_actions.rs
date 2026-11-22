@@ -12,7 +12,12 @@ pub(crate) trait PaneCommandHost: Sized + 'static {
 macro_rules! pane_commands {
     ($($command:ident),* $(,)?) => {
         pub(crate) fn action(command: CommandId) -> Option<Box<dyn Action>> {
-            match command { $(CommandId::$command => Some(Box::new($command)),)* _ => None }
+            match command {
+                $(CommandId::$command => Some(Box::new($command)),)*
+                CommandId::NextPane => Some(Box::new(NextPane)),
+                CommandId::PreviousPane => Some(Box::new(PreviousPane)),
+                _ => None,
+            }
         }
         pub(crate) fn bind<V: PaneCommandHost>(root: Div, cx: &mut Context<V>) -> Div {
             root$(.on_action(cx.listener(|this, _: &$command, window, cx|

@@ -1,6 +1,6 @@
 //! Shared terminal action dispatch; clipboard and engine services belong to hosts.
 use gpui::{prelude::*, *};
-use crate::{IncreaseFontSize, DecreaseFontSize, ResetFontSize, CopySelectionWithLineBreaks, CopySelection, EditorSelectAll, ClearScrollback};
+use crate::{IncreaseFontSize, DecreaseFontSize, ResetFontSize, CopySelectionWithLineBreaks, CopySelection, Paste, EditorSelectAll, ClearScrollback};
 use rmux_core::commands::CommandId;
 
 pub(crate) trait TerminalCommandHost: Sized + 'static {
@@ -12,6 +12,8 @@ pub(crate) trait TerminalCommandHost: Sized + 'static {
 }
 pub(crate) fn action(command: CommandId) -> Option<Box<dyn Action>> {
     match command {
+        CommandId::CopySelection => Some(Box::new(CopySelection)),
+        CommandId::Paste => Some(Box::new(Paste)),
         CommandId::IncreaseFontSize => Some(Box::new(IncreaseFontSize)),
         CommandId::DecreaseFontSize => Some(Box::new(DecreaseFontSize)),
         CommandId::ResetFontSize => Some(Box::new(ResetFontSize)),
