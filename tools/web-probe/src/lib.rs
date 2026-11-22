@@ -563,7 +563,7 @@ impl Render for InputProbe {
                             palette_view::result(index, 36., row == this.selected)
                                 .child(div().flex_1().min_w_0().truncate().child({
                                     let title = this.result_title(index).to_owned();
-                                    let matches = palette_match::highlights(&title, this.input.read(cx).value());
+                                    let matches = palette_match::fuzzy_highlights(&title, this.input.read(cx).value());
                                     StyledText::new(title).with_highlights(matches.into_iter().map(|range| (range,
                                         HighlightStyle { color: Some(rgb_to_hsla(rgb(0xffffff))), background_color: Some(rgb_to_hsla(rgb(0x41638c))), ..Default::default() })))
                                 }))

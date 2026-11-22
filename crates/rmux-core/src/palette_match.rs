@@ -170,6 +170,16 @@ mod tests {
 /// Map case-folded word matches back to displayed UTF-8 ranges. The caller uses
 /// bounded UI labels or captured preview lines, never unbounded scrollback.
 pub fn highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
+    match_highlights(text, query, false)
+}
+
+/// Highlight the contiguous or greedy subsequence match used by palette ranking.
+/// Literal document searches should continue to use `highlights`.
+pub fn fuzzy_highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
+    match_highlights(text, query, true)
+}
+
+fn match_highlights(text: &str, query: &str, fuzzy: bool) -> Vec<std::ops::Range<usize>> {
     if query.trim().is_empty() { return Vec::new(); }
     // Whole-string lowering preserves contextual final sigma, matching the
     // ranked search. Lowering each scalar separately always produces σ.
@@ -186,10 +196,22 @@ pub fn highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
     let mut marked = vec![false; boundaries.len()];
     for word in query.split_whitespace() {
         let word = word.to_lowercase();
-        for (start, matched) in folded.match_indices(&word) {
-            let end = start + matched.len();
-            let first = boundaries.partition_point(|(range, _)| range.end <= start);
-            let last = boundaries.partition_point(|(range, _)| range.start < end);
+        let mut matches: Vec<_> = folded.match_indices(&word)
+            .map(|(start, matched)| start..start + matched.len()).collect();
+        if matches.is_empty() && fuzzy {
+            let mut chars = folded.char_indices();
+            for wanted in word.chars() {
+                let Some((start, ch)) = chars.find(|(_, ch)| *ch == wanted) else {
+                    // A partial subsequence is not a match for this word.
+                    matches.clear();
+                    break;
+                };
+                matches.push(start..start + ch.len_utf8());
+            }
+        }
+        for matched in matches {
+            let first = boundaries.partition_point(|(range, _)| range.end <= matched.start);
+            let last = boundaries.partition_point(|(range, _)| range.start < matched.end);
             marked[first..last].fill(true);
         }
     }
@@ -206,6 +228,17 @@ pub fn highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
 #[cfg(test)]
 mod highlight_tests {
     use super::highlights as preview_highlights;
+    #[test]
+    fn fuzzy_labels_show_complete_ranked_subsequences_only() {
+        let text = "Split Below";
+        let ranges = super::fuzzy_highlights(text, "splt blw");
+        assert_eq!(ranges.iter().map(|range| &text[range.clone()]).collect::<Vec<_>>(), ["Spl", "t", "B", "l", "w"]);
+        assert!(preview_highlights(text, "splt blw").is_empty());
+        assert!(super::fuzzy_highlights(text, "spltz").is_empty());
+        assert_eq!(super::fuzzy_highlights("s p l t splt", "splt"), vec![8..12]);
+        assert_eq!(super::fuzzy_highlights("東京作業", "東業"), vec![0..3, 9..12]);
+        assert_eq!(super::fuzzy_highlights("İ ΟΣ", "iς"), vec![0..2, 5..7]);
+    }
     #[test]
     fn highlights_agree_with_search_for_contextual_greek_lowercase() {
         let text = "ΟΣ build";

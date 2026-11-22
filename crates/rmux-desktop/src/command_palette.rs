@@ -1033,7 +1033,11 @@ impl CommandPalette {
             Some(subtitle) => format!("{title}\n{subtitle}").into(),
             None => title.clone().into(),
         };
-        let title_ranges = file_browser::preview_highlights(&title, self.input.read(cx).value());
+        let title_ranges = if self.commands[command].preview_line().is_some() {
+            file_browser::preview_highlights(&title, self.input.read(cx).value())
+        } else {
+            rmux_core::palette_match::fuzzy_highlights(&title, self.input.read(cx).value())
+        };
         let code_view = if wrapped && markdown == Some(markdown_preview::Kind::Code) {
             let source = self.commands[command].preview_line().unwrap_or("");
             let query = self.input.read(cx).value();

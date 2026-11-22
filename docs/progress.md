@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Command labels now highlight fuzzy subsequences as well as contiguous words in
+the native and WASM palettes. For example, `splt blw` visibly marks the matching
+letters in Split Below using the same greedy path as ranking. Incomplete words
+do not leave misleading partial highlights; contiguous matches retain priority.
+Literal document-preview highlighting remains unchanged. Nine focused shared
+search tests, desktop cargo check and the WASM debug build pass. Local browser
+inspection confirms the result; screenshot: target/palette-fuzzy-highlights.jpg.
+The hosted demo still requires a new GitHub artifact deployment.
+
 Workspace merge acceptance now checks per-pane tab indices and selected tabs,
 plus complete notification records on a hidden tab, before and after both
 same-window and cross-window merges. Notifications retain their revision,
