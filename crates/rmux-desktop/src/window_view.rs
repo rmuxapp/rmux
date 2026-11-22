@@ -2519,20 +2519,14 @@ impl WorkspaceWindow {
             cx.notify();
         }
     }
-    fn entry_directory(entry: &Entry, window: &Window, cx: &App) -> Option<(Option<String>, Option<String>)> {
+    fn entry_pane(entry: &Entry, window: &Window, cx: &App) -> Option<Entity<PaneView>> {
         let workspace = entry.workspace.read(cx);
-        workspace
-            .focused_index(window, cx)
-            .and_then(|index| workspace.panes.get(index))
-            .or_else(|| {
-                workspace
-                    .panes
-                    .iter()
-                    .find(|pane| Some(pane.entity_id()) == entry.last_pane)
-            })
-            .or_else(|| workspace.panes.first())?
-            .read(cx)
-            .context_label(cx)
+        workspace.focused_index(window, cx).and_then(|index| workspace.panes.get(index))
+            .or_else(|| workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane))
+            .or_else(|| workspace.panes.first()).cloned()
+    }
+    fn entry_directory(entry: &Entry, window: &Window, cx: &App) -> Option<(Option<String>, Option<String>)> {
+        Self::entry_pane(entry, window, cx)?.read(cx).context_label(cx)
     }
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if let Some((_, focus)) = self.palette.take() {
@@ -4725,6 +4719,13 @@ impl Render for WorkspaceWindow {
                                                                     .when(has_branch, |row| row.child(gpui::div().flex_shrink_0().px_1().text_color(rgb(0x74717c)).child("·")))
                                                                     .child(gpui::div().flex_1().min_w_0().truncate().child(sidebar_presentation::directory_label(&directory)))))
                                                         })
+                                                        .children(Self::entry_pane(entry, window, cx).map(|pane| pane.read(cx).sidebar_details(cx)).unwrap_or_default()
+                                                            .into_iter().enumerate().map(|(index, detail)| {
+                                                                let hint: SharedString = detail.clone().into();
+                                                                gpui::div().id((if index == 0 { "workspace-extra-first" } else { "workspace-extra-second" }, target)).min_w_0().truncate().text_size(px(11.))
+                                                                    .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
+                                                                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).child(detail)
+                                                            }))
                                                     .into_any_element()
                                             },
                                         )

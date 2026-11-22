@@ -26,6 +26,17 @@ pub fn http_url(mut address: SocketAddr) -> Option<String> {
 pub struct Report { pub listeners: Vec<Listener>, pub truncated: bool, pub ownership_changed: bool }
 use crate::process_tree::{process_snapshot, stable_owned, descendants};
 
+impl Report {
+    pub fn sidebar_summary(&self) -> String {
+        let ports: BTreeSet<_> = self.listeners.iter().map(|listener| listener.address.port()).collect();
+        let partial = if self.truncated || self.ownership_changed { " · partial" } else { "" };
+        if ports.is_empty() { return format!("Ports snapshot: none{partial}"); }
+        let list = ports.iter().take(4).map(u16::to_string).collect::<Vec<_>>().join(", ");
+        let more = if ports.len() > 4 { format!(" +{}", ports.len() - 4) } else { String::new() };
+        format!("Ports snapshot: {list}{more}{partial}")
+    }
+}
+
 pub fn scan(root: u32, canceled: &AtomicBool) -> Result<Option<Report>> {
     use netstat2::{AddressFamilyFlags, ProtocolFlags, ProtocolSocketInfo, TcpState};
     if canceled.load(Ordering::Acquire) { return Ok(None); }
@@ -65,6 +76,18 @@ pub fn scan(root: u32, canceled: &AtomicBool) -> Result<Option<Report>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn sidebar_snapshot_deduplicates_ports_and_marks_partial_results() {
+        let listeners = [3000,3000,4000,5000,6000,7000].into_iter().enumerate().map(|(index,port)| Listener {
+            address: SocketAddr::from(([127,0,0,1],port)), pid: index as u32,
+        }).collect();
+        let mut report = Report { listeners, truncated: false, ownership_changed: false };
+        assert_eq!(report.sidebar_summary(), "Ports snapshot: 3000, 4000, 5000, 6000 +1");
+        report.ownership_changed = true;
+        assert!(report.sidebar_summary().ends_with(" · partial"));
+        report.listeners.clear();
+        assert_eq!(report.sidebar_summary(), "Ports snapshot: none · partial");
+    }
     #[test]
     fn canceled_scan_does_not_require_a_live_process() -> Result<()> {
         assert!(scan(0, &AtomicBool::new(true))?.is_none());

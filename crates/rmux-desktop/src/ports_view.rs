@@ -5,6 +5,7 @@ pub(super) struct State {
     generation: u64,
     loading: bool,
     report: Option<ports::Report>,
+    sidebar_snapshot: Option<String>,
     error: Option<String>,
     canceled: Option<Arc<AtomicBool>>,
     focus: Option<FocusHandle>,
@@ -17,6 +18,11 @@ impl Drop for State {
     }
 }
 impl State {
+    pub fn sidebar_label(&self) -> Option<String> {
+        if self.loading { Some("Scanning ports…".into()) }
+        else if self.error.is_some() { Some("Ports unavailable".into()) }
+        else { self.sidebar_snapshot.clone() }
+    }
     fn listener_offset(&self) -> usize {
         self.report.as_ref().map_or(0, |report| usize::from(report.ownership_changed)
             + usize::from(report.truncated)) + usize::from(self.error.is_some())
@@ -83,6 +89,7 @@ impl TerminalView {
         self.ports.visible = false;
         self.ports.report = None;
         self.ports.error = None;
+        cx.emit(TabMetadataChanged);
         cx.notify();
     }
     pub(super) fn refresh_ports(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -96,7 +103,7 @@ impl TerminalView {
             Ok((pid, ports::Permit::acquire()?))
         };
         match prepare() {
-            Err(error) => { self.ports.report = None; self.ports.selected = 0; self.ports.error = Some(error.to_string()); }
+            Err(error) => { self.ports.sidebar_snapshot = None; self.ports.report = None; self.ports.selected = 0; self.ports.error = Some(error.to_string()); }
             Ok((pid, permit)) => {
                 self.ports.loading = true;
                 self.ports.generation = self.ports.generation.wrapping_add(1);
@@ -120,10 +127,12 @@ impl TerminalView {
                         let previous_index = this.ports.selected;
                         let previous_offset = this.ports.listener_offset();
                         this.ports.report = None;
+                        this.ports.sidebar_snapshot = None;
                         if this.session.exit_status().is_some() { this.ports.error = Some("Terminal process has exited".into()); }
                         else { match result {
                             Ok(report) => {
                                 this.ports.selected = report.as_ref().map_or(0, |report| refreshed_selection(&report.listeners, previous));
+                                this.ports.sidebar_snapshot = report.as_ref().map(ports::Report::sidebar_summary);
                                 this.ports.report = report;
                             }
                             Err(error) => this.ports.error = Some(error.to_string()),
@@ -132,11 +141,13 @@ impl TerminalView {
                             || previous_offset != this.ports.listener_offset() {
                             this.reveal_selected_port();
                         }
+                        cx.emit(TabMetadataChanged);
                         cx.notify();
                     });
                 }).detach();
             }
         }
+        cx.emit(TabMetadataChanged);
         cx.notify();
     }
 }

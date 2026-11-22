@@ -56,7 +56,7 @@ do not deliver native events still rely on shell reports or manual refresh.
 Use **Refresh Pull Request for Current Terminal** from the command palette to
 look up the current local branch with GitHub CLI. `gh` must already be available
 on the app's PATH and authenticated; rmux does not install it or prompt for login.
-The sidebar shows the returned PR number, state and title alongside Git context;
+The sidebar shows the returned PR number, state and title on a separate line below Git context;
 hover for the full text. **Open Current Pull Request** opens its HTTPS page.
 Custom shortcut actions are `refresh_pull_request` and `open_pull_request`.
 
@@ -69,7 +69,12 @@ refresh again for server-side changes. Remote SSH lookup and automatic PR pollin
 are not implemented. Native visual/interaction acceptance remains pending.
 
 **Show Listening Ports** provides an on-demand local terminal process-tree
-snapshot; listening-port badges in the sidebar remain unimplemented.
+snapshot. For local terminals, the sidebar retains a compact **Ports snapshot**
+line after closing the panel, showing up to four unique port numbers and a count
+of any others. Partial scans are labeled. This is the last requested snapshot,
+not a live service-health indicator; reopen/refresh Listening Ports to update it.
+The line follows the selected terminal and disappears when that terminal exits.
+PR and port summaries do not replace the branch/directory line.
 The palette's Refresh Git Branch for Current Terminal action refreshes explicitly.
 Repeated shell directory reports refresh Git even when the path stays unchanged;
 the included zsh integration reports its directory at each prompt. `surface.list`
