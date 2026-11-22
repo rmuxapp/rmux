@@ -155,6 +155,9 @@ impl WorkspaceWindow {
         cx.observe_global::<preferences::AppearanceBaseline>(|this, cx| {
             if this.settings_state.is_some() { cx.notify(); }
         }).detach();
+        cx.observe_global::<preferences::LastSettingsSave>(|this, cx| {
+            if this.settings_state.is_some() { cx.notify(); }
+        }).detach();
         cx.observe_global::<preferences::ReloadState>(|this, cx| {
             if this.settings_state.is_some() { cx.notify(); }
         }).detach();
@@ -1327,15 +1330,16 @@ impl WorkspaceWindow {
         cx.notify();
         cx.spawn(async move |entity, cx| {
             let snapshot = settings.clone();
-            let result = executor.spawn(async move { snapshot.save_appearance() }).await;
+            let result = executor.spawn(async move { snapshot.save_appearance_with_receipt() }).await;
             let _ = cx.update(|cx| {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
-                if result.is_ok() {
+                if let Ok(receipt) = &result {
+                    if receipt.has_changes() { cx.set_global(preferences::LastSettingsSave(Some(receipt.clone()))); }
                     cx.set_global(preferences::AppearanceBaseline(settings.clone()));
                 }
                 let _ = entity.update(cx, |this, cx| {
                     this.notice = Some(match result {
-                        Ok(path) if settings.same_saved_appearance(cx.global::<Preferences>()) => format!("Settings saved to {}", path.display()),
+                        Ok(receipt) if settings.same_saved_appearance(cx.global::<Preferences>()) => format!("Settings saved to {}", receipt.path.display()),
                         Ok(_) => "Earlier settings saved. Your newer changes are not saved yet; choose Save again to keep them.".into(),
                         Err(error) => format!("Settings not saved: {error:#}"),
                     });
@@ -1401,6 +1405,49 @@ impl WorkspaceWindow {
         cx.set_global(settings);
         self.notice = Some("Unsaved settings reverted. The settings file was not changed.".into());
         cx.notify();
+    }
+    fn undo_settings_save(&mut self, cx: &mut Context<Self>) {
+        if cx.global::<preferences::ReloadState>().0 { return; }
+        let Some(receipt) = cx.global::<preferences::LastSettingsSave>().0.clone() else { return; };
+        let current = cx.global::<Preferences>().clone();
+        let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(&current);
+        cx.global_mut::<preferences::ReloadState>().0 = true;
+        self.notice = Some("Undoing last settings save…".into());
+        cx.notify();
+        let executor = cx.background_executor().clone();
+        cx.spawn(async move |entity, cx| {
+            let snapshot = current.clone();
+            let result = executor.spawn(async move {
+                receipt.undo().map(|counts| (counts, snapshot.reload()))
+            }).await;
+            let _ = cx.update(|cx| {
+                cx.global_mut::<preferences::ReloadState>().0 = false;
+                let notice = match result {
+                    Err(error) => format!("Settings save not undone: {error:#}"),
+                    Ok(((restored, skipped), loaded)) => {
+                        cx.set_global(preferences::LastSettingsSave::default());
+                        let summary = format!("Undid {restored} saved settings; kept {skipped} values changed since the save.");
+                        if unsaved || !current.same_saved_appearance(cx.global::<Preferences>()) {
+                            format!("{summary} Your session edits were kept. Reload Settings to apply the restored file.")
+                        } else {
+                            match loaded {
+                                Ok(next) => {
+                                    let socket_changed = next.socket_directory != current.socket_directory;
+                                    cx.set_global(preferences::AppearanceBaseline(next.clone()));
+                                    cx.set_global(next.confirm_close);
+                                    cx.set_global(next);
+                                    shortcuts::install(cx);
+                                    if socket_changed { format!("{summary} Restart rmux to apply the socket directory change.") }
+                                    else { summary }
+                                },
+                                Err(error) => format!("{summary} The file was restored, but session settings could not reload: {error:#}"),
+                            }
+                        }
+                    },
+                };
+                let _ = entity.update(cx, |this, cx| { this.notice = Some(notice); cx.notify(); });
+            });
+        }).detach();
     }
     fn reload_settings(&mut self, cx: &mut Context<Self>) {
         if cx.global::<preferences::ReloadState>().0 {
@@ -4286,6 +4333,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &SaveAppearanceSettings, _, cx| this.save_appearance_settings(cx)))
             .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
             .on_action(cx.listener(|this, _: &RevertAppearanceSettings, _, cx| this.revert_appearance_settings(cx)))
+            .on_action(cx.listener(|this, _: &UndoSettingsSave, _, cx| this.undo_settings_save(cx)))
             .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
             .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))

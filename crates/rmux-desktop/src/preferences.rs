@@ -2,7 +2,7 @@
 use crate::close_policy::ClosePolicy;
 use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
-use std::{io::Read, path::Path};
+use std::{io::Read, path::{Path, PathBuf}};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(try_from = "String", into = "String")]
@@ -296,6 +296,68 @@ impl gpui::Global for Preferences {}
 pub struct ReloadState(pub bool);
 impl gpui::Global for ReloadState {}
 
+#[derive(Clone)]
+pub struct SaveReceipt {
+    pub path: PathBuf,
+    source: PathBuf,
+    changes: Vec<(String, Option<serde_json::Value>, serde_json::Value)>,
+}
+#[derive(Default)]
+pub struct LastSettingsSave(pub Option<SaveReceipt>);
+impl gpui::Global for LastSettingsSave {}
+
+fn config_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
+    let file = match std::fs::File::open(path) {
+        Ok(file) => file,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+        Err(error) => return Err(error.into()),
+    };
+    let mut bytes = Vec::new();
+    file.take(64 * 1024 + 1).read_to_end(&mut bytes)?;
+    ensure!(bytes.len() <= 64 * 1024, "configuration exceeds 64 KiB");
+    Ok(Some(bytes))
+}
+
+fn replace_config(path: &Path, expected: Option<&[u8]>, bytes: &[u8]) -> Result<()> {
+    use std::io::Write;
+    Preferences::decode(bytes)?;
+    let parent = path.parent().context("Configuration path has no parent")?;
+    std::fs::create_dir_all(parent)?;
+    let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
+    temporary.write_all(bytes)?;
+    temporary.write_all(b"\n")?;
+    temporary.as_file().sync_all()?;
+    ensure!(config_bytes(path)?.as_deref() == expected,
+        "Settings file changed during this operation; retry after reviewing the file");
+    temporary.persist(path)?;
+    Ok(())
+}
+
+impl SaveReceipt {
+    pub fn has_changes(&self) -> bool { !self.changes.is_empty() }
+    /// Restore only keys whose current value still equals the saved value.
+    pub fn undo(&self) -> Result<(usize, usize)> {
+        ensure!(self.source.canonicalize()? == self.path,
+            "Settings path now points to a different file; undo was not applied");
+        let bytes = config_bytes(&self.path)?.context("Settings file no longer exists")?;
+        Preferences::decode(&bytes)?;
+        let mut current: serde_json::Value = serde_json::from_slice(&bytes)?;
+        let object = current.as_object_mut().context("Settings must be an object")?;
+        let mut restored = 0;
+        for (key, before, after) in &self.changes {
+            if object.get(key) != Some(after) { continue; }
+            match before {
+                Some(value) => { object.insert(key.clone(), value.clone()); },
+                None => { object.remove(key); },
+            }
+            restored += 1;
+        }
+        ensure!(restored > 0, "Saved values have changed since the save; nothing was undone");
+        replace_config(&self.path, Some(&bytes), &serde_json::to_vec_pretty(&current)?)?;
+        Ok((restored, self.changes.len() - restored))
+    }
+}
+
 /// Last loaded or successfully saved appearance, shared by every window.
 /// This is a session baseline, not a claim that the file has not changed externally.
 pub struct AppearanceBaseline(pub Preferences);
@@ -507,8 +569,11 @@ impl Preferences {
         self.imported_theme = baseline.imported_theme.clone();
     }
 
+    #[cfg(test)]
     pub fn save_appearance(&self) -> Result<std::path::PathBuf> {
-        use std::io::Write;
+        Ok(self.save_appearance_with_receipt()?.path)
+    }
+    pub fn save_appearance_with_receipt(&self) -> Result<SaveReceipt> {
         let path = self.source.clone().context("No configuration path is available")?;
         // Inspect the link itself: exists()/try_exists() follow it and mistake
         // a dangling user-managed symlink for a new configuration file.
@@ -517,18 +582,17 @@ impl Preferences {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => path,
             Err(error) => return Err(error.into()),
         };
-        let mut latest = Self::read_config(&path, false)?;
+        let before = config_bytes(&path)?;
+        let mut latest = before.as_deref().map(Self::decode).transpose()?.unwrap_or_default();
         latest.restore_appearance(self);
         let bytes = serde_json::to_vec_pretty(&latest)?;
-        Self::decode(&bytes)?;
-        let parent = path.parent().context("Configuration path has no parent")?;
-        std::fs::create_dir_all(parent)?;
-        let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
-        temporary.write_all(&bytes)?;
-        temporary.write_all(b"\n")?;
-        temporary.as_file().sync_all()?;
-        temporary.persist(&path)?;
-        Ok(path)
+        let old: serde_json::Map<String, serde_json::Value> = before.as_deref()
+            .map(serde_json::from_slice).transpose()?.unwrap_or_default();
+        let new: serde_json::Map<String, serde_json::Value> = serde_json::from_slice(&bytes)?;
+        let changes = new.into_iter().filter(|(key, value)| old.get(key) != Some(value))
+            .map(|(key, value)| { let prior = old.get(&key).cloned(); (key, prior, value) }).collect();
+        replace_config(&path, before.as_deref(), &bytes)?;
+        Ok(SaveReceipt { path, source: self.source.clone().unwrap(), changes })
     }
 
     pub fn scrollback_bytes(&self) -> usize {
@@ -647,6 +711,52 @@ impl Preferences {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn settings_undo_preserves_later_edits_and_restores_missing_keys() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        let original = serde_json::json!({"font_size": 13, "terminal_padding": 4});
+        std::fs::write(&path, serde_json::to_vec(&original)?)?;
+        let mut settings = super::Preferences::read_config(&path, true)?;
+        settings.source = Some(path.clone());
+        settings.font_size = 16.;
+        settings.terminal_padding = 8;
+        let receipt = settings.save_appearance_with_receipt()?;
+        let mut edited: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+        edited["font_size"] = 19.into();
+        std::fs::write(&path, serde_json::to_vec(&edited)?)?;
+        let (restored, skipped) = receipt.undo()?;
+        assert!(restored > 0);
+        assert_eq!(skipped, 1);
+        let undone: serde_json::Value = serde_json::from_slice(&std::fs::read(&path)?)?;
+        assert_eq!(undone, serde_json::json!({"font_size":19,"terminal_padding":4}));
+        assert!(receipt.undo().is_err());
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path)?)?, undone);
+        Ok(())
+    }
+
+    #[test]
+    fn settings_undo_rejects_invalid_or_retargeted_files_and_save_conflicts() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        let mut settings = super::Preferences::default();
+        settings.source = Some(path.clone());
+        let receipt = settings.save_appearance_with_receipt()?;
+        std::fs::write(&path, b"invalid external edit")?;
+        assert!(receipt.undo().is_err());
+        assert_eq!(std::fs::read(&path)?, b"invalid external edit");
+        assert!(super::replace_config(&path, Some(b"{}"), b"{}").is_err());
+        assert_eq!(std::fs::read(&path)?, b"invalid external edit");
+        #[cfg(unix)] {
+            let other = directory.path().join("other.json");
+            std::fs::write(&other, b"{}")?;
+            std::fs::remove_file(&path)?;
+            std::os::unix::fs::symlink(&other, &path)?;
+            assert!(receipt.undo().is_err());
+            assert_eq!(std::fs::read(&other)?, b"{}");
+        }
+        Ok(())
+    }
     use super::*;
     #[test]
     fn sparse_theme_palette_uses_preset_not_previous_import() -> Result<()> {

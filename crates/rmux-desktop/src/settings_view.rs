@@ -11,7 +11,7 @@ pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "curso
     #[cfg(target_os = "macos")] "option_as_alt",
     "selection_opacity", "import_theme", "file_editor",
 ];
-pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings"];
+pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings", "undo_settings_save"];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
 pub fn control_index(key: &str) -> Option<usize> {
     KEYS.iter().chain(FOOTER_KEYS).position(|candidate| *candidate == key)
@@ -23,6 +23,7 @@ pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
         2 => Box::new(ReloadSettings),
         3 => Box::new(ShowKeyboardShortcuts),
         4 => Box::new(RevertAppearanceSettings),
+        5 => Box::new(UndoSettingsSave),
         _ => return None,
     })
 }
@@ -269,8 +270,10 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                 (2, "settings-reload", "Reload from file", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
                 (3, "settings-shortcuts", "Keyboard Shortcuts…", "Search command shortcuts available in the current context"),
                 (4, "settings-revert", "Revert unsaved changes", "Restore the last loaded or saved panel values without changing the settings file"),
+                (5, "settings-undo-save", "Undo last save", "Restore saved values only where the file still matches the last save; preserve later edits"),
             ].into_iter().map(|(index, id, label, hint)| {
-                let enabled = !busy && (index != 4 || unsaved);
+                let enabled = !busy && (index != 4 || unsaved)
+                    && (index != 5 || cx.global::<preferences::LastSettingsSave>().0.is_some());
                 div().id(id).px_2().py_1().rounded_sm().text_xs().border_1()
                     .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
                     .text_color(rgb(if enabled { chrome_style::ACCENT } else { 0x777777 }))

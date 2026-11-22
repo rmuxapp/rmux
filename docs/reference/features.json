@@ -879,7 +879,9 @@
         "CONFIG"
       ],
       "acceptance": "Reject invalid writes atomically; undo only values still matching the receipt.",
-      "rmux_status": "not_started"
+      "rmux_status": "in_progress",
+      "implementation": "Bounded schema validation, atomic settings saves, explicit live reload, shared unsaved appearance baseline and in-memory revert. Undo Last Settings Save keeps one process-local receipt, restores JSON keys only where current values match the receipt, preserves later edits, validates before replacement and checks for intervening writes. Unsaved session edits are retained; otherwise the restored file reloads. Exposed in Settings, menu, palette and configurable shortcuts. All 33 preferences tests pass, including conditional undo, invalid files, redirected symlinks and detected write conflicts.",
+      "remaining": "Native Settings/menu/shortcut undo acceptance, settings schema and upstream conditional-undo coverage. File replacement is atomic but external editors are not locked across the final content check and rename; simultaneous cross-process writes can race. Undo receipts are process-local and do not cover external writes or earlier saves."
     },
     {
       "id": "A10",

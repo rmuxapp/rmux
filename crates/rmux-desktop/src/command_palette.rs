@@ -478,6 +478,7 @@ impl CommandPalette {
         command!(SaveAppearanceSettings);
         command!(ReloadSettings);
         command!(RevertAppearanceSettings);
+        if cx.global::<preferences::LastSettingsSave>().0.is_some() { command!(UndoSettingsSave); }
         command!(OpenSettingsFile);
         command!(OpenLayout);
         command!(FocusLeft);

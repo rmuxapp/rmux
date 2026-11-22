@@ -70,6 +70,20 @@ reload/restart. Revert is unavailable during save/reload operations. The menu
 and palette call this **Revert Unsaved Settings**; custom shortcuts can bind
 `revert_settings`. This does not undo a previous save on disk.
 
+**Undo last save** restores the settings file from rmux's most recent Save in
+this session. Each value is restored only if it still matches what rmux saved;
+later edits to that value are kept. Invalid files and redirected configuration
+symlinks are left alone. Undo keeps one record in memory, shared across windows;
+it is unavailable after restarting rmux and is consumed after a successful undo.
+If you have unsaved session edits, those stay active; use **Reload from file**
+when you want to apply the restored file. Otherwise the restored settings apply
+immediately. The menu/palette action is **Undo Last Settings Save** and its custom
+shortcut action is `undo_settings_save`.
+
+Save and undo check for file changes again just before atomic replacement. This
+detects intervening edits but does not lock external editors; simultaneous writes
+from another process can still race the final check and replacement.
+
 Use Tab or the arrow keys to select controls, then Enter to activate them.
 The side panel adjusts text-size defaults, terminal padding/theme, unfocused
 cursor, copy-on-select and close confirmation. Choose Active tasks, Always or Never

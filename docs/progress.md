@@ -1,3 +1,16 @@
+Settings recovery (A09): Undo Last Settings Save now has a process-local receipt
+shared across windows, a Settings footer control, menu/palette action and
+`undo_settings_save` shortcut action. It restores only JSON keys still matching
+the save, preserving later edits; validates the resulting file; rejects invalid
+files/retargeted symlinks; and compares source bytes immediately before atomic
+replacement. Save also uses that final conflict check. This is not an external
+editor lock: a concurrent writer can race the final check/rename. Undo reloads
+the file when no newer/unsaved session appearance exists, otherwise preserves
+session edits and asks the user to reload explicitly. Failed reload after a
+successful file undo is reported separately. All 33 preferences tests passed,
+including two new filesystem regression tests. Native UI acceptance is pending;
+no additional app bundle or release was built for this batch.
+
 Combined native build at c7a4898 passed. A separately signed compact fixture
 launched with temporary configuration and synthetic terminals; installed rmux
 and its sessions were untouched. UI automation could inspect the window/menu

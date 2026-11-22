@@ -465,6 +465,7 @@ actions!(
         OpenLayout,
         ReloadSettings,
         RevertAppearanceSettings,
+        UndoSettingsSave,
         ToggleSettings,
         SaveAppearanceSettings,
         OpenSettingsFile,
@@ -3561,6 +3562,7 @@ fn main() {
         cx.set_global(preferences::AppearanceBaseline(preferences.clone()));
         recovery::install(recovery_lease.clone(), cx);
         cx.set_global(preferences::ReloadState::default());
+        cx.set_global(preferences::LastSettingsSave::default());
         cx.set_global(diagnostics::ExportState::default());
         cx.set_global(PromptGate::default());
         cx.set_global(InitialDirectory(initial_directory.clone()));
@@ -3736,6 +3738,7 @@ fn main() {
                     MenuItem::action("Run Configured Command…", ShowCustomCommandPicker),
                     MenuItem::action("Reload Settings", ReloadSettings),
                     MenuItem::action("Revert Unsaved Settings", RevertAppearanceSettings),
+                    MenuItem::action("Undo Last Settings Save", UndoSettingsSave),
                     MenuItem::action("Open Settings File", OpenSettingsFile),
                     MenuItem::action("Import Terminal Theme…", ImportTerminalTheme),
                     MenuItem::action("Open Layout in New Window…", OpenLayout),
