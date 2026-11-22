@@ -161,7 +161,8 @@ pub(super) struct SurfaceText {
 }
 
 /// Resolve exact names across normal windows; cwd and startup parameters are
-/// creation-only. Never guess among duplicate names.
+/// creation-only. Native folder opens instead match their stored project identity.
+/// Never guess among duplicate names or project identities.
 fn resolve_open_workspace(create: &mut WorkspaceCreate, cx: &mut gpui::App) -> Result<Option<Value>, Failure> {
     let target = if create.window_id.is_empty() { None } else { Some(target_id(&create.window_id)?) };
     let name = create.name.as_deref().expect("validated workspace.open name");
@@ -171,13 +172,13 @@ fn resolve_open_workspace(create: &mut WorkspaceCreate, cx: &mut gpui::App) -> R
         let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
         let any: gpui::AnyWindowHandle = handle.into();
         let Ok(Some((id, workspaces))) = any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, cx| {
-            entity.read(cx).automation_named_workspaces(name).map(|workspaces| (entity.entity_id(), workspaces))
+            entity.read(cx).automation_open_workspaces(name, create.project_directory.as_deref()).map(|workspaces| (entity.entity_id(), workspaces))
         }) else { continue; };
         if target.is_some_and(|target| target != id) { continue; }
         for workspace in workspaces { matches.push((id, handle, workspace)); }
         windows.push((id, handle));
     }
-    if matches.len() > 1 { return Err(Failure { code: -32006, message: "Workspace name is ambiguous; use --window or rename duplicates" }); }
+    if matches.len() > 1 { return Err(Failure { code: -32006, message: if create.project_directory.is_some() { "Multiple workspaces belong to this project; close the duplicate before opening it again" } else { "Workspace name is ambiguous; use --window or rename duplicates" } }); }
     if let Some((id, handle, workspace)) = matches.pop() {
         create.window_id = id.to_string();
         return handle.update(cx, |view, window, cx| view.automation_reuse_workspace(create, workspace, window, cx))
@@ -266,6 +267,8 @@ pub(super) struct WorkspaceCreate {
     pub window_id: String,
     #[serde(skip)]
     pub reuse: bool,
+    #[serde(skip)]
+    pub project_directory: Option<std::path::PathBuf>,
     pub ssh_destination: Option<String>,
     pub name: Option<String>,
     pub description: Option<String>,

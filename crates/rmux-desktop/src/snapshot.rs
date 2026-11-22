@@ -82,6 +82,8 @@ fn default_sidebar_width() -> f32 {
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct WorkspaceSnapshot {
     pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub project_directory: Option<std::path::PathBuf>,
     #[serde(default)]
     pub description: String,
     #[serde(default)]
@@ -176,6 +178,10 @@ impl WindowSnapshot {
             "invalid active workspace"
         );
         for workspace in &self.workspaces {
+            ensure!(workspace.project_directory.as_ref().is_none_or(|path| path.is_absolute()
+                && path.as_os_str().len() <= 8192
+                && !path.as_os_str().as_encoded_bytes().iter().any(u8::is_ascii_control)),
+                "invalid workspace project directory");
             ensure!(
                 !workspace.name.trim().is_empty()
                     && workspace.name.len() <= 1024
@@ -298,6 +304,7 @@ mod tests {
             sidebar_width: 280.,
             active_workspace: 0,
             workspaces: vec![WorkspaceSnapshot {
+                project_directory: None,
                 name: "Build".into(),
                 description: "Build and test services".into(),
                 color: Some(0x7aa2f7),
@@ -312,6 +319,18 @@ mod tests {
                 },
             }],
         }
+    }
+    #[test]
+    fn project_identity_round_trips_and_old_layouts_remain_readable() -> anyhow::Result<()> {
+        let mut saved = fixture();
+        let project = std::env::temp_dir().join("project with spaces");
+        saved.workspaces[0].project_directory = Some(project.clone());
+        assert_eq!(WindowSnapshot::decode(&saved.encode()?)?.workspaces[0].project_directory, Some(project));
+        saved.workspaces[0].project_directory = None;
+        assert!(WindowSnapshot::decode(&saved.encode()?)?.workspaces[0].project_directory.is_none());
+        saved.workspaces[0].project_directory = Some("relative/project".into());
+        assert!(saved.encode().is_err());
+        Ok(())
     }
     #[test]
     fn saved_ssh_destinations_round_trip_and_reject_invalid_targets() -> Result<()> {

@@ -29,10 +29,16 @@ from that project to reuse its workspace; rmux keeps the existing processes,
 layout, and working directories. Switching to another project in VS Code opens
 that project's workspace instead.
 
-Matching uses the folder name. Two projects with the same folder name will reuse
-the same workspace. For explicit names or window targeting, use
-[open-workspace through the CLI](automation.md#open-or-reuse-a-named-workspace).
-Renaming a workspace means its old folder name no longer matches it.
+The next release matches native folder opens by the resolved project path.
+Different projects with the same folder name get separate workspaces; renaming
+a workspace or changing its shell directory does not change its project identity.
+That identity travels with the workspace between windows and is saved in layouts
+and sessions. Symlink aliases resolve to the same project.
+
+v0.1.7 uses folder-name matching. Workspaces created before project identity was
+introduced are left intact; the first native open creates a project workspace.
+Explicit [CLI name reuse](automation.md#open-or-reuse-a-named-workspace) continues
+to match workspace names, and reports ambiguity if multiple workspaces share one.
 
 ## Switch back to VS Code
 

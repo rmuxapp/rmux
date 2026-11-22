@@ -90,6 +90,7 @@ struct Entry {
     workspace: Entity<Workspace>,
     name: String,
     description: String,
+    project_directory: Option<std::path::PathBuf>,
     color: Option<u32>,
     icon: Option<String>,
     pinned: bool,
@@ -547,8 +548,8 @@ impl WorkspaceWindow {
         Ok(serde_json::json!({"workspace_id":target.to_string(),"closed":true,"window_closed":closes_window}))
     }
 
-    pub(super) fn automation_named_workspaces(&self, name: &str) -> Option<Vec<EntityId>> {
-        (!self.benchmark).then(|| self.workspace_state.entries.iter().filter(|entry| entry.name == name)
+    pub(super) fn automation_open_workspaces(&self, name: &str, project: Option<&std::path::Path>) -> Option<Vec<EntityId>> {
+        (!self.benchmark).then(|| self.workspace_state.entries.iter().filter(|entry| open_project::matches_workspace(&entry.name, entry.project_directory.as_deref(), name, project))
             .map(|entry| entry.workspace.entity_id()).collect())
     }
     pub(super) fn automation_reuse_workspace(&mut self, create: &automation::WorkspaceCreate, id: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
@@ -593,8 +594,8 @@ impl WorkspaceWindow {
     pub(super) fn automation_finish_workspace(&mut self, create: &automation::WorkspaceCreate, prepared: Result<PreparedTerminal>, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.command_launching = false;
         if create.reuse {
-            let matches = self.automation_named_workspaces(create.name.as_deref().unwrap()).unwrap_or_default();
-            if matches.len() > 1 { return Err(automation::Failure { code: -32006, message: "Workspace name became ambiguous during startup" }); }
+            let matches = self.automation_open_workspaces(create.name.as_deref().unwrap(), create.project_directory.as_deref()).unwrap_or_default();
+            if matches.len() > 1 { return Err(automation::Failure { code: -32006, message: "Workspace match became ambiguous during startup" }); }
             if let Some(id) = matches.first() { return self.automation_reuse_workspace(create, *id, window, cx); }
         }
         let prepared = prepared.map_err(|_| automation::Failure { code: -32005, message: "Could not prepare workspace terminal; check the executable and launch directory" })?;
@@ -615,6 +616,7 @@ impl WorkspaceWindow {
             cx.notify();
             return Err(automation::Failure { code: -32005, message: "Could not start workspace shell" });
         }
+        self.workspace_state.entries[index].project_directory = create.project_directory.clone();
         if let Some(name) = &create.name { self.workspace_state.entries[index].name = name.clone(); }
         else if let Some(destination) = &create.ssh_destination { self.workspace_state.entries[index].name = format!("SSH · {destination}"); }
         if let Some(description) = &create.description { self.workspace_state.entries[index].description = description.clone(); }
@@ -1729,6 +1731,7 @@ impl WorkspaceWindow {
         let workspace = entry.workspace.clone();
         let name = entry.name.clone();
         let description = entry.description.clone();
+        let project_directory = entry.project_directory.clone();
         let color = entry.color;
         let icon = entry.icon.clone();
         let pinned = entry.pinned;
@@ -1741,7 +1744,7 @@ impl WorkspaceWindow {
             let metadata = Self::observe_metadata(&workspace, window, cx);
             let index = destination.workspace_state.entries.len();
             destination.workspace_state.entries.insert(index, Entry {
-                workspace, name, description, color, icon, pinned, last_pane,
+                workspace, name, description, project_directory, color, icon, pinned, last_pane,
                 _closed: closed, _metadata: metadata,
             });
             // Keep the previous active entry's identity until select records it.
@@ -1764,6 +1767,7 @@ impl WorkspaceWindow {
         let rollback = workspace.clone();
         let name = entry.name.clone();
         let description = entry.description.clone();
+        let project_directory = entry.project_directory.clone();
         let color = entry.color;
         let icon = entry.icon.clone();
         let pinned = entry.pinned;
@@ -1788,6 +1792,7 @@ impl WorkspaceWindow {
                         workspace,
                         name,
                         description,
+                        project_directory,
                         color,
                         icon,
                         pinned,
@@ -1887,6 +1892,7 @@ impl WorkspaceWindow {
             workspace,
             name: name.clone(),
             description: String::new(),
+            project_directory: None,
             color: None,
             icon: None,
             pinned: false,
@@ -3399,6 +3405,7 @@ impl WorkspaceWindow {
                 workspace,
                 name: saved.name,
                 description: saved.description,
+                project_directory: saved.project_directory,
                 color: saved.color,
                 icon: saved.icon,
                 pinned: saved.pinned,
@@ -3620,6 +3627,7 @@ impl WorkspaceWindow {
                         Ok(snapshot::WorkspaceSnapshot {
                             name: entry.name.clone(),
                             description: entry.description.clone(),
+                            project_directory: entry.project_directory.clone(),
                             color: entry.color,
                             icon: entry.icon.clone(),
                             pinned: entry.pinned,
@@ -3889,6 +3897,7 @@ impl WorkspaceWindow {
             workspace,
             name: format!("Workspace {}", self.next_number),
             description: String::new(),
+            project_directory: None,
             color: None,
             icon: None,
             pinned: false,
