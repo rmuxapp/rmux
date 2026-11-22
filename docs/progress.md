@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+The shared WASM demo is now deployed from successful GitHub run 44970793969
+(e3fc657), including the contextual Greek search-highlight correction. Cloudflare
+deployment 77c82b1d completed successfully; fetching rmux.app confirms its demo
+links and iframe reference that exact artifact. The existing Escape, Close button
+and backdrop dismissal handlers remain in place; this deployment adds no new
+dismissal behavior. Website source remains local/off GitHub. Native release
+downloads are unchanged.
+
 Offline --kind completion now offers supported event names by prefix and omits
 already-selected kinds. The CLI and server capabilities/validation share one
 rmux-protocol vocabulary with no dependencies, avoiding separate drifting lists
