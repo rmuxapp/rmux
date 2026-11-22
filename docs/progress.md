@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+Accumulated-polish native reliability check (0241f26): one desktop build followed
+by `smoke-live-rpc.py --live-shell` and `smoke-session-restore.py`, with isolated
+config/layout/session files and fixture shells. Both passed. Live transfers and
+merges preserved process/surface identities, seven shell PIDs, Unicode variables,
+output and hidden-tab unread state while removing emptied source windows.
+Restore covered two windows, metadata, weighted splits, selected tabs, fresh
+shells, normal and forced-stop relaunch, corrupt/unsupported session fallback,
+and preservation of original corrupt bytes on normal Quit. All fixture cleanup
+passed. These checks do not establish visual focus, OS activation, UI pointer
+behavior or latency budgets. User sessions and installed app were not replaced.
+
+
 Sidebar editor polish: native and WASM workspace/group metadata now share a
 bordered input, explicit Save/Cancel buttons, keyboard hint and accent-matched
 icon/color presets. Button events use existing validation and focus return and
