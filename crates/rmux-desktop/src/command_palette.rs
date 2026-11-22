@@ -413,10 +413,10 @@ pub struct CommandPalette {
 impl EventEmitter<PaletteEvent> for CommandPalette {}
 impl CommandPalette {
     pub fn new(
-        workspaces: Vec<(EntityId, String)>,
+        workspaces: Vec<(EntityId, String, Option<String>)>,
         terminals: Vec<(Option<AnyWindowHandle>, EntityId, EntityId, String, Option<String>)>,
         windows: Vec<(AnyWindowHandle, String)>,
-        external_workspaces: Vec<(AnyWindowHandle, EntityId, String)>,
+        external_workspaces: Vec<(AnyWindowHandle, EntityId, String, Option<String>)>,
         groups: Vec<(u64, String)>,
         active_workspace: EntityId,
         pending: PaletteContext,
@@ -652,34 +652,34 @@ impl CommandPalette {
                 command.shortcut = shortcuts::hint(action.as_ref(), &focus, window);
             }
         }
-        for (index, (id, name)) in workspaces.into_iter().enumerate() {
+        for (index, (id, name, project)) in workspaces.into_iter().enumerate() {
             commands.push(Command {
                 title: format!("Switch to Workspace {}: {name}", index + 1),
                 target: PaletteEvent::SelectWorkspace(id),
                 shortcut: None,
-                subtitle: None,
+                subtitle: project.clone(),
             });
             if id != active_workspace {
                 commands.push(Command {
                     title: format!("Move Tab to Workspace {}: {name}", index + 1),
                     target: PaletteEvent::MoveTabToWorkspace(id),
                     shortcut: None,
-                subtitle: None,
+                subtitle: project.clone(),
                 });
             }
         }
-        for (destination, workspace, title) in external_workspaces {
+        for (destination, workspace, title, project) in external_workspaces {
             commands.push(Command {
                 title: format!("Switch to {title}"),
                 target: PaletteEvent::SelectWindowWorkspace(destination, workspace),
                 shortcut: None,
-                subtitle: None,
+                subtitle: project.clone(),
             });
             commands.push(Command {
                 title: format!("Move Tab to {title}"),
                 target: PaletteEvent::MoveTabToWindowWorkspace(destination, workspace),
                 shortcut: None,
-                subtitle: None,
+                subtitle: project.clone(),
             });
         }
         for (destination, title) in windows {

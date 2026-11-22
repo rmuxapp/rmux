@@ -203,7 +203,8 @@ Text bindings show an escaped excerpt and byte count; control characters do not
 render as invisible commands. Search by action name
 or key names. Modifier/key queries such as `ctrl tab` match actual bindings,
 including aliases; command names remain fuzzy-searchable. To bind this view
-itself, use the action `keyboard_shortcuts`.
+itself, use the action `keyboard_shortcuts`. Sidebar workspace-number hints also
+follow the active bindings; disabling a binding removes its hint.
 
 
 Shortcut overrides can be added alongside custom commands:

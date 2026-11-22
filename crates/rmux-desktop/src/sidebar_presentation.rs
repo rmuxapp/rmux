@@ -58,9 +58,12 @@ pub(crate) fn workspace_icon(custom: Option<String>, group: bool, selected: bool
 }
 
 /// Shared title geometry and full-label access in compact sidebars.
+pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {
+    div().id(id).flex_1().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD)
+}
 pub(crate) fn title(id: impl Into<ElementId>, text: SharedString) -> Stateful<Div> {
     let hint = text.clone();
-    div().id(id).flex_1().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD)
+    title_frame(id)
         .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
         .child(text)
 }

@@ -2532,7 +2532,7 @@ impl WorkspaceWindow {
         let focus = window.focused(cx);
         let workspaces = self.workspace_order(true)
             .into_iter()
-            .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone()) })
+            .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone(), entry.project_directory.as_ref().map(|path| format!("Project · {}", path.display()))) })
             .collect();
         let active_workspace = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
         let workspace = self.workspace_state.entries[self.workspace_state.active].workspace.read(cx);
@@ -2575,7 +2575,7 @@ impl WorkspaceWindow {
             let root = handle.downcast::<Self>()?.read(cx).ok()?;
             if root.benchmark { return None; }
             for entry in &root.workspace_state.entries {
-                external_workspaces.push((handle, entry.workspace.entity_id(), format!("Window {} / Workspace: {}", index + 1, entry.name)));
+                external_workspaces.push((handle, entry.workspace.entity_id(), format!("Window {} / Workspace: {}", index + 1, entry.name), entry.project_directory.as_ref().map(|path| format!("Project · {}", path.display()))));
                 for (pane_index, pane) in entry.workspace.read(cx).panes.iter().enumerate() {
                     let pane = pane.read(cx);
                     for (tab, terminal) in pane.terminals.iter().enumerate() {
@@ -4162,6 +4162,16 @@ impl Render for WorkspaceWindow {
         }
         // Sidebar-only summaries must not scan hidden terminals when the sidebar
         // is closed. A visible sidebar reads each terminal's cached metadata once.
+        let shortcut_focus = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
+            let workspace = entry.workspace.read(cx);
+            let pane = workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane)
+                .or_else(|| workspace.panes.first())?.read(cx);
+            Some(pane.terminals.active()?.read(cx).focus.clone())
+        });
+        let sidebar_shortcuts: [Option<String>; 9] = std::array::from_fn(|index| {
+            if !self.sidebar { return None; }
+            shortcut_focus.as_ref().and_then(|focus| shortcuts::hint(&SelectWorkspaceNumber { number: index + 1 }, focus, window))
+        });
         let mut navigation_positions = Vec::new();
         let mut unread_workspaces = std::collections::HashSet::new();
         let mut notification_previews = std::collections::HashMap::new();
@@ -4583,7 +4593,22 @@ impl Render for WorkspaceWindow {
                                                         .child(gpui::div().flex_1().min_w_0().flex().items_center().gap_1()
                                                             .when_some(header.map(|group| group.color).unwrap_or(entry.color), |row, color| row.child(gpui::div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                                             .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| entry.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
-                                                            .child(sidebar_presentation::title(("workspace-name", target), display_name.into()))
+                                                            .child(sidebar_presentation::title_frame(("workspace-name", target))
+                                                                .tooltip({
+                                                                    let root = cx.weak_entity();
+                                                                    let fallback = display_name.clone();
+                                                                    let is_group = header.is_some();
+                                                                    move |_, cx| {
+                                                                        let hint = if is_group { fallback.clone() } else {
+                                                                            root.read_with(cx, |root, _| root.workspace_state.entries.iter()
+                                                                                .find(|entry| entry.workspace.entity_id() == target)
+                                                                                .map(|entry| entry.project_directory.as_ref().map_or_else(|| entry.name.clone(),
+                                                                                    |path| format!("{}\nProject: {}", entry.name, path.display()))))
+                                                                                .ok().flatten().unwrap_or_else(|| fallback.clone())
+                                                                        };
+                                                                        cx.new(|_| pane_view::ControlHint(hint.into())).into()
+                                                                    }
+                                                                }).child(display_name))
                                                             .when(header.map(|group| group.pinned).unwrap_or(entry.pinned), |row| row.child(
                                                                 sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
                                                     .when_some(header, |row, _| row.child(
@@ -4599,8 +4624,11 @@ impl Render for WorkspaceWindow {
                                                     ))
                                                     .when(position < 8 || position + 1 == self.workspace_state.entries.len(), |row| {
                                                         let number = if position < 8 { position + 1 } else { 9 };
-                                                        let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl+Alt+" };
-                                                        row.child(gpui::div().flex_shrink_0().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 })).child(format!("{modifier}{number}")))
+                                                        row.when_some(sidebar_shortcuts[number - 1].clone(), |row, hint| row.child(
+                                                            gpui::div().id(("workspace-shortcut", target)).flex_shrink_0().max_w(px(64.)).truncate().text_xs()
+                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
+                                                                .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
+                                                                .child(hint)))
                                                     }))
                                                         .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
                                                         .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))

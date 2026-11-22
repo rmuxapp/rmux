@@ -32,7 +32,9 @@ that project's workspace instead.
 The next release matches native folder opens by the resolved project path.
 Different projects with the same folder name get separate workspaces; renaming
 a workspace or changing its shell directory does not change its project identity.
-That identity travels with the workspace between windows and is saved in layouts
+The command palette shows project paths alongside workspace results, and sidebar
+name tooltips include the associated project path. That identity travels with
+the workspace between windows and is saved in layouts
 and sessions. Symlink aliases resolve to the same project.
 
 v0.1.7 uses folder-name matching. For an older workspace without a stored project identity, rmux can adopt it
