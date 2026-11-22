@@ -234,7 +234,13 @@ use `action: "disabled"` in the same context to disable the default key.
 Use `preview` for text-file preview shortcuts. Markdown links expose
 `next_preview_link`, `previous_preview_link` and `open_preview_link`. Defaults
 are Tab, Shift+Tab and Alt+Enter only in the Markdown reading view.
- Wrap excerpts defaults to
+Ctrl+Alt+Left/Right scroll the selected table or code block horizontally;
+Ctrl+Alt+Up/Down scroll within the selected code block. These actions are
+`scroll_preview_left`, `scroll_preview_right`, `scroll_preview_up`, and
+`scroll_preview_down`, remappable with the `preview` context. Code blocks need
+wrapped reading mode enabled. Hints show the configured bindings when a
+scrollable block is selected; plain arrows retain their usual behavior.
+Wrap excerpts defaults to
 Ctrl+Alt+W and can be remapped with
 `{"key":"ctrl-alt-r","action":"toggle_preview_wrap","context":"preview"}`.
 Disable the original key separately with `action: "disabled"` in that context.

@@ -10384,3 +10384,18 @@ Desktop test compilation and the focused shared-position/isolation check passed.
 The native Mac is still locked, confirmed through computer-use inventory, so
 actual trackpad behavior, column alignment and screenshots remain pending. No
 installed app or user sessions were changed; no release or demo rebuild needed.
+
+
+### Keyboard reading of wide preview blocks — 2026-11-22
+
+Continued the local document-preview batch after table scrolling. Added scoped,
+remappable Ctrl+Alt+Arrow actions: horizontal movement for the selected table
+or wrapped code block, vertical movement inside code blocks. Movement is clamped
+to measured content bounds; tables retain shared horizontal position. Input
+composition is respected, selection and query stay unchanged, and plain arrows
+retain their existing navigation/editing behavior. Selected-block hints derive
+from the active keymap. Updated the file and Settings guides.
+
+One combined desktop compilation passed. Native input/visual acceptance remains
+pending from the confirmed locked desktop; no additional app build, release,
+website deployment or changes to user sessions were made.

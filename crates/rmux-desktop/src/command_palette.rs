@@ -1042,6 +1042,23 @@ impl CommandPalette {
             (false, false) => "Choose font for this terminal",
         }, "No matching installed fonts", window, cx)
     }
+    fn selected_block_scroll(&self) -> Option<(&ScrollHandle, bool)> {
+        let command = *self.search.matches.get(self.selected)?;
+        if let Some(handle) = self.table_scroll.get(&command) { return Some((handle, false)); }
+        if !self.wrap_preview { return None; }
+        self.code_scroll.get(&command).map(|state| (&state.scroll, true))
+    }
+    fn scroll_preview_block(&mut self, horizontal: f32, vertical: f32, cx: &mut Context<Self>) {
+        if self.input.read(cx).is_composing() { return; }
+        let Some((handle, code)) = self.selected_block_scroll() else { return; };
+        let max = handle.max_offset();
+        let offset = handle.offset();
+        handle.set_offset(point(
+            (offset.x + px(horizontal)).clamp(-max.width, px(0.)),
+            if code { (offset.y + px(vertical)).clamp(-max.height, px(0.)) } else { px(0.) },
+        ));
+        cx.notify();
+    }
     fn with_commands(commands: Vec<Command>, heading: &'static str, empty_message: &'static str, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let input = cx.new(|cx| text_field::TextField::new("", cx));
         input.read(cx).focus.focus(window);
@@ -1510,6 +1527,13 @@ impl Render for CommandPalette {
             .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!(" · {key} {label}"))).collect::<String>() } else { String::new() };
         let wrap_hint = (self.preview_navigation.is_some() && !self.hex_preview)
             .then(|| shortcuts::hint(&TogglePreviewWrap, &self.input.read(cx).focus, window)).flatten();
+        let block_scroll_hint = self.selected_block_scroll().map(|(_, code)| {
+            [(&ScrollPreviewLeft as &dyn Action, "left", true), (&ScrollPreviewRight as &dyn Action, "right", true),
+             (&ScrollPreviewUp as &dyn Action, "up", code), (&ScrollPreviewDown as &dyn Action, "down", code)]
+                .into_iter().filter(|(_, _, enabled)| *enabled)
+                .filter_map(|(action, label, _)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!("{key} {label}")))
+                .collect::<Vec<_>>().join(" · ")
+        }).filter(|hint| !hint.is_empty());
         let copy_hint = has_search_excerpt
             .then(|| shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window)).flatten();
         palette_view::panel(height)
@@ -1520,6 +1544,10 @@ impl Render for CommandPalette {
             .on_action(cx.listener(|this, _: &NextPreviewLink, _, cx| this.cycle_preview_link(1, cx)))
             .on_action(cx.listener(|this, _: &PreviousPreviewLink, _, cx| this.cycle_preview_link(-1, cx)))
             .on_action(cx.listener(|this, _: &TogglePreviewWrap, _, cx| this.toggle_preview_wrap(cx)))
+            .on_action(cx.listener(|this, _: &ScrollPreviewLeft, _, cx| this.scroll_preview_block(160., 0., cx)))
+            .on_action(cx.listener(|this, _: &ScrollPreviewRight, _, cx| this.scroll_preview_block(-160., 0., cx)))
+            .on_action(cx.listener(|this, _: &ScrollPreviewUp, _, cx| this.scroll_preview_block(0., 60., cx)))
+            .on_action(cx.listener(|this, _: &ScrollPreviewDown, _, cx| this.scroll_preview_block(0., -60., cx)))
             .on_action(cx.listener(|this, action: &FileBrowserBack, _, cx| this.navigate_folder(action, cx)))
             .on_action(cx.listener(|this, action: &FileBrowserForward, _, cx| this.navigate_folder(action, cx)))
             .on_action(cx.listener(|this, action: &FileBrowserParent, _, cx| this.navigate_folder(action, cx)))
@@ -1608,6 +1636,8 @@ impl Render for CommandPalette {
                         .child(if self.wrap_preview { "Single-line excerpts" } else { "Wrap excerpts" }))
                     .when(self.wrap_preview, |bar| bar.child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Up to 4 visual lines")))
             ))
+            .when_some(block_scroll_hint, |palette, hint| palette.child(
+                div().px_3().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(format!("Scroll selected block · {hint}"))))
             .when_some(self.preview_link_target(), |palette, (index, count, url)| palette.child(
                 div().px_3().py_2().flex_shrink_0().flex().flex_col().gap_1()
                     .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(format!("Link {}/{count}{link_hints}", index + 1)))

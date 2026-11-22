@@ -124,7 +124,12 @@ Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
 alignment markers; unspecified columns align left. Wide tables scroll horizontally
 with a minimum column width; the header and body rows share the same horizontal
 position, including when filtering the document. Scroll sideways over a table to
-read its remaining columns. Same-document anchors, images and document appearance controls
+read its remaining columns. With a table row selected, Ctrl+Alt+Left/Right
+scrolls by one column width. The same keys pan a selected code block, and
+Ctrl+Alt+Up/Down scroll its lines while wrapped reading mode is enabled.
+These shortcuts keep the search field focused and do not change the selected
+result. Visible hints follow custom bindings in Settings.
+Same-document anchors, images and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
 
 Relative links resolve from the current document's folder. Links to Markdown
