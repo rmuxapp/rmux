@@ -85,7 +85,7 @@ jobs:
       - name: Test live replay and cross-window terminal ownership
         run: |
           mise exec -- cargo build --locked -p rmux-desktop -p rmux-cli --features browser
-          mise exec -- cargo test --locked -p rmux-cli event_read
+          mise exec -- cargo test --locked -p rmux-cli
           mise exec -- python scripts/smoke-events.py
       - name: Test renderer reclamation and diagnostics
         run: |

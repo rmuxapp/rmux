@@ -2,15 +2,18 @@
 mod commands;
 mod completions;
 mod pipe;
+mod follow;
 use serde_json::{Value, json};
 use std::{ffi::OsString, path::PathBuf};
 
 const HELP: &str = "Usage: rmuxctl [--socket PATH] METHOD [JSON_OBJECT]\n\nConnect to an existing rmux Unix socket. Without --socket, use\n$RMUX_SOCKET_DIR/rpc.sock. Print the JSON-RPC response to stdout.\nExit 0 on success, 1 on RPC error, 2 on usage/transport failure.\nRequests are never retried: a timeout may have an unknown outcome.\n";
+#[derive(Clone)]
 struct Request {
     socket: PathBuf,
     body: Vec<u8>,
     pipe_command: Option<String>,
     pipe_json: bool,
+    follow: bool,
 }
 fn parse(
     args: impl IntoIterator<Item = OsString>,
@@ -42,7 +45,13 @@ fn parse(
         return Err("a nonempty RPC method is required".into());
     }
     let piping = method == "pipe-pane";
+    let reading_events = method == "read-events";
     let (method, mut params) = commands::expand_with_input(&method, args.collect(), std::io::stdin().lock())?;
+    let follow = reading_events && params.as_object_mut().unwrap().remove("follow").is_some();
+    if follow {
+        let wait = params.as_object_mut().unwrap().entry("wait_ms").or_insert(json!(3000));
+        if wait.as_u64() == Some(0) { return Err("--follow requires --wait-ms greater than zero".into()); }
+    }
     let pipe_json = piping && params.as_object_mut().unwrap().remove("json").is_some();
     let pipe_command = if piping {
         Some(params.as_object_mut().unwrap().remove("command").unwrap().as_str().unwrap().to_owned())
@@ -54,7 +63,7 @@ fn parse(
         return Err("request exceeds 64 KiB".into());
     }
     body.push(b'\n');
-    Ok(Some(Request { socket, body, pipe_command, pipe_json }))
+    Ok(Some(Request { socket, body, pipe_command, pipe_json, follow }))
 }
 #[cfg(unix)]
 fn exchange(request: Request) -> Result<Value, String> {
@@ -139,6 +148,7 @@ fn run() -> Result<i32, String> {
     };
     let pipe_command = request.pipe_command.take();
     let pipe_json = request.pipe_json;
+    if request.follow { return follow::run(request, &mut std::io::stdout().lock(), exchange); }
     let reply = exchange(request)?;
     if let Some(command) = pipe_command {
         if reply.get("error").is_some() { println!("{reply}"); return Ok(1); }

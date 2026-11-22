@@ -9,7 +9,7 @@ pub const HELP: &str = "Commands (JSON output except default pipe-pane; explicit
   paste-buffer --surface ID [--name NAME] [--bracketed]
   notify --surface ID [--title TITLE] [--body BODY]
   list-notifications [--window ID] [--workspace ID]
-  read-events [--surface ID] [--workspace ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]
+  read-events [--follow] [--surface ID] [--workspace ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]
   dismiss-notification --surface ID --revision NUMBER
   read-notification --surface ID --revision NUMBER
   close-workspace --workspace ID
@@ -42,7 +42,7 @@ whole process unless narrowed with --window (workspaces/panes/panels) or
 
 pub fn help(command: &str) -> Result<String, String> {
     let (arguments, description) = match command {
-        "read-events" => ("[--surface ID] [--workspace ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. Does not automatically retry or stream forever."),
+        "read-events" => ("[--follow] [--surface ID] [--workspace ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. --follow prints and flushes newline-delimited JSON response batches until Ctrl+C or an error, advancing cursors after output. Defaults to 3000 ms waiting; explicit zero wait is rejected. Empty batches carry checkpoints. Transport failures stop without retries; resume with the last printed cursor."),
         "pipe-pane" => ("--surface ID [--json] [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]", "Capture retained history (up to 1 MiB), optionally its last 1–65536 logical lines with --lines N or selected text with --selection, and feed it once to a local /bin/sh command via stdin. Truncated captures are rejected. Runs in the CLI working directory, forwards command stdout/stderr and returns its exit status. The CLI waits for the command; use normal shell interruption for long-running commands. Does not stream future output. --json captures stdout/stderr (1 MiB each) with exit_code and per-stream truncation flags; invalid UTF-8 is replaced. The CLI still returns the child exit status."),
         "paste-buffer" => ("--surface ID [--name NAME] [--bracketed]", "Queue a retained buffer to an explicit terminal without changing focus or scroll position. --bracketed uses terminal paste encoding. The buffer is retained; requests are never retried."),
         "rename-buffer" => ("[--name NAME] NEW_NAME", "Rename a retained buffer without copying its contents. Source defaults to default; an existing destination is never overwritten."),
@@ -174,6 +174,10 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             continue;
         }
         if !literal && arg.starts_with('-') && !(command == "set-buffer" && arg == "-") {
+            if command == "read-events" && arg == "--follow" {
+                if params.insert("follow".into(), Value::Bool(true)).is_some() { return Err("duplicate --follow".into()); }
+                continue;
+            }
             if command == "read-events" && matches!(arg.as_str(), "--surface" | "--workspace" | "--kind") {
                 let value = args.next().ok_or_else(|| format!("{arg} requires a value"))?.into_string().map_err(|_| "event filter must be UTF-8")?;
                 if value.is_empty() || value.len() > 96 || value.starts_with('-') { return Err("invalid event filter".into()); }
@@ -452,7 +456,7 @@ mod tests {
             vec!["--wait-ms", "3001"], vec!["--wait-ms", "-1"], vec!["--wait-ms", "+1"],
             vec!["--after", ""], vec!["--after"], vec!["--limit", "1", "--limit", "2"],
             vec!["--after", cursor, "--after", cursor], vec!["--wait-ms", "0", "--wait-ms", "1"],
-            vec!["--follow"], vec!["unexpected"]] {
+            vec!["--follow", "--follow"], vec!["unexpected"]] {
             assert!(expand("read-events", args(&options)).is_err(), "{options:?}");
         }
         assert_eq!(expand("read-events", args(&["--wait-ms", "0"])).unwrap().1["wait_ms"], 0);

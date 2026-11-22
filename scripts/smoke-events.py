@@ -209,6 +209,26 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert [e["kind"] for e in workspace_events["events"]] == ["workspace.closed"], workspace_events
             for target in (surface, created_surface):
                 assert sum(e["kind"] == "surface.closed" and e["surface_id"] == target for e in closed["events"]) == 1, closed
+            follower = subprocess.Popen([str(Path("target/debug/rmuxctl").resolve()), "read-events", "--follow",
+                "--after", boundary, "--workspace", original_workspace, "--wait-ms", "50"], env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, bufsize=0)
+            follow_selector = selectors.DefaultSelector()
+            follow_selector.register(follower.stdout, selectors.EVENT_READ)
+            try:
+                data = bytearray()
+                deadline = time.monotonic() + 5
+                while data.count(b"\n") < 2:
+                    remaining = deadline - time.monotonic()
+                    assert remaining > 0 and follow_selector.select(remaining), "follow did not flush batches"
+                    chunk = os.read(follower.stdout.fileno(), 65536)
+                    assert chunk, "follow exited early"
+                    data.extend(chunk)
+                batches = [json.loads(line)["result"] for line in data.splitlines()[:2]]
+                assert [e["kind"] for e in batches[0]["events"]] == ["workspace.closed"], batches
+                assert batches[1]["events"] == [] and batches[1]["cursor"] == batches[0]["cursor"], batches
+            finally:
+                follow_selector.close()
+                follower.terminate()
+                follower.wait(timeout=5)
             call("system.quit")
             assert process.wait(timeout=5) == 0
             errors.seek(0)

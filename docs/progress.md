@@ -2,6 +2,18 @@
 
 ## Current implementation focus
 
+rmuxctl read-events --follow now writes flushed JSON-RPC batches continuously,
+advancing the cursor only after successful output. Default waiting is 3 seconds;
+zero-wait following is rejected. Empty batches remain checkpoints and restart/
+retention gaps remain visible. RPC errors exit 1; transport errors stop without
+retry (resume from the printed cursor). Broken pipes end cleanly, and slow output
+consumers do not keep a server waiter alive between reads. Thirty CLI tests and
+native smoke pass, including consecutive flushed event/empty batches with no
+replayed closure. Follow-specific checks cover gap/cursor/filter preservation,
+invalid replies, transport failure and closed-output handling. GitHub now runs
+the small full CLI suite alongside this native smoke. This is long polling, not
+server push subscriptions or automatic reconnection.
+
 The GitHub-built e06bf79 demo (successful run 44970452287) is deployed to rmux.app
 via Cloudflare deployment 60250455. The first Cloudflare request returned internal
 error 8000000; one retry succeeded. Live browser inspection confirms the versioned

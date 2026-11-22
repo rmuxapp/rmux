@@ -324,6 +324,22 @@ the same running app. Treat cursors as opaque strings. A request without `after`
 starts at the oldest retained record. Limits are 1–128 (default 128); when
 `has_more` is true, read the next page before waiting for new events.
 
+To follow continuously from the CLI:
+
+```sh
+rmuxctl read-events --follow --kind workspace.created --kind workspace.closed
+```
+
+Each stdout line is a complete JSON-RPC response batch, flushed immediately.
+The next request carries the printed batch's cursor. Empty timeout batches are
+also printed as checkpoints; retention/restart gaps remain explicit in `result.gap`.
+Following defaults to a 3,000 ms wait; `--wait-ms 0` is rejected with `--follow`.
+Ctrl+C stops the client. RPC errors print once and exit 1; transport failures exit
+2 without retrying. Resume with `--after` using the last printed cursor and the
+same filters. A closed output pipe ends cleanly. Slow output consumers do not
+hold a server subscription: the next read can report a retention gap instead.
+This uses the existing bounded long-poll API, not a push subscription.
+
 Filter with optional `surface_id`, `workspace_id` and `kinds` (an array of up to
 16 distinct supported event names). All supplied filters must match; an empty
 kinds array accepts all kinds. The CLI uses `--surface ID`, `--workspace ID` and
