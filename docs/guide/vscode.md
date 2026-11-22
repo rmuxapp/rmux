@@ -50,8 +50,12 @@ to match workspace names, and reports ambiguity if multiple workspaces share one
 
 ## Switch back to VS Code
 
-Cmd+Tab works as usual. To add a dedicated shortcut in rmux, merge these entries
-into your rmux Settings JSON, then choose **Reload Settings**:
+Use **Cmd+Shift+C in both apps**: from VS Code it opens or reuses the current
+project in rmux; from rmux it focuses VS Code.
+
+In rmux, open **Settings → Open Settings File**, merge these entries into the
+existing `commands` and `keybindings` arrays, then choose **Reload Settings**.
+No restart is needed. Keep your other commands, bindings, and layout presets:
 
 ```json
 {
@@ -61,7 +65,7 @@ into your rmux Settings JSON, then choose **Reload Settings**:
     "argv": ["/usr/bin/open", "-a", "Visual Studio Code"]
   }],
   "keybindings": [{
-    "key": "cmd-alt-v",
+    "key": "cmd-shift-c",
     "command": "Focus VS Code",
     "context": "window"
   }]
@@ -72,6 +76,29 @@ This focuses VS Code as an application, not a specific editor window. macOS
 controls switching between Spaces; cross-Space behavior has not yet been
 verified. See [background commands](settings.md#background-commands-and-app-shortcuts)
 for other app-switching shortcuts.
+
+## Target a particular VS Code project window
+
+VS Code also accepts a folder path. For local terminals, change the command's
+`argv` to use its CLI and the current directory:
+
+```json
+"argv": [
+  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+  "."
+]
+```
+
+rmux runs background commands in the focused terminal's known working directory
+unless you configure an explicit `cwd`. VS Code looks for a window already open
+on the requested folder. Do not add `--reuse-window` for project matching: that
+flag forces the last active window.
+
+This follows the terminal's current directory, not the workspace's original
+project identity. After `cd` into a subfolder, it may open that subfolder instead.
+Use an explicit project path for a fixed command. Multi-root `.code-workspace`
+windows need their workspace file; a member folder does not identify the whole
+workspace. Remote SSH and containers need separate routing.
 
 ## If you tried the task-based setup
 

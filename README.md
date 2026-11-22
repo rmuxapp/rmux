@@ -53,7 +53,43 @@ in progress; they do not yet have automatic updates. Every archive includes
 ## Start here
 
 Use VS Code? [Set up rmux as your external terminal workspace](docs/guide/vscode.md)
-and open or reuse the current project with Cmd+Shift+C on macOS (v0.1.7+).
+with **Cmd+Shift+C in both directions** on macOS (v0.1.7+).
+
+In VS Code User Settings JSON:
+
+```json
+"terminal.external.osxExec": "/Applications/rmux.app"
+```
+
+In rmux Settings JSON, merge these entries into your existing arrays, then choose
+**Reload Settings**:
+
+```json
+{
+  "commands": [
+    {
+      "name": "Focus VS Code",
+      "mode": "background",
+      "argv": [
+        "/usr/bin/open",
+        "-a",
+        "Visual Studio Code"
+      ]
+    }
+  ],
+  "keybindings": [
+    {
+      "key": "cmd-shift-c",
+      "command": "Focus VS Code",
+      "context": "window"
+    }
+  ]
+}
+```
+
+From VS Code, the shortcut opens or reuses the project's running terminals.
+From rmux, it focuses VS Code. The return command focuses the app, not a specific
+project window; macOS controls switching between Spaces.
 
 Open a workspace for each project, split terminals for related tasks, and use the
 command palette to find actions without memorizing every shortcut. **⌘,** opens
