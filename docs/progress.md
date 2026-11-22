@@ -1,3 +1,14 @@
+Socket notification acceptance follow-up: the prior unread assertion depended
+on OS window focus after pane zoom/unzoom. Focused-terminal notifications are
+intentionally stored as read. The fixture now focuses a different pane and
+observes the target's input_focused=false before checking unread delivery.
+One full config-socket smoke then passed without rebuilding: CLI discovery/error
+exits, private endpoint, two clients, shared mutations, cross-window filtering,
+nested splits/failure atomicity, notification history/acknowledgement/OSC,
+workspace lifecycle, child cleanup, reconnection and normal endpoint cleanup.
+This resolves the previously reported smoke failure as a fixture precondition;
+no notification product semantics changed. OS activation/UI review is separate.
+
 Editor automation startup: optional absolute `socket_directory` in Settings
 JSON now enables the existing private Unix endpoint on normal app launch.
 RMUX_SOCKET_DIR wins when present; omission keeps automation opt-in. Reload

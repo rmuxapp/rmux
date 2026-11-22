@@ -132,6 +132,15 @@ with tempfile.TemporaryDirectory(prefix="rmux-socket-") as tmp:
             assert failed_split.returncode == 1, (failed_split.stdout, failed_split.stderr)
             assert call(first, "pane.list", {"workspace_id":original["id"]}) == before_failure
             call(first, "pane.zoom.set", {"pane_id":pane_id,"zoomed":False})
+            # Zoom/unzoom can focus the original terminal. Make the unread
+            # precondition explicit instead of relying on OS window activation.
+            call(first, "surface.focus", {"surface_id":nested["surface_id"]})
+            deadline = time.monotonic() + 3
+            while True:
+                target = next(row for row in call(first, "surface.list", {"workspace_id":original["id"]})["surfaces"] if row["id"] == surface)
+                if not target["input_focused"]: break
+                assert time.monotonic() < deadline, "notification target did not lose input focus"
+                time.sleep(.01)
             notification = subprocess.run([cli, "notify", "--surface", surface, "--title", "Build 世界", "--body", "Complete"], env=env, capture_output=True, text=True, timeout=8)
             assert notification.returncode == 0, (notification.stdout, notification.stderr)
             old_revision = json.loads(notification.stdout)["result"]["revision"]
