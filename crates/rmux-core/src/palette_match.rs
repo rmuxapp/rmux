@@ -58,6 +58,7 @@ pub struct RankedSearch {
     titles: Vec<String>,
     document: bool,
     shortcuts: Vec<String>,
+    details: Vec<String>,
     query: String,
     complete_candidates: bool,
     ranked: Vec<((usize, usize, usize), usize)>,
@@ -65,7 +66,7 @@ pub struct RankedSearch {
 }
 impl RankedSearch {
     pub fn new(titles: Vec<String>) -> Self {
-        Self { matches: (0..titles.len()).collect(), titles, document: false, shortcuts: Vec::new(), query: String::new(), complete_candidates: true, ranked: Vec::new() }
+        Self { matches: (0..titles.len()).collect(), titles, document: false, shortcuts: Vec::new(), details: Vec::new(), query: String::new(), complete_candidates: true, ranked: Vec::new() }
     }
     /// Literal word filtering for document rows. Preserve reading order and
     /// use the same contiguous matches as preview highlighting.
@@ -77,6 +78,12 @@ impl RankedSearch {
         assert_eq!(titles.len(), shortcuts.len());
         if shortcuts.iter().all(String::is_empty) { return Self::new(titles); }
         Self { shortcuts, ..Self::new(titles) }
+    }
+    /// Keep descriptive paths/metadata searchable without treating scattered
+    /// characters there as command abbreviations. Each word stays in one field.
+    pub fn with_details(titles: Vec<String>, details: Vec<String>, shortcuts: Vec<String>) -> Self {
+        assert_eq!(titles.len(), details.len());
+        Self { details, ..Self::with_shortcuts(titles, shortcuts) }
     }
     /// Query-dependent filters may reintroduce candidates even when text is
     /// appended (e.g. a shortcut query becomes a command-name query).
@@ -96,7 +103,7 @@ impl RankedSearch {
         }
         self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)| {
             if !include(index) { return None; }
-            command_score(title, self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))
+            item_score(title, self.details.get(index).map(String::as_str), self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))
         }));
         self.ranked.sort_unstable();
         self.matches.clear();
@@ -120,10 +127,10 @@ impl RankedSearch {
             self.ranked.clear();
             if self.shortcuts.is_empty() && self.complete_candidates && !self.query.is_empty() && normalized.starts_with(&self.query) {
                 self.ranked.extend(self.matches.iter().filter_map(|index|
-                    score(&self.titles[*index], &words).map(|score| (score, *index))));
+                    item_score(&self.titles[*index], self.details.get(*index).map(String::as_str), None, &words).map(|score| (score, *index))));
             } else {
                 self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)|
-                    command_score(title, self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))));
+                    item_score(title, self.details.get(index).map(String::as_str), self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))));
             }
             self.ranked.sort_unstable();
             self.matches.clear();
@@ -132,6 +139,25 @@ impl RankedSearch {
         self.query = normalized;
         self.complete_candidates = true;
     }
+}
+
+fn item_score(title: &str, detail: Option<&str>, shortcut: Option<&str>, words: &[&str]) -> Option<(usize, usize, usize)> {
+    let Some(detail) = detail else { return command_score(title, shortcut, words); };
+    let mut total = (0, 0, 0);
+    for word in words {
+        let name = command_score(title, shortcut, &[*word]);
+        let description = detail.find(word).map(|start|
+            (0, 0, title.chars().count() + 1 + detail[..start].chars().count()));
+        let best = match (name, description) {
+            (Some(a), Some(b)) => a.min(b),
+            (Some(a), None) | (None, Some(a)) => a,
+            (None, None) => return None,
+        };
+        total.0 += best.0;
+        total.1 += best.1;
+        total.2 += best.2;
+    }
+    Some(total)
 }
 
 fn command_score(title: &str, shortcuts: Option<&str>, words: &[&str]) -> Option<(usize, usize, usize)> {
@@ -155,6 +181,33 @@ fn command_score(title: &str, shortcuts: Option<&str>, words: &[&str]) -> Option
 #[cfg(test)]
 mod tests {
     use super::{score, tab_score, RankedSearch};
+
+    #[test]
+    fn command_details_match_literal_words_without_path_noise() {
+        let titles = vec!["next pane".into(), "switch to terminal: notes".into(), "build project".into()];
+        let details = vec![String::new(), "/private/nested/example/text/pane".into(), "/work/東京 café".into()];
+        let mut search = RankedSearch::with_details(titles.clone(), details.clone(), vec![String::new(); 3]);
+        search.update("next pane");
+        assert_eq!(search.matches, [0]);
+        search.update("bld café");
+        assert_eq!(search.matches, [2]);
+        search.update("notes example");
+        assert_eq!(search.matches, [1]);
+        search.update("notesexample");
+        assert!(search.matches.is_empty());
+        // Incremental filtering must use the same field rules as a fresh query.
+        for query in ["n", "ne", "next", "next p", "next pane", "", "東京", "CAFÉ"] {
+            search.update(query);
+            let mut fresh = RankedSearch::with_details(titles.clone(), details.clone(), vec![String::new(); 3]);
+            fresh.update(query);
+            assert_eq!(search.matches, fresh.matches, "{query}");
+        }
+        let mut shortcuts = RankedSearch::with_details(titles, details, vec!["cmd ]".into(), String::new(), String::new()]);
+        shortcuts.update_filtered("cmd pane", |_| true);
+        assert_eq!(shortcuts.matches, [0]);
+        shortcuts.update("café");
+        assert_eq!(shortcuts.matches, [2]);
+    }
 
     #[test]
     fn document_search_keeps_source_order_and_literal_unicode_matches() {

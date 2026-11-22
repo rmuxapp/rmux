@@ -858,7 +858,7 @@ impl CommandPalette {
         self.shortcuts_only = true;
         self.commands.retain(|command| command.shortcut.is_some());
         self.commands.sort_by_cached_key(|command| command.title.to_lowercase());
-        self.search = palette_match::RankedSearch::with_shortcuts(self.commands.iter().map(Command::search_text).collect(), self.commands.iter().map(Command::shortcut_text).collect());
+        self.search = palette_match::RankedSearch::with_details(self.commands.iter().map(|command| command.title.to_lowercase()).collect(), self.commands.iter().map(|command| command.subtitle.as_deref().unwrap_or_default().to_lowercase()).collect(), self.commands.iter().map(Command::shortcut_text).collect());
         self.selected = 0;
         self.scroll.reset(self.commands.len());
         self.heading = "Keyboard shortcuts · Current context";
@@ -1193,7 +1193,7 @@ impl CommandPalette {
         .detach();
         Self {
             input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, preview_history: None, location: None,
-            search: palette_match::RankedSearch::with_shortcuts(commands.iter().map(Command::search_text).collect(), commands.iter().map(Command::shortcut_text).collect()),
+            search: palette_match::RankedSearch::with_details(commands.iter().map(|command| command.title.to_lowercase()).collect(), commands.iter().map(|command| command.subtitle.as_deref().unwrap_or_default().to_lowercase()).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
             headings: Default::default(),
             table_scroll: Default::default(),
@@ -1436,7 +1436,7 @@ impl CommandPalette {
             let ranges = match &self.commands[command].target {
                 PaletteEvent::SearchTerminal { query, preview: true, .. } => literal_highlights(text, query),
                 _ if self.commands[command].preview_line().is_some() => file_browser::preview_highlights(text, self.input.read(cx).value()),
-                _ => rmux_core::palette_match::fuzzy_highlights(text, self.input.read(cx).value()),
+                _ => rmux_core::palette_match::highlights(text, self.input.read(cx).value()),
             };
             StyledText::new(text.clone()).with_highlights(ranges.into_iter().map(|range| (
                 range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
