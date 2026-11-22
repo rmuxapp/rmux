@@ -4322,7 +4322,8 @@ impl Render for WorkspaceWindow {
                                                     )
                                                     .into_any_element()
                                             } else {
-                                                gpui::div().flex().items_center().gap_2()
+                                                gpui::div().w_full().min_w_0().flex().flex_col().gap_1()
+                                                    .child(gpui::div().w_full().min_w_0().min_h(px(24.)).flex().items_center().gap_1()
                                                     .when_some(header, |row, group| {
                                                         let id = group.id;
                                                         row.child(sidebar_presentation::group_toggle(("group-collapse", target), group.collapsed)
@@ -4339,35 +4340,14 @@ impl Render for WorkspaceWindow {
                                                             .bg(rgb(crate::sidebar_presentation::ACCENT)).text_color(rgb(0x211d2c))
                                                             .child(unread_count.to_string())
                                                     ))
-                                                    .child(gpui::div().flex_1().min_w_0().flex().flex_col().gap_1()
-                                                        .child(gpui::div().flex().items_center().gap_2()
+                                                        .child(gpui::div().flex_1().min_w_0().flex().items_center().gap_1()
                                                             .when_some(header.map(|group| group.color).unwrap_or(entry.color), |row, color| row.child(gpui::div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                                             .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| entry.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
-                                                            .child(gpui::div().id(("workspace-name", target)).min_w_0().truncate()
+                                                            .child(gpui::div().id(("workspace-name", target)).flex_1().min_w_0().truncate()
                                                                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(title_hint.clone())).into())
                                                                 .font_weight(FontWeight::SEMIBOLD).child(display_name))
                                                             .when(header.map(|group| group.pinned).unwrap_or(entry.pinned), |row| row.child(
                                                                 sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
-                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
-                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
-                                                        .when_some(preview, |column, message| {
-                                                            let text: SharedString = if message.title.is_empty() { message.body.clone() } else if message.body.is_empty() { message.title.clone() } else { format!("{} — {}", message.title, message.body) }.into();
-                                                            let hint = text.clone();
-                                                            column.child(gpui::div().id(("workspace-message", target)).text_size(px(12.)).line_clamp(2)
-                                                                .text_color(rgb(if selected { 0xe8f2ff } else { 0xb5b5b5 }))
-                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).child(text))
-                                                        })
-
-                                                        .when_some(Self::entry_directory(entry, window, cx), |column, (branch, directory)| {
-                                                            let hint: SharedString = [branch.as_deref(), directory.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n").into();
-                                                            column.child(gpui::div().id(("workspace-context", target)).flex().items_center().gap_1().min_w_0().text_size(px(11.))
-                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
-                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
-                                                                .when_some(branch, |row, branch| row
-                                                                    .child(icons::icon("branch"))
-                                                                    .child(gpui::div().max_w(relative(0.45)).truncate().child(branch)))
-                                                                .when_some(directory, |row, directory| row.child(gpui::div().flex_1().min_w_0().truncate().child(directory))))
-                                                        }))
                                                     .when_some(header, |row, _| row.child(
                                                         gpui::div().id(("group-add", target)).w(px(24.)).h(px(24.)).flex_shrink_0()
                                                             .flex().items_center().justify_center().rounded_sm().child(icons::icon("plus"))
@@ -4386,7 +4366,30 @@ impl Render for WorkspaceWindow {
                                                         let number = if position < 8 { position + 1 } else { 9 };
                                                         let modifier = if cfg!(target_os = "macos") { "⌘" } else { "Ctrl+Alt+" };
                                                         row.child(gpui::div().flex_shrink_0().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 })).child(format!("{modifier}{number}")))
-                                                    })
+                                                    }))
+                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
+                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
+                                                        .when_some(preview, |column, message| {
+                                                            let text: SharedString = if message.title.is_empty() { message.body.clone() } else if message.body.is_empty() { message.title.clone() } else { format!("{} — {}", message.title, message.body) }.into();
+                                                            let hint = text.clone();
+                                                            column.child(gpui::div().id(("workspace-message", target)).text_size(px(12.)).line_clamp(1).text_ellipsis()
+                                                                .text_color(rgb(if selected { crate::chrome_style::SELECTED_DETAIL } else { 0xb5b5b5 }))
+                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).child(text))
+                                                        })
+
+                                                        .when_some(Self::entry_directory(entry, window, cx), |column, (branch, directory)| {
+                                                            let hint: SharedString = [branch.as_deref(), directory.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n").into();
+                                                            let has_branch = branch.is_some();
+                                                            column.child(gpui::div().id(("workspace-context", target)).flex().items_center().gap_1().min_w_0().text_size(px(11.))
+                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
+                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
+                                                                .when_some(branch, |row, branch| row
+                                                                    .child(icons::icon("branch"))
+                                                                    .child(gpui::div().min_w_0().max_w(relative(0.45)).truncate().child(branch)))
+                                                                .when_some(directory, |row, directory| row
+                                                                    .when(has_branch, |row| row.child(gpui::div().flex_shrink_0().px_1().text_color(rgb(0x74717c)).child("·")))
+                                                                    .child(gpui::div().flex_1().min_w_0().truncate().child(sidebar_presentation::directory_label(&directory)))))
+                                                        })
                                                     .into_any_element()
                                             },
                                         )

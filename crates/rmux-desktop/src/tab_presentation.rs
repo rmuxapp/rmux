@@ -24,7 +24,7 @@ pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {
         .child(crate::icons::icon("close"))
 }
 pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stateful<Div> {
-    div().id(id).flex().items_center().flex_shrink_0().px_2().gap_2()
+    div().id(id).h_full().flex().items_center().flex_shrink_0().px_2().gap_2()
         .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())
         .cursor_pointer().text_color(rgb(0x9b9b9b))
         .hover(move |style| style.bg(rgb(if active { 0x353239 } else { 0x2e2e2e })))

@@ -2,6 +2,51 @@
 
 ## Current implementation focus
 
+Sidebar/tab batch review: native bundle and WASM compilation pass together.
+Native screenshot target/sidebar-batch-review.png confirms title-line controls,
+full-width details, readable single-line notification ellipses and full-height
+tab selection. Review showed a fixed-length path suffix can still hide the final
+folder beside a long branch; long paths now prefer …/final-folder, retaining a
+character-bounded suffix for unusually long folder names. That final formatting
+adjustment has a clean diff but has not been rebuilt. The isolated native review
+process exited cleanly; user sessions remain untouched.
+
+Continuing the held sidebar polish batch: branch and directory labels now have
+a visible separator, and long directories retain their final 28 Unicode scalar
+values with a leading ellipsis, keeping the destination visible instead of only
+the root prefix. Full branch/path context remains in the hover hint. Unread
+previews request an ellipsis, and browser title rows use the native 24 px minimum
+height and tighter control spacing. Diff check passes; combined compilation and
+visual review of these follow-up edits are pending. No additional build run.
+
+Visible sidebar density polish: group disclosure, unread count, name, pin, add
+button and shortcut now occupy the title line rather than being centered beside
+the entire detail block. Descriptions, message previews and branch/directory
+context use the available row width. Unread previews are bounded to one line;
+tab selection fills the strip height. Native debug build and synthetic layout
+review pass. Review caught a truncate() layout issue showing only an ellipsis;
+using a one-line clamp restores readable previews. Screenshot:
+target/sidebar-density-polish.png. Changes remain local; no release/deployment.
+
+Sparkle generation check now exercises the real pinned generate_appcast tool
+against a disposable ad-hoc-signed copy of the existing debug executable, with a
+public Ed25519 test-vector key. scripts/check-generated-appcast.py confirms its
+embedded Markdown notes, version-specific history link, ZIP URL/length and
+signature shape pass the publication validator. Initial fixture failures exposed
+missing bundle sealing and SUPublicEDKey in the fixture; both are now supplied.
+No production keychain/signing credentials, native release build or publication
+was used. This verifies actual feed generation, not native note rendering or
+installation. Run via mise exec -- python3 scripts/check-generated-appcast.py.
+
+Website promotion: GitHub Shared WASM demo run 44974683364 succeeded for
+e76c9648739799f335b6484c18e0e10835ea9545 in 4m15s, including compiler dependency,
+font/startup, engine adapter and incremental-search checks. Imported that artifact
+and deployed directly from the local site/ops directories to Cloudflare deployment
+bf36d2a9.rmux-site.pages.dev. The production rmux.app HTML references the new
+versioned demo path and all three existing 0.1.5 downloads. Website source remains
+off GitHub. Next-release notes are drafted in docs/releases/v0.1.6.md; package
+version and native release remain 0.1.5.
+
 Native visual review of 7454978: one debug bundle build succeeds, and an isolated
 synthetic layout renders the shared palette, shortcut badges and sidebar colors.
 Screenshot: target/native-chrome-polish.png. The machine's Metal HUD is visible;

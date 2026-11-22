@@ -1,6 +1,22 @@
 //! Workspace sidebar geometry and selection styling shared by both hosts.
 use gpui::{prelude::*, *};
 pub(crate) use crate::chrome_style::{ACCENT, SELECTED_DETAIL};
+
+/// Keep the useful end of a long directory visible in a narrow sidebar.
+/// The caller retains the unabridged value in its tooltip.
+pub(crate) fn directory_label(directory: &str) -> String {
+    const LIMIT: usize = 28;
+    if directory.chars().count() > LIMIT {
+        let leaf = directory.rsplit(['/', '\\']).find(|part| !part.is_empty()).unwrap_or(directory);
+        if leaf != directory && leaf.chars().count() <= LIMIT {
+            return format!("…/{leaf}");
+        }
+    }
+    match directory.char_indices().rev().nth(LIMIT - 1) {
+        Some((offset, _)) if offset > 0 => format!("…{}", &directory[offset..]),
+        _ => directory.to_owned(),
+    }
+}
 pub(crate) fn sidebar(width: f32) -> Div {
     div().w(px(width)).overflow_hidden().flex_shrink_0().h_full().flex().flex_col().bg(rgb(0x242424))
 }

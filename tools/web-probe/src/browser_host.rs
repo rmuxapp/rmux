@@ -393,7 +393,7 @@ impl Render for BrowserHost {
                                 this.show_workspace_menu(target, menu_group, event.position, window, cx);
                             }))
                             .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
-                            .child(div().flex().items_center().gap_2()
+                            .child(div().min_h(px(24.)).min_w_0().flex().items_center().gap_1()
                                 .when_some(header, |row, group| {
                                     let id = group.id;
                                     row.child(sidebar_presentation::group_toggle(("group-collapse", entity.entity_id()), group.collapsed)
