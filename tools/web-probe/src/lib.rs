@@ -735,9 +735,10 @@ impl Render for InputProbe {
                         .h(px(self.search.matches.iter().map(|index| self.result_height(*index)).sum::<f32>().min(320.)))
                 })
                 .when(self.search.matches.is_empty(), |panel| panel.child(palette_view::empty_state(if self.shortcuts_only { "No matching bound commands" } else { "No matching commands or workspaces" })))
-                .child(palette_view::footer().child(if let Some(feedback) = self.feedback.clone() {
+                .child(palette_view::footer().justify_between().child(if let Some(feedback) = self.feedback.clone() {
                     div().child(feedback).into_any_element()
-                } else { palette_view::navigation_hints().into_any_element() })))))
+                } else { palette_view::navigation_hints().into_any_element() })
+                    .when(self.feedback.is_none(), |footer| footer.child(palette_view::result_position(self.selected, self.search.matches.len())))))))
     }
 }
 #[wasm_bindgen::prelude::wasm_bindgen(start)]

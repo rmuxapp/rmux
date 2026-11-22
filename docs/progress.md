@@ -10354,3 +10354,17 @@ extension and nonnumeric/extra coordinate fields are not treated as locations;
 zero/overflow coordinates are rejected by the resolver. Nine hyperlink and
 seven desktop resolver tests passed. Native editor launch remains unreviewed;
 no release build or user-session changes were made.
+
+
+### Palette result-position feedback — 2026-11-22
+
+Native and browser command palettes now share a compact selected/total count in
+the footer, including zero-result feedback. It follows the filtered result list
+and selection, and stays out of native document-preview/feedback footers.
+Desktop compilation and one WASM build passed. Browser review confirmed a
+filtered list and Down navigation showing “2 of 7”; screenshot:
+`target/palette-result-position.jpg`. A distinct local artifact URL avoided an
+old cached WASM module during review. Narrow viewport emulation changed canvas
+scale unexpectedly, so that observation is not narrow-layout acceptance. The
+viewport override was reset, temporary tab closed, and review server stopped.
+Native visual acceptance remains pending.

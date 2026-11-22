@@ -1607,9 +1607,11 @@ impl Render for CommandPalette {
             ))
             .when((!compact || self.feedback.is_some() || has_search_excerpt || has_ssh_destination || has_preview_file) && self.buffer_rename.is_none() && !self.directory_input && !self.terminal_search_input && !self.ssh_input, |palette| palette.child(
                 palette_view::footer()
-                    .child(div().flex_1().min_w_0().child(if let Some(feedback) = self.feedback {
+                    .child(div().flex_1().min_w_0().child(if let Some(feedback) = self.feedback.clone() {
                         div().child(feedback).into_any_element()
                     } else { palette_view::navigation_hints().into_any_element() }))
+                    .when(!has_preview_file && self.feedback.is_none(), |footer| footer.child(
+                        palette_view::result_position(self.selected, self.search.matches.len())))
                     .when(has_preview_file, |footer| footer.child(
                         div().id("preview-selected-hex").px_2().py_1().rounded_sm()
                             .cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))

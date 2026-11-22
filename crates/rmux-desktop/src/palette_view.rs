@@ -75,6 +75,12 @@ pub(crate) fn footer() -> Div {
         .flex().flex_wrap().items_center().gap_2().text_xs().text_color(rgb(0xa0a0a0))
 }
 
+pub(crate) fn result_position(selected: usize, count: usize) -> Div {
+    div().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0))
+        .child(if count == 0 { "0 results".to_owned() }
+            else { format!("{} of {count}", selected.min(count - 1) + 1) })
+}
+
 pub(crate) fn shortcut(text: impl Into<SharedString>) -> Div {
     div().flex_shrink_0().max_w(relative(0.4)).truncate().px_2().py_1()
         .text_xs().line_height(px(16.)).rounded_sm().border_1().border_color(rgb(0x45454b))
