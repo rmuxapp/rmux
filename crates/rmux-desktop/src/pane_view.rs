@@ -1074,7 +1074,9 @@ impl PaneView {
             TabCloseScope::Finished => "Their output history will be discarded.",
             _ => "Their processes will stop and output history will be discarded.",
         };
-        let detail = format!("Close {} {description}? {consequence} The current terminal will remain open.", targets.len());
+        let keeper = self.terminals.iter().position(|terminal| terminal.entity_id() == keep)
+            .map(|index| crate::close_policy::display_name(&self.tab_title(index, cx))).unwrap_or_else(|| "Current terminal".into());
+        let detail = format!("Close {} {description}? {consequence} “{keeper}” will remain open.", targets.len());
         let answer = window.prompt(PromptLevel::Warning, title, Some(&detail), &["Cancel", button], cx);
         cx.spawn_in(window, async move |entity, cx| {
             let confirmed = matches!(answer.await, Ok(1));
@@ -1137,8 +1139,10 @@ impl PaneView {
             return;
         };
         self.close_prompt = Some(id);
-        let answer = window.prompt(PromptLevel::Warning, "Close terminal?",
-            Some("Closing this terminal terminates its owned process and discards its output history."),
+        let title = format!("Close “{}”?", crate::close_policy::display_name(&self.tab_title(index, cx)));
+        let detail = if view.process_exit.is_some() { "This terminal has finished. Closing it discards its output history." }
+            else { "Closing this terminal stops its owned process and discards its output history." };
+        let answer = window.prompt(PromptLevel::Warning, &title, Some(detail),
             &["Cancel", "Close Terminal"], cx);
         cx.spawn_in(window, async move |entity, cx| {
             let confirmed = matches!(answer.await, Ok(1));

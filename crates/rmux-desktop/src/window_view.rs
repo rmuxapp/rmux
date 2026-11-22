@@ -794,7 +794,7 @@ impl WorkspaceWindow {
         let id = group.id;
         let anchor = group.members[0];
         let members = group.members.clone();
-        let message = format!("Close ‘{}’ and its {} workspaces?", group.name, members.len());
+        let message = format!("Close “{}” and its {} workspaces?", crate::close_policy::display_name(&group.name), members.len());
         let Some(permit) = cx.global::<PromptGate>().acquire() else { return; };
         self.close_prompt = Some(anchor);
         let answer = window.prompt(PromptLevel::Warning, &message,
@@ -1602,8 +1602,10 @@ impl WorkspaceWindow {
             return;
         };
         self.window_close_prompt = true;
-        let answer = window.prompt(PromptLevel::Warning, "Close window?",
-            Some("Closing this window terminates the terminal processes in all of its workspaces and discards their output history."),
+        let count = self.workspace_state.entries.len();
+        let title = format!("Close window with {count} {}?", if count == 1 { "workspace" } else { "workspaces" });
+        let answer = window.prompt(PromptLevel::Warning, &title,
+            Some("Closing this window stops its owned terminal processes and discards their output history. Other rmux windows stay open."),
             &["Cancel", "Close Window"], cx);
         cx.spawn_in(window, async move |entity, cx| {
             let confirmed = matches!(answer.await, Ok(1));
@@ -2468,8 +2470,10 @@ impl WorkspaceWindow {
             return;
         };
         self.close_prompt = Some(id);
-        let answer = window.prompt(PromptLevel::Warning, "Close workspace?",
-            Some("Closing this workspace terminates all of its owned terminal processes and discards their output history."),
+        let title = format!("Close workspace “{}”?", crate::close_policy::display_name(&entry.name));
+        let count: usize = entry.workspace.read(cx).panes.iter().map(|pane| pane.read(cx).terminals.len()).sum();
+        let detail = format!("This closes {count} terminal {}, stops their owned processes and discards their output history.", if count == 1 { "tab" } else { "tabs" });
+        let answer = window.prompt(PromptLevel::Warning, &title, Some(&detail),
             &["Cancel", "Close Workspace"], cx);
         cx.spawn_in(window, async move |entity, cx| {
             let confirmed = matches!(answer.await, Ok(1));

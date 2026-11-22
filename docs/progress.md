@@ -10550,3 +10550,19 @@ is used only by preview history; external automation remains strict. These are
 integration corrections, not a claim of native runtime acceptance. Native link
 clicking and history navigation still need an unlocked desktop review. No user
 sessions, release artifacts or website deployments changed.
+
+
+### Close-confirmation target and scope clarity — 2026-11-22
+
+Batched native close-dialog copy improvements across terminal, workspace, group,
+window and application scopes. Terminal/workspace prompts name the affected
+object; workspace prompts count terminal tabs, window prompts count workspaces,
+and Quit counts windows. Batch-tab prompts name the terminal kept open. Finished
+terminals describe output-history removal without claiming a running process
+will stop. Names are bounded to 80 Unicode characters and control characters are
+replaced for native dialog readability. Existing target IDs, confirmation policy,
+Cancel-first buttons and teardown behavior remain unchanged.
+
+One desktop compilation passed. No user terminal was closed or native quit prompt
+triggered. Native visual/dialog acceptance remains pending; this copy-only batch
+did not require additional runtime tests, a release build or a deployment.

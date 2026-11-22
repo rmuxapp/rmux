@@ -318,9 +318,9 @@ fn request_quit(cx: &mut App) {
     let Some(permit) = cx.global::<PromptGate>().acquire() else {
         return;
     };
+    let detail = format!("Quit across {} {}? This stops all owned terminal processes and discards their output history.", windows.len(), if windows.len() == 1 { "window" } else { "windows" });
     let answer = target.update(cx, |_, window, cx| window.prompt(PromptLevel::Warning,
-        "Quit rmux?",
-        Some("Quitting terminates the owned terminal processes in every rmux window and discards their output history."),
+        "Quit rmux?", Some(&detail),
         &["Cancel", "Quit rmux"], cx));
     let Ok(answer) = answer else { return };
     cx.global_mut::<Shutdowns>().quit_prompt = true;

@@ -1,4 +1,13 @@
 //! Startup policy shared by every user-requested termination scope.
+/// Keep user/shell titles readable in native confirmation dialogs.
+pub fn display_name(name: &str) -> String {
+    let mut chars = name.chars().map(|ch| if ch.is_control() { ' ' } else { ch });
+    let mut label: String = chars.by_ref().take(80).collect();
+    if chars.next().is_some() { label.push('…'); }
+    let label = label.trim();
+    if label.is_empty() { "Untitled".into() } else { label.to_owned() }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ClosePolicy {
