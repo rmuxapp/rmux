@@ -26,29 +26,29 @@ pub(crate) fn navigated_result(selected: usize, count: usize, key: &str) -> Opti
 pub(crate) fn panel(height: f32) -> Stateful<Div> {
     div().id("command-palette").w(px(520.)).max_w(relative(0.9)).h_auto()
         .max_h(px((height - top_inset(height) - 8.).max(0.))).overflow_hidden()
-        .flex().flex_col().rounded_lg().border_1().border_color(rgb(0x454545)).bg(rgb(0x252525))
+        .flex().flex_col().rounded_lg().border_1().border_color(crate::chrome_style::hover()).bg(crate::chrome_style::surface())
 }
 pub(crate) fn header(text: impl Into<SharedString>, close: impl IntoElement) -> Div {
     div().flex().flex_shrink_0().items_center().justify_between().gap_2().px_3().pt_3()
-        .child(div().min_w_0().flex_1().text_size(px(13.)).text_color(rgb(0xbcbcc4)).child(text.into()))
+        .child(div().min_w_0().flex_1().text_size(px(13.)).text_color(crate::chrome_style::muted()).child(text.into()))
         .child(close)
 }
 pub(crate) fn close_button() -> Stateful<Div> {
     div().id("close-command-palette").flex_shrink_0().px_2().h(px(28.))
-        .flex().items_center().rounded_sm().text_xs().text_color(rgb(0xbcbcc4))
-        .cursor_pointer().hover(|style| style.bg(rgb(0x454545)).text_color(rgb(0xffffff)))
+        .flex().items_center().rounded_sm().text_xs().text_color(crate::chrome_style::muted())
+        .cursor_pointer().hover(|style| style.bg(crate::chrome_style::hover_strong()).text_color(crate::chrome_style::foreground()))
         .child("Close ×")
 }
 pub(crate) fn search(input: Entity<crate::text_field::TextField>, cx: &App) -> Div {
     let can_clear = !input.read(cx).value().is_empty() && !input.read(cx).is_composing();
     div().w_full().min_w_0().flex_shrink_0().p_3().child(div().w_full().min_w_0().px_3().py_2().rounded_md()
         .flex().items_center().gap_2()
-        .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a))
+        .border_1().border_color(crate::chrome_style::selected_border()).bg(crate::chrome_style::background())
         .child(div().flex_1().min_w_0().child(input.clone()))
         .when(can_clear, |field| field.child(div().id("clear-palette-search")
             .flex_shrink_0().w(px(24.)).h(px(24.)).flex().items_center().justify_center()
-            .rounded_sm().text_sm().text_color(rgb(0xbcbcc4)).cursor_pointer()
-            .hover(|style| style.bg(rgb(0x353535)).text_color(rgb(0xffffff)))
+            .rounded_sm().text_sm().text_color(crate::chrome_style::muted()).cursor_pointer()
+            .hover(|style| style.bg(crate::chrome_style::hover_strong()).text_color(crate::chrome_style::foreground()))
             .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Clear search".into())).into())
             .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
             .on_click(move |event, window, cx| {
@@ -67,38 +67,38 @@ pub(crate) fn result_row_height(has_subtitle: bool) -> f32 {
 pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {
     div().id(("command", id)).w_full().min_w_0().px_3().h(px(height))
         .text_sm().line_height(px(20.)).flex().items_center().gap_3().cursor_pointer()
-        .when(selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
-        .hover(move |row| row.bg(rgb(if selected { crate::chrome_style::SELECTED_HOVER } else { 0x303030 })))
+        .when(selected, |row| row.bg(crate::chrome_style::selected()))
+        .hover(move |row| row.bg(if selected { crate::chrome_style::selected_hover() } else { crate::chrome_style::hover() }))
 }
 pub(crate) fn footer() -> Div {
-    div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x363636))
-        .flex().flex_wrap().items_center().gap_2().text_xs().text_color(rgb(0xa0a0a0))
+    div().flex_shrink_0().px_3().py_2().border_t_1().border_color(crate::chrome_style::hover())
+        .flex().flex_wrap().items_center().gap_2().text_xs().text_color(crate::chrome_style::muted())
 }
 
 pub(crate) fn result_position(selected: usize, count: usize) -> Div {
-    div().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0))
+    div().flex_shrink_0().text_xs().text_color(crate::chrome_style::muted())
         .child(if count == 0 { "0 results".to_owned() }
             else { format!("{} of {count}", selected.min(count - 1) + 1) })
 }
 
 pub(crate) fn shortcut(text: impl Into<SharedString>) -> Div {
     div().flex_shrink_0().max_w(relative(0.4)).truncate().px_2().py_1()
-        .text_xs().line_height(px(16.)).rounded_sm().border_1().border_color(rgb(0x45454b))
-        .bg(rgb(0x2b2b30)).text_color(rgb(0xbcbcc4)).child(text.into())
+        .text_xs().line_height(px(16.)).rounded_sm().border_1().border_color(crate::chrome_style::border())
+        .bg(crate::chrome_style::elevated()).text_color(crate::chrome_style::muted()).child(text.into())
 }
 
 pub(crate) fn navigation_hints() -> Div {
     div().flex().flex_wrap().items_center().gap_3()
         .children([("↑↓", "Navigate"), ("↵", "Run"), ("Esc", "Close")].into_iter().map(|(key, label)|
             div().flex().items_center().gap_1()
-                .child(div().px_1().rounded_sm().border_1().border_color(rgb(0x45454b))
-                    .text_color(rgb(0xbcbcc4)).child(key))
+                .child(div().px_1().rounded_sm().border_1().border_color(crate::chrome_style::border())
+                    .text_color(crate::chrome_style::muted()).child(key))
                 .child(label)))
 }
 
 pub(crate) fn empty_state(message: impl Into<SharedString>) -> Div {
     div().w_full().px_3().py_6().flex_shrink_0().text_center().text_sm()
-        .text_color(rgb(0xbcbcc4)).child(message.into())
+        .text_color(crate::chrome_style::muted()).child(message.into())
 }
 
 // Keep the destination within one viewport of the starting row. Always advance

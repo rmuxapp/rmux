@@ -174,7 +174,7 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
         .on_key_down(cx.listener(TerminalView::ports_key))
         .on_action(cx.listener(|this, _: &CopySelection, _, cx| { this.copy_port(cx); cx.stop_propagation(); }))
         .h(px(180.)).max_h(relative(0.4)).min_w_0().overflow_hidden().flex_shrink_0().flex().flex_col()
-        .bg(rgb(0x242424)).border_b_1().border_color(rgb(0x383838)).text_size(px(12.))
+        .bg(crate::chrome_style::surface()).border_b_1().border_color(crate::chrome_style::border()).text_size(px(12.))
         .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
             if let Some(focus) = &this.ports.focus { focus.focus(window); }
             cx.stop_propagation();
@@ -193,7 +193,7 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                 if event.standard_click() { this.close_ports(window, cx); }
             })).child(icons::icon("close"))))
         .child(div().id("port-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_2().pb_2()
-            .when_some(state.error.clone(), |list, error| list.child(div().text_color(rgb(0xf2a5a5)).child(error)))
+            .when_some(state.error.clone(), |list, error| list.child(div().text_color(crate::chrome_style::danger()).child(error)))
             .when_some(state.report.as_ref(), |list, report| list
                 .when(report.listeners.is_empty(), |list| list.child("No local TCP listeners found for this terminal."))
                 .when(report.ownership_changed, |list| list.child("Some process ownership changed during the scan; refresh for current results."))
@@ -201,7 +201,7 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                 .children(report.listeners.iter().enumerate().map(|(index, row)| {
                     let address = row.address.to_string();
                     div().id(("listener-row", index)).py_1().px_1().rounded_sm().flex().items_center().gap_2().cursor_pointer()
-                        .when(index == state.selected, |row| row.bg(rgb(if state.focus.as_ref().is_some_and(|focus| focus.is_focused(window)) { crate::chrome_style::SELECTED } else { 0x333333 })))
+                        .when(index == state.selected, |row| row.bg(if state.focus.as_ref().is_some_and(|focus| focus.is_focused(window)) { crate::chrome_style::selected() } else { crate::chrome_style::hover() }))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                             this.ports.selected = index;
                             if let Some(focus) = &this.ports.focus { focus.focus(window); }
@@ -210,7 +210,7 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                         .child(div().id(("listener-address", index)).flex_1().min_w_0().truncate()
                             .tooltip({ let address: SharedString = address.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(address.clone())).into() })
                             .child(address.clone()))
-                        .child(div().text_color(rgb(0xa0a0a0)).child(format!("PID {}", row.pid)))
+                        .child(div().text_color(crate::chrome_style::muted()).child(format!("PID {}", row.pid)))
                         .when_some(ports::http_url(row.address), |row, url| row.child(
                             pane_view::pane_control("open-port-http", "Open as HTTP in Default Browser").id(("open-port-http", index))
                                 .on_click(move |event, _, cx| { if event.standard_click() { cx.stop_propagation(); cx.open_url(&url); } })
@@ -219,6 +219,6 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                             .on_click(move |event, _, cx| { if event.standard_click() { clipboard::write(ClipboardItem::new_string(address.clone()), cx); } })
                             .child(icons::icon("copy")))
                 }))))
-        .child(div().px_2().py_1().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ / Tab Select · Enter Copy · O Open HTTP · R Refresh · Esc Close"))
+        .child(div().px_2().py_1().text_xs().text_color(crate::chrome_style::muted()).child("↑↓ / Tab Select · Enter Copy · O Open HTTP · R Refresh · Esc Close"))
         .into_any_element()
 }

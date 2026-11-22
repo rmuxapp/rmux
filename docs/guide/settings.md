@@ -490,6 +490,13 @@ terminal theme's default palette.
 
 ## Theme presets
 
+Theme selection applies to the entire window: the sidebar, tab strips, command
+palette, menus, search fields and inspectors use the terminal background and
+matching text, accent and border colors. Light themes switch the whole interface
+to light colors. Imported themes and explicit foreground/background overrides
+follow the same path, and changes apply live to all windows. Per-terminal OSC
+color changes stay local to that terminal.
+
 `terminal_theme` accepts `"dark"` (the existing default), `"light"` (white
 background with a darker ANSI palette), `"solarized_dark"`, `"solarized_light"`, `"nord"`,
 `"catppuccin_mocha"`, or `"catppuccin_latte"`.

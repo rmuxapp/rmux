@@ -19,7 +19,7 @@ impl Preedit {
         let mut backgrounds = vec![fill(Bounds::new(origin, size(line.width() + px(2.), height)), background)];
         if !selection.is_empty() {
             backgrounds.push(fill(Bounds::new(origin + point(start.min(offset), px(0.)),
-                size((offset-start).abs(), height)), rgb(0x344b70)));
+                size((offset-start).abs(), height)), crate::chrome_style::selected()));
         }
         Self { line, origin, height, backgrounds, cursor: origin + point(offset, px(0.)) }
     }

@@ -25,6 +25,6 @@ pub(crate) fn indicator(bounds: Bounds<Pixels>, frame: &Frame) -> Option<PaintQu
     let bar = Scrollbar::new(frame.rows.len(),frame.scrollback_lines,frame.scrollback_offset,f32::from(bounds.size.height))?;
     Some(fill(
         Bounds::new(bounds.origin + point(bounds.size.width - px(3.), px(bar.top)), size(px(3.),px(bar.thumb))),
-        rgb(0x667085),
+        crate::chrome_style::muted(),
     ))
 }

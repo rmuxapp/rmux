@@ -35,8 +35,8 @@ pub(crate) fn drag_capture<H: SidebarHost>(cx: &Context<H>) -> impl IntoElement 
 }
 pub(crate) fn divider<H: SidebarHost>(width: f32, cx: &Context<H>) -> Stateful<Div> {
     div().id("sidebar-divider").w(px(5.)).h_full().flex_shrink_0()
-        .bg(rgb(0x242424)).border_l_1().border_color(rgb(0x383838)).cursor(CursorStyle::ResizeLeftRight)
-        .hover(|style| style.bg(rgb(0x7795c8)))
+        .bg(crate::chrome_style::surface()).border_l_1().border_color(crate::chrome_style::border()).cursor(CursorStyle::ResizeLeftRight)
+        .hover(|style| style.bg(crate::chrome_style::accent()))
         .on_mouse_down(MouseButton::Left, cx.listener(move |this, event: &MouseDownEvent, _, cx| {
             let (stored, drag) = this.sidebar_state();
             if event.click_count == 2 { *stored = DEFAULT_WIDTH; *drag = None; cx.notify(); }

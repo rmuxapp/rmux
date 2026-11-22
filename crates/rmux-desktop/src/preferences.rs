@@ -510,6 +510,18 @@ impl Preferences {
     pub fn selection_background(&self) -> Option<CellColor> {
         self.selection_background.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_background)).or_else(|| self.terminal_theme.bundled().and_then(|theme| theme.selection_background))
     }
+    pub fn chrome_palette(&self) -> crate::chrome_style::Palette {
+        let pack = |rmux_terminal::Color(r, g, b)| (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+        let colors = self.terminal_colors();
+        let palette = self.effective_palette();
+        let ansi = |index, fallback| palette.map(|colors| pack(colors[index])).unwrap_or(fallback);
+        crate::chrome_style::Palette::new(
+            pack(colors[1].unwrap_or(rmux_terminal::DEFAULT_BACKGROUND)),
+            pack(colors[0].unwrap_or(rmux_terminal::DEFAULT_FOREGROUND)),
+            ansi(4, 0xa99be8), ansi(3, 0xf0b85b), ansi(1, 0xf18a8a), ansi(2, 0x9fceb0),
+        )
+    }
+
     pub fn terminal_colors(&self) -> [Option<rmux_terminal::Color>; 3] {
         let defaults = match self.terminal_theme {
             TerminalTheme::CatppuccinMocha | TerminalTheme::CatppuccinLatte => self.terminal_theme.bundled().unwrap().colors,
@@ -791,6 +803,19 @@ impl Preferences {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn chrome_theme_follows_presets_and_explicit_background() -> Result<()> {
+        for theme in TerminalTheme::ALL {
+            let settings = Preferences::decode(&serde_json::to_vec(&serde_json::json!({"terminal_theme": theme}))?)?;
+            let rmux_terminal::Color(r, g, b) = settings.terminal_colors()[1].unwrap_or(rmux_terminal::DEFAULT_BACKGROUND);
+            let background = (u32::from(r) << 16) | (u32::from(g) << 8) | u32::from(b);
+            assert_eq!(settings.chrome_palette().surface, background);
+        }
+        let settings = Preferences::decode(br##"{"terminal_theme":"nord","background_color":"#fff1dd"}"##)?;
+        assert_eq!(settings.chrome_palette().surface, 0xfff1dd);
+        Ok(())
+    }
+
     #[test]
     fn startup_disables_only_invalid_editor_without_changing_config() -> anyhow::Result<()> {
         use super::Preferences;

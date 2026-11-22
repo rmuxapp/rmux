@@ -429,10 +429,10 @@ impl Render for BrowserHost {
                                     })))))
                             .when_some(header, |row, group| {
                                 let count = group.members.len();
-                                row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 }))
+                                row.child(div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() })
                                     .truncate().child(format!("{count} {}", if count == 1 { "workspace" } else { "workspaces" })))
                             })
-                            .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
+                            .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() }).truncate().child(metadata.description.clone())))
                             .child(sidebar_presentation::context_row(("workspace-context", target), Some("main".into()),
                                 Some(entity.read(cx).context_directory(cx)), selected))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(

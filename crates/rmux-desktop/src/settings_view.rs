@@ -111,7 +111,7 @@ pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
 fn button(id: String, label: String, hint: String, key: &'static str, delta: i32) -> impl IntoElement {
     let hint: SharedString = hint.into();
     div().id(SharedString::from(id)).min_w_0().max_w_full().px_2().py_1().rounded_sm().cursor_pointer()
-        .bg(rgb(0x353535)).hover(|s| s.bg(rgb(0x454545))).text_size(px(12.))
+        .bg(crate::chrome_style::hover()).hover(|s| s.bg(crate::chrome_style::hover_strong())).text_size(px(12.))
         .on_click(move |event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(AdjustSetting { key: key.into(), delta }), cx); } })
         .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
         .child(div().truncate().child(label))
@@ -119,7 +119,7 @@ fn button(id: String, label: String, hint: String, key: &'static str, delta: i32
 fn row(label: &'static str, key: &'static str, value: String, stepper: bool, selected: bool, readonly: bool) -> impl IntoElement {
     div().id(SharedString::from(format!("setting-row-{key}"))).min_w_0().px_1().py_3()
         .on_mouse_down(MouseButton::Left, move |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: key.into() }), cx))
-        .when(selected, |s| s.bg(rgb(chrome_style::SELECTED))).border_b_1().border_color(rgb(0x383838))
+        .when(selected, |s| s.bg(crate::chrome_style::selected())).border_b_1().border_color(crate::chrome_style::border())
         .flex().flex_wrap().items_center().gap_2()
         .child(div().flex_1().w(px(120.)).min_w_0().max_w_full().text_size(px(13.)).child(label))
         .child(div().flex().flex_wrap().items_center().gap_2().min_w_0().max_w_full()
@@ -127,7 +127,7 @@ fn row(label: &'static str, key: &'static str, value: String, stepper: bool, sel
                 .child(button(format!("{key}-less"), "−".into(), format!("Decrease {label}"), key, -1)))
             .child(if readonly {
                 div().id(SharedString::from(format!("{key}-readonly")))
-                    .px_2().py_1().text_size(px(12.)).text_color(rgb(0xa0a0a0))
+                    .px_2().py_1().text_size(px(12.)).text_color(crate::chrome_style::muted())
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Controlled by RMUX_CONFIRM_CLOSE. Remove the override and restart rmux to edit this policy here.".into())).into())
                     .child(value).into_any_element()
             } else if stepper {
@@ -169,11 +169,11 @@ fn theme_preview(settings: &Preferences) -> impl IntoElement {
                     div().flex_1().h_full().bg(rgb_color(color)))))))
         .when_some(settings.theme_file.as_ref(), |preview, path| {
             let hint: SharedString = path.display().to_string().into();
-            preview.child(div().id("imported-theme-path").min_w_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
+            preview.child(div().id("imported-theme-path").min_w_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
                 .child(format!("Imported: {}", path.file_name().unwrap_or_default().to_string_lossy())))
         })
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(if overridden {
+        .child(div().text_xs().text_color(crate::chrome_style::muted()).child(if overridden {
             "Preview includes your configured color overrides."
         } else { "Preview of configured colors. Apps may override them." }))
 }
@@ -195,21 +195,21 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .child(pane_view::pane_control("close-settings", "Close Settings")
                 .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSettings), cx); } }).child(icons::icon("close"))))
         .child(div().id("settings-scroll").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_3()
-            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Changes apply now. Save to keep them. Settings marked below require a restart."))
+            .child(div().pt_3().text_xs().text_color(crate::chrome_style::muted()).child("Changes apply now. Save to keep them. Settings marked below require a restart."))
             .child(row("Default text size", "font", format!("{} pt", settings.font_size), true, state.selected == 0, false))
             .child(row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, state.selected == 1, false))
-            .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(rgb(0x383838))
+            .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(crate::chrome_style::border())
                 .on_mouse_down(MouseButton::Left, |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: "theme".into() }), cx))
-                .when(state.selected == 2, |row| row.bg(rgb(chrome_style::SELECTED)))
-                .child(div().mb_2().text_size(px(13.)).child("Terminal theme"))
+                .when(state.selected == 2, |row| row.bg(crate::chrome_style::selected()))
+                .child(div().mb_2().text_size(px(13.)).child("App & terminal theme"))
                 .child(div().flex().flex_wrap().gap_2().children(
                     preferences::TerminalTheme::ALL.into_iter().enumerate().map(|(index, theme)| {
                         let selected = settings.theme_file.is_none() && settings.terminal_theme == theme;
                         div().id(("theme-choice", index)).px_2().py_1().rounded_sm().cursor_pointer()
                             .text_size(px(12.)).border_1()
-                            .border_color(rgb(if selected { chrome_style::ACCENT } else { 0x454545 }))
-                            .bg(rgb(if selected { crate::chrome_style::SELECTED } else { 0x292929 }))
-                            .hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER)))
+                            .border_color(if selected { crate::chrome_style::accent() } else { crate::chrome_style::hover() })
+                            .bg(if selected { crate::chrome_style::selected() } else { crate::chrome_style::elevated() })
+                            .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                             .on_click(move |event, window, cx| {
                                 if event.standard_click() { window.dispatch_action(Box::new(SetTerminalTheme { theme }), cx); }
                             }).child(theme.label())
@@ -230,14 +230,14 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             }.into(), false, state.selected == 8, false))
             .child(div()
                 .child(row("New terminal scrollback", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 9, false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Output history budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Output history budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
             .child(div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, state.selected == 10, false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.")))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.")))
             .child(row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, state.selected == 11, false))
             .child(row("Default font family", "font_family", settings.font_family.clone(), false, state.selected == 12, false))
             .child(row("Terminal background opacity", "opacity", format!("{}%", settings.background_opacity), true, state.selected == 13, false))
             .child(div().child(row("Blur behind terminal", "blur", if settings.background_blur { "On" } else { "Off" }.into(), false, state.selected == 14, false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Blur requires opacity below 100% and OS/compositor support. Text, colored cells, tabs and sidebar remain opaque.")))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Blur requires opacity below 100% and OS/compositor support. Text, colored cells, tabs and sidebar remain opaque.")))
             .child(row("New workspace position", "workspace_placement", match settings.new_workspace_placement {
                 workspace_groups::Placement::AfterCurrent => "After current",
                 workspace_groups::Placement::Top => "First",
@@ -245,41 +245,41 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             }.into(), false, state.selected == 15, false))
             .when(cfg!(target_os = "macos"), |panel| panel.child(div()
                 .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
             .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, Some(state.selected) == control_index("selection_opacity"), false))
                 .child(button("selection-opacity-reset".into(), "Use theme default".into(), "Reset selection opacity to the theme default".into(), "selection_opacity", 0)))
             .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, Some(state.selected) == control_index("import_theme"), false))
             .child(div()
                 .child(row("External editor", "file_editor", "Configure…".into(), false, Some(state.selected) == control_index("file_editor"), false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Opens Settings JSON. Set file_editor.program and args, then Reload Settings."))
-                .child(div().id("settings-editor-program").pt_1().text_xs().min_w_0().truncate().text_color(rgb(0xb8b8b8))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Opens Settings JSON. Set file_editor.program and args, then Reload Settings."))
+                .child(div().id("settings-editor-program").pt_1().text_xs().min_w_0().truncate().text_color(crate::chrome_style::muted())
                     .tooltip({ let program: SharedString = settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "No external editor configured".into()).into();
                         move |_, cx| cx.new(|_| pane_view::ControlHint(program.clone())).into() })
                     .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
             .child(div()
                 .child(row("VS Code configuration", "editor_example", "Copy example".into(), false, Some(state.selected) == control_index("editor_example"), false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.")))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.")))
             .child(div()
                 .child(row("Edit settings without configured editor", "editor_fallback", "Open…".into(), false, Some(state.selected) == control_index("editor_fallback"), false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(if cfg!(target_os = "macos") { "Opens TextEdit if your editor configuration needs repair." } else { "Uses the system file association if your editor configuration needs repair." })))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child(if cfg!(target_os = "macos") { "Opens TextEdit if your editor configuration needs repair." } else { "Uses the system file association if your editor configuration needs repair." })))
             .child(div()
                 .child(row("Saved command history", "shell_history", "Configure…".into(), false,
                     Some(state.selected) == control_index("shell_history"), false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xb8b8b8))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted())
                     .child(format!("{} · Experimental", shell_history::settings_status(&settings.shell_history_directory))))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0))
+                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted())
                     .child("Recall commands when restoring a saved session. Supports zsh and non-login Bash. Set shell_history_directory in Settings JSON, then restart rmux."))
                 .when_some(settings.shell_history_directory.as_ref(), |row, path| {
                     let path: SharedString = path.display().to_string().into();
-                    row.child(div().id("settings-history-directory").pt_1().text_xs().min_w_0().truncate().text_color(rgb(0xb8b8b8))
+                    row.child(div().id("settings-history-directory").pt_1().text_xs().min_w_0().truncate().text_color(crate::chrome_style::muted())
                         .tooltip({ let path = path.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(path.clone())).into() })
                         .child(path))
                 }))
-            .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
-        .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838)).flex().flex_col().gap_2()
-            .child(div().text_xs().text_color(rgb(if unsaved { 0xe3bc78 } else { 0xa0a0a0 }))
+            .child(div().py_3().text_xs().text_color(crate::chrome_style::muted()).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
+        .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(crate::chrome_style::border()).flex().flex_col().gap_2()
+            .child(div().text_xs().text_color(if unsaved { crate::chrome_style::warning() } else { crate::chrome_style::muted() })
                 .child(if unsaved { "Unsaved changes" } else { "No unsaved changes" }))
-            .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ select · ←→ change · Enter apply · Esc close"))
+            .child(div().text_xs().text_color(crate::chrome_style::muted()).child("↑↓ select · ←→ change · Enter apply · Esc close"))
             .children([
                 [
                     (0, "settings-save", save_label.as_str(), "Save current appearance settings to the settings file"),
@@ -295,10 +295,10 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                 let enabled = footer_enabled(index, busy, unsaved,
                     cx.global::<preferences::LastSettingsSave>().0.is_some());
                 div().id(id).flex_1().min_w_0().h(px(30.)).flex().items_center().justify_center().px_2().rounded_sm().text_xs().border_1()
-                    .when(index == 0, |button| button.bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED })))
-                    .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
-                    .text_color(rgb(if enabled { chrome_style::ACCENT } else { 0x777777 }))
-                    .when(enabled, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
+                    .when(index == 0, |button| button.bg(if busy { crate::chrome_style::hover() } else { crate::chrome_style::selected() }))
+                    .border_color(if state.selected == KEYS.len() + index { crate::chrome_style::accent() } else { crate::chrome_style::hover() })
+                    .text_color(if enabled { crate::chrome_style::accent() } else { crate::chrome_style::muted() })
+                    .when(enabled, |link| link.cursor_pointer().hover(|style| style.bg(crate::chrome_style::selected_hover())))
                     .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
                     .on_mouse_down(MouseButton::Left, move |_, window, cx| {
                         if enabled { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); }

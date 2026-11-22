@@ -103,8 +103,8 @@ impl TerminalView {
         let header_height = if destination.is_some() { 48. } else { 0. };
         deferred(anchored().position(menu.position).snap_to_window().child(
             div().id("terminal-context-menu").track_focus(&menu.focus).key_context("TerminalMenu")
-                .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.)))).py_1().bg(rgb(0x292929)).text_color(rgb(0xd6d6d6))
-                .border_1().border_color(rgb(0x465063)).rounded_md().shadow_md().occlude()
+                .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.)))).py_1().bg(crate::chrome_style::elevated()).text_color(crate::chrome_style::foreground())
+                .border_1().border_color(crate::chrome_style::border()).rounded_md().shadow_md().occlude()
                 .on_mouse_down_out(cx.listener(|this, _, window, cx| this.dismiss_terminal_menu(window, cx)))
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
@@ -140,15 +140,15 @@ impl TerminalView {
                     let destination = (index == 9).then(|| menu.link_error.map(|error| error.message().to_owned())
                         .or_else(|| menu.file.as_ref().map(|file| file.label())).or_else(|| menu.link.clone())).flatten();
                     div().id(("terminal-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
-                        .when(matches!(index, 3 | 5 | 7 | 8), |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
+                        .when(matches!(index, 3 | 5 | 7 | 8), |row| row.mt_1().border_t_1().border_color(crate::chrome_style::border()))
                         .when(enabled[index], |row| row.cursor_pointer()
-                            .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+                            .when(index == menu.selected, |row| row.bg(crate::chrome_style::selected()))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {
                                 if let Some(menu) = &mut this.terminal_menu {
                                     if menu.selected != index { menu.selected = index; cx.notify(); }
                                 }
                             })))
-                        .when(!enabled[index], |row| row.text_color(rgb(0x777777)))
+                        .when(!enabled[index], |row| row.text_color(crate::chrome_style::muted()))
                         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                             if event.standard_click() { this.activate_terminal_menu(index, window, cx); }
                             cx.stop_propagation();
@@ -156,7 +156,7 @@ impl TerminalView {
                         .when_some(destination, |row, target| row.tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(target.clone().into())).into()))
                         .child(div().flex_1().min_w_0().truncate().child(*label))
                         .when_some(hints[index].clone(), |row, hint| row.child(
-                            div().id(("terminal-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
+                            div().id(("terminal-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
                                 .child(hint)
                         ))

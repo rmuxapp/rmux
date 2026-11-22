@@ -108,7 +108,7 @@ pub fn panel(rows: &[Row], application: Option<process_metrics::Sample>, sampled
         .when_some(focus, |panel, focus| panel.track_focus(focus))
         .on_key_down(cx.listener(window_view::WorkspaceWindow::memory_key))
         .h(px(240.)).max_h(relative(0.45)).flex_shrink_0().min_h_0()
-        .flex().flex_col().bg(rgb(0x242424)).border_t_1().border_color(rgb(0x3b4352))
+        .flex().flex_col().bg(crate::chrome_style::surface()).border_t_1().border_color(crate::chrome_style::border())
         .child(div().h(px(36.)).flex_shrink_0().px_3().flex().items_center().gap_2()
             .child(div().flex_1().min_w_0().truncate().text_sm()
                 .child(if loading { "Terminal memory · Sampling…".into() } else { format!("Terminal memory · {sampled}/{} sampled · {} resident", rows.len(), mib(resident)) }))
@@ -121,19 +121,19 @@ pub fn panel(rows: &[Row], application: Option<process_metrics::Sample>, sampled
         .child(div().px_3().pb_1().text_sm()
             .child(application.map(|sample| format!("rmux · RSS {} · CPU {} · all windows", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "— refresh after baseline".into()))).unwrap_or_else(|| "rmux process sample unavailable".into())))
         .child(div().id("memory-sort").mx_3().mb_1().text_xs().cursor_pointer()
-            .text_color(rgb(0xb4c7ef)).hover(|style| style.text_color(rgb(0xffffff)))
+            .text_color(crate::chrome_style::accent()).hover(|style| style.text_color(crate::chrome_style::foreground()))
             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Choose memory sort order".into())).into())
             .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ShowTerminalMemorySort), cx); } })
             .child(format!("{} · Choose…{}", sort.label(), sampled_at.map(|ms| {
                 let seconds = ms / 1000;
                 format!(" · Sampled {:02}:{:02}:{:02} UTC", seconds / 3600 % 24, seconds / 60 % 60, seconds % 60)
             }).unwrap_or_default())))
-        .child(div().px_3().pb_2().text_xs().text_color(rgb(0xa0a0a0))
+        .child(div().px_3().pb_2().text_xs().text_color(crate::chrome_style::muted())
             .child("Shell tree includes descendants; RSS may count shared pages more than once · up to 256 terminals / 4,096 processes · manual refresh"))
         .child(list(scroll, move |index, _, cx| {
             entity.update(cx, |root, cx| root.render_memory_row(indices[index], index == selected, cx))
         }).with_sizing_behavior(ListSizingBehavior::Auto).flex_1().min_h_0().w_full())
-        .child(div().px_3().py_1().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0))
+        .child(div().px_3().py_1().flex_shrink_0().text_xs().text_color(crate::chrome_style::muted())
             .child("↑↓ / Tab Select · PgUp/PgDn Page · Enter Focus · R Refresh · S Sort · C Copy · Esc Close"))
         .into_any_element()
 }
@@ -146,18 +146,18 @@ pub fn render_row(row: &Row, index: usize, selected: bool, cx: &mut Context<wind
         mib(usage.primary_resident_bytes.saturating_add(usage.alternate_resident_bytes)),
         mib(usage.compressed_bytes), mib(usage.image_bytes), mib(usage.virtual_bytes)))
         .unwrap_or_else(|| row.status.into());
-    div().id(("terminal-memory-row", index)).px_3().py_2().border_b_1().border_color(rgb(0x383838))
-        .when(selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
-        .cursor_pointer().hover(move |style| style.bg(rgb(if selected { crate::chrome_style::SELECTED_HOVER } else { 0x303030 })))
+    div().id(("terminal-memory-row", index)).px_3().py_2().border_b_1().border_color(crate::chrome_style::border())
+        .when(selected, |row| row.bg(crate::chrome_style::selected()))
+        .cursor_pointer().hover(move |style| style.bg(if selected { crate::chrome_style::selected_hover() } else { crate::chrome_style::hover() }))
         .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
             if event.standard_click() { this.focus_memory_terminal(workspace, surface, window, cx); }
         }))
         .child(div().text_sm().truncate().child(format!("{} · PID {}", row.name, row.pid.map(|pid| pid.to_string()).unwrap_or_else(|| "—".into()))))
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(detail))
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(row.process.map(|sample| format!("Shell RSS {} · CPU {}", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "— refresh after baseline".into()))).unwrap_or_else(|| "Shell process sample unavailable".into())))
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(row.tree.map(|sample| format!("Shell tree RSS {} · CPU {} · {}/{} processes{}", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "—".into()), sample.sampled_processes, sample.expected_processes, if sample.complete { "" } else { " · partial" })).unwrap_or_else(|| "Shell tree unavailable or ownership changed".into())))
-        .when_some(row.foreground_pid, |row_element, pid| row_element.child(div().text_xs().text_color(rgb(0xa0a0a0))
+        .child(div().text_xs().text_color(crate::chrome_style::muted()).child(detail))
+        .child(div().text_xs().text_color(crate::chrome_style::muted()).child(row.process.map(|sample| format!("Shell RSS {} · CPU {}", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "— refresh after baseline".into()))).unwrap_or_else(|| "Shell process sample unavailable".into())))
+        .child(div().text_xs().text_color(crate::chrome_style::muted()).child(row.tree.map(|sample| format!("Shell tree RSS {} · CPU {} · {}/{} processes{}", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "—".into()), sample.sampled_processes, sample.expected_processes, if sample.complete { "" } else { " · partial" })).unwrap_or_else(|| "Shell tree unavailable or ownership changed".into())))
+        .when_some(row.foreground_pid, |row_element, pid| row_element.child(div().text_xs().text_color(crate::chrome_style::muted())
             .child(row.foreground.map(|sample| format!("Foreground PID {pid} · RSS {} · CPU {}", mib(sample.resident_bytes), sample.cpu_percent.map(|cpu| format!("{cpu:.1}%")).unwrap_or_else(|| "— refresh after baseline".into())))
                 .unwrap_or_else(|| format!("Foreground PID {pid} · unavailable or job changed")))))
         .into_any_element()

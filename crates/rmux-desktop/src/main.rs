@@ -2173,15 +2173,15 @@ impl Render for TerminalView {
             .child(TerminalElement { view: cx.entity() })
             .when(self.hidden_line_input, |root| root.child(
                 div().id("hidden-line-input").absolute().bottom(px(8.)).left(px(8.)).px_2().py_1()
-                    .rounded_sm().bg(rgb(0x292929)).text_xs().text_color(rgb(0xb8c4d4))
+                    .rounded_sm().bg(crate::chrome_style::elevated()).text_xs().text_color(crate::chrome_style::muted())
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("The local terminal has disabled echo for line input. Remote and raw-mode password prompts may not be detected.".into())).into())
                     .child("Input hidden")
             ))
             .when(self.rendered_paste_pending || self.image_paste_pending(), |root| root.child(
                 div().id("paste-status").absolute().bottom(px(8.)).right(px(8.))
                     .max_w_full().px_2().h(px(28.)).flex().items_center().gap_2()
-                    .occlude().rounded_md().border_1().border_color(rgb(0x465063))
-                    .text_xs().text_color(rgb(0xc6cdd8)).bg(rgb(0x292929))
+                    .occlude().rounded_md().border_1().border_color(crate::chrome_style::border())
+                    .text_xs().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::elevated())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -2195,8 +2195,8 @@ impl Render for TerminalView {
             ))
             .when_some(self.saved_ssh_destination.clone().filter(|_| !ended_ssh), |root, destination| root.child(
                 div().id("saved-ssh-notice").flex().flex_wrap().items_center().gap_2()
-                    .px_2().py_1().flex_shrink_0().min_w_0().bg(rgb(0x292929))
-                    .border_t_1().border_color(rgb(0x414141)).text_xs().text_color(rgb(0xb8b8b8))
+                    .px_2().py_1().flex_shrink_0().min_w_0().bg(crate::chrome_style::elevated())
+                    .border_t_1().border_color(crate::chrome_style::border()).text_xs().text_color(crate::chrome_style::muted())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -2206,8 +2206,8 @@ impl Render for TerminalView {
                             cx.new(|_| pane_view::ControlHint(format!("Local shell. Saved SSH destination: {destination}. Not connected.").into())).into()
                         }})
                         .child(format!("Local shell · SSH not connected: {destination}")))
-                    .child(div().id("connect-saved-ssh").px_2().py_1().rounded_sm().bg(rgb(0x383838))
-                        .cursor_pointer().hover(|style| style.bg(rgb(0x484848)))
+                    .child(div().id("connect-saved-ssh").px_2().py_1().rounded_sm().bg(crate::chrome_style::border())
+                        .cursor_pointer().hover(|style| style.bg(crate::chrome_style::hover_strong()))
                         .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Connect to the saved SSH host in a new workspace; keep this local shell".into())).into())
                         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                             if event.standard_click() {
@@ -2219,8 +2219,8 @@ impl Render for TerminalView {
             ))
             .when_some(self.process_exit.clone(), |root, status| root.child(
                 div().id("process-exit-status").flex().flex_wrap().items_center().gap_2()
-                    .px_2().py_1().flex_shrink_0().min_w_0().bg(rgb(0x292929))
-                    .border_t_1().border_color(rgb(0x414141)).text_xs().text_color(rgb(0xb8b8b8))
+                    .px_2().py_1().flex_shrink_0().min_w_0().bg(crate::chrome_style::elevated())
+                    .border_t_1().border_color(crate::chrome_style::border()).text_xs().text_color(crate::chrome_style::muted())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -2228,8 +2228,8 @@ impl Render for TerminalView {
                     .child(div().id("process-exit-message").flex_1().min_w_0().truncate()
                         .tooltip({ let hint: SharedString = status.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into() })
                         .child(status))
-                    .child(div().id("new-shell-after-exit").px_2().py_1().rounded_sm().bg(rgb(0x383838))
-                        .cursor_pointer().hover(|style| style.bg(rgb(0x484848)))
+                    .child(div().id("new-shell-after-exit").px_2().py_1().rounded_sm().bg(crate::chrome_style::border())
+                        .cursor_pointer().hover(|style| style.bg(crate::chrome_style::hover_strong()))
                         .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(if ended_ssh {
                             "Reconnect to the same SSH destination in a new tab, keeping this terminal's output"
                         } else {
@@ -2244,7 +2244,7 @@ impl Render for TerminalView {
                         })).child(if ended_ssh { "Reconnect SSH" } else { "New shell" }))
                     .when(ended_ssh, |row| row.child(
                         div().id("local-shell-after-ssh-exit").px_2().py_1().rounded_sm()
-                            .cursor_pointer().hover(|style| style.bg(rgb(0x383838)))
+                            .cursor_pointer().hover(|style| style.bg(crate::chrome_style::border()))
                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Open a local shell in a new tab without reconnecting SSH".into())).into())
                             .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                 if event.standard_click() {
@@ -2274,8 +2274,8 @@ impl Render for TerminalView {
 fn div_error(error: String, dismiss: impl Fn(&ClickEvent, &mut Window, &mut App) + 'static) -> impl IntoElement {
     let copy = error.clone();
     div().flex().items_start().gap_2().px_2().py_1().flex_shrink_0().min_w_0()
-        .bg(rgb(0x302626)).border_t_1().border_color(rgb(0x644141))
-        .text_sm().text_color(rgb(0xf2a5a5))
+        .bg(crate::chrome_style::elevated()).border_t_1().border_color(crate::chrome_style::border())
+        .text_sm().text_color(crate::chrome_style::danger())
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
         .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -2622,8 +2622,8 @@ struct LinkHint { target: SharedString, caption: SharedString }
 impl Render for LinkHint {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div().w(px(520.).min((window.viewport_size().width - px(24.)).max(px(1.))))
-            .px_2().py_1().rounded_md().bg(rgb(0x383838)).text_color(rgb(0xe5e5e5))
-            .child(div().text_xs().text_color(rgb(0xa0a0a0)).truncate().child(
+            .px_2().py_1().rounded_md().bg(crate::chrome_style::border()).text_color(crate::chrome_style::foreground())
+            .child(div().text_xs().text_color(crate::chrome_style::muted()).truncate().child(
                 self.caption.clone()))
             .child(div().text_sm().truncate().child(self.target.clone()))
     }
@@ -3326,7 +3326,7 @@ impl Render for Workspace {
             .size_full()
             .relative()
             .child(split_view::drag_capture(cx))
-            .text_color(rgb(0xdcdfe6))
+            .text_color(crate::chrome_style::foreground())
             .flex()
             .flex_col()
             .map(|root| pane_actions::bind(root, cx))
@@ -3382,8 +3382,8 @@ impl Render for Workspace {
                 // Out of flow: starting/canceling must not resize every live PTY.
                 div().id("split-launch-status").absolute().top(px(36.)).right(px(8.))
                     .w(px(250.)).max_w_full().h(px(32.)).px_2().flex().items_center().gap_2()
-                    .occlude().rounded_md().shadow_md().border_1().border_color(rgb(0x465063))
-                    .text_xs().text_color(rgb(0xc6cdd8)).bg(rgb(0x292929))
+                    .occlude().rounded_md().shadow_md().border_1().border_color(crate::chrome_style::border())
+                    .text_xs().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::elevated())
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -3686,6 +3686,11 @@ fn main() {
         cx.set_global(copy_buffers::Store::default());
         cx.set_global(preferences.confirm_close);
         cx.set_global(preferences.clone());
+        chrome_style::set_palette(preferences.chrome_palette());
+        cx.observe_global::<Preferences>(|cx| {
+            chrome_style::set_palette(cx.global::<Preferences>().chrome_palette());
+            cx.refresh_windows();
+        }).detach();
         cx.set_global(preferences::AppearanceBaseline(preferences.clone()));
         cx.set_global(preferences::StartupSocket {
             configured: preferences.socket_directory.clone(),

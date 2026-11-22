@@ -107,7 +107,7 @@ impl SamplePane {
                         let title = self.tab_name(index, cx);
                         let ranges = rmux_core::palette_match::fuzzy_highlights(&title, &query);
                         let title = StyledText::new(title).with_highlights(ranges.into_iter().map(|range| (
-                            range, HighlightStyle { color: Some(rgb_to_hsla(rgb(crate::chrome_style::ACCENT))), font_weight: Some(FontWeight::BOLD), ..Default::default() }
+                            range, HighlightStyle { color: Some(rgb_to_hsla(crate::chrome_style::accent())), font_weight: Some(FontWeight::BOLD), ..Default::default() }
                         )));
                         crate::palette_view::result(index, 40., picker.selected == Some(id))
                             .child(div().text_xs().text_color(rgb(0xa0a0a0)).child((index + 1).to_string()))

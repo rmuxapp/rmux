@@ -19,7 +19,7 @@ pub fn mask(bounds: Bounds<Pixels>) -> ContentMask<Pixels> { ContentMask { bound
 
 pub fn preedit(window: &Window, text: SharedString, family: &SharedString, font_size: f32) -> Line {
     let run = TextRun { len: text.len(), font: font(family.clone()),
-        color: rgb(0xffffff).into(),
+        color: crate::chrome_style::foreground().into(),
         background_color: None,
         underline: Some(UnderlineStyle { thickness: px(1.), color: None, wavy: false }),
         strikethrough: None };

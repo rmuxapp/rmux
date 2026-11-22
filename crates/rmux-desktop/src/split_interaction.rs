@@ -106,7 +106,7 @@ pub(crate) fn render_panes<H: SplitHost>(
                                 } else {
                                     CursorStyle::ResizeUpDown
                                 })
-                                .hover(|style| style.bg(rgb(0x40536b)))
+                                .hover(|style| style.bg(crate::chrome_style::selected()))
                                 .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint(
                                     "Drag to resize · Double-click to equalize these two panes".into()
                                 )).into())

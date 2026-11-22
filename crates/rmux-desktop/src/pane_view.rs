@@ -311,9 +311,9 @@ impl PaneView {
                         else if index == 9 { format!("Close Finished Tabs ({})…", self.finished_tab_count(menu.target, cx)) }
                         else { (*label).to_owned() };
                     tab_presentation::menu_row(index, matches!(index, 1 | 4 | 6))
-                        .when(enabled[index] && index >= 6, |row| row.text_color(rgb(0xffa4a4)))
+                        .when(enabled[index] && index >= 6, |row| row.text_color(crate::chrome_style::danger()))
                         .when(enabled[index], |row| row.cursor_pointer()
-                            .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+                            .when(index == menu.selected, |row| row.bg(crate::chrome_style::selected()))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {
                                 if let Some(menu) = &mut this.tab_menu {
                                     if menu.selected != index {
@@ -322,14 +322,14 @@ impl PaneView {
                                     }
                                 }
                             })))
-                        .when(!enabled[index], |row| row.text_color(rgb(0x777777)))
+                        .when(!enabled[index], |row| row.text_color(crate::chrome_style::muted()))
                         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                             if event.standard_click() { this.activate_tab_menu(index, window, cx); }
                             cx.stop_propagation();
                         }))
                         .child(div().flex_1().min_w_0().truncate().child(label))
                         .when_some(hints[index].clone(), |row, hint| row.child(
-                            div().id(("tab-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
+                            div().id(("tab-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| ControlHint(hint.clone().into())).into() })
                                 .child(hint)
                         ))
@@ -406,20 +406,20 @@ impl PaneView {
         let highlighted = |text: SharedString| {
             let ranges = palette_match::fuzzy_highlights(&text, query);
             StyledText::new(text).with_highlights(ranges.into_iter().map(|range| (
-                range, HighlightStyle { color: Some(rgb(crate::chrome_style::ACCENT).into()),
+                range, HighlightStyle { color: Some(crate::chrome_style::accent().into()),
                     font_weight: Some(FontWeight::BOLD), ..Default::default() }
             )))
         };
         div().id(("choose-tab", id)).w_full().min_w_0().flex().items_center().gap_2().px_3().h(px(52.)).text_sm().line_height(px(20.)).cursor_pointer()
             .tooltip(move |_, cx| cx.new(|_| ControlHint(hint.clone())).into())
-            .when(Some(id) == selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
-            .hover(|row| row.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+            .when(Some(id) == selected, |row| row.bg(crate::chrome_style::selected()))
+            .hover(|row| row.bg(crate::chrome_style::selected_hover()))
             .child(div().w(px(16.)).flex_shrink_0().child(if index == self.terminals.active_index() { "✓" } else { "" }))
-            .child(div().w(px(24.)).flex_shrink_0().text_xs().text_color(rgb(0xaaaaaa)).child((index + 1).to_string()))
+            .child(div().w(px(24.)).flex_shrink_0().text_xs().text_color(crate::chrome_style::muted()).child((index + 1).to_string()))
             .child(div().flex_1().min_w_0().flex().flex_col().gap_1()
                 .child(div().truncate().child(highlighted(title)))
-                .when_some(directory, |column, directory| column.child(div().text_xs().line_height(px(16.)).text_color(rgb(0xaaaaaa)).truncate().child(highlighted(directory)))))
-            .when(terminal.read(cx).attention.any(), |row| row.child(div().w(px(6.)).h(px(6.)).rounded_full().bg(rgb(0xf0b85b))))
+                .when_some(directory, |column, directory| column.child(div().text_xs().line_height(px(16.)).text_color(crate::chrome_style::muted()).truncate().child(highlighted(directory)))))
+            .when(terminal.read(cx).attention.any(), |row| row.child(div().w(px(6.)).h(px(6.)).rounded_full().bg(crate::chrome_style::warning())))
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 if !event.standard_click() { return; }
                 cx.stop_propagation();
@@ -1293,7 +1293,7 @@ impl Render for PaneView {
                                             .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope && item.item != target))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, _| {
                                                 if item.scope == scope && item.item != target {
-                                                    style.bg(rgb(0x303b4a)).border_color(rgb(0x4599ef))
+                                                    style.bg(crate::chrome_style::elevated()).border_color(crate::chrome_style::accent())
                                                 } else { style }
                                             })
                                             .on_drop(cx.listener(move |this, item: &drag_item::DragItem, window, cx| this.drop_tab(item, Some(target), window, cx)))
@@ -1316,7 +1316,7 @@ impl Render for PaneView {
                                                 }
                                             }))
                                             .when(terminal.read(cx).attention.any(), |tab| tab.child(
-                                                div().w(px(6.)).h(px(6.)).flex_shrink_0().rounded_full().bg(rgb(0xf0b85b))
+                                                div().w(px(6.)).h(px(6.)).flex_shrink_0().rounded_full().bg(crate::chrome_style::warning())
                                             ))
                                             .when_some(terminal.read(cx).program_status.as_ref().filter(|_| terminal.read(cx).process_exit.is_none()), |tab, status| {
                                                 let record = &status.record;
@@ -1354,7 +1354,7 @@ impl Render for PaneView {
                                                 tab.child(div().text_xs().flex_shrink_0().text_color(rgb(tint)).child(text))
                                             })
                                             .when(terminal.read(cx).process_exit.is_some(), |tab| {
-                                                tab.child(div().text_xs().flex_shrink_0().text_color(rgb(0xa0a0a0)).child("Finished"))
+                                                tab.child(div().text_xs().flex_shrink_0().text_color(crate::chrome_style::muted()).child("Finished"))
                                             })
                                             .child({
                                                 let fallback = display_title.clone();
@@ -1388,7 +1388,7 @@ impl Render for PaneView {
                                         .border_l_2().border_color(gpui::transparent_black())
                                         .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope))
                                         .drag_over(move |style, item: &drag_item::DragItem, _, _| {
-                                            if item.scope == scope { style.bg(rgb(0x303b4a)).border_color(rgb(0x4599ef)) } else { style }
+                                            if item.scope == scope { style.bg(crate::chrome_style::elevated()).border_color(crate::chrome_style::accent()) } else { style }
                                         })
                                         .on_drop(cx.listener(|this, item: &drag_item::DragItem, window, cx| this.drop_tab(item, None, window, cx)))
                                 }),
@@ -1402,7 +1402,7 @@ impl Render for PaneView {
                                 })).child(icons::icon("chevron-down"))
                         ))
                         .when(self.spawning_tab.is_some(), |header| header.child(
-                            div().flex().items_center().gap_1().px_2().text_xs().text_color(rgb(0xaaaaaa))
+                            div().flex().items_center().gap_1().px_2().text_xs().text_color(crate::chrome_style::muted())
                                 .child(if self.tab_launch_canceled.as_ref().is_some_and(|cancel| cancel.load(Ordering::Relaxed)) { "Canceling…" } else { "Starting…" })
                                 .child(action_control("cancel-new-tab", "Cancel New Terminal Tab", CancelNewTab, control_focus.clone())
                                     .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
@@ -1473,7 +1473,7 @@ impl Render for PaneView {
                 root.child(deferred(div().absolute().top(px(30.)).bottom_0().left_0().right_0()
                     .flex().flex_col().min_h_0()
                     .child(div().id("tab-picker-container").occlude().w(px(520.)).max_w_full().min_w_0().min_h_0().overflow_hidden().flex().flex_col()
-                    .bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md()
+                    .bg(crate::chrome_style::elevated()).border_1().border_color(crate::chrome_style::border()).rounded_md().shadow_md()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Right, |_, _, cx| cx.stop_propagation())
@@ -1511,7 +1511,7 @@ impl Render for PaneView {
                         }))))
                     .child(crate::palette_view::search(input, cx))
                     .child(if matches.is_empty() {
-                        div().p_3().text_sm().text_color(rgb(0xaaaaaa)).child("No matching tabs").into_any_element()
+                        div().p_3().text_sm().text_color(crate::chrome_style::muted()).child("No matching tabs").into_any_element()
                     } else {
                         let entity = cx.entity();
                         let height = px((matches.len() as f32 * 52.).min(240.));

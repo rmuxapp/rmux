@@ -100,7 +100,7 @@ impl SamplePane {
                         tab_presentation::menu_row(index, matches!(index, 1 | 2 | 4))
                             .when(enabled[index] && index >= 4, |row| row.text_color(rgb(0xffa4a4)))
                             .when(enabled[index], |row| row.cursor_pointer()
-                                .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+                                .when(index == menu.selected, |row| row.bg(crate::chrome_style::selected()))
                                 .on_mouse_move(cx.listener(move |this, _, _, cx| {
                                     if let Some(menu) = &mut this.menu {
                                         if menu.selected != index { menu.selected = index; cx.notify(); }

@@ -225,7 +225,7 @@ impl TextField {
         })
     }
     fn line(&self, window: &Window) -> text_layout::Line {
-        text_layout::shape(window, self.text.text.clone().into(), font(FONT_FAMILY), 0xffffff)
+        text_layout::shape(window, self.text.text.clone().into(), font(FONT_FAMILY), crate::chrome_style::foreground_rgb())
     }
 
 }
@@ -239,7 +239,7 @@ impl Render for TextField {
             .flex_shrink_0()
             .flex()
             .items_center()
-            .bg(rgb(0x242a36))
+            .bg(crate::chrome_style::elevated())
             .track_focus(&self.focus)
             .key_context("TextInput")
             .on_mouse_down(
@@ -311,7 +311,7 @@ impl Render for TextField {
                     .min_w_0()
                     .h(px(24.))
                     .overflow_hidden()
-                    .bg(rgb(0x12141a))
+                    .bg(crate::chrome_style::background())
                     .on_mouse_down(
                         MouseButton::Left,
                         cx.listener(|this, event: &MouseDownEvent, window, cx| {
@@ -390,12 +390,12 @@ impl Render for TextField {
                                                 origin + point(start, px(0.)),
                                                 size(end - start, px(24.)),
                                             ),
-                                            rgb(0x344b70),
+                                            crate::chrome_style::selected(),
                                         ));
                                     }
                                     let _ = line.paint(origin, px(24.), window, cx);
                                         if let Some(placeholder) = placeholder {
-                                            let hint = text_layout::shape(window, placeholder.into(), window.text_style().font(), 0x858585);
+                                            let hint = text_layout::shape(window, placeholder.into(), window.text_style().font(), crate::chrome_style::muted_rgb());
                                             let _ = hint.paint(origin + point(px(5.), px(0.)), px(24.), window, cx);
                                         }
                                     if focused {
@@ -408,7 +408,7 @@ impl Render for TextField {
                                                     ),
                                                 size(px(1.), px(20.)),
                                             ),
-                                            rgb(0xffffff),
+                                            crate::chrome_style::foreground(),
                                         ));
                                     }
                                 });
@@ -419,7 +419,7 @@ impl Render for TextField {
             )
             .when(self.rejected_edit, |field| field.child(
                 div().id("text-too-long").flex_shrink_0().px_2().text_xs()
-                    .text_color(rgb(0xf18a8a))
+                    .text_color(crate::chrome_style::danger())
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint(
                         "Text is too long. Shorten it and try again (4 KB limit). Your existing text was kept.".into()
                     )).into())

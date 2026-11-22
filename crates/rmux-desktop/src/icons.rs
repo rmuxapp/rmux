@@ -30,5 +30,5 @@ impl AssetSource for Assets {
 }
 pub fn icon(name: &'static str) -> Svg {
     // GPUI's SVG paint path reads the element's own color, not inherited text style.
-    svg().path(format!("icons/{name}.svg")).size(px(14.)).flex_shrink_0().text_color(rgb(0xb8b8b8))
+    svg().path(format!("icons/{name}.svg")).size(px(14.)).flex_shrink_0().text_color(crate::chrome_style::muted())
 }

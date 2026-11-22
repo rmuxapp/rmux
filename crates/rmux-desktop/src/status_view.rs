@@ -107,9 +107,9 @@ pub fn panel(records: &[Record], loading: bool, ended: bool, state: &State, wind
         .flex_shrink_0()
         .flex()
         .flex_col()
-        .bg(rgb(0x222222))
+        .bg(crate::chrome_style::surface())
         .border_b_1()
-        .border_color(rgb(0x383838))
+        .border_color(crate::chrome_style::border())
         .on_mouse_down(MouseButton::Left, cx.listener(|view, _, window, cx| {
             if let Some(state) = &view.status_ui { state.focus.focus(window); }
             cx.stop_propagation();
@@ -190,7 +190,7 @@ pub fn panel(records: &[Record], loading: bool, ended: bool, state: &State, wind
                         .ml(px(record.id.matches('/').count().min(8) as f32 * 8.))
                         .p_2()
                         .rounded_sm()
-                        .bg(rgb(if selected == Some(index) { if focused { crate::chrome_style::SELECTED } else { 0x333333 } } else { 0x2b2b2b }))
+                        .bg(if selected == Some(index) { if focused { crate::chrome_style::selected() } else { crate::chrome_style::hover() } } else { crate::chrome_style::elevated() })
                         .text_sm()
                         .child(
                             div().flex().items_center().min_w_0().gap_2()
@@ -207,7 +207,7 @@ pub fn panel(records: &[Record], loading: bool, ended: bool, state: &State, wind
                         .when(!record.app.is_empty() || !record.title.is_empty(), |row| {
                             row.child(
                                 div().id(("status-metadata", index)).min_w_0().truncate()
-                                    .text_xs().text_color(rgb(0xaaaaaa))
+                                    .text_xs().text_color(crate::chrome_style::muted())
                                     .tooltip({ let metadata: SharedString = metadata.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(metadata.clone())).into() })
                                     .child(metadata),
                             )
@@ -217,6 +217,6 @@ pub fn panel(records: &[Record], loading: bool, ended: bool, state: &State, wind
                         })
                 })),
         )
-        .child(div().flex_shrink_0().px_2().py_1().text_xs().text_color(rgb(0xaaaaaa)).child("↑↓ / Tab Select · C Copy · Esc Close"))
+        .child(div().flex_shrink_0().px_2().py_1().text_xs().text_color(crate::chrome_style::muted()).child("↑↓ / Tab Select · C Copy · Esc Close"))
         .into_any_element()
 }

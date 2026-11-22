@@ -469,7 +469,7 @@ impl Render for BrowserView {
         };
         let detail = format!("{} · {}", self.page.status, self.page.committed);
         div().size_full().flex().flex_col().key_context("Browser")
-            .bg(rgb(0x252525)).text_color(rgb(0xe5e5e5)).text_size(px(14.))
+            .bg(crate::chrome_style::surface()).text_color(crate::chrome_style::foreground()).text_size(px(14.))
             .child(div().h(px(44.)).flex_shrink_0().px_2().flex().items_center().gap_1()
                 .child(pane_view::action_control("browser-back", "Back", Back, focus.clone()).child("‹")
                     .when(!back, |button| button.opacity(0.4).cursor_default())
@@ -478,7 +478,7 @@ impl Render for BrowserView {
                     .when(!forward, |button| button.opacity(0.4).cursor_default())
                     .when(forward, |button| button.on_click(cx.listener(|this, _, _, cx| { this.navigation(Navigation::Forward); cx.notify(); }))))
                 .child(reload_control)
-                .child(div().flex_1().min_w_0().px_2().py_1().rounded_md().border_1().border_color(rgb(0x465063)).bg(rgb(0x242a36)).child(self.input.clone()))
+                .child(div().flex_1().min_w_0().px_2().py_1().rounded_md().border_1().border_color(crate::chrome_style::border()).bg(crate::chrome_style::elevated()).child(self.input.clone()))
                 .child(pane_view::action_control("browser-inspector", "Toggle Web Inspector", ToggleInspector, focus.clone()).child("{}")
                     .when(!loaded, |button| button.opacity(0.4).cursor_default())
                     .when(loaded, |button| button.on_click(cx.listener(|this, _, _, cx| this.toggle_inspector(cx)))))
@@ -492,10 +492,10 @@ impl Render for BrowserView {
                     }))))
             .when(self.find.visible, |root| root.child(div().h(px(40.)).flex_shrink_0().px_2().flex().items_center().gap_1()
                 .child(div().text_xs().px_1().child("Find"))
-                .child(div().flex_1().min_w_0().px_2().py_1().rounded_md().border_1().border_color(rgb(0x465063)).bg(rgb(0x242a36)).child(self.find_input.clone()))
+                .child(div().flex_1().min_w_0().px_2().py_1().rounded_md().border_1().border_color(crate::chrome_style::border()).bg(crate::chrome_style::elevated()).child(self.find_input.clone()))
                 .child(div().w(px(90.)).text_xs().truncate().child(self.find.status))
                 .child(pane_view::control_button("browser-find-case").child("Aa")
-                    .when(self.find.case_sensitive, |button| button.bg(rgb(0x465063)))
+                    .when(self.find.case_sensitive, |button| button.bg(crate::chrome_style::border()))
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Match case".into())).into())
                     .on_click(cx.listener(|this, _, _, cx| {
                         if this.find_input.read(cx).is_composing() { return; }
@@ -513,7 +513,7 @@ impl Render for BrowserView {
                     .on_click(cx.listener(|this, _, window, cx| this.close_find(window, cx))))))
             .child(div().h(px(24.)).flex_shrink_0().px_3().flex().items_center().gap_2().text_xs()
                 .child(div().id("browser-status").flex_1().min_w_0().truncate()
-                    .when(self.page.failed, |status| status.text_color(rgb(0xf0b85b)))
+                    .when(self.page.failed, |status| status.text_color(crate::chrome_style::warning()))
                     .tooltip({ let detail = detail.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(detail.clone().into())).into() })
                     .child(detail))
                 .child(pane_view::action_control("browser-zoom", "Actual Size", ResetZoom, focus).w(px(48.)).h(px(24.))

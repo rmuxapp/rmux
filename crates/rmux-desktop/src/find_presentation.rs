@@ -59,9 +59,9 @@ pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_
             .items_center()
             .gap_1()
             .px_2().py_1()
-            .bg(rgb(0x242424))
+            .bg(crate::chrome_style::surface())
             .border_b_1()
-            .border_color(rgb(0x353535))
+            .border_color(crate::chrome_style::hover())
             .on_mouse_down(
                 MouseButton::Left,
                 cx.listener(|this, _, window, cx| {
@@ -75,13 +75,13 @@ pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
             .child(div().id("find-query").flex_1().min_w(px(80.)).max_w_full()
                 .flex().items_center().gap_1().px_2().rounded_sm().border_1()
-                .border_color(rgb(if status_error { 0xb85c5c } else { crate::chrome_style::SELECTED_BORDER }))
-                .bg(rgb(0x12141a))
+                .border_color(if status_error { crate::chrome_style::danger() } else { crate::chrome_style::selected_border() })
+                .bg(crate::chrome_style::background())
                 .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Find in terminal · Enter / Shift+Enter navigates matches · Alt+Up/Down recalls queries".into())).into())
                 .child(div().flex_1().min_w_0().child(input))
                 .when(can_clear, |field| field.child(div().id("find-clear").flex_shrink_0()
-                    .px_1().text_xs().text_color(rgb(0xaaaaaa)).cursor_pointer()
-                    .hover(|style| style.text_color(rgb(0xffffff)))
+                    .px_1().text_xs().text_color(crate::chrome_style::muted()).cursor_pointer()
+                    .hover(|style| style.text_color(crate::chrome_style::foreground()))
                     .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Clear search; keep Find open".into())).into())
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                         cx.stop_propagation();
@@ -92,7 +92,7 @@ pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_
             .child(div().flex().items_center().gap_1().min_w_0().max_w_full()
                 .child(div().id("find-status").min_w_0().max_w(px(140.))
                     .text_xs()
-                    .text_color(rgb(if status_error { 0xf08080 } else { 0xa0a0a0 }))
+                    .text_color(if status_error { crate::chrome_style::danger() } else { crate::chrome_style::muted() })
                     .truncate()
                     .tooltip({ let status: SharedString = status.clone().into(); move |_, cx| cx.new(|_| crate::control_hint::ControlHint(status.clone())).into() })
                     .child(if has_query || status_error { status.clone() } else { String::new() }))

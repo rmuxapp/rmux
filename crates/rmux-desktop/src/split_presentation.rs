@@ -15,10 +15,10 @@ pub(crate) fn branch(axis: Axis) -> Div {
         .when(axis == Axis::Rows, |root| root.flex_col())
 }
 pub(crate) fn divider(id: impl Into<ElementId>, axis: Axis, width: f32) -> Stateful<Div> {
-    div().id(id).flex_shrink_0().bg(rgb(0x242424)).flex().items_center().justify_center()
+    div().id(id).flex_shrink_0().bg(crate::chrome_style::surface()).flex().items_center().justify_center()
         .child(if axis == Axis::Columns {
-            div().w(px(1.)).h_full().bg(rgb(0x383838))
-        } else { div().h(px(1.)).w_full().bg(rgb(0x383838)) })
+            div().w(px(1.)).h_full().bg(crate::chrome_style::border())
+        } else { div().h(px(1.)).w_full().bg(crate::chrome_style::border()) })
         .when(axis == Axis::Columns, |bar| bar.w(px(width)).h_full())
         .when(axis == Axis::Rows, |bar| bar.h(px(width)).w_full())
 }
@@ -31,8 +31,8 @@ pub(crate) fn restore_layout<V: crate::pane_actions::PaneCommandHost>(hidden: us
         None => "Restore split layout".into(),
     }.into();
     div().id("restore-pane-layout").h(px(28.)).min_w_0().flex_shrink_0().px_3()
-        .flex().gap_2().items_center().text_xs().bg(rgb(0x27344a)).cursor_pointer()
-        .hover(|style| style.bg(rgb(0x354660)))
+        .flex().gap_2().items_center().text_xs().bg(crate::chrome_style::elevated()).cursor_pointer()
+        .hover(|style| style.bg(crate::chrome_style::selected()))
         .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
         .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
             if event.standard_click() { this.run_pane_command(rmux_core::commands::CommandId::TogglePaneZoom, window, cx); }
@@ -40,5 +40,5 @@ pub(crate) fn restore_layout<V: crate::pane_actions::PaneCommandHost>(hidden: us
         .child(crate::icons::icon("split-right"))
         .child(div().flex_1().min_w_0().truncate().child(status))
         .child(div().flex_shrink_0().child("Restore layout"))
-        .when_some(shortcut, |row, shortcut| row.child(div().max_w(relative(0.3)).truncate().text_color(rgb(0xa0b6d6)).child(shortcut)))
+        .when_some(shortcut, |row, shortcut| row.child(div().max_w(relative(0.3)).truncate().text_color(crate::chrome_style::accent()).child(shortcut)))
 }

@@ -3,35 +3,35 @@ use gpui::{prelude::*, *};
 pub(crate) fn menu_frame(window: &Window) -> Stateful<Div> {
     div().id("tab-context-menu")
         .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.))))
-        .py_1().bg(rgb(0x292929)).border_1().border_color(rgb(0x465063))
+        .py_1().bg(crate::chrome_style::elevated()).border_1().border_color(crate::chrome_style::border())
         .rounded_md().shadow_md().occlude()
 }
 pub(crate) fn menu_row(index: usize, section: bool) -> Stateful<Div> {
     div().id(("tab-menu-item", index)).mx_1().px_3().py_2().rounded_sm()
         .text_size(px(13.)).flex().items_center().gap_3()
-        .when(section, |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
+        .when(section, |row| row.mt_1().border_t_1().border_color(crate::chrome_style::border()))
 }
 pub(crate) fn strip() -> Div {
     div().flex().w_full().min_w_0().max_w_full().overflow_hidden()
         .h(px(30.)).flex_shrink_0().items_center()
-        .border_b_1().border_color(rgb(0x383838)).bg(rgb(0x242424))
+        .border_b_1().border_color(crate::chrome_style::border()).bg(crate::chrome_style::surface())
 }
 pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {
     div().id(id).flex().items_center().justify_center().w(px(22.)).h(px(22.))
         .flex_shrink_0().rounded_sm().cursor_pointer()
         .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Close Terminal Tab".into())).into())
-        .hover(|style| style.bg(rgb(0x50505c)).text_color(rgb(0xffffff)))
+        .hover(|style| style.bg(crate::chrome_style::hover_strong()).text_color(crate::chrome_style::foreground()))
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(crate::icons::icon("close"))
 }
 pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stateful<Div> {
     div().id(id).h_full().flex().items_center().flex_shrink_0().px_2().gap_2()
         .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())
-        .cursor_pointer().text_color(rgb(0x9b9b9b))
-        .hover(move |style| style.bg(rgb(if active { 0x353239 } else { 0x2e2e2e })))
-        .when(active, |tab| tab.bg(rgb(if focused {0x303030} else {0x292929}))
-            .text_color(rgb(if focused {0xe5e5e5} else {0xb8bfcb}))
-            .border_color(rgb(if focused {crate::sidebar_presentation::ACCENT} else {0x575260})))
+        .cursor_pointer().text_color(crate::chrome_style::muted())
+        .hover(move |style| style.bg(if active { crate::chrome_style::hover() } else { crate::chrome_style::hover() }))
+        .when(active, |tab| tab.bg(if focused {crate::chrome_style::hover()} else {crate::chrome_style::elevated()})
+            .text_color(if focused {crate::chrome_style::foreground()} else {crate::chrome_style::muted()})
+            .border_color(if focused {crate::chrome_style::accent()} else {crate::chrome_style::border()}))
 }
 
 pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &App) -> Div {
@@ -39,30 +39,30 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &Ap
     let too_long = count > rmux_core::tabs::CUSTOM_TITLE_LIMIT;
     let save = input.clone();
     let cancel = input.clone();
-    div().flex().flex_col().gap_2().px_3().py_2().bg(rgb(0x292929)).min_w_0()
-        .border_b_1().border_color(rgb(0x383838))
+    div().flex().flex_col().gap_2().px_3().py_2().bg(crate::chrome_style::elevated()).min_w_0()
+        .border_b_1().border_color(crate::chrome_style::border())
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(div().flex().items_center().justify_between().gap_2().text_xs()
-            .child(div().text_color(rgb(0xbcbcc4)).child("Rename tab"))
-            .child(div().text_color(rgb(if too_long { 0xffa4a4 } else { 0xa0a0a0 }))
+            .child(div().text_color(crate::chrome_style::muted()).child("Rename tab"))
+            .child(div().text_color(if too_long { crate::chrome_style::danger() } else { crate::chrome_style::muted() })
                 .child(format!("{count}/{}", rmux_core::tabs::CUSTOM_TITLE_LIMIT))))
         .child(div().flex().flex_wrap().items_center().gap_2().min_w_0()
             .child(div().flex_1().min_w(px(80.)).max_w_full().px_2().py_1().rounded_sm()
-                .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
+                .border_1().border_color(crate::chrome_style::selected_border()).bg(crate::chrome_style::background()).child(input))
             .child(div().id("cancel-tab-rename").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                .hover(|style| style.bg(rgb(0x383838)))
+                .hover(|style| style.bg(crate::chrome_style::border()))
                 .on_click(move |event, _, cx| {
                     cx.stop_propagation();
                     if event.standard_click() { cancel.update(cx, |input, cx| input.cancel(cx)); }
                 }).child("Cancel"))
             .child(div().id("save-tab-rename").when(too_long, |button| button.opacity(0.45)).px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                .bg(rgb(crate::chrome_style::SELECTED)).border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER))
-                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                .bg(crate::chrome_style::selected()).border_1().border_color(crate::chrome_style::selected_border())
+                .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                 .on_click(move |event, _, cx| {
                     cx.stop_propagation();
                     if event.standard_click() && !too_long { save.update(cx, |input, cx| input.submit(false, cx)); }
                 }).child("Save")))
-        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(if too_long { "Name is too long. Shorten it to 128 characters to save." } else { "Leave empty for automatic title · Enter saves · Esc cancels" }))
+        .child(div().text_xs().text_color(crate::chrome_style::muted()).child(if too_long { "Name is too long. Shorten it to 128 characters to save." } else { "Leave empty for automatic title · Enter saves · Esc cancels" }))
 }
 
 pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {

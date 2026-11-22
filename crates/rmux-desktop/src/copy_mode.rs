@@ -435,12 +435,12 @@ impl CopyMode {
             let from = selected.start.max(range.start + start);
             let to = selected.end.min(range.start + end);
             (from < to).then(|| (from - range.start - start + prefix.len()..to - range.start - start + prefix.len(),
-                HighlightStyle { background_color: Some(rgb(0x41638c).into()), ..Default::default() }))
+                HighlightStyle { background_color: Some(crate::chrome_style::selected().into()), ..Default::default() }))
         } else { None };
         let anchor = self.anchor.unwrap_or(self.cursor);
         let selected = (self.cursor.min(anchor)..=self.cursor.max(anchor)).contains(&index);
         div().id(("copy-line", index)).w_full().min_h(px(22.)).px_2().py_1().text_size(px(12.)).font_family(FONT_FAMILY)
-            .when(selected && !self.characters, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+            .when(selected && !self.characters, |row| row.bg(crate::chrome_style::selected()))
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 if event.standard_click() {
                     this.copy_message = None;
@@ -453,14 +453,14 @@ impl CopyMode {
                 }
             }))
             .flex().gap_2()
-            .child(div().w(px(54.)).flex_shrink_0().text_color(rgb(0x909090)).child((index + 1).to_string()))
+            .child(div().w(px(54.)).flex_shrink_0().text_color(crate::chrome_style::muted()).child((index + 1).to_string()))
             .child(div().min_w_0().flex_1().child(StyledText::new(display).with_highlights(highlights))).into_any_element()
     }
 }
 impl Render for CopyMode {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let entity = cx.entity();
-        div().absolute().inset_0().size_full().occlude().bg(rgb(0x242424)).text_color(rgb(0xd6d6d6))
+        div().absolute().inset_0().size_full().occlude().bg(crate::chrome_style::surface()).text_color(crate::chrome_style::foreground())
             .flex().flex_col().track_focus(&self.focus).key_context("CopyMode")
             .on_key_down(cx.listener(Self::key))
             .on_action(cx.listener(|this, _: &Find, window, cx| { this.open_search(window, cx); cx.stop_propagation(); }))
@@ -482,12 +482,12 @@ impl Render for CopyMode {
             .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
             .on_mouse_move(|_, _, cx| cx.stop_propagation())
             .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
-            .child(div().px_3().py_2().flex().items_center().gap_2().border_b_1().border_color(rgb(0x383838))
+            .child(div().px_3().py_2().flex().items_center().gap_2().border_b_1().border_color(crate::chrome_style::border())
                 .child(div().flex_1().min_w_0().text_sm().child("Copy mode"))
-                .when_some(self.buffer.as_ref(), |header, buffer| header.child(div().text_xs().text_color(rgb(0xa0a0a0))
+                .when_some(self.buffer.as_ref(), |header, buffer| header.child(div().text_xs().text_color(crate::chrome_style::muted())
                     .child(format!("Line {} / {}", self.cursor + 1, buffer.lines.len()))))
                 .child(div().id("save-copy-buffer").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                    .bg(rgb(0x353535)).hover(|s| s.bg(rgb(0x454545)))
+                    .bg(crate::chrome_style::hover()).hover(|s| s.bg(crate::chrome_style::hover_strong()))
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.open_buffer_name(window, cx); } }))
                     .child("Save Buffer…"))
                 .child(pane_view::pane_control("close-copy-mode", "Close Copy Mode")
@@ -503,8 +503,8 @@ impl Render for CopyMode {
             .when(!self.search_message.is_empty(), |root| root.child(div().px_3().py_1().text_xs().child(self.search_message.clone())))
             .child(list(self.scroll.clone(), move |index, _, cx| entity.update(cx, |this, cx| this.row(index, cx)))
                 .flex_1().min_h_0().w_full())
-            .when_some(self.copy_message.clone(), |root, message| root.child(div().px_3().py_1().text_xs().text_color(rgb(0x9fceb0)).child(message)))
-            .child(div().px_3().py_2().text_xs().border_t_1().border_color(rgb(0x383838))
+            .when_some(self.copy_message.clone(), |root, message| root.child(div().px_3().py_1().text_xs().text_color(crate::chrome_style::success()).child(message)))
+            .child(div().px_3().py_2().text_xs().border_t_1().border_color(crate::chrome_style::border())
                 .child(if self.rectangular { "Rectangle mode · Arrows move · Shift / Space select · r characters · Enter copy · Esc close" }
                     else if self.characters { "Character mode · ←→ / h l move · Shift / Space select · r rectangle · c lines · Enter copy · Esc close" }
                     else { "Line mode · ↑↓ move · Shift / Space select · c characters · Enter copy · / search · Esc close" }))

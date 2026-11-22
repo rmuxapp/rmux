@@ -288,7 +288,7 @@ impl WorkspaceWindow {
                         }))
                         .child(div().flex_1().min_w_0().truncate().child(label))
                         .when_some(hints[index].clone(), |row, hint| row.child(
-                            div().id(("workspace-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
+                            div().id(("workspace-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
                                 .child(hint)
                         ))
@@ -2289,7 +2289,7 @@ impl WorkspaceWindow {
                     .child(div().flex_1().min_w_0().truncate().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).child("Notifications"))
                     .when(total_count > 0, |header| header.child(
                         div().id("dismiss-all-notifications").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                            .hover(|style| style.bg(rgb(0x353535)))
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Dismiss all notifications in this window".into())).into())
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if event.standard_click() { this.dismiss_all_notifications(cx); }
@@ -2307,16 +2307,16 @@ impl WorkspaceWindow {
                 .children([(false, format!("All {total_count}")), (true, format!("Unread {unread_count}"))].into_iter().map(|(unread_only, label)| {
                     div().id(if unread_only { "notification-filter-unread" } else { "notification-filter-all" })
                         .px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                        .bg(if unread_only == navigation.unread_only { rgb(crate::chrome_style::SELECTED) } else { rgb(0x242424) })
-                        .text_color(if unread_only == navigation.unread_only { rgb(0xffffff) } else { rgb(0xa0a0a0) })
-                        .hover(|style| style.bg(rgb(0x353535)))
+                        .bg(if unread_only == navigation.unread_only { crate::chrome_style::selected() } else { crate::chrome_style::surface() })
+                        .text_color(if unread_only == navigation.unread_only { crate::chrome_style::foreground() } else { crate::chrome_style::muted() })
+                        .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                         .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                             if event.standard_click() { this.set_notification_filter(unread_only, cx); }
                         })).child(label)
                 })))
             .when(has_unread, |panel| panel.child(
                         div().id("mark-all-read").flex_shrink_0().mx_3().mb_2().px_2().py_1().rounded_sm().text_xs()
-                            .text_color(rgb(crate::chrome_style::ACCENT)).cursor_pointer().hover(|style| style.bg(rgb(0x353535)))
+                            .text_color(crate::chrome_style::accent()).cursor_pointer().hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Acknowledge all alerts in this window; keep messages".into())).into())
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if event.standard_click() { this.mark_all_read(cx); }
@@ -2334,7 +2334,7 @@ impl WorkspaceWindow {
                     .when(messages.is_empty(), |list| {
                         list.child(div().p_3().text_sm()
                             .child(if navigation.unread_only { "No unread notifications" } else { "No notifications yet" })
-                            .child(div().mt_2().text_xs().text_color(rgb(0xa0a0a0)).child(
+                            .child(div().mt_2().text_xs().text_color(crate::chrome_style::muted()).child(
                                 if navigation.unread_only && total_count > 0 { "Choose All to see earlier messages." }
                                 else { "Messages from your terminals appear here." }
                             )))
@@ -2350,11 +2350,11 @@ impl WorkspaceWindow {
                                 .mb_2()
                                 .rounded_md()
                                 .border_1()
-                                .border_color(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::ACCENT) } else { rgb(0x383838) })
+                                .border_color(if selected == Some((terminal, revision)) { crate::chrome_style::accent() } else { crate::chrome_style::border() })
                                 .text_sm()
                                 .cursor_pointer()
-                                .bg(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::SELECTED) } else { rgb(0x292929) })
-                                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                .bg(if selected == Some((terminal, revision)) { crate::chrome_style::selected() } else { crate::chrome_style::elevated() })
+                                .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                                 .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
                                     if let Some(state) = &mut this.notification_navigation {
                                         state.selected = Some((terminal, revision));
@@ -2378,7 +2378,7 @@ impl WorkspaceWindow {
                                                     .h(px(6.))
                                                     .flex_shrink_0()
                                                     .rounded_full()
-                                                    .bg(rgb(0xf0b85b)),
+                                                    .bg(crate::chrome_style::warning()),
                                             )
                                         })
                                         .child(
@@ -2386,7 +2386,7 @@ impl WorkspaceWindow {
                                                 .min_w_0()
                                                 .truncate()
                                                 .text_xs()
-                                                .text_color(rgb(0xa0a0a0))
+                                                .text_color(crate::chrome_style::muted())
                                                 .child(source_label),
                                         ),
                                 )
@@ -2405,7 +2405,7 @@ impl WorkspaceWindow {
                                         .when(unread, |controls| controls.child(
                                             div().id(SharedString::from(format!("read-notification-{terminal}-{revision}")))
                                                 .px_2().py_1().rounded_sm().text_xs()
-                                                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                                .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                                                 .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                     cx.stop_propagation();
                                                     if event.standard_click() { this.change_notification(terminal, revision, true, cx); }
@@ -2413,7 +2413,7 @@ impl WorkspaceWindow {
                                         ))
                                         .child(div().id(SharedString::from(format!("expand-notification-{terminal}-{revision}")))
                                             .px_2().py_1().rounded_sm().text_xs()
-                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                            .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                 cx.stop_propagation();
                                                 if !event.standard_click() { return; }
@@ -2424,7 +2424,7 @@ impl WorkspaceWindow {
                                             })).child(if expanded { "Less" } else { "More" }))
                                         .child(div().id(SharedString::from(format!("copy-notification-{terminal}-{revision}")))
                                             .px_2().py_1().rounded_sm().text_xs()
-                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                            .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                                             .on_click(move |event, _, cx| {
                                                 cx.stop_propagation();
                                                 if event.standard_click() {
@@ -2438,7 +2438,7 @@ impl WorkspaceWindow {
                                             .py_1()
                                             .rounded_sm()
                                             .text_xs()
-                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                            .hover(|style| style.bg(crate::chrome_style::selected_hover()))
                                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                 cx.stop_propagation();
                                                 if event.standard_click() { this.dismiss_notification(terminal, revision, cx); }
@@ -2449,8 +2449,8 @@ impl WorkspaceWindow {
                         },
                     )),
             )
-            .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838))
-                .text_xs().text_color(rgb(0xa0a0a0))
+            .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(crate::chrome_style::border())
+                .text_xs().text_color(crate::chrome_style::muted())
                 .child("↑↓ / Tab select · Home/End first/last · Enter open")
                 .child(div().mt_1().child("U filter · R mark read · E expand · Delete dismiss · Esc close")))
             .into_any_element()
@@ -4355,8 +4355,8 @@ impl Render for WorkspaceWindow {
             .size_full()
             .relative()
             .flex()
-            .when(background == WindowBackgroundAppearance::Opaque, |root| root.bg(rgb(0x12141a)))
-            .text_color(rgb(0xdcdfe6))
+            .when(background == WindowBackgroundAppearance::Opaque, |root| root.bg(crate::chrome_style::background()))
+            .text_color(crate::chrome_style::foreground())
             .child(crate::sidebar_interaction::drag_capture(cx))
             .on_action(cx.listener(|this, _: &CloseWindow, window, cx| this.request_close_window(window, cx)))
             .on_action(cx.listener(|this, _: &ShowBufferPicker, window, cx| this.show_buffer_picker(command_palette::BufferMode::Paste, window, cx)))
@@ -4576,7 +4576,7 @@ impl Render for WorkspaceWindow {
                         .child(
                             crate::sidebar_presentation::header()
                                 .when(cfg!(target_os = "macos"), |header| header.pl(px(80.)))
-                                 .child(gpui::div().id("sidebar-title-drag").flex_1().min_w_0().truncate().text_xs().text_color(rgb(0xa0a0a0))
+                                 .child(gpui::div().id("sidebar-title-drag").flex_1().min_w_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } })
                                     .child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
                                 .child(pane_view::action_control("sidebar-new-workspace", "New Workspace", NewWorkspace, None)
@@ -4636,7 +4636,7 @@ impl Render for WorkspaceWindow {
                                                 else { owner.accepts_tab_drop(item, target, cx) }
                                             })))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, cx| {
-                                                if item.container == container || hover_owner.upgrade().is_some_and(|owner| owner.read(cx).accepts_tab_drop(item, target, cx)) { style.bg(rgb(0x435a7b)) } else { style }
+                                                if item.container == container || hover_owner.upgrade().is_some_and(|owner| owner.read(cx).accepts_tab_drop(item, target, cx)) { style.bg(crate::chrome_style::selected()) } else { style }
                                             })
                                             .on_drop(cx.listener(move |this, item: &drag_item::DragItem, window, cx| this.drop_workspace(item, target, window, cx))))
                                         .on_mouse_down(MouseButton::Right, cx.listener(move |this, event: &MouseDownEvent, window, cx| {
@@ -4701,7 +4701,7 @@ impl Render for WorkspaceWindow {
                                                     .when(unread_count > 0, |row| row.child(
                                                         gpui::div().min_w(px(16.)).h(px(16.)).px_1().flex_shrink_0().rounded_full()
                                                             .flex().items_center().justify_center().text_size(px(10.)).font_weight(FontWeight::SEMIBOLD)
-                                                            .bg(rgb(crate::sidebar_presentation::ACCENT)).text_color(rgb(0x211d2c))
+                                                            .bg(crate::chrome_style::accent()).text_color(crate::chrome_style::on_accent())
                                                             .child(unread_count.to_string())
                                                     ))
                                                         .child(gpui::div().flex_1().min_w_0().flex().items_center().gap_1()
@@ -4740,17 +4740,17 @@ impl Render for WorkspaceWindow {
                                                         let number = if position < 8 { position + 1 } else { 9 };
                                                         row.when_some(sidebar_shortcuts[number - 1].clone(), |row, hint| row.child(
                                                             gpui::div().id(("workspace-shortcut", target)).flex_shrink_0().max_w(px(64.)).truncate().text_xs()
-                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
+                                                                .text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() })
                                                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
                                                                 .child(hint)))
                                                     }))
-                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else if unread_count > 0 { 0xd6d6d6 } else { 0xa0a0a0 })).truncate().child(summary)))
-                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(entry.description.clone())))
+                                                        .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else if unread_count > 0 { crate::chrome_style::foreground() } else { crate::chrome_style::muted() }).truncate().child(summary)))
+                                                        .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() }).truncate().child(entry.description.clone())))
                                                         .when_some(preview, |column, message| {
                                                             let text: SharedString = if message.title.is_empty() { message.body.clone() } else if message.body.is_empty() { message.title.clone() } else { format!("{} — {}", message.title, message.body) }.into();
                                                             let hint = text.clone();
                                                             column.child(gpui::div().id(("workspace-message", target)).text_size(px(12.)).line_clamp(1).text_ellipsis()
-                                                                .text_color(rgb(if selected { crate::chrome_style::SELECTED_DETAIL } else { 0xb5b5b5 }))
+                                                                .text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() })
                                                                 .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).child(text))
                                                         })
 
@@ -4764,10 +4764,10 @@ impl Render for WorkspaceWindow {
                                                                     None => detail.clone(),
                                                                 }.into();
                                                                 gpui::div().id((if index == 0 { "workspace-extra-first" } else { "workspace-extra-second" }, target)).min_w_0().truncate().text_size(px(11.))
-                                                                    .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
+                                                                    .text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() })
                                                                     .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
                                                                     .when_some(url, |row, url| row.cursor_pointer()
-                                                                        .hover(|style| style.text_color(rgb(0xc7dcff)))
+                                                                        .hover(|style| style.text_color(crate::chrome_style::foreground()))
                                                                         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                                                         .on_click(move |event, _, cx| {
                                                                             cx.stop_propagation();
@@ -4802,9 +4802,9 @@ impl Render for WorkspaceWindow {
                     })
                     .when_some(self.memory_rows.as_ref(), |div, rows| div.child(memory_view::panel(rows, self.memory_application, self.memory_sampled_at, self.memory_sort, self.memory_loading, self.memory_scroll.clone(), self.memory_focus.as_ref(), self.memory_selected, cx)))
                     .when_some(self.notice.clone(), |div, notice| div.child(gpui::div().flex().items_start().flex_shrink_0().min_w_0()
-                        .gap_2().px_3().py_2().text_xs().bg(rgb(0x292929)).border_t_1().border_color(rgb(0x3b4557))
+                        .gap_2().px_3().py_2().text_xs().bg(crate::chrome_style::elevated()).border_t_1().border_color(crate::chrome_style::border())
                         .child(gpui::div().id("window-notice-text").flex_1().min_w_0().max_h(px(96.)).overflow_scroll().whitespace_normal()
-                            .text_color(rgb(0xd7deeb)).child(notice.clone()))
+                            .text_color(crate::chrome_style::foreground()).child(notice.clone()))
                         .child(pane_view::pane_control("copy-notice", "Copy message")
                             .on_click(move |event, _, cx| {
                                 if event.standard_click() { clipboard::write(ClipboardItem::new_string(notice.clone()), cx); }
@@ -4831,7 +4831,7 @@ impl Render for WorkspaceWindow {
                                 this.cancel_file_loading(cx);
                             })).child(icons::icon("close"))))
                         .when(self.restore_job.is_some(), |row| row.child(gpui::div().id("cancel-restore").flex_shrink_0().px_2().py_1().rounded_sm().cursor_pointer()
-                            .hover(|style| style.bg(rgb(0x353535)))
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if !event.standard_click() { return; }
                                 this.cancel_restore(cx);
@@ -4839,8 +4839,8 @@ impl Render for WorkspaceWindow {
             )
             .when_some(window.pending_input_keystrokes().filter(|keys| !keys.is_empty()), |root, keys| root.child(
                 div().absolute().bottom(px(8.)).right(px(8.)).max_w(relative(0.8))
-                    .px_3().py_2().rounded_md().border_1().border_color(rgb(0x465063))
-                    .bg(rgb(0x292929)).text_color(rgb(0xdcdfe6)).text_size(px(12.)).shadow_md()
+                    .px_3().py_2().rounded_md().border_1().border_color(crate::chrome_style::border())
+                    .bg(crate::chrome_style::elevated()).text_color(crate::chrome_style::foreground()).text_size(px(12.)).shadow_md()
                     .child(format!("{}  ·  Waiting for next key…", keys.iter().map(shortcuts::key_label).collect::<Vec<_>>().join(" ")))
             ))
             .when_some(self.workspace_menu.clone(), |root, menu| root.child(self.workspace_menu_element(menu, window, cx)))

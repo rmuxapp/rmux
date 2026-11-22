@@ -73,9 +73,9 @@ impl PreviewStyledText {
             let mut styled = base.clone().highlight(HighlightStyle {
                 font_weight: style.bold.then_some(FontWeight::BOLD),
                 font_style: style.italic.then_some(FontStyle::Italic),
-                color: if *matched { Some(rgb(0xffffff).into()) } else { style.link.map(|_| rgb(0x8ebfff).into()) },
+                color: if *matched { Some(crate::chrome_style::foreground().into()) } else { style.link.map(|_| crate::chrome_style::accent().into()) },
                 underline: style.link.map(|_| UnderlineStyle { thickness: px(1.), color: None, wavy: false }),
-                background_color: if *matched { Some(rgb(0x41638c).into()) } else { style.code.then(|| rgb(0x363b46).into()) },
+                background_color: if *matched { Some(crate::chrome_style::selected().into()) } else { style.code.then(|| crate::chrome_style::elevated().into()) },
                 strikethrough: style.strike.then_some(StrikethroughStyle { thickness: px(1.), color: None }),
                 ..Default::default()
             });
@@ -110,7 +110,7 @@ impl RenderOnce for PreviewStyledText {
 }
 #[cfg(test)]
 mod preview_typography_tests {
-    use super::{PreviewStyledText, markdown_preview, TextStyle, FontWeight, SharedString, FONT_FAMILY, rgb};
+    use super::{PreviewStyledText, markdown_preview, TextStyle, FontWeight, SharedString, FONT_FAMILY};
     #[test]
     fn inline_code_font_preserves_heading_and_search_attributes() {
         let text = "before 界 after";
@@ -131,7 +131,7 @@ mod preview_typography_tests {
         assert_eq!(runs[1].font.family, SharedString::from(FONT_FAMILY));
         assert_eq!(runs[1].font.weight, FontWeight::BOLD);
         assert!(runs[1].strikethrough.is_some());
-        assert_eq!(runs[1].background_color, Some(rgb(0x41638c).into()));
+        assert_eq!(runs[1].background_color, Some(crate::chrome_style::selected().into()));
     }
 }
 
@@ -1386,11 +1386,11 @@ impl CommandPalette {
                     let cells = markdown_preview::table_cells(&line.text, &line.spans, self.input.read(cx).value());
                     div().id(("table-scroll", command)).w_full().overflow_x_scroll()
                         .track_scroll(&self.table_scroll[&command])
-                        .child(div().flex().w_full().min_w(px(columns.min(markdown_preview::TABLE_VISIBLE_COLUMNS) as f32 * 160.)).border_b_1().border_color(rgb(0x637894))
+                        .child(div().flex().w_full().min_w(px(columns.min(markdown_preview::TABLE_VISIBLE_COLUMNS) as f32 * 160.)).border_b_1().border_color(crate::chrome_style::border())
                         .when(header, |row| row.font_weight(FontWeight::BOLD))
                         .children(cells.into_iter().enumerate().map(|(column, (text, spans))| {
                             let search = file_browser::preview_highlights(&text, self.input.read(cx).value());
-                            div().flex_1().min_w_0().px_2().border_r_1().border_color(rgb(0x637894))
+                            div().flex_1().min_w_0().px_2().border_r_1().border_color(crate::chrome_style::border())
                                 .text_align(match alignment[column] {
                                     markdown_preview::Alignment::Center => TextAlign::Center,
                                     markdown_preview::Alignment::Right => TextAlign::Right,
@@ -1423,7 +1423,7 @@ impl CommandPalette {
                 .children(state.lines.iter().map(|(line, ranges)| {
                     div().h(px(20.)).flex_shrink_0().whitespace_nowrap().child(
                         StyledText::new(line.clone()).with_highlights(ranges.iter().cloned().map(|range| (
-                            range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
+                            range, HighlightStyle { color: Some(crate::chrome_style::foreground().into()), background_color: Some(crate::chrome_style::selected().into()), ..Default::default() }
                         ))))
                 })).into_any_element())
         } else { None };
@@ -1439,7 +1439,7 @@ impl CommandPalette {
                 _ => rmux_core::palette_match::highlights(text, self.input.read(cx).value()),
             };
             StyledText::new(text.clone()).with_highlights(ranges.into_iter().map(|range| (
-                range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
+                range, HighlightStyle { color: Some(crate::chrome_style::foreground().into()), background_color: Some(crate::chrome_style::selected().into()), ..Default::default() }
             )))
         });
         palette_view::result(command, self.command_height(command), selected)
@@ -1447,7 +1447,7 @@ impl CommandPalette {
             .when_some(heading, |row, level| row.font_weight(FontWeight::BOLD).text_size(px(match level { 1 => 20., 2 => 18., 3 => 16., _ => 14. })).line_height(px(24.)))
             .when(markdown == Some(markdown_preview::Kind::Code), |row| row.font_family(FONT_FAMILY))
             .when_some(match markdown { Some(markdown_preview::Kind::List { depth, .. }) => Some(depth), _ => None }, |row, depth| row.pl(px(12. + depth.saturating_sub(1).min(8) as f32 * 12.)))
-            .when(matches!(markdown, Some(markdown_preview::Kind::Quote | markdown_preview::Kind::List { .. })), |row| row.border_l_2().border_color(rgb(0x637894)))
+            .when(matches!(markdown, Some(markdown_preview::Kind::Quote | markdown_preview::Kind::List { .. })), |row| row.border_l_2().border_color(crate::chrome_style::border()))
             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                 if !event.standard_click() { return; }
                 let Some(row) = this.search.matches.iter().position(|index| *index == command) else { return; };
@@ -1465,7 +1465,7 @@ impl CommandPalette {
                         .child(if let Some(table) = table { table } else if let Some(code) = code_view {
                             code
                         } else { div().when(wrapped, |title| title.whitespace_normal().line_clamp(if heading.is_some() { 2 } else { 4 }).text_ellipsis()).when(!wrapped, |title| title.truncate()).child(title).into_any_element() })
-                        .when_some(subtitle, |column, subtitle| column.child(div().truncate().text_xs().line_height(px(16.)).text_color(rgb(0xa0a0a0)).child(subtitle)))),
+                        .when_some(subtitle, |column, subtitle| column.child(div().truncate().text_xs().line_height(px(16.)).text_color(crate::chrome_style::muted()).child(subtitle)))),
             )
             .when_some(self.commands[command].shortcut.clone(), |row, shortcut| {
                 row.child(
@@ -1490,9 +1490,9 @@ impl CommandPalette {
     fn file_navigation_button(&self, id: &'static str, label: &'static str, action: Option<Box<dyn Action>>, cx: &mut Context<Self>) -> impl IntoElement {
         let enabled = action.is_some();
         div().id(id).px_2().py_1().rounded_sm().text_xs()
-            .text_color(rgb(if enabled { 0xdcdfe6 } else { 0x777777 }))
-            .bg(rgb(0x303030))
-            .when(enabled, |button| button.cursor_pointer().hover(|style| style.bg(rgb(0x454545))))
+            .text_color(if enabled { crate::chrome_style::foreground() } else { crate::chrome_style::muted() })
+            .bg(crate::chrome_style::hover())
+            .when(enabled, |button| button.cursor_pointer().hover(|style| style.bg(crate::chrome_style::hover_strong())))
             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                 if !event.standard_click() || this.input.read(cx).is_composing() { return; }
                 if let Some(action) = &action { cx.emit(PaletteEvent::Run(action.boxed_clone())); }
@@ -1734,7 +1734,7 @@ impl Render for CommandPalette {
             ))
             .when_some(self.location.clone(), |palette, location| palette.child(
                 div().id("file-browser-location").flex_shrink_0().min_w_0().px_3().pt_2()
-                    .text_xs().text_color(rgb(0xb8b8b8)).truncate()
+                    .text_xs().text_color(crate::chrome_style::muted()).truncate()
                     .tooltip({ let location = location.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(location.clone())).into() })
                     .child(location)
             ))
@@ -1763,27 +1763,27 @@ impl Render for CommandPalette {
                         Some(if self.markdown_preview { Box::new(PreviewMarkdownFile { path: path.clone() }) } else if *hex { Box::new(PreviewHexFile { path: path.clone() }) } else { Box::new(PreviewLocalFile { path: path.clone() }) }), cx))
             ))
             .when(!preview_shortcuts.is_empty(), |palette| palette.child(
-                div().flex_shrink_0().px_3().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(preview_shortcuts)
+                div().flex_shrink_0().px_3().pt_2().text_xs().text_color(crate::chrome_style::muted()).child(preview_shortcuts)
             ))
             .when(self.preview_navigation.is_some() && !self.hex_preview, |palette| palette.child(
                 div().px_3().pt_2().flex_shrink_0().flex().items_center().gap_2()
                     .child(div().id("preview-wrap").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                        .bg(rgb(if self.wrap_preview { crate::chrome_style::SELECTED } else { 0x303030 }))
-                        .hover(|style| style.bg(rgb(0x454545)))
+                        .bg(if self.wrap_preview { crate::chrome_style::selected() } else { crate::chrome_style::hover() })
+                        .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                         .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                             if event.standard_click() { this.toggle_preview_wrap(cx); }
                         }))
                         .tooltip({ let hint: SharedString = format!("Toggle wrapped excerpts{} · Copy retains the full captured line", wrap_hint.as_ref().map(|hint| format!(" · {hint}")).unwrap_or_default()).into();
                             move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into() })
                         .child(if self.wrap_preview { "Single-line excerpts" } else { "Wrap excerpts" }))
-                    .when(self.wrap_preview, |bar| bar.child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Up to 4 visual lines")))
+                    .when(self.wrap_preview, |bar| bar.child(div().text_xs().text_color(crate::chrome_style::muted()).child("Up to 4 visual lines")))
             ))
             .when_some(block_scroll_hint, |palette, hint| palette.child(
-                div().px_3().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(format!("Scroll selected block · {hint}"))))
+                div().px_3().pt_2().text_xs().text_color(crate::chrome_style::muted()).child(format!("Scroll selected block · {hint}"))))
             .when_some(self.preview_link_target(), |palette, (index, count, url)| palette.child(
                 div().px_3().py_2().flex_shrink_0().flex().flex_col().gap_1()
-                    .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(format!("Link {}/{count}{link_hints}", index + 1)))
-                    .child(div().id("preview-link-target").truncate().text_sm().text_color(rgb(0x8ebfff)).cursor_pointer()
+                    .child(div().text_xs().text_color(crate::chrome_style::muted()).child(format!("Link {}/{count}{link_hints}", index + 1)))
+                    .child(div().id("preview-link-target").truncate().text_sm().text_color(crate::chrome_style::accent()).cursor_pointer()
                         .tooltip({ let url = url.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(url.clone().into())).into() })
                         .on_click(cx.listener(|this, event: &ClickEvent, _, cx| { if event.standard_click() { cx.stop_propagation(); this.open_preview_link(cx); } }))
                         .child(url))))
@@ -1802,15 +1802,15 @@ impl Render for CommandPalette {
             })
             .when(self.buffer_rename.is_some() || self.directory_input || self.terminal_search_input || self.ssh_input, |palette| palette.child(
                 div().flex_shrink_0().px_3().py_2().flex().flex_wrap().items_center().gap_2()
-                    .child(div().flex_1().min_w_0().text_xs().text_color(rgb(0xa0a0a0))
+                    .child(div().flex_1().min_w_0().text_xs().text_color(crate::chrome_style::muted())
                         .child(if self.ssh_input { "Enter connects · Escape cancels" } else if self.terminal_search_input { "Enter searches · Escape cancels" } else if self.directory_input { "Enter opens · Escape cancels" } else { "Enter saves · Escape cancels" }))
                     .child(div().id("buffer-rename-cancel").px_3().py_1().rounded_sm()
-                        .text_sm().cursor_pointer().bg(rgb(0x353535)).hover(|style| style.bg(rgb(0x454545)))
+                        .text_sm().cursor_pointer().bg(crate::chrome_style::hover()).hover(|style| style.bg(crate::chrome_style::hover_strong()))
                         .on_click(cx.listener(|_, event: &ClickEvent, _, cx| {
                             if event.standard_click() { cx.emit(PaletteEvent::Close); }
                         })).child("Cancel"))
                     .child(div().id("buffer-rename-save").px_3().py_1().rounded_sm()
-                        .text_sm().cursor_pointer().bg(rgb(0x007aff)).hover(|style| style.bg(rgb(0x1685ff)))
+                        .text_sm().cursor_pointer().text_color(crate::chrome_style::on_accent()).bg(crate::chrome_style::accent()).hover(|style| style.bg(crate::chrome_style::accent()))
                         .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                             if event.standard_click() { this.run(cx); }
                         })).child(if self.ssh_input { "Connect" } else if self.terminal_search_input { "Search" } else if self.directory_input { "Open" } else { "Save" }))
@@ -1824,8 +1824,8 @@ impl Render for CommandPalette {
                         palette_view::result_position(self.selected, self.search.matches.len())))
                     .when(has_preview_file, |footer| footer.child(
                         div().id("preview-selected-hex").px_2().py_1().rounded_sm()
-                            .cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))
-                            .hover(|style| style.bg(rgb(0x454545)))
+                            .cursor_pointer().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::hover())
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if !event.standard_click() { return; }
                                 this.preview_selected_hex(cx);
@@ -1833,16 +1833,16 @@ impl Render for CommandPalette {
                             })).child("Preview as Hex · Shift+Enter")
                     ))
                     .when(has_preview_file, |footer| footer.child(
-                        div().id("edit-selected-file").px_2().py_1().rounded_sm().cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))
-                            .hover(|style| style.bg(rgb(0x454545)))
+                        div().id("edit-selected-file").px_2().py_1().rounded_sm().cursor_pointer().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::hover())
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if event.standard_click() { this.edit_selected_file(cx); }
                             })).child("External Editor")
                     ))
                     .when(has_ssh_destination, |footer| footer.child(
                         div().id("edit-ssh-destination").px_2().py_1().rounded_sm()
-                            .cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))
-                            .hover(|style| style.bg(rgb(0x454545)))
+                            .cursor_pointer().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::hover())
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if !event.standard_click() { return; }
                                 this.edit_selected_ssh(cx);
@@ -1851,8 +1851,8 @@ impl Render for CommandPalette {
                     ))
                     .when(has_search_excerpt, |footer| footer.child(
                         div().id("copy-search-excerpt").px_2().py_1().rounded_sm()
-                            .cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))
-                            .hover(|style| style.bg(rgb(0x454545)))
+                            .cursor_pointer().text_color(crate::chrome_style::foreground()).bg(crate::chrome_style::hover())
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Copy the displayed excerpt, including clipping ellipses".into())).into())
                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                 if !event.standard_click() { return; }

@@ -11,12 +11,13 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--binary", default="target/debug/rmux")
 parser.add_argument("--scene", choices=["workspace", "overflow", "compact"], default="workspace")
 parser.add_argument("--check", action="store_true")
+parser.add_argument("--theme", default="dark", choices=["dark", "light", "solarized_dark", "solarized_light", "nord", "catppuccin_mocha", "catppuccin_latte"])
 args = parser.parse_args()
 binary = Path(args.binary).resolve()
 with tempfile.TemporaryDirectory(prefix="rmux-visual-") as temporary:
     root = Path(temporary)
     config = root / "config.json"
-    config.write_text(json.dumps({"font_size": 13, "confirm_close": "never"}))
+    config.write_text(json.dumps({"font_size": 13, "confirm_close": "never", "terminal_theme": args.theme}))
     shell = root / "preview-shell"
     shell.write_text('''#!/bin/sh
 trap 'exit 0' HUP TERM
@@ -66,7 +67,7 @@ done
     saved = root / "layout.json"
     saved.write_text(json.dumps(layout))
     env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}
-    env.update(RMUX_CONFIG=str(config), RMUX_SHELL=str(shell))
+    env.update(RMUX_CONFIG=str(config), RMUX_SHELL=str(shell), MTL_HUD_ENABLED="0")
     subprocess.run([str(binary), "--check-layout", str(saved)], env=env, check=True)
     if not args.check:
         print("Synthetic preview: close its window to finish. Your configuration is unchanged.", flush=True)
