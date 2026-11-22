@@ -327,7 +327,7 @@ Session/configuration actions include `save_layout`, `open_layout`, `save_sessio
 `open_settings_file`, and `save_appearance`. These retain the existing dialogs and
 save behavior. Diagnostics actions include `terminal_memory`,
 `close_terminal_memory`, `copy_terminal_memory`, `cycle_terminal_memory_sort`,
-`refresh_git_context`, `toggle_program_status`, and `dismiss_all_notifications`.
+`refresh_git_context`, `refresh_pull_request`, `open_pull_request`, `toggle_program_status`, and `dismiss_all_notifications`.
 Use `"context":"window"` for a binding that should also work while a window panel
 has focus; bindings otherwise require terminal context. No new defaults are added.
 

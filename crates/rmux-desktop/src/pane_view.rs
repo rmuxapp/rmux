@@ -492,6 +492,8 @@ impl PaneView {
                 "directory_label":terminal.directory_label,
                 "remote_directory":terminal.remote_directory_label,
                 "git_branch":terminal.git_branch,
+                "pull_request":terminal.pull_request,
+                "pull_request_status":terminal.pull_request_status,
                 "program_status":terminal.program_status.as_ref().map(|summary| {
                     use rmux_terminal::program_status::{State, Kind};
                     let record = &summary.record;
@@ -722,7 +724,14 @@ impl PaneView {
         }
         let directory = terminal.directory_label.clone()
             .or_else(|| terminal.snapshot_directory.as_ref().map(|path| path.to_string_lossy().into_owned()));
-        (terminal.git_branch.is_some() || directory.is_some()).then(|| (terminal.git_branch.clone(), directory))
+        let pr = terminal.pull_request.as_ref().map(pull_request::PullRequest::label)
+            .or_else(|| terminal.pull_request_status.clone());
+        let branch = match (pr, terminal.git_branch.as_ref()) {
+            (Some(pr), Some(branch)) => Some(format!("{pr} · {branch}")),
+            (Some(pr), None) => Some(pr),
+            (None, branch) => branch.cloned(),
+        };
+        (branch.is_some() || directory.is_some()).then_some((branch, directory))
     }
     pub fn needs_attention(&self, cx: &App) -> bool {
         self.terminals

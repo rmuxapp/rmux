@@ -53,7 +53,23 @@ available. Discovery runs in the background on shell directory reports. A shared
 native filesystem watcher refreshes branch badges on HEAD changes, including
 external checkouts, without running Git or polling while idle. Filesystems that
 do not deliver native events still rely on shell reports or manual refresh.
-PR and listening-port metadata are not yet implemented.
+Use **Refresh Pull Request for Current Terminal** from the command palette to
+look up the current local branch with GitHub CLI. `gh` must already be available
+on the app's PATH and authenticated; rmux does not install it or prompt for login.
+The sidebar shows the returned PR number, state and title alongside Git context;
+hover for the full text. **Open Current Pull Request** opens its HTTPS page.
+Custom shortcut actions are `refresh_pull_request` and `open_pull_request`.
+
+Lookup is manual, limited to one request at a time, and times out after ten
+seconds. It uses the repository selected by `gh`, searches matching head branches
+across all PR states, and takes the first result. Forks with identical branch names
+may need repository configuration in `gh`. No result and lookup failure have
+separate sidebar messages. Directory/branch changes clear the cached result;
+refresh again for server-side changes. Remote SSH lookup and automatic PR polling
+are not implemented. Native visual/interaction acceptance remains pending.
+
+**Show Listening Ports** provides an on-demand local terminal process-tree
+snapshot; listening-port badges in the sidebar remain unimplemented.
 The palette's Refresh Git Branch for Current Terminal action refreshes explicitly.
 Repeated shell directory reports refresh Git even when the path stays unchanged;
 the included zsh integration reports its directory at each prompt. `surface.list`

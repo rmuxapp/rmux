@@ -103,6 +103,8 @@ commands! {
     MarkAllRead => "Mark All Read in This Window",
     ToggleNotifications => "Toggle Notifications",
     DismissAllNotifications => "Dismiss All Notifications",
+    RefreshPullRequest => "Refresh Pull Request for Current Terminal",
+    OpenPullRequest => "Open Current Pull Request",
     RefreshGitContext => "Refresh Git Branch for Current Terminal",
     ToggleProgramStatus => "Toggle Program Status",
     ShowListeningPorts => "Show Listening Ports",

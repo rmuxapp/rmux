@@ -22,6 +22,7 @@ mod terminal_search;
 #[cfg(unix)]
 mod image_paste;
 mod git_context;
+mod pull_request;
 mod git_watch;
 mod clipboard;
 #[cfg(target_os = "macos")]
@@ -499,6 +500,8 @@ actions!(
         ToggleNotifications,
         DismissAllNotifications,
         RefreshGitContext,
+        RefreshPullRequest,
+        OpenPullRequest,
         ToggleProgramStatus,
         ShowListeningPorts,
         CloseListeningPorts,
@@ -620,6 +623,9 @@ struct TerminalView {
     remote_directory_label: Option<String>,
     snapshot_directory: Option<std::path::PathBuf>,
     git_branch: Option<String>,
+    pull_request: Option<pull_request::PullRequest>,
+    pull_request_status: Option<String>,
+    pull_request_task: Option<Task<()>>,
     git_loading: bool,
     git_watch_path: Option<std::path::PathBuf>,
     git_watch_task: Option<Task<()>>,
@@ -696,6 +702,39 @@ impl TerminalView {
         if self.hidden_line_input != hidden { self.hidden_line_input = hidden; cx.notify(); }
     }
 
+    fn clear_pull_request(&mut self) {
+        self.pull_request_task = None;
+        self.pull_request = None;
+        self.pull_request_status = None;
+    }
+    fn refresh_pull_request(&mut self, cx: &mut Context<Self>) {
+        if self.pull_request_task.is_some() { return; }
+        if self.session.remote_destination().is_some() {
+            self.error = Some("Pull request lookup is available for local terminals only".into()); cx.notify(); return;
+        }
+        let Some((directory, branch)) = self.snapshot_directory.clone().zip(self.git_branch.clone())
+            .filter(|(_, branch)| !branch.starts_with("detached ")) else {
+                self.error = Some("No local Git branch is available; refresh the Git branch first".into()); cx.notify(); return;
+            };
+        self.pull_request = None;
+        self.pull_request_status = Some("Looking up PR…".into());
+        cx.emit(TabMetadataChanged); cx.notify();
+        let executor = cx.background_executor().clone();
+        self.pull_request_task = Some(cx.spawn(async move |entity, cx| {
+            let lookup_directory = directory.clone(); let lookup_branch = branch.clone();
+            let result = executor.spawn(async move { pull_request::lookup(&lookup_directory, &lookup_branch).await }).await;
+            let _ = entity.update(cx, |this, cx| {
+                this.pull_request_task = None;
+                if this.snapshot_directory.as_ref() != Some(&directory) || this.git_branch.as_ref() != Some(&branch) { return; }
+                match result {
+                    Ok(Some(pr)) => { this.pull_request = Some(pr); this.pull_request_status = None; },
+                    Ok(None) => { this.pull_request_status = Some("No PR found".into()); },
+                    Err(error) => { this.pull_request_status = Some("PR unavailable".into()); this.error = Some(format!("Pull request: {error:#}")); },
+                }
+                cx.emit(TabMetadataChanged); cx.notify();
+            });
+        }));
+    }
     fn refresh_git_context(&mut self, cx: &mut Context<Self>) {
         if self.git_loading { self.git_refresh_pending = true; return; }
         let directory = self.snapshot_directory.clone();
@@ -725,6 +764,7 @@ impl TerminalView {
                     }
                 }
                 if this.snapshot_directory == directory && this.git_branch != branch {
+                    this.clear_pull_request();
                     this.git_branch = branch;
                     cx.emit(TabMetadataChanged); cx.notify();
                 }
@@ -968,6 +1008,7 @@ impl TerminalView {
                             if (revision != 0 || directory.is_some()) && view.snapshot_directory != directory {
                                 view.snapshot_directory = directory.clone();
                                 directory_changed = true;
+                                view.clear_pull_request();
                                 view.git_branch = None;
                                 metadata_changed = true;
                             }
@@ -1041,6 +1082,9 @@ impl TerminalView {
             remote_directory_label: None,
             snapshot_directory,
             git_branch: None,
+            pull_request: None,
+            pull_request_status: None,
+            pull_request_task: None,
             git_loading: false,
             git_watch_path: None,
             git_watch_task: None,
@@ -2011,6 +2055,11 @@ impl Render for TerminalView {
             .on_action(cx.listener(Self::copy_working_directory))
             .on_action(cx.listener(Self::reveal_working_directory))
             .on_action(cx.listener(|this, _: &RefreshGitContext, _, cx| this.refresh_git_context(cx)))
+            .on_action(cx.listener(|this, _: &RefreshPullRequest, _, cx| this.refresh_pull_request(cx)))
+            .on_action(cx.listener(|this, _: &OpenPullRequest, _, cx| {
+                if let Some(pr) = &this.pull_request { cx.open_url(&pr.url); }
+                else { this.error = Some("Refresh Pull Request first to look up this branch".into()); cx.notify(); }
+            }))
             .on_action(
                 cx.listener(|this, _: &PreviousPrompt, _, cx| this.scroll(Scroll::Prompts(-1), cx)),
             )

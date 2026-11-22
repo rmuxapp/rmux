@@ -83,6 +83,8 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "close_terminal_memory" => Box::new(CloseTerminalMemory),
         "copy_terminal_memory" => Box::new(CopyTerminalMemory),
         "cycle_terminal_memory_sort" => Box::new(CycleTerminalMemorySort),
+        "refresh_pull_request" => Box::new(RefreshPullRequest),
+        "open_pull_request" => Box::new(OpenPullRequest),
         "refresh_git_context" => Box::new(RefreshGitContext),
         "toggle_program_status" => Box::new(ToggleProgramStatus),
         "dismiss_all_notifications" => Box::new(DismissAllNotifications),

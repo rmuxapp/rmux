@@ -658,6 +658,8 @@ impl CommandPalette {
         command!(ToggleNotifications);
         command!(DismissAllNotifications);
         command!(RefreshGitContext);
+        command!(RefreshPullRequest);
+        command!(OpenPullRequest);
         command!(ToggleProgramStatus);
         command!(ShowListeningPorts);
         command!(CloseListeningPorts);
