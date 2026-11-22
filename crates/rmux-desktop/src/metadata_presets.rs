@@ -37,9 +37,9 @@ pub(crate) fn render(input: &Entity<TextField>, icons: bool, cx: &App) -> AnyEle
                 else if value.is_empty() { "×".into() } else { String::new() };
             div().id(("metadata-preset", index)).w(px(28.)).h(px(28.))
                 .flex().items_center().justify_center().rounded_md().border_1()
-                .border_color(rgb(if selected { 0xa7c7ff } else { 0x465063 }))
-                .bg(rgb(0x252d3b)).cursor_pointer()
-                .hover(|button| button.bg(rgb(0x3a465c)))
+                .border_color(rgb(if selected { crate::chrome_style::ACCENT } else { crate::chrome_style::SELECTED_BORDER }))
+                .bg(rgb(crate::chrome_style::SELECTED)).cursor_pointer()
+                .hover(|button| button.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                 .tooltip(move |_, cx| cx.new(|_| ControlHint(name.into())).into())
                 .child(div().w(px(16.)).h(px(16.)).rounded_sm().text_center().line_height(px(16.))
                     .when_some(color, |swatch, color| swatch.bg(rgb(color))).child(label))
@@ -51,4 +51,33 @@ pub(crate) fn render(input: &Entity<TextField>, icons: bool, cx: &App) -> AnyEle
                     text_layout::focus(&focus, window, cx);
                 })
         })).into_any_element()
+}
+
+/// Compact metadata form shared by sidebar hosts. Buttons preserve the editor's
+/// validation, stable target identity and focus-return behavior.
+pub(crate) fn editor(input: &Entity<TextField>, label: impl Into<SharedString>, presets: Option<bool>, cx: &App) -> Stateful<Div> {
+    let save = input.clone();
+    let cancel = input.clone();
+    div().id("workspace-metadata-editor").w_full().min_w_0().flex().flex_col().gap_2()
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .on_click(|_, _, cx| cx.stop_propagation())
+        .child(div().text_xs().text_color(rgb(crate::chrome_style::SELECTED_DETAIL)).child(label.into()))
+        .child(div().w_full().min_w_0().px_2().py_1().rounded_sm().border_1()
+            .border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input.clone()))
+        .when_some(presets, |editor, icons| editor.child(render(input, icons, cx)))
+        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Enter saves · Esc cancels"))
+        .child(div().flex().flex_wrap().items_center().justify_end().gap_2()
+            .child(div().id("cancel-metadata-edit").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
+                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                .on_click(move |event, _, cx| {
+                    cx.stop_propagation();
+                    if event.standard_click() { cancel.update(cx, |input, cx| input.cancel(cx)); }
+                }).child("Cancel"))
+            .child(div().id("save-metadata-edit").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
+                .bg(rgb(crate::chrome_style::SELECTED)).border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER))
+                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                .on_click(move |event, _, cx| {
+                    cx.stop_propagation();
+                    if event.standard_click() { save.update(cx, |input, cx| input.submit(false, cx)); }
+                }).child("Save")))
 }

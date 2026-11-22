@@ -4321,17 +4321,12 @@ impl Render for WorkspaceWindow {
                                                     *id == entry.workspace.entity_id()
                                                 })
                                             {
-                                                gpui::div()
-                                                    .w_full()
-                                                    .min_w_0()
-                                                    .child(gpui::div().text_xs().child(field.label()))
-                                                    .child(input.clone())
-                                                    .when(matches!(field, MetadataField::Color | MetadataField::Icon | MetadataField::GroupColor | MetadataField::GroupIcon), |editor| editor.child(crate::metadata_presets::render(input, matches!(field, MetadataField::Icon | MetadataField::GroupIcon), cx)))
-                                                    .child(
-                                                        gpui::div()
-                                                            .text_xs()
-                                                            .child("Enter to save · Esc to cancel"),
-                                                    )
+                                                crate::metadata_presets::editor(input, field.label(),
+                                                    match field {
+                                                        MetadataField::Color | MetadataField::GroupColor => Some(false),
+                                                        MetadataField::Icon | MetadataField::GroupIcon => Some(true),
+                                                        _ => None,
+                                                    }, cx)
                                                     .into_any_element()
                                             } else {
                                                 gpui::div().w_full().min_w_0().flex().flex_col().gap_1()

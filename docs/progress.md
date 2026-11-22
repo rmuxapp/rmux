@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Sidebar editor polish: native and WASM workspace/group metadata now share a
+bordered input, explicit Save/Cancel buttons, keyboard hint and accent-matched
+icon/color presets. Button events use existing validation and focus return and
+stop bubbling into workspace selection. Narrow-sidebar review caught a squeezed
+hint beside the controls; it now occupies its own line above the button row.
+Native compile and WASM build pass. Browser preset+Save applied a blue workspace
+marker; preset+Cancel retained the original unset color and restored terminal
+focus. Screenshot: `target/sidebar-editor-polish.png`. Native pointer acceptance
+and each metadata field's validation paths remain outside this focused review.
+
+
 Command coverage polish: Copy, Paste and Previous/Next Pane are now discoverable
 in native and WASM palettes and effective-shortcut lists. Both hosts resolve them
 through shared action adapters; existing clipboard, paste and pane-cycle handlers

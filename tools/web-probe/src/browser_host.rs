@@ -146,7 +146,7 @@ impl BrowserHost {
         self.editor_hint = match field {
             WorkspaceField::Icon | WorkspaceField::GroupIcon => "Icon: one symbol or emoji; empty clears",
             WorkspaceField::Color | WorkspaceField::GroupColor => "Color: #RRGGBB; empty clears",
-            _ => "Enter to save · Esc to cancel",
+            _ => "Edit workspace or group",
         }.into();
         self.editor_presets = match field {
             WorkspaceField::Color | WorkspaceField::GroupColor => Some(false),
@@ -412,9 +412,7 @@ impl Render for BrowserHost {
                                     sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some()))))
                             .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
-                                div().flex().flex_col().gap_1().child(input.clone())
-                                    .when_some(self.editor_presets, |editor, icons| editor.child(crate::metadata_presets::render(input, icons, cx)))
-                                    .child(div().text_xs().child(self.editor_hint.clone()))))
+                                crate::metadata_presets::editor(input, self.editor_hint.clone(), self.editor_presets, cx)))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
                                 let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.1.entity_id() == target) else { return; };
