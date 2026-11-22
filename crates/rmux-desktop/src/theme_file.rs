@@ -109,3 +109,14 @@ mod tests {
         Ok(())
     }
 }
+
+/// Immutable bundled themes are parsed once, never from the render loop's filesystem.
+pub fn catppuccin(latte: bool) -> &'static Theme {
+    static LATTE: std::sync::OnceLock<Theme> = std::sync::OnceLock::new();
+    static MOCHA: std::sync::OnceLock<Theme> = std::sync::OnceLock::new();
+    if latte {
+        LATTE.get_or_init(|| parse(include_str!("../themes/catppuccin-latte.conf")).expect("valid bundled Latte theme"))
+    } else {
+        MOCHA.get_or_init(|| parse(include_str!("../themes/catppuccin-mocha.conf")).expect("valid bundled Mocha theme"))
+    }
+}

@@ -75,14 +75,25 @@ pub enum TerminalTheme {
     SolarizedDark,
     SolarizedLight,
     Nord,
+    CatppuccinMocha,
+    CatppuccinLatte,
 }
 impl TerminalTheme {
-    pub const ALL: [Self; 5] = [Self::Dark, Self::Light, Self::SolarizedDark, Self::SolarizedLight, Self::Nord];
+    pub const ALL: [Self; 7] = [Self::Dark, Self::Light, Self::SolarizedDark, Self::SolarizedLight, Self::Nord, Self::CatppuccinMocha, Self::CatppuccinLatte];
     pub fn label(self) -> &'static str {
         match self {
             Self::Dark => "Dark", Self::Light => "Light",
             Self::SolarizedDark => "Solarized Dark", Self::SolarizedLight => "Solarized Light",
             Self::Nord => "Nord",
+            Self::CatppuccinMocha => "Catppuccin Mocha",
+            Self::CatppuccinLatte => "Catppuccin Latte",
+        }
+    }
+    fn bundled(self) -> Option<&'static crate::theme_file::Theme> {
+        match self {
+            Self::CatppuccinMocha => Some(crate::theme_file::catppuccin(false)),
+            Self::CatppuccinLatte => Some(crate::theme_file::catppuccin(true)),
+            _ => None,
         }
     }
     pub fn cycle(self, delta: i32) -> Self {
@@ -320,6 +331,7 @@ impl Preferences {
     pub fn terminal_palette(&self) -> Option<[rmux_terminal::Color; 16]> {
         self.ansi_palette.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.palette)).map(|colors| colors.map(HexColor::rgb)).or_else(|| {
             match self.terminal_theme {
+                TerminalTheme::CatppuccinMocha | TerminalTheme::CatppuccinLatte => self.terminal_theme.bundled().and_then(|theme| theme.palette).map(|colors| colors.map(HexColor::rgb)),
                 TerminalTheme::Dark => None,
                 TerminalTheme::Light => Some([
                     0x24292f, 0xa82020, 0x176b35, 0x805c00,
@@ -345,14 +357,14 @@ impl Preferences {
         })
     }
     fn cursor_color_setting(&self) -> Option<CellColor> {
-        self.cursor_color.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_color))
+        self.cursor_color.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_color)).or_else(|| self.terminal_theme.bundled().and_then(|theme| theme.cursor_color))
     }
     pub fn cursor_fill(&self, foreground: rmux_terminal::Color, background: rmux_terminal::Color, engine_color: rmux_terminal::Color, engine_explicit: bool) -> rmux_terminal::Color {
         if engine_explicit { return engine_color; }
         self.cursor_color_setting().map(|setting| setting.resolve(foreground, background)).unwrap_or(engine_color)
     }
     pub fn cursor_text(&self, foreground: rmux_terminal::Color, background: rmux_terminal::Color) -> rmux_terminal::Color {
-        let target = self.cursor_text.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_text))
+        let target = self.cursor_text.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.cursor_text)).or_else(|| self.terminal_theme.bundled().and_then(|theme| theme.cursor_text))
             .unwrap_or(CellColor::CellBackground).resolve(foreground, background);
         // Fade the block's inverted glyph back to the original terminal text.
         // At zero opacity the cursor must not leave an inverted glyph behind.
@@ -366,7 +378,7 @@ impl Preferences {
         color
     }
     pub fn selection_foreground(&self) -> Option<CellColor> {
-        self.selection_foreground.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_foreground))
+        self.selection_foreground.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_foreground)).or_else(|| self.terminal_theme.bundled().and_then(|theme| theme.selection_foreground))
     }
     pub fn selection_background_fill(&self, foreground: rmux_terminal::Color, background: rmux_terminal::Color) -> gpui::Hsla {
         let mut fill: gpui::Hsla = self.selection_background().map(|setting| crate::color(setting.resolve(foreground, background))).unwrap_or_else(|| gpui::rgba(0x668fca80).into());
@@ -374,10 +386,11 @@ impl Preferences {
         fill
     }
     pub fn selection_background(&self) -> Option<CellColor> {
-        self.selection_background.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_background))
+        self.selection_background.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_background)).or_else(|| self.terminal_theme.bundled().and_then(|theme| theme.selection_background))
     }
     pub fn terminal_colors(&self) -> [Option<rmux_terminal::Color>; 3] {
         let defaults = match self.terminal_theme {
+            TerminalTheme::CatppuccinMocha | TerminalTheme::CatppuccinLatte => self.terminal_theme.bundled().unwrap().colors,
             TerminalTheme::Dark => [None; 3],
             TerminalTheme::Nord => [Some(HexColor(0xd8dee9)), Some(HexColor(0x2e3440)), Some(HexColor(0xd8dee9))],
             TerminalTheme::Light => [Some(HexColor(0x24292f)), Some(HexColor(0xffffff)), Some(HexColor(0x0755a8))],
@@ -901,8 +914,36 @@ mod tests {
         for theme in TerminalTheme::ALL {
             assert_eq!(theme.cycle(1).cycle(-1), theme);
         }
-        assert_eq!(TerminalTheme::Nord.cycle(1), TerminalTheme::Dark);
+        assert_eq!(TerminalTheme::CatppuccinLatte.cycle(1), TerminalTheme::Dark);
         assert!(Preferences::decode(br#"{"terminal_theme":"unknown"}"#).is_err());
+        Ok(())
+    }
+    #[test]
+    fn catppuccin_presets_include_cursor_selection_and_override_precedence() -> Result<()> {
+        use rmux_terminal::Color;
+        let (fg, bg) = (Color(200, 100, 20), Color(20, 40, 60));
+        for (name, background, cursor, text, selection) in [
+            ("catppuccin_mocha", Color(30,30,46), Color(245,224,220), Color(17,17,27), Color(53,55,73)),
+            ("catppuccin_latte", Color(239,241,245), Color(220,138,120), Color(239,241,245), Color(216,218,225)),
+        ] {
+            let mut settings = Preferences::decode(&serde_json::to_vec(&serde_json::json!({"terminal_theme":name}))?)?;
+            assert_eq!(settings.terminal_colors()[1], Some(background));
+            assert_eq!(settings.terminal_colors()[2], Some(cursor));
+            assert_eq!(settings.cursor_text(fg, bg), text);
+            assert_eq!(settings.selection_background().unwrap().resolve(fg,bg), selection);
+            assert!(settings.terminal_palette().is_some());
+            assert_eq!(serde_json::to_value(&settings)?["terminal_theme"], name);
+            let directory = tempfile::tempdir()?;
+            let path = directory.path().join("theme");
+            std::fs::write(&path, "cursor-color = 010203\ncursor-text = cell-background\nselection-background = cell-foreground")?;
+            settings = settings.import_theme(path)?;
+            assert_eq!(settings.cursor_fill(fg,bg,cursor,false), Color(1,2,3));
+            assert_eq!(settings.cursor_fill(fg,bg,cursor,true), cursor);
+            assert_eq!(settings.cursor_text(fg,bg), bg);
+            assert_eq!(settings.selection_background().unwrap().resolve(fg,bg), fg);
+            settings.cursor_color = Some(CellColor::CellBackground);
+            assert_eq!(settings.cursor_fill(fg,bg,cursor,false), bg);
+        }
         Ok(())
     }
     #[test]

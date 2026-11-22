@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Added Catppuccin Mocha and Latte presets to Settings and palette commands, with
+ANSI, foreground/background, cursor and selection colors from the pinned official
+Ghostty port. Bundled themes parse once into immutable cached data; no filesystem
+reads are added to rendering. Explicit/imported colors retain precedence, as do
+application cursor overrides. The upstream license is included in release notices.
+All 28 preference tests pass, including preset parsing, override precedence and
+existing theme behavior. Native screenshot verification remains pending: the Mac
+was locked when checked this cycle.
+
 Selection opacity is configurable in Settings and JSON (`selection_opacity`,
 0–100 or null for theme default). The control uses 5% steps and an explicit reset;
 Save Settings persists it without replacing existing selection colors. The

@@ -22,6 +22,7 @@ for package in sorted(metadata['packages'], key=lambda p: (p['name'], p['version
             parts.append('\n' + path.name + '\n' + path.read_text(encoding='utf-8', errors='replace') + '\n')
 repo = Path(__file__).resolve().parent.parent
 parts.append('\nGhostty notices\n' + (repo / 'release/ghostty-notices.txt').read_text(encoding='utf-8'))
+parts.append('\n' + (repo / 'release/catppuccin-notices.txt').read_text(encoding='utf-8'))
 if os.environ.get('RMUX_RELEASE_TARGET') == 'wasm32-unknown-unknown':
     fonts = repo / 'tools/web-probe/assets'
     for name in ['FiraMono-LICENSE', 'Inter-OFL.txt', 'NotoSansCJK-OFL.txt', 'NotoSansCJK-README.md', 'NotoEmoji-OFL.txt', 'NotoEmoji-README.md']:

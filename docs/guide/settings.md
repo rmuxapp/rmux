@@ -349,10 +349,15 @@ terminal theme's default palette.
 ## Theme presets
 
 `terminal_theme` accepts `"dark"` (the existing default), `"light"` (white
-background with a darker ANSI palette), `"solarized_dark"`, `"solarized_light"`, or `"nord"`.
+background with a darker ANSI palette), `"solarized_dark"`, `"solarized_light"`, `"nord"`,
+`"catppuccin_mocha"`, or `"catppuccin_latte"`.
 The Solarized presets use [Ethan Schoonover's published palette](https://ethanschoonover.com/solarized/).
 Nord uses the [official Nord terminal palette](https://github.com/nordtheme/alacritty/blob/main/src/nord.yaml).
-Settings shows all five presets as direct choices, highlighting the selected one;
+Catppuccin Mocha and Latte use the [official Ghostty port](https://github.com/catppuccin/ghostty/tree/92b40c1137b647bdc21f999c098d19d3f59a0227),
+including its ANSI, cursor and selection colors. Explicit JSON colors and imported
+theme values take precedence over preset defaults. The split divider color from
+that port is not applied.
+Settings shows all seven presets as direct choices, highlighting the selected one;
 A compact sample below the choices shows configured text, background, block-cursor
 text and selection colors, plus ANSI swatches when a preset or custom palette
 supplies them. Hover the imported filename to see its full path. It includes
