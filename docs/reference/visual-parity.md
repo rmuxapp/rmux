@@ -101,3 +101,17 @@ the narrow pane while its caret remained visible. Local screenshots:
 `target/demo-palette-current.png` and `target/demo-narrow-pane-editing.png`.
 These are browser sample-session screenshots, not native acceptance evidence.
 The temporary review tab/server were closed; the public demo was not deployed.
+
+Native project-open integration at `82ce70e` (November 22, 2026, macOS): a
+combined debug bundle ran with a separate bundle ID, config, socket and temporary
+projects. `/usr/bin/open -a <review bundle> <folder>` delivered real folder-open
+events. An existing `api` workspace launched in `client-a/api` was adopted;
+opening `client-b/api` created a distinct workspace. After renaming the first
+workspace and changing its shell directory, opening `client-a/api` selected its
+original workspace and surface. The PTY PID was unchanged and a shell variable
+set before reopening retained its value. Three workspaces remained (the initial
+empty workspace and two projects), with no duplicate for the reopened project.
+The process exited normally through `system.quit`; temporary fixtures were
+removed. Local result: `target/native-project-check.json`. This verifies native
+event routing, identity and process continuity, not cross-Space activation or
+visual focus. The installed application was not used or replaced.
