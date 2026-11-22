@@ -191,6 +191,14 @@ under `context: "files"` for the browser or `context: "file_preview"` for text/h
 previews. Directories and symlink rows do not launch an editor, and IME composition
 suspends the action. **Settings → External editor → Configure…** opens Settings
 JSON and shows the currently configured executable (hover for the full path).
+**VS Code configuration → Copy example** copies a Settings JSON example for
+this platform, including line and column navigation. Merge its `file_editor`
+property into your existing configuration and adjust the executable path for
+your installation; copying does not apply the settings.
+If your configured editor cannot launch, **Edit settings without configured
+editor → Open…** bypasses it. macOS uses TextEdit; other platforms use the system
+file association. Your editor configuration is preserved so you can repair it.
+
 Set the editor explicitly, then Reload Settings:
 
 ```json

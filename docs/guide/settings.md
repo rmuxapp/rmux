@@ -384,6 +384,9 @@ Open Settings File in the menu or palette uses your configured `file_editor`.
 Without one, macOS uses TextEdit; other platforms use the system's default
 application for JSON. If missing, this explicit action creates a default
 file without overwriting an existing one. After editing, use Reload Settings.
+Settings also provides **VS Code configuration → Copy example** and **Edit
+settings without configured editor → Open…**. The latter bypasses a broken
+editor configuration without overwriting it.
 
 ## Scrollback budget
 

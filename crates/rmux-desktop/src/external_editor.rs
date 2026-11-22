@@ -16,6 +16,17 @@ pub fn settings_editor(configured: Option<&Editor>) -> Option<Editor> {
     #[cfg(not(target_os = "macos"))]
     None
 }
+/// An explicit example, never automatically applied or used to discover apps.
+pub fn vscode_example() -> String {
+    let program = if cfg!(target_os = "macos") {
+        "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code"
+    } else if cfg!(windows) {
+        "C:\\Program Files\\Microsoft VS Code\\Code.exe"
+    } else { "/usr/bin/code" };
+    serde_json::to_string_pretty(&serde_json::json!({"file_editor": {
+        "program": program, "args": ["--goto", "{file}:{line}:{column}"]
+    }})).expect("static editor example is serializable")
+}
 impl Editor {
     pub fn validate(&self) -> Result<()> {
         ensure!(self.program.is_absolute() && self.program.as_os_str().len() <= 8192 && !self.program.as_os_str().as_encoded_bytes().contains(&0), "file_editor.program must be an absolute path up to 8192 bytes without NULs");

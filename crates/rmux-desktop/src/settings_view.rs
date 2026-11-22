@@ -9,7 +9,7 @@ pub struct State {
 }
 pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
-    "selection_opacity", "import_theme", "file_editor", "shell_history",
+    "selection_opacity", "import_theme", "file_editor", "editor_example", "editor_fallback", "shell_history",
 ];
 pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings", "undo_settings_save"];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
@@ -40,7 +40,7 @@ pub enum ControlInput {
 
 /// Arrow keys change values; they must never open a dialog or an editor.
 pub fn control_input(control: &str, key: &str) -> ControlInput {
-    let action = matches!(control, "file_editor" | "import_theme" | "font_family" | "shell_history")
+    let action = matches!(control, "file_editor" | "editor_example" | "editor_fallback" | "import_theme" | "font_family" | "shell_history")
         || FOOTER_KEYS.contains(&control);
     match (action, key) {
         (true, "enter" | "space") => ControlInput::Activate,
@@ -257,6 +257,12 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                         move |_, cx| cx.new(|_| pane_view::ControlHint(program.clone())).into() })
                     .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
             .child(div()
+                .child(row("VS Code configuration", "editor_example", "Copy example".into(), false, Some(state.selected) == control_index("editor_example"), false))
+                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.")))
+            .child(div()
+                .child(row("Edit settings without configured editor", "editor_fallback", "Open…".into(), false, Some(state.selected) == control_index("editor_fallback"), false))
+                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(if cfg!(target_os = "macos") { "Opens TextEdit if your editor configuration needs repair." } else { "Uses the system file association if your editor configuration needs repair." })))
+            .child(div()
                 .child(row("Saved command history", "shell_history", "Configure…".into(), false,
                     Some(state.selected) == control_index("shell_history"), false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xb8b8b8))
@@ -313,7 +319,7 @@ mod tests {
     #[test]
     fn arrows_adjust_values_but_never_launch_actions() {
         use super::{control_input, ControlInput};
-        for control in ["file_editor", "import_theme", "font_family", "shell_history"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
+        for control in ["file_editor", "editor_example", "editor_fallback", "import_theme", "font_family", "shell_history"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
             assert_eq!(control_input(control, "left"), ControlInput::None);
             assert_eq!(control_input(control, "right"), ControlInput::None);
             assert_eq!(control_input(control, "enter"), ControlInput::Activate);

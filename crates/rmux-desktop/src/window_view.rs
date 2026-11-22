@@ -1318,8 +1318,7 @@ impl WorkspaceWindow {
                 return;
             }
             if selected < settings_view::KEYS.len() {
-                if matches!(settings_view::KEYS[selected], "file_editor" | "shell_history") {
-                    self.open_settings_file(cx);
+                if self.editor_setting_action(settings_view::KEYS[selected], cx) {
                     cx.stop_propagation();
                     return;
                 }
@@ -1529,7 +1528,23 @@ impl WorkspaceWindow {
             });
         }).detach();
     }
+    fn editor_setting_action(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
+        match key {
+            "file_editor" | "shell_history" => self.open_settings_file(cx),
+            "editor_fallback" => self.open_settings_file_with(true, cx),
+            "editor_example" => {
+                clipboard::write(ClipboardItem::new_string(external_editor::vscode_example()), cx);
+                self.notice = Some("Copied VS Code example. Merge file_editor into Settings JSON, check the program path, then Reload Settings.".into());
+                cx.notify();
+            }
+            _ => return false,
+        }
+        true
+    }
     fn open_settings_file(&mut self, cx: &mut Context<Self>) {
+        self.open_settings_file_with(false, cx);
+    }
+    fn open_settings_file_with(&mut self, use_default_editor: bool, cx: &mut Context<Self>) {
         if cx.global::<preferences::ReloadState>().0 {
             return;
         }
@@ -1544,7 +1559,7 @@ impl WorkspaceWindow {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
                 match result {
                     Ok(path) => {
-                        let editor = external_editor::settings_editor(cx.global::<Preferences>().file_editor.as_ref());
+                        let editor = external_editor::settings_editor(if use_default_editor { None } else { cx.global::<Preferences>().file_editor.as_ref() });
                         if let Some(editor) = editor {
                             let _ = entity.update(cx, |this, cx| {
                                 this.launch_external_editor(editor, EditLocalFile { path, line: None, column: None }, cx);
@@ -4469,8 +4484,7 @@ impl Render for WorkspaceWindow {
                     state.focus.focus(window);
                 }
                 let mut settings = cx.global::<Preferences>().clone();
-                if matches!(change.key.as_str(), "file_editor" | "shell_history") {
-                    this.open_settings_file(cx);
+                if this.editor_setting_action(&change.key, cx) {
                     return;
                 }
                 if change.key == "import_theme" {
