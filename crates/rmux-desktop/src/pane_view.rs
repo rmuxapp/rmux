@@ -927,6 +927,7 @@ impl PaneView {
                         if origin.as_ref().is_some_and(|focus| focus.is_focused(window)) {
                             this.select(this.terminals.len() - 1, window, cx);
                         }
+                        this.reconcile_tab_picker(cx);
                         cx.emit(PaneMetadataChanged);
                     }
                     Err(error) => this.error = Some(error.to_string()),
@@ -941,6 +942,7 @@ impl PaneView {
         let Some((from, next)) = self.terminals.move_active(delta) else { return; };
         self.labels.swap(from, next);
         self.tab_scroll.scroll_to_item(next);
+        self.reconcile_tab_picker(cx);
         cx.emit(PaneMetadataChanged);
         cx.notify();
     }
@@ -996,6 +998,7 @@ impl PaneView {
         let terminal = self.terminals.remove(index);
         let label = self.labels.remove(index);
         self.tab_scroll.scroll_to_item(self.terminals.active_index());
+        self.reconcile_tab_picker(cx);
         cx.emit(PaneMetadataChanged);
         cx.notify();
         Some(TabTransfer { terminal, label })
@@ -1082,6 +1085,7 @@ impl PaneView {
             .expect("batch close preserves its keeper");
         self.terminals.select(selected_index);
         self.tab_scroll.scroll_to_item(self.terminals.active_index());
+        self.reconcile_tab_picker(cx);
         if replace_focus { self.focus(window, cx); }
         cx.emit(PaneMetadataChanged);
         cx.notify();
@@ -1150,6 +1154,7 @@ impl PaneView {
         let removed = self.terminals.remove(index);
         self.titles.remove(&removed.entity_id());
         self.labels.remove(index);
+        self.reconcile_tab_picker(cx);
         cx.emit(PaneMetadataChanged);
         if self.terminals.is_empty() {
             cx.emit(PaneEmpty);

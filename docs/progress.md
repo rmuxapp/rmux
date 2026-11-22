@@ -1,3 +1,13 @@
+Native tab-picker lifecycle polish: asynchronous terminal creation, keyboard
+reordering, tab transfers out, and single/batch closing now reconcile an open
+picker immediately. Previously only metadata updates refreshed its list state,
+so structural changes could leave stale row counts or selection until a later
+title update. Existing selection/scroll reconciliation preserves a surviving
+identity and chooses a nearby result when it disappears. The six focused tab
+order/list tests passed; these cover the reconciliation helpers and close-scope
+rules, not native interaction or asynchronous launch acceptance. No app bundle,
+release, or deployment was produced.
+
 Combined WASM review at 8511c46: one local demo build passed with the accumulated
 shared UI changes. In-browser review verified Cmd+P opens the palette, keyboard
 shortcut discovery and `ctrl tab` filtering, Escape restores terminal typing,
