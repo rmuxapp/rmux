@@ -10465,3 +10465,19 @@ All three focused menu-navigation checks passed, including modifier combinations
 disabled-item traversal and typeahead cycling. Desktop test compilation and WASM
 compilation passed. No visual geometry changed, so no repeat screenshot/build or
 release was performed; native runtime acceptance remains pending.
+
+
+### Edit the selected preview source line — 2026-11-22
+
+Text preview rows now retain original line numbers, and Markdown parsing uses
+source event offsets plus a single line-start index to retain each reading block's
+source line. The external-editor toolbar button and Ctrl+Alt+E use the selected
+row's line through existing literal editor arguments. Search/filtering and wrap
+modes preserve those locations; code blocks point to their first content line.
+Markdown subtitles expose the location. Hex dumps do not invent text locations.
+The file-browser/open-file action still opens normally without a selected line.
+
+Desktop test compilation and all 17 Markdown tests passed, including a mixed
+CRLF fixture with blank lines, inline formatting, code, rules, and table rows.
+Updated editor documentation with line-placeholder behavior. Actual external
+editor launching remains unreviewed; no user editor, files or sessions changed.

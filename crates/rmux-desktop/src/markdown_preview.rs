@@ -61,7 +61,7 @@ pub enum Kind { #[default] Paragraph, Heading(u8), Code, Quote, Table { header: 
 pub struct InlineStyle { pub bold: bool, pub italic: bool, pub code: bool, pub strike: bool, pub link: Option<usize> }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span { pub range: std::ops::Range<usize>, pub style: InlineStyle }
-pub struct Block { pub text: String, pub kind: Kind, pub spans: Vec<Span>, pub links: Vec<String> }
+pub struct Block { pub text: String, pub source_line: u32, pub kind: Kind, pub spans: Vec<Span>, pub links: Vec<String> }
 pub fn blocks(source: &str) -> (Vec<Block>, bool) {
     let mut output = Vec::new();
     let mut text = String::new();
@@ -78,13 +78,18 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
     let mut quote = 0usize;
     let mut lists: Vec<Option<u64>> = Vec::new();
     let mut items: Vec<Kind> = Vec::new();
+    let line_starts: Vec<usize> = std::iter::once(0).chain(source.bytes().enumerate()
+        .filter_map(|(index, byte)| (byte == b'\n').then_some(index + 1))).collect();
+    let block_offset = std::cell::Cell::new(0);
+    let source_line = |offset| line_starts.partition_point(|start| *start <= offset) as u32;
     let flush = |output: &mut Vec<Block>, text: &mut String, spans: &mut Vec<Span>, links: &mut Vec<String>, kind| {
         if text.trim().is_empty() && !matches!(kind, Kind::Table { .. }) { text.clear(); spans.clear(); links.clear(); return false; }
         if output.len() >= 512 { return true; }
-        output.push(Block { text: std::mem::take(text), kind, spans: std::mem::take(spans), links: std::mem::take(links) });
+        output.push(Block { source_line: source_line(block_offset.get()), text: std::mem::take(text), kind, spans: std::mem::take(spans), links: std::mem::take(links) });
         false
     };
-    for event in Parser::new_ext(source, Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES) {
+    for (event, range) in Parser::new_ext(source, Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES).into_offset_iter() {
+        if text.is_empty() { block_offset.set(range.start); }
         match event {
             Event::Start(Tag::Table(columns)) => {
                 if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
@@ -174,7 +179,7 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
             Event::SoftBreak | Event::HardBreak => text.push('\n'),
             Event::Rule => {
                 if flush(&mut output, &mut text, &mut spans, &mut links, kind) || output.len() >= 512 { return (output, true); }
-                output.push(Block { text: "────────".into(), kind: Kind::Paragraph, spans: Vec::new(), links: Vec::new() });
+                output.push(Block { source_line: source_line(range.start), text: "────────".into(), kind: Kind::Paragraph, spans: Vec::new(), links: Vec::new() });
             },
             _ => {},
         }
@@ -277,6 +282,13 @@ mod tests {
         }
         let (rows, _) = blocks("[local](../guide.md) [script](javascript:alert) [anchor](#part)");
         assert_eq!(rows[0].links, ["../guide.md", "#part"]);
+    }
+    #[test]
+    fn reading_blocks_retain_source_lines_across_blank_lines_and_markup() {
+        let source = "# Title\r\n\r\nParagraph **bold**.\r\ncontinued\r\n\r\n- item\r\n\r\n```sh\r\necho 界\r\n```\r\n\r\n---\r\n\r\n| A | B |\r\n|---|---|\r\n| x | y |\r\n";
+        let (rows, limited) = blocks(source);
+        assert!(!limited);
+        assert_eq!(rows.iter().map(|row| row.source_line).collect::<Vec<_>>(), [1, 3, 6, 9, 12, 14, 16]);
     }
     #[test]
     fn heading_fragments_decode_and_resolve_duplicate_unicode_titles() {

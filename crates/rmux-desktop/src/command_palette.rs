@@ -180,7 +180,7 @@ mod navigation_tests {
         let title = crate::file_browser::preview_line_title(&text, "");
         assert!(!title.contains("Needle"));
         let command = super::Command { title, subtitle: Some("Line 1".into()), shortcut: None,
-            target: super::PaletteEvent::Run(Box::new(crate::CopyPreviewLine { text: text.clone(), markdown: None, spans: Vec::new(), links: Default::default() })) };
+            target: super::PaletteEvent::Run(Box::new(crate::CopyPreviewLine { text: text.clone(), source_line: Some(7), markdown: None, spans: Vec::new(), links: Default::default() })) };
         let mut search = crate::palette_match::RankedSearch::new(vec![command.search_text()]);
         search.update("NEEDLE 世界");
         assert_eq!(search.matches, [0]);
@@ -921,7 +921,7 @@ impl CommandPalette {
             let title = file_browser::preview_line_title(&text, "");
             let copy_hint = if preview.partial_line == Some(index) { "Partial line · Enter copies only the captured text" } else { "Enter copies this preview line" };
             Command { title, subtitle: Some(format!("Line {} · {copy_hint}", index + 1)), shortcut: None,
-                target: PaletteEvent::Run(Box::new(CopyPreviewLine { text, markdown: None, spans: Vec::new(), links: Default::default() })) }
+                target: PaletteEvent::Run(Box::new(CopyPreviewLine { text, source_line: (!preview.hex).then_some((index + 1) as u32), markdown: None, spans: Vec::new(), links: Default::default() })) }
         }));
         let mut palette = Self::with_commands(commands, if preview.hex && preview.truncated { "Hex preview · First 8 KiB / 1,024 rows" } else if preview.hex { "Hex preview · Search bytes or ASCII · Read only" } else if preview.truncated { "Text preview · Limited to 64 KiB / 512 lines" } else if empty { "Text preview · Empty file" } else { "Text preview · Search lines · Read only" }, "No matching preview lines", window, cx);
         palette.hex_preview = preview.hex;
@@ -942,7 +942,7 @@ impl CommandPalette {
                 if let Some(line) = action.as_any().downcast_ref::<CopyPreviewLine>() {
                     block_number += 1;
                     let block = blocks.next().expect("one reading block per line");
-                    command.target = PaletteEvent::Run(Box::new(CopyPreviewLine { text: line.text.clone(), markdown: Some(block.kind), spans: block.spans, links: block.links.into_iter().map(SharedString::from).collect() }));
+                    command.target = PaletteEvent::Run(Box::new(CopyPreviewLine { text: line.text.clone(), source_line: Some(block.source_line), markdown: Some(block.kind), spans: block.spans, links: block.links.into_iter().map(SharedString::from).collect() }));
                     let label = match command.markdown_kind() {
                         Some(markdown_preview::Kind::Heading(level)) => format!("Heading H{level}"),
                         Some(markdown_preview::Kind::Code) => "Code · Scroll to read".into(),
@@ -951,7 +951,7 @@ impl CommandPalette {
                         Some(markdown_preview::Kind::List { checked: Some(false), .. }) => "Pending task".into(),
                         _ => "Block".into(),
                     };
-                    command.subtitle = Some(format!("{label} {block_number} · Enter copies reading text"));
+                    command.subtitle = Some(format!("{label} {block_number} · Source line {} · Enter copies reading text", block.source_line));
                 } else if let Some(action) = action.as_any().downcast_ref::<PreviewMarkdownFile>() {
                     command.title = "View Markdown Source".into();
                     command.subtitle = Some("Read-only text preview".into());
@@ -1196,11 +1196,16 @@ impl CommandPalette {
         else if self.wrap_preview && self.commands[command].preview_line().is_some() { 116. }
         else { result_row_height(self.commands[command].subtitle.is_some()) }
     }
+    fn selected_source_line(&self) -> Option<u32> {
+        let command = self.commands.get(*self.search.matches.get(self.selected)?)?;
+        let PaletteEvent::Run(action) = &command.target else { return None; };
+        action.as_any().downcast_ref::<CopyPreviewLine>()?.source_line
+    }
     fn edit_selected_file(&mut self, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
         let path = self.preview_navigation.as_ref().map(|(path, _)| path.clone())
             .or_else(|| self.selected_preview_file().map(std::path::Path::to_owned));
-        if let Some(path) = path { cx.emit(PaletteEvent::Run(Box::new(EditLocalFile { path, ..Default::default() }))); }
+        if let Some(path) = path { cx.emit(PaletteEvent::Run(Box::new(EditLocalFile { path, line: self.selected_source_line(), column: None }))); }
     }
     fn navigate_folder(&mut self, action: &dyn Action, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
@@ -1684,7 +1689,7 @@ impl Render for CommandPalette {
                         Some(if *hex { Box::new(PreviewLocalFile { path: path.clone() }) } else { Box::new(PreviewHexFile { path: path.clone() }) }), cx))
                     .child(self.file_navigation_button("preview-markdown", if self.markdown_preview { "View Source" } else { "Read Markdown" },
                         Some(if self.markdown_preview { Box::new(PreviewLocalFile { path: path.clone() }) } else { Box::new(PreviewMarkdownFile { path: path.clone() }) }), cx))
-                    .child(self.file_navigation_button("preview-editor", "External Editor", Some(Box::new(EditLocalFile { path: path.clone(), ..Default::default() })), cx))
+                    .child(self.file_navigation_button("preview-editor", "External Editor", Some(Box::new(EditLocalFile { path: path.clone(), line: self.selected_source_line(), column: None })), cx))
                     .child(self.file_navigation_button("preview-refresh", "Refresh",
                         Some(if self.markdown_preview { Box::new(PreviewMarkdownFile { path: path.clone() }) } else if *hex { Box::new(PreviewHexFile { path: path.clone() }) } else { Box::new(PreviewLocalFile { path: path.clone() }) }), cx))
             ))

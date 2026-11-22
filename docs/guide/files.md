@@ -157,7 +157,8 @@ returning from a missing-file error. **Cmd+[ / Cmd+]** on macOS (**Alt+Left /
 Alt+Right** elsewhere) performs the same navigation. History retains up to 32
 preview locations per window, with each document's search, selected result,
 wrap setting and text/hex/Markdown mode. Opening another document after going
-back replaces the forward history. Files are reread when revisited.
+back replaces the forward history. Moving between different documents rereads
+the destination; same-document heading history reuses the loaded preview.
 
 Web links open in the default browser when clicked. For keyboard use, select a
 reading block, use Tab/Shift+Tab to cycle its destinations, then Alt+Enter
@@ -170,7 +171,11 @@ links per block and 64 KiB across the document. Additional links remain plain te
 ## Open an external editor
 
 **External Editor** opens the selected regular file from the directory browser
-or text/hex preview. Ctrl+Alt+E invokes the same action; remap `edit_selected_file`
+or text/hex/Markdown preview. Selecting a text line or Markdown reading block
+passes its source line to the editor; Markdown subtitles show that line number.
+Code blocks point to their first content line. Search and wrapping do not change
+these source locations. Hex rows and non-content actions have no source line.
+Ctrl+Alt+E invokes the same action; remap `edit_selected_file`
 under `context: "files"` for the browser or `context: "file_preview"` for text/hex
 previews. Directories and symlink rows do not launch an editor, and IME composition
 suspends the action. **Settings → External editor → Configure…** opens Settings
@@ -187,7 +192,10 @@ Set the editor explicitly, then Reload Settings:
 Use arguments supported by your editor (`--` is an example argument, not added
 by rmux). The argument list must contain exactly one `{file}` placeholder; rmux
 replaces it with the absolute file path inside that argument. Optional `{line}`
-and `{column}` placeholders use a terminal link’s location, or 1 when absent. It does not interpolate
+and `{column}` placeholders use the selected preview line or terminal link’s
+location, or 1 when absent. Your editor arguments must include `{line}` for the
+editor to use that location (for example, VS Code accepts `"--goto"` followed by
+`"{file}:{line}:{column}"`). It does not interpolate
 shell expressions, expand environment variables, or choose a file association.
 Paths with spaces, quotes or shell punctuation remain data. Directories and
 symbolic links are rejected. The editor starts in the file's parent directory,
