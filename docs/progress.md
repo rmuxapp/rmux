@@ -1,3 +1,14 @@
+Shared-demo tab discovery: multi-tab pane headers now expose Choose Terminal
+Tab, also reachable through the command palette. The bounded sample-host chooser
+uses native tab_score ranking, palette search/clear/header/row/footer controls,
+modifier-aware navigation and IME guards. It selects stable terminal identities,
+closes on blur and tab lifecycle actions, and restores terminal focus on Escape.
+One corrected WASM build and combined browser pass verified twelve-tab overflow,
+palette/toolbar opening, numeric ranking (2 before 12), Enter selection,
+no-results feedback and immediate sample-command input after Escape. Screenshot:
+target/demo-tab-chooser.png. Sample sessions have no real directory/process
+metadata. Native behavior was not changed; no release or website deployment.
+
 Tab overflow layout: a live shared-demo review with twelve tabs exposed pane
 controls pushed outside the viewport by the tab strip's intrinsic width. The
 shared strip now has explicit full-width/min-width/max-width bounds and clips

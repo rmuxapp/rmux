@@ -189,6 +189,11 @@ An emptied source pane/workspace closes.
 The command palette also offers `Move Tab to Workspace …` for each other workspace
 in this window. Search by its name to choose a destination directly; numbered
 results distinguish duplicate names and resolve targets by stable workspace ID.
+The browser demo also provides **Choose Terminal Tab** from the pane header
+and command palette. Its sample tabs can be searched by title or tab number;
+Enter selects and Escape returns to the terminal. Desktop directory and process
+metadata are not simulated by that chooser.
+
 Multi-tab pane headers also have a `⌄` tab picker for crowded strips. Use its list
 to see titles and unread markers; Up/Down navigates, Enter selects, and Escape
 returns to the terminal without switching tabs. Page Up/Down advances by the

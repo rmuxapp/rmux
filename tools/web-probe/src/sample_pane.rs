@@ -6,10 +6,13 @@ pub(crate) struct TabDrop { pub source: EntityId, pub terminal: EntityId, pub ta
 impl EventEmitter<TabDrop> for SamplePane {}
 impl EventEmitter<PaneEmpty> for SamplePane {}
 include!("sample_tab_menu.rs");
+include!("sample_tab_picker.rs");
 pub(crate) struct SamplePane {
     pub scope: Option<EntityId>,
     menu: Option<SampleTabMenu>,
     menu_blur: Option<Subscription>,
+    picker: Option<SampleTabPicker>,
+    picker_blur: Option<Subscription>,
     rename: Option<Entity<crate::text_field::TextField>>,
     terminals: rmux_core::tabs::Tabs<Entity<TerminalSample>>,
     labels: std::collections::HashMap<EntityId, String>,
@@ -51,11 +54,13 @@ impl SamplePane {
     pub fn take_active_for_split(&mut self, cx: &mut Context<Self>) -> Option<TabTransfer> {
         if self.terminals.len() < 2 { return None; }
         self.rename = None;
+        self.picker = None;
+        self.picker_blur = None;
         let id = self.terminals.active()?.entity_id();
         self.take_tab(id, cx)
     }
     pub fn from_transfer(transfer: TabTransfer) -> Self {
-        Self { scope: None, menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
+        Self { scope: None, menu: None, menu_blur: None, picker: None, picker_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(transfer.terminals, transfer.active),
             labels: transfer.labels, next_number: transfer.next_number, tab_scroll: ScrollHandle::new() }
     }
     pub fn tab_count(&self) -> usize { self.terminals.len() }
@@ -90,6 +95,8 @@ impl SamplePane {
 
     pub fn take_all_tabs(&mut self, cx: &mut Context<Self>) -> TabTransfer {
         self.rename = None;
+        self.picker = None;
+        self.picker_blur = None;
         self.menu = None;
         self.menu_blur = None;
         // Joining panes changes the layout owner just like dragging one tab.
@@ -128,6 +135,8 @@ impl SamplePane {
         if index >= self.terminals.len() { return; }
         let replace_focus = self.terminals[index].read(cx).is_focused(window) || self.rename.is_some();
         self.rename = None;
+        self.picker = None;
+        self.picker_blur = None;
         let removed = self.terminals.remove(index);
         self.labels.remove(&removed.entity_id());
         if self.terminals.is_empty() { cx.emit(PaneEmpty); }
@@ -143,7 +152,7 @@ impl SamplePane {
     pub fn new(font_size: f32, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let terminal = cx.new(|cx| TerminalSample::new(font_size, window,cx));
         let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
-        Self { scope: None, menu: None, menu_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
+        Self { scope: None, menu: None, menu_blur: None, picker: None, picker_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) {
         if let Some(terminal) = self.terminals.active() {
@@ -156,6 +165,8 @@ impl SamplePane {
             self.terminals[self.terminals.active_index()].update(cx, |terminal, cx| terminal.release_render_cache(cx));
         }
         self.rename = None;
+        self.picker = None;
+        self.picker_blur = None;
         self.terminals.select(index);
         self.tab_scroll.scroll_to_item(index);
         self.focus(window, cx);
@@ -232,6 +243,7 @@ impl Render for SamplePane {
         let accepts_incoming = self.terminals.len() < 16 && self.rename.is_none();
         crate::pane_presentation::frame(false, false)
             .map(|root| crate::tab_actions::bind(root, cx))
+            .on_action(cx.listener(|this, _: &crate::ShowTabPicker, window, cx| this.show_picker(window, cx)))
             .child(tab_presentation::strip()
                 .child(div().id("sample-tabs").flex().flex_1().h_full().min_w_0().overflow_x_scroll().track_scroll(&self.tab_scroll)
                     .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.scope == scope && (item.container == container || accepts_incoming)))
@@ -275,6 +287,9 @@ impl Render for SamplePane {
                                 this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_tab(window,cx); }
                             }))})))
+                .when(self.terminals.len() > 1, |strip| strip.child(crate::pane_presentation::action_control("tab-picker", "Choose Terminal Tab", Box::new(crate::ShowTabPicker), control_focus.clone(), mac)
+                    .child(crate::icons::icon("chevron-down"))
+                    .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.show_picker(window, cx); } }))))
                 .child(crate::pane_presentation::action_control("add-tab", "New Terminal Tab", Box::new(crate::NewTab), control_focus.clone(), mac).child(crate::icons::icon("plus"))
                     .on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.add(window,cx); } })))
                 .children([
@@ -290,6 +305,7 @@ impl Render for SamplePane {
                         }))
                 })))
             .child(div().flex_1().min_h_0().children(self.terminals.active().cloned()))
+            .when_some(self.picker.clone(), |root, picker| root.child(self.picker_element(picker, cx)))
             .when_some(self.menu.clone(), |root, menu| root.child(self.menu_element(menu, window, cx)))
             .when_some(self.rename.as_ref(), |root, input| root.child(tab_presentation::rename_editor(input.clone())))
     }
