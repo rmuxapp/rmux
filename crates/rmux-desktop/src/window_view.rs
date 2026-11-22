@@ -238,6 +238,9 @@ impl WorkspaceWindow {
     fn workspace_menu_element(&self, menu: WorkspaceMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let pinned = self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == menu.target).is_some_and(|entry| entry.pinned);
         let pinned = menu.group.map_or(pinned, |id| self.workspace_state.groups.entries().iter().any(|group| group.id == id && group.pinned));
+        let name = menu.group.and_then(|id| self.workspace_state.groups.entries().iter().find(|group| group.id == id).map(|group| group.name.clone()))
+            .or_else(|| self.workspace_state.entries.iter().find(|entry| entry.workspace.entity_id() == menu.target).map(|entry| entry.name.clone()))
+            .unwrap_or_else(|| "Unavailable workspace".into());
         let labels = crate::workspace_menu_view::labels(menu.group.is_some(), pinned);
         let actions = crate::workspace_menu_view::commands(menu.group.is_some()).map(|command|
             crate::workspace_actions::action(command).expect("workspace menu command"));
@@ -268,8 +271,9 @@ impl WorkspaceWindow {
                     cx.stop_propagation();
                     cx.notify();
                 }))
+                .child(crate::workspace_menu_view::target_header(name.into(), menu.group.is_some()))
                 .child(div().id("workspace-menu-scroll")
-                    .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
+                    .max_h((window.viewport_size().height - px(74.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(labels.into_iter().enumerate().map(|(index, label)| {
                     crate::workspace_menu_view::row(index, menu.selected)

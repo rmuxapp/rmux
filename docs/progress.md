@@ -10432,3 +10432,20 @@ Both focused history tests passed, covering state restoration, forward branching
 file/heading history interleaving and bounded retention. Desktop compilation
 passed after the focus-path adjustment. Native interaction/screenshots remain
 pending; no installed sessions or published artifacts were modified.
+
+
+### Workspace context menu target clarity — 2026-11-22
+
+Returned to shared sidebar polish. Native and browser workspace/group menus now
+show a compact target-name header with full-name tooltip, separate management
+from editing actions, and distinguish Close with muted red text. The scrollable
+action area reserves header space in short windows; header content does not
+change keyboard row indices. Names resolve from the captured workspace/group
+identity. No command semantics or close policies changed.
+
+One native compile and one WASM debug build passed. Browser review opened the
+website workspace menu from the sidebar, verified the target and grouping,
+used End to select Close, and Escape to dismiss with terminal focus restored.
+Screenshot: `target/workspace-menu-context.jpg`. Native appearance and group-menu
+runtime acceptance remain pending. The temporary review tab/server were closed;
+no deployment or installed application changes were made.

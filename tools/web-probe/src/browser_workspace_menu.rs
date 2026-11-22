@@ -60,6 +60,9 @@ impl BrowserHost {
         let pinned = menu.group.map_or_else(
             || self.workspace_state.entries.iter().any(|entry| entry.1.entity_id() == menu.target && entry.2),
             |id| self.workspace_state.groups.entries().iter().any(|group| group.id == id && group.pinned));
+        let name = menu.group.and_then(|id| self.workspace_state.groups.entries().iter().find(|group| group.id == id).map(|group| group.name.clone()))
+            .or_else(|| self.workspace_state.entries.iter().find(|entry| entry.1.entity_id() == menu.target).map(|entry| entry.0.clone()))
+            .unwrap_or_else(|| "Unavailable workspace".into());
         let labels = crate::workspace_menu_view::labels(menu.group.is_some(), pinned);
         deferred(anchored().position(menu.position).snap_to_window().child(
             crate::workspace_menu_view::frame(window).track_focus(&menu.focus).key_context("WorkspaceMenu")
@@ -86,7 +89,8 @@ impl BrowserHost {
                     cx.stop_propagation();
                     cx.notify();
                 }))
-                .child(div().id("workspace-menu-scroll").max_h((window.viewport_size().height - px(26.)).max(px(1.)))
+                .child(crate::workspace_menu_view::target_header(name.into(), menu.group.is_some()))
+                .child(div().id("workspace-menu-scroll").max_h((window.viewport_size().height - px(74.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(labels.into_iter().enumerate().map(|(index, label)| {
                         crate::workspace_menu_view::row(index, menu.selected)
