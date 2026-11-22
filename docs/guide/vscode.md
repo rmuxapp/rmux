@@ -33,7 +33,7 @@ Starting with **rmux 0.1.8**, native folder opens match the resolved project pat
 Different projects with the same folder name get separate workspaces; renaming
 a workspace or changing its shell directory does not change its project identity.
 The command palette shows project paths alongside workspace results, and sidebar
-name tooltips include the associated project path. In the next release, palette
+name tooltips include the associated project path. Starting with **rmux 0.1.9**, palette
 results also show the current workspace, group, description, and configured
 workspace shortcut; group names and descriptions are searchable. That identity travels with
 the workspace between windows and is saved in layouts
