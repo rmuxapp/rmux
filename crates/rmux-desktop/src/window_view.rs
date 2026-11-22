@@ -1224,10 +1224,15 @@ impl WorkspaceWindow {
         if self.command_launching { self.notice = Some("A command is already starting in this window".into()); cx.notify(); return; }
         if self.automation_available(cx).is_err() || self.workspace_state.entries.len() >= 64 { self.notice = Some("Window is busy or has reached its workspace limit".into()); cx.notify(); return; }
         let directory = command.cwd.clone().or_else(|| self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
-            let workspace = entry.workspace.read(cx);
-            workspace.panes.iter().find(|pane| Some(pane.entity_id()) == entry.last_pane).or_else(|| workspace.panes.first())
-                .and_then(|pane| pane.read(cx).cached_directory(cx))
+            Self::entry_pane(entry, window, cx).and_then(|pane| pane.read(cx).cached_directory(cx))
         }));
+        // Capture the invoking project before asynchronous startup: switching
+        // workspaces while the child starts must not change its editor target.
+        // SSH workspaces have their own remote identity, not the local project.
+        let project_directory = if remote.is_none() {
+            self.workspace_state.entries.get(self.workspace_state.active)
+                .and_then(|entry| entry.project_directory.clone())
+        } else { None };
         let scrollback = cx.global::<Preferences>().scrollback_bytes();
         let colors = cx.global::<Preferences>().terminal_colors();
         let palette = cx.global::<Preferences>().effective_palette();
@@ -1263,6 +1268,7 @@ impl WorkspaceWindow {
                         let seed = TerminalSeed::Ready(prepared, CellMetrics::new(settings.font_size), settings.font_family.clone().into());
                         let Some(index) = this.add_configured(1, false, None, None, false, Some((seed, Some(name.clone()))), window, cx) else { return; };
                         this.workspace_state.entries[index].name = name;
+                        this.workspace_state.entries[index].project_directory = project_directory;
                         this.select(index, window, cx);
                         this.notice = None;
                     }

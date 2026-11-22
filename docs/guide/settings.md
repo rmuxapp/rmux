@@ -147,7 +147,11 @@ On development main (after v0.1.12), a complete argument `{project_dir}` expands
 to the active workspace's stored project directory. This is the project opened
 from VS Code or a native folder open, independent of terminal `cd`, workspace
 renaming, and command `cwd`. It works for terminal and background commands
-invoked inside rmux. Workspaces without a stored project identity, and standalone
+invoked inside rmux. Local terminal commands carry that project identity into
+their new workspace, so an editor-return shortcut still targets the original
+project. The identity is captured when the command starts; switching workspaces
+during startup does not retarget it. SSH connections do not inherit a local
+project identity. Workspaces without a stored project identity, and standalone
 `rmux --command`, report an error instead of guessing. Use `{{project_dir}}` for
 a literal argument of that spelling. Embedded tokens, executable paths, `cwd`,
 and environment values are not expanded. Paths are passed as a single argument,

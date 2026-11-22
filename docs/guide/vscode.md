@@ -114,6 +114,8 @@ use the workspace's stored project directory as a complete argument:
 
 Keep `mode: "background"` and your Cmd+Shift+C binding. This remains tied to the
 original project when you rename its rmux workspace or `cd` into another folder.
+Local configured commands that open a new terminal workspace retain this project
+too, so the same return shortcut works from a dedicated build or test workspace.
 Open the workspace through VS Code's external-terminal command to establish the
 project identity. A manually created workspace without one reports an error;
 rmux does not substitute an unrelated current directory. This targets local

@@ -10715,3 +10715,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 
 - Bash and zsh now retain only the latest raw/encoded working directory and skip the per-byte encoding loop when PWD is unchanged. They still emit OSC 7 and prompt/status markers every prompt, preserving shell reporting and resynchronization behavior. A directory change (including returning to an earlier directory) recomputes the encoded value. No subprocess, timer, disk write, or unbounded cache added.
 - The focused Bash/zsh integration scripts passed using existing shells with user startup files disabled. Added directory-change/return/repeated-prompt scenarios alongside existing UTF-8/control-byte encoding, user hook preservation, idempotence, command status and opt-out checks. No native rebuild needed for this script-only batch; no numerical latency claim made.
+
+### Project identity through configured terminal commands
+
+- Local configured commands now carry the invoking workspace's stored project identity into their dedicated terminal workspace. Editor-return commands therefore retain the original project even when the command uses a different cwd. Identity is captured before asynchronous preparation, so switching workspaces during startup cannot retarget it. SSH connection workspaces remain separate from local project identity.
+- Command terminal startup now uses the shared focused/remembered/first-pane lookup for its default directory, matching background commands. Updated the Settings and VS Code guides.
+- Desktop compilation and diff checks passed. Native command-launch → editor-return and restore acceptance remain pending; no release, app launch or user-session changes.
