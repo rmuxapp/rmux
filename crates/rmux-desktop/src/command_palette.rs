@@ -339,10 +339,7 @@ impl CommandPalette {
         command!(Find);
         command!(ShowSshConnection);
         command!(ToggleSettings);
-        commands.push(Command {
-            title: "Keyboard Shortcuts…".into(), subtitle: None, shortcut: None,
-            target: PaletteEvent::Run(Box::new(ShowKeyboardShortcuts)),
-        });
+        command!(ShowKeyboardShortcuts);
         if pending.workspace { command!(CancelNewWorkspace); }
         command!(RefreshTerminalMemory);
         command!(CycleTerminalMemorySort);

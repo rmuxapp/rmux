@@ -26,3 +26,18 @@ pub(crate) fn format_key_parts(key: &str, modifiers: Modifiers, mac: bool) -> St
     });
     parts.join(if mac { "" } else { "+" })
 }
+
+pub(crate) fn search_terms(label: &str) -> String {
+    let mut words = String::new();
+    for ch in label.chars() {
+        words.push_str(match ch {
+            '⌘' => " cmd command ", '⌃' => " ctrl control ",
+            '⌥' => " alt option ", '⇧' => " shift ",
+            '↑' => " up ", '↓' => " down ", '←' => " left ", '→' => " right ",
+            '↩' => " enter return ", '⌫' => " backspace ", '⌦' => " delete ",
+            '⇥' => " tab ", '+' => " ",
+            _ => { words.push(ch); continue; }
+        });
+    }
+    format!("{label} {words}").to_lowercase()
+}

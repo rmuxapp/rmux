@@ -39,6 +39,7 @@ use rmux_core::{palette_match, commands::CommandId, layout::{PaneTree, Axis}};
 #[path = "../../../crates/rmux-desktop/src/split_presentation.rs"]
 mod split_presentation;
 const COMMANDS: &[CommandId] = &[
+    CommandId::ShowKeyboardShortcuts,
     CommandId::NewWorkspace, CommandId::NewTab, CommandId::RenameTab, CommandId::CloseOtherTabs, CommandId::CloseTabsToRight, CommandId::ToggleSidebar,
     CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,
     CommandId::MoveWorkspaceUp, CommandId::MoveWorkspaceDown,
@@ -96,6 +97,7 @@ struct InputProbe {
     next_pane: usize,
     split_drag: Option<split_interaction::SplitDrag>,
     palette_open: bool,
+    shortcuts_only: bool,
     palette_origin: Option<FocusHandle>,
     result_hints: Vec<Option<String>>,
     samples: std::collections::HashMap<usize, Entity<sample_pane::SamplePane>>,
@@ -143,14 +145,14 @@ impl InputProbe {
             });
             cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
                 match event {
-                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.filter_shortcuts(query.trim().is_empty()); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
                     text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
                     text_field::EditEvent::Cancelled => this.dismiss_palette(window, cx),
                 }
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, palette_open: false };
+            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, shortcuts_only: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
@@ -309,9 +311,10 @@ impl InputProbe {
         // focus path, before later frames replace it with the palette input.
         self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
             .map(|index| self.result_hint(index, window, cx)).collect();
-        self.search = palette_match::RankedSearch::new(COMMANDS.iter().map(|command| command.title().to_lowercase())
-            .chain(self.workspace_results.iter().map(|(_, title)| title.to_lowercase()))
-            .chain(self.group_results.iter().map(|(_, title)| title.to_lowercase())).collect());
+        self.search = palette_match::RankedSearch::new((0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+            .map(|index| format!("{} {}", self.result_title(index), self.result_hints.get(index)
+                .and_then(|hint| hint.as_deref()).map(shortcut_label::search_terms).unwrap_or_default()).to_lowercase()).collect());
+        self.filter_shortcuts(true);
         self.selected = 0;
         self.scroll.reset(self.search.matches.len());
         cx.notify();
@@ -350,12 +353,19 @@ impl InputProbe {
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette_open { self.dismiss_palette(window, cx); return; }
         self.palette_origin = window.focused(cx);
+        self.shortcuts_only = false;
         self.palette_open = true;
+        self.input.update(cx, |input, _| input.placeholder = Some("Type a command or workspace name…"));
         cx.emit(PaletteRequest::Open);
         self.input.update(cx, |input, cx| { input.replace_draft("", cx); input.focus.focus(window, cx); });
         cx.notify();
     }
 
+    fn filter_shortcuts(&mut self, empty_query: bool) {
+        if !self.shortcuts_only { return; }
+        self.search.matches.retain(|index| *index < COMMANDS.len() && self.result_hints.get(*index).is_some_and(Option::is_some));
+        if empty_query { self.search.matches.sort_by_key(|index| COMMANDS[*index].title()); }
+    }
     fn choose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
         if index >= COMMANDS.len() + self.workspace_results.len() {
@@ -373,6 +383,19 @@ impl InputProbe {
             return;
         }
         let command = COMMANDS[index];
+        if command == CommandId::ShowKeyboardShortcuts {
+            self.shortcuts_only = true;
+            self.input.update(cx, |input, cx| {
+                input.placeholder = Some("Search commands or keys, e.g. cmd shift…");
+                input.replace_draft("", cx);
+            });
+            self.search.update("");
+            self.filter_shortcuts(true);
+            self.selected = 0;
+            self.scroll.reset(self.search.matches.len());
+            cx.notify();
+            return;
+        }
         if let Some(action) = pane_actions::action(command).or_else(|| workspace_actions::action(command)).or_else(|| find_presentation::action(command)) {
             self.close_palette(window, cx);
             window.dispatch_action(action, cx);
@@ -564,7 +587,7 @@ impl Render for InputProbe {
                         this.feedback = None; cx.notify(); cx.stop_propagation();
                     }
                 }))
-                .child(palette_view::header("Search commands and workspaces", palette_view::close_button()
+                .child(palette_view::header(if self.shortcuts_only { "Keyboard shortcuts · Current context" } else { "Search commands and workspaces" }, palette_view::close_button()
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                         if event.standard_click() { this.dismiss_palette(window, cx); }
                         cx.stop_propagation();
@@ -591,7 +614,7 @@ impl Render for InputProbe {
                     }).with_sizing_behavior(ListSizingBehavior::Auto).w_full().min_h_0()
                         .h(px((self.search.matches.len() as f32 * 36.).min(320.)))
                 })
-                .when(self.search.matches.is_empty(), |panel| panel.child(palette_view::empty_state("No matching commands or workspaces")))
+                .when(self.search.matches.is_empty(), |panel| panel.child(palette_view::empty_state(if self.shortcuts_only { "No matching bound commands" } else { "No matching commands or workspaces" })))
                 .child(palette_view::footer().child(if let Some(feedback) = self.feedback.clone() {
                     div().child(feedback).into_any_element()
                 } else { palette_view::navigation_hints().into_any_element() })))))

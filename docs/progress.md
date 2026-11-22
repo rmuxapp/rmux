@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Shortcut discovery now also runs in the WASM demo. Native and browser use the
+same command identity and symbolic/plain key search terms. The browser view
+filters resolved command hints, sorts empty-query results by title, preserves
+original command indices for dispatch, and resets to the ordinary palette on
+reopen. Browser acceptance: searched Keyboard Shortcuts, then `cmd shift`, chose
+Split Below from the filtered list and observed a second pane. Reopening Cmd+P
+returned the normal heading and unbound Keyboard Shortcuts entry. Screenshot:
+`target/shortcut-discovery.png`. Native check and WASM build passed; native list
+visual acceptance is still open. Production demo has not been deployed.
+
+
 Shortcut discovery: View and the command palette now expose Keyboard Shortcuts.
 It reuses the resolved command catalog, keeps only bound commands, sorts by name,
 and searches command titles and symbolic/plain key names. Enter runs through the

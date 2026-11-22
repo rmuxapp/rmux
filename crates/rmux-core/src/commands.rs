@@ -24,6 +24,7 @@ commands! {
     Find => "Find in Terminal",
     ShowSshConnection => "Connect via SSH…",
     ToggleSettings => "Settings",
+    ShowKeyboardShortcuts => "Keyboard Shortcuts…",
     CancelNewWorkspace => "Cancel New Workspace",
     RefreshTerminalMemory => "Show / Refresh Terminal Memory",
     CycleTerminalMemorySort => "Cycle Terminal Memory Sort",

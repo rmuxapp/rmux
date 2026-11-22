@@ -21,20 +21,8 @@ pub(super) fn key_label(key: &Keystroke) -> String { format_keystroke(key, cfg!(
 /// Keep the displayed shortcut searchable both as symbols and familiar key names.
 /// This is derived from the resolved hint, so disabled/default overrides cannot
 /// advertise a binding that is not actually used by the originating terminal.
-pub(super) fn search_terms(label: &str) -> String {
-    let mut words = String::new();
-    for ch in label.chars() {
-        words.push_str(match ch {
-            '⌘' => " cmd command ", '⌃' => " ctrl control ",
-            '⌥' => " alt option ", '⇧' => " shift ",
-            '↑' => " up ", '↓' => " down ", '←' => " left ", '→' => " right ",
-            '↩' => " enter return ", '⌫' => " backspace ", '⌦' => " delete ",
-            '⇥' => " tab ", '+' => " ",
-            _ => { words.push(ch); continue; }
-        });
-    }
-    format!("{label} {words}").to_lowercase()
-}
+pub(super) use crate::shortcut_label::search_terms;
+
 fn format_keystroke(key: &Keystroke, mac: bool) -> String { format_key_parts(&key.key, key.modifiers, mac) }
 use crate::shortcut_label::format_key_parts;
 
