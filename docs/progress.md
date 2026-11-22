@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Shortcut discovery: View and the command palette now expose Keyboard Shortcuts.
+It reuses the resolved command catalog, keeps only bound commands, sorts by name,
+and searches command titles and symbolic/plain key names. Enter runs through the
+same palette dispatch path; Escape uses normal focus restoration. It shows the
+preferred binding in the originating focus context, not all aliases or text-editor
+keys. A custom `keyboard_shortcuts` action is supported. Native bundle passes;
+the menu entry was observed. The UI tool lost access to the isolated window before
+list interaction/visual review, so that acceptance remains open. The preview
+process was still live and was stopped through its normal SIGINT cleanup.
+
+
 Combined browser input review (ee65dca): rebuilt the WASM demo once and checked
 it at localhost:4319. Cmd+P opened the palette; Down selected New Terminal Tab;
 Shift+Down followed by Backspace on the empty query preserved that selection.

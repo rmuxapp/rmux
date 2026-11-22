@@ -147,6 +147,7 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "tab_menu" => Box::new(ShowTabMenu),
         "workspace_menu" => Box::new(ShowWorkspaceMenu),
         "tab_picker" => Box::new(ShowTabPicker), "palette" => Box::new(ShowCommandPalette),
+        "keyboard_shortcuts" => Box::new(ShowKeyboardShortcuts),
         "toggle_zoom" => Box::new(TogglePaneZoom), "toggle_sidebar" => Box::new(ToggleSidebar),
         "resize_pane_left" => Box::new(ResizePaneLeft),
         "resize_pane_right" => Box::new(ResizePaneRight),

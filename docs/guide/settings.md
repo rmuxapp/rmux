@@ -121,6 +121,11 @@ remain pending; shortcut overrides are described below.
 
 ## Custom keyboard shortcuts
 
+**View → Keyboard Shortcuts…** lists effective command bindings for the current
+focus context, including custom commands and overrides. Search by action name
+or key names. To bind this view itself, use the action `keyboard_shortcuts`.
+
+
 Shortcut overrides can be added alongside custom commands:
 
 ```json

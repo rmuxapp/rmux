@@ -2420,6 +2420,13 @@ impl WorkspaceWindow {
         });
         self.install_palette(palette, focus, window, cx);
     }
+    fn show_keyboard_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.is_some() { self.close_palette(window, cx); }
+        self.show_palette(window, cx);
+        if let Some((palette, _)) = &self.palette {
+            palette.update(cx, |palette, cx| palette.show_shortcuts(cx));
+        }
+    }
     fn show_workspace_merge_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
         let Some(source) = self.workspace_state.entries.get(self.workspace_state.active).map(|entry| entry.workspace.entity_id()) else { return; };
@@ -4112,6 +4119,7 @@ impl Render for WorkspaceWindow {
                 }
             }))
             .on_action(cx.listener(|this, _: &ShowCommandPalette, window, cx| this.show_palette(window, cx)))
+            .on_action(cx.listener(|this, _: &ShowKeyboardShortcuts, window, cx| this.show_keyboard_shortcuts(window, cx)))
             .on_action(cx.listener(|this, _: &SaveLayout, window, cx| this.save_layout(window, cx)))
             .on_action(cx.listener(|this, _: &SaveSession, window, cx| this.save_session(window, cx)))
             .on_action(cx.listener(|this, _: &OpenLayout, _, cx| this.open_layout(cx)))

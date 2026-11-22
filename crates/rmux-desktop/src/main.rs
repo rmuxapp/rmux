@@ -394,6 +394,7 @@ actions!(
         ShowFontPicker,
         ShowDefaultFontPicker,
         ShowCommandPalette,
+        ShowKeyboardShortcuts,
         NewWindow,
         CloseWindow,
         CloseWorkspace,
@@ -3770,6 +3771,7 @@ fn main() {
                 items: vec![
                     MenuItem::action("Split Right", Split),
                     MenuItem::action("Command Palette…", ShowCommandPalette),
+                    MenuItem::action("Keyboard Shortcuts…", ShowKeyboardShortcuts),
                     MenuItem::action("Split Below", SplitBelow),
                     MenuItem::action("Split Left", SplitLeft),
                     MenuItem::action("Split Above", SplitAbove),

@@ -339,6 +339,10 @@ impl CommandPalette {
         command!(Find);
         command!(ShowSshConnection);
         command!(ToggleSettings);
+        commands.push(Command {
+            title: "Keyboard Shortcuts…".into(), subtitle: None, shortcut: None,
+            target: PaletteEvent::Run(Box::new(ShowKeyboardShortcuts)),
+        });
         if pending.workspace { command!(CancelNewWorkspace); }
         command!(RefreshTerminalMemory);
         command!(CycleTerminalMemorySort);
@@ -575,6 +579,20 @@ impl CommandPalette {
         let palette = Self::with_commands(commands, "Search commands and workspaces", "No matching commands or workspaces", window, cx);
         palette.input.update(cx, |input, _| input.placeholder = Some("Type a command or workspace name…"));
         palette
+    }
+    pub fn show_shortcuts(&mut self, cx: &mut Context<Self>) {
+        self.commands.retain(|command| command.shortcut.is_some());
+        self.commands.sort_by_cached_key(|command| command.title.to_lowercase());
+        self.search = palette_match::RankedSearch::new(self.commands.iter().map(Command::search_text).collect());
+        self.selected = 0;
+        self.scroll.reset(self.commands.len());
+        self.heading = "Keyboard shortcuts · Current context";
+        self.empty_message = "No matching bound commands";
+        self.input.update(cx, |input, cx| {
+            input.placeholder = Some("Search commands or keys, e.g. cmd shift…");
+            cx.notify();
+        });
+        cx.notify();
     }
     pub fn buffers(entries: Vec<(String, usize, String)>, revision: u64, surface_id: String, mode: BufferMode, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let commands = entries.into_iter().map(|(name, bytes, preview)| Command {

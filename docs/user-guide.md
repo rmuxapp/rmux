@@ -98,6 +98,10 @@ keeps the terminal processes running.
 ## Everyday shortcuts
 
 These are defaults. Custom bindings appear in menus and the command palette.
+Use **View → Keyboard Shortcuts…** (also in the palette) to search bound commands
+by name or keys, such as `cmd shift`. The list shows each command’s preferred
+binding in the context you opened it from; Enter runs the selected command.
+It excludes unbound commands and does not list every text-editing key.
 
 | Task | macOS | Linux / Windows |
 | --- | --- | --- |
