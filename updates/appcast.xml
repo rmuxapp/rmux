@@ -3,45 +3,53 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.7</title>
-            <pubDate>Sun, 22 Nov 2026 05:35:03 +0000</pubDate>
+            <title>0.1.8</title>
+            <pubDate>Sun, 22 Nov 2026 06:17:54 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.7</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.7</sparkle:version>
-            <sparkle:shortVersionString>0.1.7</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.8</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.8</sparkle:version>
+            <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.7 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.8 — preview
 
-This release improves everyday keyboard navigation, project switching, and
-workspace controls.
+This release makes returning to a project more reliable and improves keyboard
+navigation, document previews, and the browser demo.
 
-## VS Code and macOS
+## Project workspaces
 
-- Use rmux as VS Code's external terminal with `"terminal.external.osxExec": "/Applications/rmux.app"`. Cmd+Shift+C opens or reuses the folder's named workspace and activates its window. No extension or socket setup required.
-- Explicit automation activation now brings the application forward as well as selecting its window.
-- Option+Left/Right moves by word with standard shell bindings; negotiated Kitty keyboard input remains intact. Cmd+Left/Right sends line-start/end controls, and Cmd+Backspace sends Ctrl+U.
-- Open Settings File uses the configured external editor, falling back to TextEdit on macOS. Socket restart notices remain accurate across repeated settings reloads.
+- Opening a project from VS Code now reuses its resolved folder path. Two projects named `api` get separate workspaces, and renaming a workspace no longer breaks reuse.
+- Existing terminals keep their processes, layout, and working directories. Project identity survives saved sessions and moves between windows; symlink aliases resolve to the same project.
+- Matching older workspaces are adopted when their name and original launch directory agree. Ambiguous matches are reported instead of guessed.
+- Workspace search results and sidebar tooltips show the project path. Sidebar shortcut hints follow your configured bindings.
 
-See the [VS Code setup guide](../guide/vscode.md).
+See the [VS Code setup guide](../guide/vscode.md) for the single-setting setup.
 
-## Terminal and interface polish
+## Keyboard navigation and previews
 
-- Open compiler paths at a line and column in a configured editor, including quoted paths with spaces. Link feedback distinguishes missing directory context, remote files, and unsupported targets.
-- Tab overflow keeps pane controls visible. Detailed tab tooltips are formatted on hover rather than on every redraw.
-- Shared sidebar group controls have consistent titles, member counts, and add buttons. The WASM demo gains a searchable terminal-tab chooser.
-- A duplicate tooltip registration caught during native review is fixed before publication.
+- Shell line-start, line-end, and delete-to-start actions can be found in the command palette and assigned shortcuts.
+- Shortcut configuration catches conflicting sequence prefixes in overlapping contexts. Keyboard Shortcuts also lists configured literal terminal-text bindings.
+- Markdown previews can follow local document and directory links. Document preview Back/Forward history retains search and display state, and replacing a preview preserves the original terminal focus target.
 
-## Scope
+## Browser demo
 
-macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP are
-built on GitHub. macOS is signed and notarized, with Sparkle updates. Linux and
-Windows remain platform previews; native Windows validation is deferred.
-Cross-Space switching and VS Code switching latency have not been measured.
-Projects with identical folder names share the workspace name. Remote file
-opening and hosted shell sessions in the WASM demo remain unsupported.
+- Edit sample commands with cursor movement, word navigation, Home/End, and deletion, including Unicode text and narrow panes.
+- Recall previous sample commands with Up/Down or Ctrl+P/N, then return to your unfinished draft. History is bounded and separate for each session.
+
+## Availability and checks
+
+GitHub builds the macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and
+Windows x86-64 ZIP. macOS is signed and notarized, with Sparkle updates.
+
+Focused checks cover shortcut conflicts, preview loading/history, sample command
+editing/history, and project identity. A native smoke check confirmed that
+reopening and renaming projects retains the same terminal process. Browser
+editing and workspace switching were reviewed; the latest history addition and
+native visual changes still need a visual pass. Cross-Space focus remains
+unverified, and native Windows runtime validation remains deferred. The browser
+demo uses sample sessions, not real shells.
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.7/rmux-0.1.7-macos-arm64.zip" length="7223192" type="application/octet-stream" sparkle:edSignature="su2CRr+2D1SHGHkLnupoHN7v+mmrN71liGjXiuWqwV5Jqrp1GHcH6xP+Wm+7ZvbSMm1fTiFfx807MHvbCx1bCA=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.8/rmux-0.1.8-macos-arm64.zip" length="7249285" type="application/octet-stream" sparkle:edSignature="nuLHGg1gNmdmEMoy5+u6l3f52bd2dH2cRcujq9AX0Ox7+UrsDdJyuckBJqahkMeKAKE+lpWR9IleEgfsaom+Aw=="/>
         </item>
     </channel>
 </rss>
