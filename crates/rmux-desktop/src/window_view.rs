@@ -1267,6 +1267,13 @@ impl WorkspaceWindow {
             self.toggle_settings(window, cx);
         } else if matches!(key, "left" | "right" | "enter" | "space") {
             let selected = state.selected;
+            let control = settings_view::KEYS.iter().chain(settings_view::FOOTER_KEYS).nth(selected).copied();
+            let input = control.map(|control| settings_view::control_input(control, key))
+                .unwrap_or(settings_view::ControlInput::None);
+            if input == settings_view::ControlInput::None {
+                cx.stop_propagation();
+                return;
+            }
             if selected < settings_view::KEYS.len() {
                 if settings_view::KEYS[selected] == "file_editor" {
                     self.open_settings_file(cx);
@@ -1290,13 +1297,15 @@ impl WorkspaceWindow {
                     return;
                 }
                 let mut settings = cx.global::<Preferences>().clone();
-                settings_view::adjust(&mut settings, settings_view::KEYS[selected], if key == "left" { -1 } else { 1 });
+                if let settings_view::ControlInput::Adjust(delta) = input {
+                    settings_view::adjust(&mut settings, settings_view::KEYS[selected], delta);
+                }
                 if !settings.same_saved_appearance(cx.global::<Preferences>()) {
                     cx.set_global(settings.confirm_close);
                     cx.set_global(settings);
                 }
                 cx.notify();
-            } else if matches!(key, "enter" | "space") {
+            } else if !cx.global::<preferences::ReloadState>().0 {
                 if let Some(action) = settings_view::footer_action(selected - settings_view::KEYS.len()) {
                     window.dispatch_action(action, cx);
                 }

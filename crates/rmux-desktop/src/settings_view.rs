@@ -25,6 +25,25 @@ pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
         _ => return None,
     })
 }
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum ControlInput {
+    Adjust(i32),
+    Activate,
+    None,
+}
+
+/// Arrow keys change values; they must never open a dialog or an editor.
+pub fn control_input(control: &str, key: &str) -> ControlInput {
+    let action = matches!(control, "file_editor" | "import_theme" | "font_family")
+        || FOOTER_KEYS.contains(&control);
+    match (action, key) {
+        (true, "enter" | "space") => ControlInput::Activate,
+        (false, "left") => ControlInput::Adjust(-1),
+        (false, "right" | "enter" | "space") => ControlInput::Adjust(1),
+        _ => ControlInput::None,
+    }
+}
 // The heading precedes the settings. Save/editor controls live in a fixed footer.
 pub fn scroll_index(control: usize) -> usize {
     control + 1
@@ -271,6 +290,19 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
 #[cfg(test)]
 mod tests {
     use super::{adjust, next_control, Preferences, close_policy, workspace_groups, KEYS, FOOTER_COUNT};
+    #[test]
+    fn arrows_adjust_values_but_never_launch_actions() {
+        use super::{control_input, ControlInput};
+        for control in ["file_editor", "import_theme", "font_family"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
+            assert_eq!(control_input(control, "left"), ControlInput::None);
+            assert_eq!(control_input(control, "right"), ControlInput::None);
+            assert_eq!(control_input(control, "enter"), ControlInput::Activate);
+            assert_eq!(control_input(control, "space"), ControlInput::Activate);
+        }
+        assert_eq!(control_input("font", "left"), ControlInput::Adjust(-1));
+        assert_eq!(control_input("font", "right"), ControlInput::Adjust(1));
+        assert_eq!(control_input("copy", "space"), ControlInput::Adjust(1));
+    }
     #[test]
     fn keyboard_navigation_wraps_and_adjustments_stay_in_bounds() {
         assert_eq!(next_control(0, "tab", true), Some(KEYS.len() + FOOTER_COUNT - 1));

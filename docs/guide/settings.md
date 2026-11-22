@@ -67,7 +67,8 @@ override remains authoritative
 and is not saved into your config. Active tasks uses reported task status. Changes apply for the session; Save persists those
 fields while preserving other configuration options. Font defaults update matching terminals live while retaining custom size/family
 values. Reset Font Size returns the focused terminal to the size default. The editor link exposes the remaining settings. Tab/Shift-Tab or up/down navigate
-the panel; left/right adjust, Enter/Space activate, and Escape closes it. Opening
+the panel; left/right adjust values, Enter/Space activate, and Escape closes it.
+Font/theme pickers and editor actions open only with Enter/Space, not arrow keys. Opening
 the panel moves keyboard focus out of the shell; closing restores its prior focus
 when the panel still owns focus.
 

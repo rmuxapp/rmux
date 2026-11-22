@@ -1,3 +1,10 @@
+Settings keyboard follow-up: Left/Right now adjust values without launching
+the font picker, theme import dialog or external editor. Enter/Space activate
+those action controls. Keyboard activation of fixed-footer actions also respects
+the same busy state as pointer clicks. Both targeted Settings tests passed,
+covering value adjustment, action activation, navigation wrapping and bounds.
+No additional app bundle build or repeated native capture was performed.
+
 Settings save-state polish: the fixed footer now reports unsaved session
 appearance changes against a shared last-loaded/successfully-saved baseline.
 Successful saves record the submitted snapshot, so edits made during a save
