@@ -1,3 +1,10 @@
+Automation foregrounding fix: workspace open/reuse and the other explicit
+activate paths now activate both the destination window and the application.
+Previously they only keyed the window, allowing VS Code to remain foreground
+on macOS. Background requests keep their existing behavior. Desktop cargo check
+passes; native cross-application focus acceptance remains pending. The installed
+release is unchanged; open -a /Applications/rmux.app after rmuxctl is a workaround.
+
 Settings restart feedback: reload and conditional undo now compare socket_directory
 with the startup snapshot instead of the previously loaded settings. Repeated
 reloads retain the restart notice; restoring the startup value clears it. When

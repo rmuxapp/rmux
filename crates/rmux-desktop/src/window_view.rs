@@ -1,5 +1,13 @@
 use super::*;
 
+/// Selecting/keying a window alone does not foreground the application on macOS.
+/// Call only for explicit activation requests; background RPC stays background.
+fn activate_destination(window: &mut Window, cx: &mut App) {
+    window.activate_window();
+    cx.activate(true);
+}
+
+
 /// Resolve current ownership at click time, including detached/moved terminals.
 #[cfg(unix)]
 pub(super) fn focus_native_notification(terminal: &WeakEntity<TerminalView>, revision: u64, cx: &mut App) {
@@ -547,7 +555,7 @@ impl WorkspaceWindow {
         let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)
             .ok_or(automation::Failure { code: -32004, message: "Workspace no longer exists" })?;
         if create.focus || create.activate { self.select(index, window, cx); }
-        if create.activate { window.activate_window(); }
+        if create.activate { activate_destination(window, cx); }
         let mut result = self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap()
             .iter().find(|row| row["id"] == id.to_string()).unwrap().clone();
         result["reused"] = true.into();
@@ -611,7 +619,7 @@ impl WorkspaceWindow {
         if let Some(description) = &create.description { self.workspace_state.entries[index].description = description.clone(); }
         let id = self.workspace_state.entries[index].workspace.entity_id().to_string();
         if create.focus || create.activate { self.select(index, window, cx); }
-        if create.activate { window.activate_window(); }
+        if create.activate { activate_destination(window, cx); }
         cx.notify();
         let mut result = self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap().iter().find(|row| row["id"] == id).unwrap().clone();
         if create.reuse { result["reused"] = false.into(); }
@@ -1022,7 +1030,7 @@ impl WorkspaceWindow {
         let pane = workspace.read(cx).panes.iter().find(|pane| pane.entity_id() == pane_id).unwrap();
         let surface = pane.read(cx).active_terminal_id().unwrap();
         if split.focus || split.activate { self.focus_terminal(workspace.entity_id(), surface, window, cx); }
-        if split.activate { window.activate_window(); }
+        if split.activate { activate_destination(window, cx); }
         cx.notify();
         Ok(serde_json::json!({"pane_id":pane_id.to_string(),"surface_id":surface.to_string(),"workspace_id":workspace.entity_id().to_string()}))
     }
@@ -1085,7 +1093,7 @@ impl WorkspaceWindow {
             return Err(automation::Failure { code: -32004, message: "Surface not found" });
         };
         self.focus_terminal(workspace, terminal, window, cx);
-        if focus.activate { window.activate_window(); }
+        if focus.activate { activate_destination(window, cx); }
         Ok(serde_json::json!({"surface_id":focus.surface_id,"workspace_id":workspace.to_string(),"selected":true}))
     }
     fn automation_available(&self, cx: &App) -> Result<(), automation::Failure> {
@@ -1101,7 +1109,7 @@ impl WorkspaceWindow {
     pub(super) fn automation_focus_history(&mut self, navigation: &automation::FocusHistory, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
         let target = self.navigate_focus(matches!(navigation.direction, automation::FocusDirection::Forward), window, cx);
-        if target.is_some() && navigation.activate { window.activate_window(); }
+        if target.is_some() && navigation.activate { activate_destination(window, cx); }
         Ok(serde_json::json!({"window_id": navigation.window_id, "moved": target.is_some(),
             "surface_id": target.map(|id| id.as_u64().to_string())}))
     }
@@ -1111,7 +1119,7 @@ impl WorkspaceWindow {
             return Err(automation::Failure { code: -32004, message: "Workspace not found" });
         };
         self.select(index, window, cx);
-        if selection.activate { window.activate_window(); }
+        if selection.activate { activate_destination(window, cx); }
         Ok(serde_json::json!({"workspace_id":selection.workspace_id,"selected":true}))
     }
     pub(super) fn automation_snapshot(&self, window_id: String, include_workspaces: bool, cx: &App) -> serde_json::Value {
@@ -1742,7 +1750,7 @@ impl WorkspaceWindow {
         });
         result.and_then(|result| result)?;
         self.remove_workspace_entry(index, window, cx);
-        if activate { let _ = target.update(cx, |_, window, _| window.activate_window()); }
+        if activate { let _ = target.update(cx, |_, window, cx| activate_destination(window, cx)); }
         Ok(())
     }
     fn detach_workspace(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -2605,7 +2613,7 @@ impl WorkspaceWindow {
     pub(super) fn merge_workspace_to_window(&mut self, source_id: EntityId, destination_id: EntityId, target: AnyWindowHandle, activate: bool, window: &mut Window, cx: &mut Context<Self>) -> Result<()> {
         if target == window.window_handle() {
             self.merge_workspaces(source_id, destination_id, window, cx)?;
-            if activate { window.activate_window(); }
+            if activate { activate_destination(window, cx); }
             return Ok(());
         }
         self.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
@@ -2623,7 +2631,7 @@ impl WorkspaceWindow {
             let workspace = destination.workspace_state.entries[index].workspace.clone();
             workspace.update(cx, |workspace, cx| workspace.absorb_workspace(&source, true, window, cx))?;
             destination.select(index, window, cx);
-            if activate { window.activate_window(); }
+            if activate { activate_destination(window, cx); }
             Ok(())
         })??;
         // The destination now owns every pane; removing this entry cannot stop
@@ -3119,7 +3127,7 @@ impl WorkspaceWindow {
         if target == window.window_handle() {
             anyhow::ensure!(self.automation_contains_workspace(destination_id), "destination workspace closed");
             self.transfer_tab(workspace.entity_id(), source.entity_id(), id, destination_id, window, cx);
-            if activate { window.activate_window(); }
+            if activate { activate_destination(window, cx); }
             return Ok(());
         }
         let target = target.downcast::<Self>().ok_or_else(|| anyhow::anyhow!("invalid destination window"))?;
@@ -3156,7 +3164,7 @@ impl WorkspaceWindow {
         } else if self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| entry.workspace == workspace) {
             source.read(cx).focus(window, cx);
         }
-        if activate { let _ = target.update(cx, |_, window, _| window.activate_window()); }
+        if activate { let _ = target.update(cx, |_, window, cx| activate_destination(window, cx)); }
         cx.notify();
         Ok(())
     }
