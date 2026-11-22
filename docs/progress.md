@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+The browser command palette now highlights matching query words in result labels,
+using the same Unicode-safe range mapping as native previews. That helper and its
+regression test moved into rmux-core; desktop retains its existing call sites via
+an alias. Seven shared search tests and the debug WASM build pass. Local browser
+inspection confirms highlighted workspace results and aligned shortcut hints;
+evidence: target/palette-match-highlights.jpg. The hosted demo still requires a
+GitHub-built artifact import/deploy.
+
 The existing macOS GitHub job now builds the app/CLI with its already-used browser
 feature set and runs the live event smoke plus the focused CLI event parser test.
 CLI and smoke-script changes trigger this job. The smoke covers filtered replay,

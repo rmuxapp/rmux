@@ -85,36 +85,7 @@ pub fn preview_line_title(text: &str, query: &str) -> String {
     if title.is_empty() { title.push_str("(empty line)"); }
     title
 }
-/// Map case-folded word matches back to displayed UTF-8 ranges. The caller uses
-/// only the bounded preview excerpt, never an entire file or scrollback.
-pub fn preview_highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
-    if query.trim().is_empty() { return Vec::new(); }
-    let mut folded = String::new();
-    let mut boundaries = Vec::new();
-    for (start, ch) in text.char_indices() {
-        let folded_start = folded.len();
-        folded.extend(ch.to_lowercase());
-        boundaries.push((folded_start..folded.len(), start..start + ch.len_utf8()));
-    }
-    let mut marked = vec![false; boundaries.len()];
-    for word in query.split_whitespace() {
-        let word = word.to_lowercase();
-        for (start, matched) in folded.match_indices(&word) {
-            let end = start + matched.len();
-            let first = boundaries.partition_point(|(range, _)| range.end <= start);
-            let last = boundaries.partition_point(|(range, _)| range.start < end);
-            marked[first..last].fill(true);
-        }
-    }
-    let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
-    for ((_, source), marked) in boundaries.into_iter().zip(marked) {
-        if !marked { continue; }
-        if let Some(previous) = ranges.last_mut() && previous.end == source.start {
-            previous.end = source.end;
-        } else { ranges.push(source); }
-    }
-    ranges
-}
+pub use rmux_core::palette_match::highlights as preview_highlights;
 
 pub fn entered_directory(text: &str) -> Result<PathBuf, &'static str> {
     if text.is_empty() || text.len() > 4096 || text.contains('\0') {
@@ -485,21 +456,5 @@ mod hex_tests {
         assert!(hex_preview_cancellable(path, &AtomicBool::new(true)).is_err());
         assert!(hex_preview_cancellable(root.path().to_owned(), &AtomicBool::new(false)).is_err());
         Ok(())
-    }
-}
-
-#[cfg(test)]
-mod highlight_tests {
-    use super::preview_highlights;
-    #[test]
-    fn preview_highlights_merge_words_and_preserve_expanding_unicode() {
-        let text = "…İstanbul ÉCOLE 世界 needle";
-        let ranges = preview_highlights(text, "i École 世界 need needle");
-        assert_eq!(ranges.iter().map(|range| &text[range.clone()]).collect::<Vec<_>>(), ["İ", "ÉCOLE", "世界", "needle"]);
-        assert!(preview_highlights(text, "   ").is_empty());
-        assert!(preview_highlights(text, "absent").is_empty());
-        assert_eq!(preview_highlights("abcabc", "abc bc"), vec![0..6]);
-        // A match within an expanded scalar highlights the whole source scalar.
-        assert_eq!(preview_highlights("İ", "\u{307}"), vec![0..2]);
     }
 }
