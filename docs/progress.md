@@ -10642,3 +10642,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Closing Terminal 1 while editing Terminal 3 preserved both its draft and input focus; further typing appended to the existing draft. Screenshot: target/tab-rename-survives-close.jpg.
 - Closing the edited Terminal 3 removed the rename form and returned focus to surviving Terminal 2. Typing `echo surviving terminal` immediately executed in that sample terminal and displayed its output. No additional fix was required from these checks. The temporary browser tab/server were closed.
 - This accepts the tested WASM interactions only. Native close confirmation, cross-window transfers and PR/port sidebar rendering remain separate acceptance work; installed native sessions were untouched.
+
+### PR palette availability and cancellation
+
+- Palette construction now reflects the originating terminal: Refresh becomes Cancel Pull Request Lookup while its task is pending; Open Current Pull Request appears only with a cached PR. Actions still recheck live state when invoked, and the explicit cancel shortcut safely does nothing after completion.
+- Cancellation drops the owned lookup task, invoking the existing child cleanup and leaving a clear canceled status. Retry clears only errors owned by the PR workflow; unrelated terminal errors remain visible. Standardized PR prerequisite errors carry the same prefix for this ownership check.
+- Desktop cargo check passed. Native cancel/retry/palette runtime acceptance remains pending; no network lookup, release build or deployment performed.

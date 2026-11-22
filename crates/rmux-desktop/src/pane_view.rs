@@ -627,12 +627,16 @@ impl PaneView {
         self.terminals.active().map(Entity::entity_id)
     }
 
-    pub fn pending_palette_operations(&self, cx: &App) -> (bool, bool) {
+    pub fn pending_palette_operations(&self, cx: &App) -> (bool, bool, bool, bool) {
         let paste = self.terminals.active().is_some_and(|terminal| {
             let terminal = terminal.read(cx);
             terminal.image_paste_pending() || terminal.session.paste_pending()
         });
-        (self.spawning_tab.is_some(), paste)
+        let (pr_loading, pr_available) = self.terminals.active().map(|terminal| {
+            let terminal = terminal.read(cx);
+            (terminal.pull_request_task.is_some(), terminal.pull_request.is_some())
+        }).unwrap_or_default();
+        (self.spawning_tab.is_some(), paste, pr_loading, pr_available)
     }
 
     pub fn release_render_caches(&mut self, cx: &mut Context<Self>) {

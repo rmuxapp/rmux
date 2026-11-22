@@ -287,6 +287,8 @@ pub struct PaletteContext {
     pub tab: bool,
     pub split: bool,
     pub paste: bool,
+    pub pull_request_loading: bool,
+    pub pull_request_available: bool,
     pub file_loading: bool,
     pub restore: bool,
     pub active_group: Option<u64>,
@@ -658,8 +660,9 @@ impl CommandPalette {
         command!(ToggleNotifications);
         command!(DismissAllNotifications);
         command!(RefreshGitContext);
-        command!(RefreshPullRequest);
-        command!(OpenPullRequest);
+        if pending.pull_request_loading { command!(CancelPullRequest); }
+        else { command!(RefreshPullRequest); }
+        if pending.pull_request_available { command!(OpenPullRequest); }
         command!(ToggleProgramStatus);
         command!(ShowListeningPorts);
         command!(CloseListeningPorts);

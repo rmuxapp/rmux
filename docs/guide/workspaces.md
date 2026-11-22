@@ -60,7 +60,9 @@ The sidebar shows the returned PR number, state and title on a separate line bel
 hover for the full text and destination URL. Click the PR summary to open the
 page without switching workspaces. **Open Current Pull Request** provides the
 same workflow from the keyboard through the command palette.
-Custom shortcut actions are `refresh_pull_request` and `open_pull_request`.
+While a lookup runs, the palette offers **Cancel Pull Request Lookup** instead
+of Refresh. Open appears once a PR is available. Custom shortcut actions are
+`refresh_pull_request`, `cancel_pull_request` and `open_pull_request`.
 
 Lookup is manual, limited to one request at a time, and times out after ten
 seconds. It uses the repository selected by `gh`, searches matching head branches

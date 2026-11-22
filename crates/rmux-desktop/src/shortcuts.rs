@@ -84,6 +84,7 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "copy_terminal_memory" => Box::new(CopyTerminalMemory),
         "cycle_terminal_memory_sort" => Box::new(CycleTerminalMemorySort),
         "refresh_pull_request" => Box::new(RefreshPullRequest),
+        "cancel_pull_request" => Box::new(CancelPullRequest),
         "open_pull_request" => Box::new(OpenPullRequest),
         "refresh_git_context" => Box::new(RefreshGitContext),
         "toggle_program_status" => Box::new(ToggleProgramStatus),

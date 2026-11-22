@@ -501,6 +501,7 @@ actions!(
         DismissAllNotifications,
         RefreshGitContext,
         RefreshPullRequest,
+        CancelPullRequest,
         OpenPullRequest,
         ToggleProgramStatus,
         ShowListeningPorts,
@@ -707,14 +708,24 @@ impl TerminalView {
         self.pull_request = None;
         self.pull_request_status = None;
     }
+    fn clear_pull_request_error(&mut self) {
+        if self.error.as_deref().is_some_and(|error| error.starts_with("Pull request:")) { self.error = None; }
+    }
+    fn cancel_pull_request(&mut self, cx: &mut Context<Self>) {
+        if self.pull_request_task.take().is_none() { return; }
+        self.clear_pull_request_error();
+        self.pull_request_status = Some("PR lookup canceled".into());
+        cx.emit(TabMetadataChanged); cx.notify();
+    }
     fn refresh_pull_request(&mut self, cx: &mut Context<Self>) {
         if self.pull_request_task.is_some() { return; }
+        self.clear_pull_request_error();
         if self.session.remote_destination().is_some() {
-            self.error = Some("Pull request lookup is available for local terminals only".into()); cx.notify(); return;
+            self.error = Some("Pull request: lookup is available for local terminals only".into()); cx.notify(); return;
         }
         let Some((directory, branch)) = self.snapshot_directory.clone().zip(self.git_branch.clone())
             .filter(|(_, branch)| !branch.starts_with("detached ")) else {
-                self.error = Some("No local Git branch is available; refresh the Git branch first".into()); cx.notify(); return;
+                self.error = Some("Pull request: no local Git branch is available; refresh the Git branch first".into()); cx.notify(); return;
             };
         self.pull_request = None;
         self.pull_request_status = Some("Looking up PR…".into());
@@ -2056,9 +2067,10 @@ impl Render for TerminalView {
             .on_action(cx.listener(Self::reveal_working_directory))
             .on_action(cx.listener(|this, _: &RefreshGitContext, _, cx| this.refresh_git_context(cx)))
             .on_action(cx.listener(|this, _: &RefreshPullRequest, _, cx| this.refresh_pull_request(cx)))
+            .on_action(cx.listener(|this, _: &CancelPullRequest, _, cx| this.cancel_pull_request(cx)))
             .on_action(cx.listener(|this, _: &OpenPullRequest, _, cx| {
                 if let Some(pr) = &this.pull_request { cx.open_url(&pr.url); }
-                else { this.error = Some("Refresh Pull Request first to look up this branch".into()); cx.notify(); }
+                else { this.error = Some("Pull request: refresh first to look up this branch".into()); cx.notify(); }
             }))
             .on_action(
                 cx.listener(|this, _: &PreviousPrompt, _, cx| this.scroll(Scroll::Prompts(-1), cx)),

@@ -2563,12 +2563,12 @@ impl WorkspaceWindow {
             .collect();
         let active_workspace = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
         let workspace = self.workspace_state.entries[self.workspace_state.active].workspace.read(cx);
-        let (tab, paste) = workspace.focused_index(window, cx)
+        let (tab, paste, pull_request_loading, pull_request_available) = workspace.focused_index(window, cx)
             .map(|index| workspace.panes[index].read(cx).pending_palette_operations(cx))
             .unwrap_or_default();
         let pending = command_palette::PaletteContext {
             workspace: self.workspace_launch_cancel.is_some(),
-            split: workspace.spawning_split.is_some(), tab, paste,
+            split: workspace.spawning_split.is_some(), tab, paste, pull_request_loading, pull_request_available,
             file_loading: self.file_browser_job.is_some(),
             restore: self.restore_job.is_some(),
             active_group: self.workspace_state.groups.containing(active_workspace).map(|group| group.id),
