@@ -1,3 +1,14 @@
+Settings edge-case recovery: the first-save undo regression exposed macOS's
+`/var`/`/private/var` alias: a newly created file's receipt retained an unresolved
+path and rejected its own canonical target. Receipts now record the canonical
+written path. Undo of a first save leaves a valid empty/default configuration.
+Atomic writes now count the trailing newline against the 64 KiB limit, preventing
+a successful save that cannot reload. Command and layout-preset validation adds
+the array index and entry name without echoing arguments/environment values;
+editor validation identifies `file_editor`. Five focused settings tests passed,
+including first-save undo, exact-size reload, failed oversize-write preservation,
+diagnostic context and the prior conditional-undo protections. No app bundle.
+
 Settings recovery (A09): Undo Last Settings Save now has a process-local receipt
 shared across windows, a Settings footer control, menu/palette action and
 `undo_settings_save` shortcut action. It restores only JSON keys still matching

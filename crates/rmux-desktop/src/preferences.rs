@@ -321,6 +321,7 @@ fn config_bytes(path: &Path) -> Result<Option<Vec<u8>>> {
 fn replace_config(path: &Path, expected: Option<&[u8]>, bytes: &[u8]) -> Result<()> {
     use std::io::Write;
     Preferences::decode(bytes)?;
+    ensure!(bytes.len() < 64 * 1024, "configuration including its final newline exceeds 64 KiB");
     let parent = path.parent().context("Configuration path has no parent")?;
     std::fs::create_dir_all(parent)?;
     let mut temporary = tempfile::NamedTempFile::new_in(parent)?;
@@ -592,7 +593,7 @@ impl Preferences {
         let changes = new.into_iter().filter(|(key, value)| old.get(key) != Some(value))
             .map(|(key, value)| { let prior = old.get(&key).cloned(); (key, prior, value) }).collect();
         replace_config(&path, before.as_deref(), &bytes)?;
-        Ok(SaveReceipt { path, source: self.source.clone().unwrap(), changes })
+        Ok(SaveReceipt { path: path.canonicalize()?, source: self.source.clone().unwrap(), changes })
     }
 
     pub fn scrollback_bytes(&self) -> usize {
@@ -616,31 +617,37 @@ impl Preferences {
         let value: Self = serde_json::from_slice(bytes)?;
         ensure!(value.layout_presets.len() <= 32, "at most 32 layout presets are allowed");
         let mut preset_names = std::collections::HashSet::new();
-        for preset in &value.layout_presets {
-            ensure!(!preset.name.trim().is_empty() && preset.name.len() <= 128 && !preset.name.chars().any(char::is_control), "preset name must be nonempty, at most 128 bytes and contain no controls");
-            ensure!(preset_names.insert(preset.name.trim().to_lowercase()), "duplicate layout preset name");
-            ensure!(preset.path.is_absolute() && preset.path.as_os_str().len() <= 8192 && !preset.path.to_string_lossy().chars().any(char::is_control), "preset path must be absolute, at most 8192 bytes and contain no controls");
-            ensure!(preset.cwd.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192 && !path.to_string_lossy().chars().any(char::is_control)), "preset cwd must be absolute, at most 8192 bytes and contain no controls");
+        for (index, preset) in value.layout_presets.iter().enumerate() {
+            (|| -> Result<()> {
+                ensure!(!preset.name.trim().is_empty() && preset.name.len() <= 128 && !preset.name.chars().any(char::is_control), "preset name must be nonempty, at most 128 bytes and contain no controls");
+                ensure!(preset_names.insert(preset.name.trim().to_lowercase()), "duplicate layout preset name");
+                ensure!(preset.path.is_absolute() && preset.path.as_os_str().len() <= 8192 && !preset.path.to_string_lossy().chars().any(char::is_control), "preset path must be absolute, at most 8192 bytes and contain no controls");
+                ensure!(preset.cwd.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192 && !path.to_string_lossy().chars().any(char::is_control)), "preset cwd must be absolute, at most 8192 bytes and contain no controls");
+                Ok(())
+            })().with_context(|| format!("layout_presets[{index}] ({:?})", preset.name))?;
         }
         ensure!(value.commands.len() <= 32, "at most 32 custom commands are allowed");
         let mut names = std::collections::HashSet::new();
-        for command in &value.commands {
-            ensure!(!command.name.trim().is_empty() && command.name.len() <= 128 && !command.name.chars().any(char::is_control), "command name must be nonempty, at most 128 bytes and contain no controls");
-            ensure!(names.insert(command.name.trim().to_lowercase()), "duplicate custom command name");
-            ensure!(!command.argv.is_empty() && command.argv.len() <= 64 && !command.argv[0].is_empty(), "command argv must contain a program and at most 64 entries");
-            ensure!(command.argv.iter().all(|arg| !arg.contains('\0')) && command.argv.iter().map(String::len).sum::<usize>() <= 16 * 1024, "command arguments must fit 16 KiB without NULs");
-            ensure!(command.env.len() <= 64 && command.env.iter().map(|(key, value)| key.len() + value.len()).sum::<usize>() <= 16 * 1024, "command environment must fit 64 entries and 16 KiB");
-            for (key, value) in &command.env {
-                ensure!(!key.is_empty() && key.len() <= 128 && key.bytes().enumerate().all(|(i, byte)| byte == b'_' || byte.is_ascii_alphabetic() || (i > 0 && byte.is_ascii_digit())) && !value.contains('\0'), "command environment requires portable variable names and values without NULs");
-            }
-            #[cfg(windows)]
-            {
-                let mut keys = std::collections::HashSet::new();
-                ensure!(command.env.keys().all(|key| keys.insert(key.to_ascii_lowercase())), "duplicate case-insensitive environment variable");
-            }
-            ensure!(command.cwd.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "command cwd must be an absolute path up to 8192 bytes");
+        for (index, command) in value.commands.iter().enumerate() {
+            (|| -> Result<()> {
+                ensure!(!command.name.trim().is_empty() && command.name.len() <= 128 && !command.name.chars().any(char::is_control), "command name must be nonempty, at most 128 bytes and contain no controls");
+                ensure!(names.insert(command.name.trim().to_lowercase()), "duplicate custom command name");
+                ensure!(!command.argv.is_empty() && command.argv.len() <= 64 && !command.argv[0].is_empty(), "command argv must contain a program and at most 64 entries");
+                ensure!(command.argv.iter().all(|arg| !arg.contains('\0')) && command.argv.iter().map(String::len).sum::<usize>() <= 16 * 1024, "command arguments must fit 16 KiB without NULs");
+                ensure!(command.env.len() <= 64 && command.env.iter().map(|(key, value)| key.len() + value.len()).sum::<usize>() <= 16 * 1024, "command environment must fit 64 entries and 16 KiB");
+                for (key, value) in &command.env {
+                    ensure!(!key.is_empty() && key.len() <= 128 && key.bytes().enumerate().all(|(i, byte)| byte == b'_' || byte.is_ascii_alphabetic() || (i > 0 && byte.is_ascii_digit())) && !value.contains('\0'), "command environment requires portable variable names and values without NULs");
+                }
+                #[cfg(windows)]
+                {
+                    let mut keys = std::collections::HashSet::new();
+                    ensure!(command.env.keys().all(|key| keys.insert(key.to_ascii_lowercase())), "duplicate case-insensitive environment variable");
+                }
+                ensure!(command.cwd.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "command cwd must be an absolute path up to 8192 bytes");
+                Ok(())
+            })().with_context(|| format!("commands[{index}] ({:?})", command.name))?;
         }
-        if let Some(editor) = &value.file_editor { editor.validate()?; }
+        if let Some(editor) = &value.file_editor { editor.validate().context("file_editor")?; }
         ensure!(value.theme_file.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "theme_file must be an absolute path up to 8192 bytes");
         ensure!(value.terminal_padding <= 32, "terminal_padding must be between 0 and 32");
         ensure!(value.session_file.as_ref().is_none_or(|path| path.is_absolute() && path.as_os_str().len() <= 8192), "session_file must be an absolute path up to 8192 bytes");
@@ -711,6 +718,51 @@ impl Preferences {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn settings_write_limit_includes_the_trailing_newline() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        let mut bytes = b"{}".to_vec();
+        bytes.resize(64 * 1024 - 1, b' ');
+        super::replace_config(&path, None, &bytes)?;
+        let saved = std::fs::read(&path)?;
+        assert_eq!(saved.len(), 64 * 1024);
+        super::Preferences::read_config(&path, true)?;
+        bytes.push(b' ');
+        let error = super::replace_config(&path, Some(&saved), &bytes).unwrap_err();
+        assert!(error.to_string().contains("final newline"));
+        assert_eq!(std::fs::read(&path)?, saved);
+        Ok(())
+    }
+
+    #[test]
+    fn settings_validation_identifies_the_failing_entry_without_command_contents() {
+        let commands = br#"{"commands":[{"name":"Valid","argv":["echo"]},{"name":"Build","argv":[],"env":{"TOKEN":"private-value"}}]}"#;
+        let error = format!("{:#}", super::Preferences::decode(commands).err().unwrap());
+        assert!(error.contains("commands[1] (\"Build\")"), "{error}");
+        assert!(error.contains("argv"), "{error}");
+        assert!(!error.contains("private-value"));
+        let presets = br#"{"layout_presets":[{"name":"Review","path":"relative.json"}]}"#;
+        let error = format!("{:#}", super::Preferences::decode(presets).err().unwrap());
+        assert!(error.contains("layout_presets[0] (\"Review\")"), "{error}");
+        assert!(error.contains("absolute"), "{error}");
+    }
+
+    #[test]
+    fn settings_undo_of_first_save_leaves_a_valid_default_file() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        let mut settings = super::Preferences::default();
+        settings.source = Some(path.clone());
+        settings.font_size = 20.;
+        let receipt = settings.save_appearance_with_receipt()?;
+        let (restored, skipped) = receipt.undo()?;
+        assert!(restored > 0);
+        assert_eq!(skipped, 0);
+        assert_eq!(serde_json::from_slice::<serde_json::Value>(&std::fs::read(&path)?)?, serde_json::json!({}));
+        assert_eq!(super::Preferences::read_config(&path, true)?.font_size, super::Preferences::default().font_size);
+        Ok(())
+    }
     #[test]
     fn settings_undo_preserves_later_edits_and_restores_missing_keys() -> anyhow::Result<()> {
         let directory = tempfile::tempdir()?;
