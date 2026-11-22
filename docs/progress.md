@@ -10744,3 +10744,13 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Reproduced the missing ENV bootstrap on the installed macOS Bash 3.2.57 with both interactive and interactive-login invocations. The child retained ENV and reported POSIX mode enabled; explicitly sourcing that same private fixture worked. Equal real/effective user IDs ruled out privileged startup suppression.
 - Apple's published bash-3.2/shell.c, run_startup_files, locally forces posixly_correct to zero around interactive startup selection. This explains why the POSIX/ENV technique cannot bootstrap this binary as assumed in earlier experiments. Source: https://raw.githubusercontent.com/apple-oss-distributions/bash/main/bash-3.2/shell.c (lines 1040–1093 at review time).
 - Automatic Bash login integration remains open. Do not retry the same ENV bootstrap on the bundled Apple Bash or remove the login guard without a compatible startup design. Existing non-login --rcfile integration and manual login sourcing remain available. No shell files, shell selection, tool installations or launch behavior changed.
+
+### Release 0.1.13 and website refresh
+
+- GitHub Release run 45028528127 succeeded for source ed7a0cc: signed/notarized macOS DMG and ZIP, Linux tarball, Windows ZIP, checksums and appcast published. Main feed advanced in dc8620c. Downloaded macOS ZIP and appcast checksums matched SHA256SUMS; feed bytes and release metadata matched the published archive.
+- Shared WASM run 45028527786 succeeded from the same source. Imported its artifact and deployed the private website directly to Cloudflare at 3dd731e3.rmux-site.pages.dev. Root-domain download links and the project-aware VS Code page returned HTTP 200 with expected content. Private site commit a7edf52; site source remains off GitHub.
+
+### Browser palette search alignment after 0.1.13
+
+- The WASM palette now uses the shared field-aware matcher for both ordinary and shortcut-only searches. Command abbreviations remain fuzzy; workspace descriptions and paths match literal words, avoiding the noisy cross-field matches fixed in native 0.1.13.
+- Added matching subtitle highlights and consolidated duplicated search construction so both modes stay aligned. The existing shared matcher regression tests cover these semantics; WASM target compilation and diff checks passed. Browser visual acceptance and deployment of this follow-up remain pending.

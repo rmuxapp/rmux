@@ -396,12 +396,7 @@ impl InputProbe {
         // focus path, before later frames replace it with the palette input.
         self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
             .map(|index| self.result_hint(index, window, cx)).collect();
-        self.search = palette_match::RankedSearch::with_shortcuts(
-                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_search_text(index)).collect(),
-                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
-                        .map(shortcut_label::search_terms).unwrap_or_default()).collect());
+        self.search = self.ranked_palette_search();
         self.filter_shortcuts("");
         self.selected = 0;
         self.scroll.reset(self.search.matches.len());
@@ -442,11 +437,13 @@ impl InputProbe {
         index.checked_sub(COMMANDS.len()).and_then(|index| self.workspace_results.get(index))
             .map(|(_, _, subtitle)| subtitle.as_str()).filter(|subtitle| !subtitle.is_empty())
     }
-    fn result_search_text(&self, index: usize) -> String {
-        match self.result_subtitle(index) {
-            Some(subtitle) => format!("{} {subtitle}", self.result_title(index)).to_lowercase(),
-            None => self.result_title(index).to_lowercase(),
-        }
+    fn ranked_palette_search(&self) -> palette_match::RankedSearch {
+        let count = COMMANDS.len() + self.workspace_results.len() + self.group_results.len();
+        palette_match::RankedSearch::with_details(
+            (0..count).map(|index| self.result_title(index).to_lowercase()).collect(),
+            (0..count).map(|index| self.result_subtitle(index).unwrap_or_default().to_lowercase()).collect(),
+            (0..count).map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
+                .map(shortcut_label::search_terms).unwrap_or_default()).collect())
     }
     fn result_height(&self, index: usize) -> f32 {
         palette_view::result_row_height(self.result_subtitle(index).is_some())
@@ -502,12 +499,7 @@ impl InputProbe {
             self.shortcuts_only = true;
             self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
                 .map(|index| self.result_hint(index, window, cx)).collect();
-            self.search = palette_match::RankedSearch::with_shortcuts(
-                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_search_text(index)).collect(),
-                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                    .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
-                        .map(shortcut_label::search_terms).unwrap_or_default()).collect());
+            self.search = self.ranked_palette_search();
             self.input.update(cx, |input, cx| {
                 input.placeholder = Some("Search commands or keys, e.g. cmd shift…");
                 input.replace_draft("", cx);
@@ -731,7 +723,10 @@ impl Render for InputProbe {
                                         HighlightStyle { color: Some(rgb_to_hsla(rgb(0xffffff))), background_color: Some(rgb_to_hsla(rgb(0x41638c))), ..Default::default() })))
                                 }))
                                 .when_some(this.result_subtitle(index), |column, subtitle| column.child(
-                                    div().truncate().text_xs().line_height(px(16.)).text_color(rgb(0xa0a0a0)).child(subtitle.to_owned()))))
+                                    div().truncate().text_xs().line_height(px(16.)).text_color(rgb(0xa0a0a0)).child(
+                                        StyledText::new(subtitle.to_owned()).with_highlights(
+                                            palette_match::highlights(subtitle, this.input.read(cx).value()).into_iter().map(|range| (range,
+                                                HighlightStyle { color: Some(rgb_to_hsla(rgb(0xffffff))), background_color: Some(rgb_to_hsla(rgb(0x41638c))), ..Default::default() })))))))
                                 .when_some(this.result_hints.get(index).cloned().flatten(), |row, hint| row.child(
                                     palette_view::shortcut(hint)))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
