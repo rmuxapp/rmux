@@ -255,8 +255,8 @@ mod tests {
     }
     #[test]
     fn links_preserve_unicode_styles_and_keep_images_inert() {
-        let (rows, _) = blocks("[**界** code](https://example.com/a) [again](https://example.com/a) [file](file:///tmp/a) ![image](https://example.com/image.png)\n\n[next](https://example.org)");
-        assert_eq!(rows[0].links, ["https://example.com/a", "file:///tmp/a"]);
+        let (rows, _) = blocks("[**界** code](https://example.com/a) [again](https://example.com/a) [file](../a.txt) ![image](https://example.com/image.png)\n\n[next](https://example.org)");
+        assert_eq!(rows[0].links, ["https://example.com/a", "../a.txt"]);
         assert_eq!(rows[1].links, ["https://example.org"]);
         let first = rows[0].spans.first().unwrap();
         assert_eq!(&rows[0].text[first.range.clone()], "界");

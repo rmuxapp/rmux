@@ -80,3 +80,12 @@ metadata. Group headers can show a hidden member's unread message. The preview
 uses the newest unread message across panes and group members, ordered by the
 application-wide arrival sequence. Existing shell paths and descriptions remain
 secondary. Git branch context is now implemented via background HEAD discovery; PR and port rows remain missing. Native rendering of the branch/path combination is unverified.
+
+November 21, 2026 follow-up: the combined native debug bundle at `1835fbf`
+built and launched in an isolated app/config/socket. The Mac was locked, so no
+visual or click/focus acceptance is claimed and no screenshot was captured.
+The review process was stopped; the installed app was untouched. Pending review:
+named shell-line actions in the palette, relative Markdown/text/directory link
+activation by click and keyboard, and return focus after leaving a preview.
+Focused local-link tests exercise actual preview/directory loaders, including
+encoded spaces, uppercase Markdown extensions, file URLs and missing-file errors.

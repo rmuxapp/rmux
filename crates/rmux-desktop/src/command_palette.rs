@@ -10,6 +10,37 @@ fn local_preview_link(uri: &str, source: Option<&std::path::Path>) -> Option<Box
     Some(if markdown { Box::new(PreviewMarkdownFile { path }) } else { Box::new(PreviewLocalFile { path }) })
 }
 
+#[cfg(test)]
+mod local_link_tests {
+    use super::{local_preview_link, PreviewMarkdownFile, PreviewLocalFile, BrowseDirectory, file_browser};
+    #[test]
+    fn linked_files_use_preview_loaders_and_keep_errors_local() -> anyhow::Result<()> {
+        let directory = tempfile::tempdir()?;
+        let docs = directory.path().join("docs");
+        std::fs::create_dir(&docs)?;
+        let source = docs.join("index.md");
+        let target = directory.path().join("other guide.MD");
+        std::fs::write(&target, "# Linked guide\n")?;
+        let action = local_preview_link("../other%20guide.MD", Some(&source)).unwrap();
+        let path = &action.as_any().downcast_ref::<PreviewMarkdownFile>().unwrap().path;
+        assert_eq!(path, &target);
+        let canceled = std::sync::atomic::AtomicBool::new(false);
+        let preview = file_browser::preview_cancellable(path.clone(), &canceled)?;
+        assert_eq!(preview.contents, "# Linked guide\n");
+        let absolute = url::Url::from_file_path(&target).unwrap();
+        assert!(local_preview_link(absolute.as_str(), Some(&source)).unwrap().as_any().is::<PreviewMarkdownFile>());
+        let action = local_preview_link("../missing.txt", Some(&source)).unwrap();
+        let path = &action.as_any().downcast_ref::<PreviewLocalFile>().unwrap().path;
+        assert!(file_browser::preview_cancellable(path.clone(), &canceled).is_err());
+        let action = local_preview_link("../", Some(&source)).unwrap();
+        let path = &action.as_any().downcast_ref::<BrowseDirectory>().unwrap().path;
+        assert!(file_browser::list_cancellable(path.clone(), &canceled)?.entries.iter().any(|entry| entry.path == target));
+        assert!(local_preview_link("https://example.com", Some(&source)).is_none());
+        assert!(local_preview_link("../other.md", None).is_none());
+        Ok(())
+    }
+}
+
 // Resolve the inherited row style at render time so headings retain their
 // size/weight and only inline-code runs switch to the terminal's monospace font.
 #[derive(IntoElement)]
