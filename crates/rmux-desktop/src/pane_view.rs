@@ -443,6 +443,7 @@ impl PaneView {
                 "index":index, "type":"terminal", "title":self.tab_title(index, cx),
                 "selected":index == self.terminals.active_index(), "attention":terminal.attention.any(),
                 "input_focused":terminal.input_focused,
+                "bell_revision":terminal.bell_revision.to_string(),
                 "directory_label":terminal.directory_label,
                 "remote_directory":terminal.remote_directory_label,
                 "git_branch":terminal.git_branch,

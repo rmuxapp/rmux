@@ -120,7 +120,8 @@ native terminal integration.
 `mise run test-fish-integration` uses pinned, mise-managed fish 4.9.3. Its startup
 checks pass on macOS, covering user configuration, login modes and avoiding duplicate
 hooks. `mise run test-fish-startup` passes a real macOS PTY fixture with Unicode cwd
-and prompt navigation. Older fish fallback and Linux runtime coverage remain pending.
+and prompt navigation. The startup checks also pass on Ubuntu CI. Older fish fallback and Linux native
+PTY coverage remain pending.
 Event behavior follows
 the [fish event documentation](https://fishshell.com/docs/current/language.html#event-handlers)
 and [built-in URL escaping](https://fishshell.com/docs/current/cmds/string-escape.html).

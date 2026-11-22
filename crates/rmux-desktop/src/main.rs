@@ -901,6 +901,7 @@ impl TerminalView {
                         }
                         if metadata.bell_revision != view.bell_revision {
                             view.bell_revision = metadata.bell_revision;
+                            events::publish("surface.bell", cx.entity_id(), None, cx);
                             if !view.input_focused {
                                 view.attention.bell();
                                 metadata_changed = true;

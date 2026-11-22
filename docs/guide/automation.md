@@ -372,6 +372,12 @@ Program status reports signal a new status revision; progress signals a changed
 value. These events describe metadata delivered to the UI, not every intermediate
 escape sequence in a burst of terminal output.
 
+`surface.bell` signals newly observed terminal bells, including in focused
+terminals. `surface.list` exposes `bell_revision` as a decimal string: a per-surface
+64-bit wrapping count starting at zero. A burst may produce one replay event for
+several bells; compare revisions to count them. OSC terminator BEL bytes are not
+terminal bells. The attention indicator still only marks unfocused terminals.
+
 `surface.focus_changed` reports changes to terminal keyboard focus, including
 window activation/deactivation and focus moving into an editor or palette.
 Repeated reports of the same focus state do not emit events. Fetch

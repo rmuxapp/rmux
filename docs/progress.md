@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Event replay now emits `surface.bell` independently of terminal focus; surface
+snapshots expose `bell_revision` as a decimal string. Burst delivery may coalesce
+several bells into one event, while the counter retains their count. Native smoke
+passes three real shell BELs, filtered replay, no duplicate idle events and exclusion
+of OSC terminator BEL bytes. Existing unfocused-only attention behavior is unchanged.
+
+Shell integration CI run 44968164363 passed on Ubuntu, including the newly added
+mise-managed fish 4.9.3 startup/native-marker checks. Linux graphical/PTY acceptance
+and older fish fallback coverage remain pending.
+
 Fish now defers to built-in directory/prompt integration in 3.7+ and respects the
 native mark-prompt feature switch, avoiding duplicate OSC 7/133 hooks. Pinned fish
 4.9.3 was installed through mise; startup tests and a real macOS PTY test pass for

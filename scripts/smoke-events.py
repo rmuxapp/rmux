@@ -20,7 +20,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
     reported_directory = Path(directory) / "reported 世界"
     reported_directory.mkdir()
     shell = Path(directory) / "fixture-shell"
-    shell.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nwhile IFS= read -r line; do\n  case "$line" in\n    metadata) printf "\\033]7501;state=working:id=build\\007\\033]9;4;1;42\\007\\033]2;Replay title 世界\\007\\033]7;file://localhost%s\\007" "$RMUX_TEST_URL" ;;\n  esac\ndone\n')
+    shell.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nwhile IFS= read -r line; do\n  case "$line" in\n    bell) printf "\\007\\007\\007" ;;\n    metadata) printf "\\033]7501;state=working:id=build\\007\\033]9;4;1;42\\007\\033]2;Replay title 世界\\007\\033]7;file://localhost%s\\007" "$RMUX_TEST_URL" ;;\n  esac\ndone\n')
     shell.chmod(0o700)
     env.update(RMUX_CONFIG=str(config), RMUX_SHELL=str(shell), RMUX_SOCKET_DIR=str(endpoint), RMUX_TEST_URL=quote(str(reported_directory)))
     with tempfile.TemporaryFile() as errors:
@@ -126,6 +126,22 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             call("surface.send_text", {"surface_id": surface, "text": "metadata\n"})
             duplicate = call("events.read", {"after": boundary, "wait_ms": 100})
             assert not any(e["kind"] in ("surface.title_changed", "surface.directory_changed") for e in duplicate["events"])
+            # OSC terminator BEL bytes above must not count as terminal bells.
+            assert current["bell_revision"] == "0", current
+            boundary = call("events.read")["cursor"]
+            call("surface.send_text", {"surface_id": surface, "text": "bell\n"})
+            bell_events = []
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                page = call("events.read", {"after": boundary, "wait_ms": 100, "surface_id": surface, "kinds": ["surface.bell"]})
+                boundary = page["cursor"]
+                bell_events.extend(page["events"])
+                current = next(s for s in call("surface.list")["surfaces"] if s["id"] == surface)
+                if current["bell_revision"] == "3" and bell_events:
+                    break
+            assert current["bell_revision"] == "3" and bell_events, (current, bell_events)
+            assert all(e["kind"] == "surface.bell" and e["surface_id"] == surface for e in bell_events)
+            assert call("events.read", {"after": boundary, "wait_ms": 50, "kinds": ["surface.bell"]})["events"] == []
             window = call("window.list")["windows"][0]["id"]
             original_workspace = call("workspace.list")["workspaces"][0]["id"]
             boundary = call("events.read")["cursor"]
