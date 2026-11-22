@@ -14,6 +14,16 @@ pub(crate) fn format_key_parts(key: &str, modifiers: Modifiers, mac: bool) -> St
     if modifiers.alt { parts.push(if mac { "⌥" } else { "Alt" }.to_owned()); }
     if modifiers.shift { parts.push(if mac { "⇧" } else { "Shift" }.to_owned()); }
     if modifiers.platform { parts.push(if mac { "⌘" } else if cfg!(target_os = "windows") { "Win" } else { "Super" }.to_owned()); }
+    // GPUI/browser bindings may carry the shifted character as well as Shift.
+    // Display the underlying key once, rather than e.g. Shift+Command+}.
+    let key = if modifiers.shift {
+        match key {
+            "{" => "[", "}" => "]",
+            "!" => "1", "@" => "2", "#" => "3", "$" => "4", "%" => "5",
+            "^" => "6", "&" => "7", "*" => "8", "(" => "9", ")" => "0",
+            other => other,
+        }
+    } else { key };
     parts.push(match key {
         "up" => "↑".into(), "down" => "↓".into(), "left" => "←".into(), "right" => "→".into(),
         "enter" => if mac { "↩" } else { "Enter" }.into(),
@@ -39,5 +49,34 @@ pub(crate) fn search_terms(label: &str) -> String {
             _ => { words.push(ch); continue; }
         });
     }
-    format!("{label} {words}").to_lowercase()
+    let aliases = label.to_lowercase()
+        .replace("pgup", "page up").replace("pgdn", "page down")
+        .replace("esc", "escape");
+    format!("{label} {words} {aliases}").to_lowercase()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{format_key_parts, search_terms};
+    use gpui::Modifiers;
+    #[test]
+    fn shifted_aliases_display_the_base_key_once() {
+        let mac = Modifiers { platform: true, shift: true, ..Default::default() };
+        assert_eq!(format_key_parts("}", mac, true), "⇧⌘]");
+        assert_eq!(format_key_parts("{", mac, true), "⇧⌘[");
+        assert_eq!(format_key_parts("]", mac, true), "⇧⌘]");
+        assert_eq!(format_key_parts("!", mac, true), "⇧⌘1");
+        let other = Modifiers { control: true, shift: true, ..Default::default() };
+        assert_eq!(format_key_parts("@", other, false), "Ctrl+Shift+2");
+        let literal = Modifiers { platform: true, ..Default::default() };
+        assert_eq!(format_key_parts("}", literal, true), "⌘}");
+        assert_eq!(format_key_parts("@", literal, true), "⌘@");
+    }
+    #[test]
+    fn named_navigation_keys_have_searchable_long_names() {
+        assert!(search_terms("Ctrl+PgUp").contains("page up"));
+        assert!(search_terms("Ctrl+PgDn").contains("page down"));
+        assert!(search_terms("Esc").contains("escape"));
+        assert!(search_terms("⇧⌘]").contains("command"));
+    }
 }

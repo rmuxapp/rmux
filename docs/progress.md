@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Shortcut label correction from the browser review: shifted bracket and numeric
+aliases now display the base key once when Shift is already present (for example
+⇧⌘] rather than ⇧⌘}, and Ctrl+Shift+2 rather than Ctrl+Shift+@). Literal symbols
+without Shift remain literal. The shared formatter serves native and WASM chrome.
+Search terms also accept the long names page up, page down and escape. Two
+focused formatter/search tests pass; no app or demo rebuild for this text-only
+follow-up. No binding or dispatch semantics changed.
+
+
 Shortcut discovery now also runs in the WASM demo. Native and browser use the
 same command identity and symbolic/plain key search terms. The browser view
 filters resolved command hints, sorts empty-query results by title, preserves
