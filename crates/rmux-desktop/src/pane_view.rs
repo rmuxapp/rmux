@@ -1436,6 +1436,8 @@ impl Render for PaneView {
                 let selected = matches.iter().map(|index| self.terminals[*index].entity_id())
                     .find(|id| Some(*id) == selected)
                     .or_else(|| matches.first().map(|index| self.terminals[*index].entity_id()));
+                let count = matches.len();
+                let selected_row = matches.iter().position(|index| Some(self.terminals[*index].entity_id()) == selected).unwrap_or(0);
                 root.child(deferred(div().absolute().top(px(30.)).bottom_0().left_0().right_0()
                     .flex().flex_col().min_h_0()
                     .child(div().id("tab-picker-container").occlude().w(px(520.)).max_w_full().min_w_0().min_h_0().overflow_hidden().flex().flex_col()
@@ -1487,7 +1489,8 @@ impl Render for PaneView {
                         }).with_sizing_behavior(ListSizingBehavior::Auto)
                             .w_full().min_h_0().h(height).into_any_element()
                     })
-                    .child(crate::palette_view::footer().child("↑↓ choose · Enter open · Esc close"))
+                    .child(crate::palette_view::footer().justify_between().child("↑↓ choose · Enter open · Esc close")
+                        .child(crate::palette_view::result_position(selected_row, count)))
                     )).with_priority(1))
             })
     }

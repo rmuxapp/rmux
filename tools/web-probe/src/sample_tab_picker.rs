@@ -69,6 +69,9 @@ impl SamplePane {
     }
     fn picker_element(&self, picker: SampleTabPicker, cx: &mut Context<Self>) -> AnyElement {
         let matches = self.picker_matches(cx);
+        let count = matches.len();
+        let selected_row = matches.iter().position(|index| Some(self.terminals[*index].entity_id()) == picker.selected).unwrap_or(0);
+        let query = picker.input.read(cx).value().to_owned();
         deferred(div().absolute().top(px(30.)).bottom_0().left_0().right_0().flex().flex_col().min_h_0()
             .child(div().id("sample-tab-picker").occlude().w(px(520.)).max_w_full().min_w_0().min_h_0().overflow_hidden().flex().flex_col()
                 .bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md()
@@ -84,23 +87,31 @@ impl SamplePane {
                     if picker.input.read(cx).is_composing() { return; }
                     let matches = this.picker_matches(cx);
                     let selected = matches.iter().position(|index| Some(this.terminals[*index].entity_id()) == picker.selected).unwrap_or(0);
-                    if let Some(next) = crate::palette_view::navigated_result(selected, matches.len(), key) {
+                    let next = if matches!(key, "pageup" | "pagedown") {
+                        crate::palette_view::paged_result(selected, matches.len(), key == "pageup", f32::from(picker.scroll.bounds().size.height), |_| 40.)
+                    } else { crate::palette_view::navigated_result(selected, matches.len(), key) };
+                    if let Some(next) = next {
                         let id = this.terminals[matches[next]].entity_id();
                         if let Some(picker) = &mut this.picker { picker.selected = Some(id); picker.scroll.scroll_to_item(next); }
                         cx.notify();
                     }
                     cx.stop_propagation();
                 }))
-                .child(crate::palette_view::header("Choose Terminal Tab", crate::palette_view::close_button()
+                .child(crate::palette_view::header(format!("Terminal tabs · {count} of {}", self.terminals.len()), crate::palette_view::close_button()
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.dismiss_picker(window, cx); } }))))
                 .child(crate::palette_view::search(picker.input, cx))
                 .child(div().id("sample-tab-picker-results").min_h_0().max_h(px(320.)).overflow_y_scroll().track_scroll(&picker.scroll)
                     .when(matches.is_empty(), |list| list.child(crate::palette_view::empty_state("No matching tabs")))
                     .children(matches.into_iter().map(|index| {
                         let id = self.terminals[index].entity_id();
+                        let title = self.tab_name(index, cx);
+                        let ranges = rmux_core::palette_match::fuzzy_highlights(&title, &query);
+                        let title = StyledText::new(title).with_highlights(ranges.into_iter().map(|range| (
+                            range, HighlightStyle { color: Some(rgb_to_hsla(rgb(crate::chrome_style::ACCENT))), font_weight: Some(FontWeight::BOLD), ..Default::default() }
+                        )));
                         crate::palette_view::result(index, 40., picker.selected == Some(id))
                             .child(div().text_xs().text_color(rgb(0xa0a0a0)).child((index + 1).to_string()))
-                            .child(div().min_w_0().flex_1().truncate().child(self.tab_name(index, cx)))
+                            .child(div().min_w_0().flex_1().truncate().child(title))
                             .when(index == self.terminals.active_index(), |row| row.child(crate::palette_view::shortcut("Active")))
                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                 if !event.standard_click() { return; }
@@ -109,7 +120,8 @@ impl SamplePane {
                                 }
                             }))
                     })))
-                .child(crate::palette_view::footer().child(crate::palette_view::navigation_hints()))
+                .child(crate::palette_view::footer().justify_between().child(crate::palette_view::navigation_hints())
+                    .child(crate::palette_view::result_position(selected_row, count)))
             )).priority(2).into_any_element()
     }
 }

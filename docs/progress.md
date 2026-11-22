@@ -10566,3 +10566,19 @@ Cancel-first buttons and teardown behavior remain unchanged.
 One desktop compilation passed. No user terminal was closed or native quit prompt
 triggered. Native visual/dialog acceptance remains pending; this copy-only batch
 did not require additional runtime tests, a release build or a deployment.
+
+
+### Tab chooser search feedback parity — 2026-11-22
+
+Native tab reconciliation already preserves stable terminal identity through
+reordering/removal. Improved the remaining chooser feedback gap: both hosts now
+show selected/filtered result position, and the WASM chooser highlights matching
+title text and shows filtered/total counts like native. Browser Page Up/Down now
+uses the measured result viewport and shared page-navigation function instead
+of a fixed eight-row jump. Empty results use the shared zero-result feedback.
+
+Native compilation and WASM build passed after adapting highlights to the web
+renderer color type. Browser review with three sample tabs confirmed highlighted
+“term” matches, Down selecting row two, “2 of 3” feedback and Escape dismissal.
+Screenshot: `target/tab-picker-search-polish.jpg`. Paging in short viewports and
+native runtime acceptance remain pending. Review tab/server closed; no deployment.
