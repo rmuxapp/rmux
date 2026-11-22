@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Native visual review of 7454978: one debug bundle build succeeds, and an isolated
+synthetic layout renders the shared palette, shortcut badges and sidebar colors.
+Screenshot: target/native-chrome-polish.png. The machine's Metal HUD is visible;
+its values are not a controlled performance measurement. Keyboard follow-ups did
+not visibly change the palette and the UI tool subsequently reported no windows
+available, so dismissal/input and notification mouse checks are not accepted.
+The fixture exited cleanly through its RPC shutdown handler; the installed app
+and user sessions were not replaced. Continue native interaction review when UI
+access is available rather than rebuilding this unchanged batch.
+
 Completed the combined chrome/input polish batch with notification-panel fixes:
 desktop close, open and dismiss handlers now require standard clicks, matching
 the existing read/copy/filter controls. The close control uses the shared 28 px
