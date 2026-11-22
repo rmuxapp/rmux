@@ -10110,3 +10110,35 @@ Next: collect only commands accepted by shell history policy; persist identity
 through session restoration; import history without executing it or duplicating
 entries in global history; define cleanup for closed sessions. Shell integration
 and restored-shell acceptance are required before describing T19 as implemented.
+
+
+### Shell-approved history capture — 2026-11-22
+
+The next T19 layer is implemented but remains off by default. Bash/zsh hooks
+under `RMUX_SESSION_HISTORY=1` report accepted history entries at the next prompt
+using private OSC `9999;rmux-history;<hex UTF-8>`. They do not inspect PTY input,
+change HISTFILE, or replay commands. Initial history is skipped; Bash history
+mode, HISTIGNORE/HISTCONTROL, zsh HIST_IGNORE_SPACE/SAVEHIST, and disabled
+HISTFILE are respected. zsh uses its history parameter to preserve raw multiline
+and Unicode entries; formatted `fc` output would escape them. An ignored zsh
+entry does not advance the saved sequence because its number can be reused.
+
+The terminal recognizes these reports through the existing bounded OSC path,
+without changing the ordinary-output fast-path condition. It records at most
+512 entries / 128 KiB through shared rmux-core history state and exposes a
+revision-based snapshot accessor. Reports are metadata supplied by terminal
+output, not authenticated commands, and must never be automatically executed.
+The existing private JSON store uses that same bounded record type.
+
+Validation: isolated existing Bash/zsh tests passed for exclusions, multiline
+Unicode, initialization, opt-out and preserved exit status; existing shell
+integration checks passed. Two terminal tests passed for every report split,
+BEL/ST termination, malformed/oversize rejection, duplicate revisions, and no
+visible protocol leakage. Three storage tests and two Unicode tests passed.
+The Unicode tests needed updating from the removed backspace method to the
+current measured deletion API. Desktop compilation passed. No GUI build needed.
+
+Still required before activation: persistent terminal identity, asynchronous
+save lifecycle, shell-native history import without global duplication, explicit
+history-clear/reset semantics, retention cleanup, and restored-shell acceptance.
+The application does not yet set the opt-in flag or save these records.

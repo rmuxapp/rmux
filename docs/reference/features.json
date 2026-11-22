@@ -656,7 +656,7 @@
       "acceptance": "Preserve user-selected copy policy and restore session history without duplicating prompt execution.",
       "rmux_status": "in_progress",
       "implementation": "Ordinary Copy unwraps terminal soft wraps. Copy with Line Breaks preserves them through the Edit menu, palette and copy_with_line_breaks shortcut action. Both use bounded background streaming exports; engine tests cover wrap modes, limits and selection/viewport preservation. Per-terminal history storage groundwork is implemented but not activated: bounded Unicode/multiline records, atomic private-file replacement, and corrupt/oversize-file rejection have focused tests.",
-      "remaining": "Shell-approved history capture respecting shell history opt-outs, stable per-terminal identity in session snapshots, startup restoration without replay/global-history duplication, retention cleanup, and native lifecycle acceptance. The storage module is not yet called by live shells. Broader reflow acceptance remains pending.",
+      "remaining": "Stable per-terminal identity in session snapshots, asynchronous persistence, startup restoration without replay/global-history duplication, explicit history-clear/reset semantics, retention cleanup, and native lifecycle acceptance. Opt-in Bash/zsh capture and bounded engine decoding are tested, but the application does not yet enable capture or save records. Broader reflow acceptance remains pending.",
       "implementation_sources": [
         "crates/rmux-terminal/src/selection.rs",
         "crates/rmux-desktop/src/shell_history.rs"

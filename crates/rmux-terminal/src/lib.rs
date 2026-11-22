@@ -74,6 +74,8 @@ struct Callbacks {
     progress: Option<Progress>,
     program_status: program_status::Records,
     program_finished: bool,
+    shell_history: rmux_core::shell_history::History,
+    shell_history_revision: u64,
 }
 
 impl Callbacks {
@@ -199,6 +201,7 @@ pub mod selection;
 pub mod session;
 mod text_export;
 mod shell_integration;
+mod shell_history;
 
 pub use rmux_core::scroll::Scroll;
 
@@ -562,7 +565,7 @@ impl Terminal {
     pub fn write(&mut self, bytes: &[u8]) {
         self.revision = self.revision.wrapping_add(1);
         self.mouse.refresh = true;
-        // A supported notification starts with literal OSC + "99;". A chunk
+        // Notifications and private history reports begin with OSC + "99". A chunk
         // without '9' cannot contain it. Keep the boundary path if an OSC is
         // already captured, or if an introducer could be split at this suffix.
         // Other OSCs can remain entirely on Ghostty's normal bulk path.
@@ -573,6 +576,11 @@ impl Terminal {
         } else {
             self.write_with_osc_boundaries(bytes);
         }
+    }
+
+    /// Snapshot only when shell-approved commands changed. No screen parsing.
+    pub fn shell_history_since(&self, revision: u64) -> Option<(u64, &rmux_core::shell_history::History)> {
+        (revision != self.callbacks.shell_history_revision).then_some((self.callbacks.shell_history_revision, &self.callbacks.shell_history))
     }
 
     fn write_with_osc_boundaries(&mut self, bytes: &[u8]) {
@@ -588,7 +596,11 @@ impl Terminal {
             if let Some(capture) = &mut self.osc_capture {
                 if !self.osc_discard {
                     let data = &remaining[..stop.consumed - usize::from(end)];
-                    if capture.len() + data.len() > 8192 || !capture.iter().chain(data.iter()).zip(b"99;").all(|(a, b)| a == b) {
+                    let prefix_matches = |prefix: &[u8]| capture.iter().chain(data.iter()).zip(prefix).all(|(a, b)| a == b);
+                    let history = prefix_matches(shell_history::PREFIX);
+                    let notification = prefix_matches(b"99;");
+                    let limit = if history { shell_history::CAPTURE_LIMIT } else { 8192 };
+                    if capture.len() + data.len() > limit || !(history || notification) {
                         self.osc_discard = true;
                         capture.clear();
                     } else {
@@ -598,6 +610,11 @@ impl Terminal {
             }
             if end {
                 if !self.osc_discard && matches!(stop.end, GHOSTTY_TERMINAL_STRING_END_ST_ESC | GHOSTTY_TERMINAL_STRING_END_BEL) {
+                    if let Some(command) = self.osc_capture.as_deref().and_then(shell_history::decode) {
+                        if self.callbacks.shell_history.record(&command) {
+                            self.callbacks.shell_history_revision = self.callbacks.shell_history_revision.wrapping_add(1);
+                        }
+                    }
                     if let Some(response) = self.osc_capture.as_deref().and_then(kitty_notification::query_response) {
                         let terminator: &[u8] = if stop.end == GHOSTTY_TERMINAL_STRING_END_BEL { b"\x07" } else { b"\x1b\\" };
                         // Bound our query replies between PTY drains. Never append a

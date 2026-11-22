@@ -2,32 +2,11 @@
 //! Call from background work; no global shell history file is opened here.
 use anyhow::{Result, ensure};
 use serde::{Deserialize, Serialize};
-use std::{collections::VecDeque, io::Read, path::PathBuf};
+use std::{io::Read, path::PathBuf};
 
-const ENTRY_LIMIT: usize = 512;
-const TEXT_LIMIT: usize = 128 * 1024;
-const COMMAND_LIMIT: usize = 8 * 1024;
+use rmux_core::shell_history::{History, ENTRY_LIMIT, TEXT_LIMIT, COMMAND_LIMIT};
 // JSON escaping may expand each byte sixfold.
 const FILE_LIMIT: usize = TEXT_LIMIT * 6 + ENTRY_LIMIT * 8 + 128;
-
-#[derive(Default, Debug, PartialEq, Eq)]
-pub(crate) struct History {
-    entries: VecDeque<String>,
-    bytes: usize,
-}
-impl History {
-    pub fn entries(&self) -> impl Iterator<Item = &str> { self.entries.iter().map(String::as_str) }
-    pub fn record(&mut self, command: &str) -> bool {
-        if command.trim().is_empty() || command.len() > COMMAND_LIMIT || command.contains('\0')
-            || self.entries.back().is_some_and(|last| last == command) { return false; }
-        while self.entries.len() >= ENTRY_LIMIT || self.bytes + command.len() > TEXT_LIMIT {
-            if let Some(old) = self.entries.pop_front() { self.bytes -= old.len(); }
-        }
-        self.bytes += command.len();
-        self.entries.push_back(command.to_owned());
-        true
-    }
-}
 
 #[derive(Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -61,7 +40,7 @@ impl Store {
         let mut history = History::default();
         for command in saved.commands {
             ensure!(command.len() <= COMMAND_LIMIT && !command.contains('\0'), "invalid terminal history entry");
-            ensure!(history.bytes + command.len() <= TEXT_LIMIT, "terminal history exceeds text limit");
+            ensure!(history.text_bytes() + command.len() <= TEXT_LIMIT, "terminal history exceeds text limit");
             history.record(&command);
         }
         Ok(history)
@@ -108,16 +87,16 @@ mod tests {
     fn recording_retains_recent_commands_with_bounded_memory() {
         let mut history = History::default();
         for index in 0..1000 { history.record(&format!("echo {index}")); }
-        assert_eq!(history.entries.len(), ENTRY_LIMIT);
-        assert_eq!(history.entries.front().unwrap(), "echo 488");
+        assert_eq!(history.entries().len(), ENTRY_LIMIT);
+        assert_eq!(history.entries().next().unwrap(), "echo 488");
         assert!(!history.record("echo 999"));
         assert!(!history.record(" \n"));
         assert!(!history.record("bad\0command"));
         assert!(!history.record(&"x".repeat(COMMAND_LIMIT + 1)));
         for index in 0..100 { history.record(&format!("{index}{}", "x".repeat(8000))); }
-        assert!(history.bytes <= TEXT_LIMIT);
-        assert!(history.entries.len() < ENTRY_LIMIT);
-        assert!(history.entries.back().unwrap().starts_with("99"));
+        assert!(history.text_bytes() <= TEXT_LIMIT);
+        assert!(history.entries().len() < ENTRY_LIMIT);
+        assert!(history.entries().next_back().unwrap().starts_with("99"));
     }
     #[test]
     fn malformed_or_future_history_is_not_silently_overwritten() -> Result<()> {

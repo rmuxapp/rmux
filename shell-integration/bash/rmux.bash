@@ -18,14 +18,42 @@ _rmux_bash_capture_status() {
     return "$_rmux_bash_command_status"
 }
 
+
+# Only shell-approved history is eligible; never inspect raw terminal input.
+# Kept off until the application enables the complete persistence lifecycle.
+_rmux_bash_history_report() {
+    [[ ${RMUX_SESSION_HISTORY-0} == 1 && -n ${HISTFILE-} && $HISTFILE != /dev/null ]] || return 0
+    [[ -o history ]] || return 0
+    local listing sequence command LC_ALL=C encoded='' character hex byte index
+    listing=$(HISTTIMEFORMAT= builtin history 1)
+    [[ $listing =~ ^[[:space:]]*([0-9]+)[*]?[[:space:]][[:space:]](.*)$ ]] || return 0
+    sequence=${BASH_REMATCH[1]}
+    command=${BASH_REMATCH[2]}
+    if [[ -z ${_rmux_history_sequence+x} ]]; then
+        _rmux_history_sequence=$sequence
+        return 0
+    fi
+    [[ $sequence != $_rmux_history_sequence ]] || return 0
+    _rmux_history_sequence=$sequence
+    (( ${#command} > 0 && ${#command} <= 8192 )) || return 0
+    for (( index=0; index<${#command}; index++ )); do
+        character=${command:index:1}
+        builtin printf -v byte '%d' "'$character"
+        builtin printf -v hex '%02x' "$((byte & 255))"
+        encoded+=$hex
+    done
+    builtin printf '\e]9999;rmux-history;%s\a' "$encoded"
+}
+
 _rmux_bash_precmd() {
     local command_status=${_rmux_bash_command_status-0}
+    _rmux_bash_history_report
     if [[ ${_rmux_bash_prompt_seen-} == 1 ]]; then
         builtin printf '\e]133;D;%d\a' "$command_status"
     fi
     _rmux_bash_prompt_seen=1
     local LC_ALL=C
-    local encoded='' character hex byte index
+    local encoded='' character hex byte byte index
     for (( index = 0; index < ${#PWD}; index++ )); do
         character=${PWD:index:1}
         case $character in

@@ -52,9 +52,9 @@ mod tests {
         }
         assert_eq!(input.text(), "echo e\u{301}界👩‍💻");
         assert_eq!(input.display(7), "\r\x1b[2K$ 界👩‍💻");
-        input.backspace();
+        input.delete(true, measure).unwrap();
         assert_eq!(input.text(), "echo e\u{301}界");
-        input.backspace(); input.backspace();
+        input.delete(true, measure).unwrap(); input.delete(true, measure).unwrap();
         assert_eq!(input.text(), "echo ");
         assert!(input.append("\n", measure).is_err());
         assert!(input.append(&"x".repeat(MAX_INPUT_BYTES), measure).is_err());
