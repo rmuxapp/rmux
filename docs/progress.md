@@ -10738,3 +10738,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Fixed the shortcut reference capturing the Settings focus handle before the main palette closed that inspector. Shortcut enumeration now uses the palette's restored dispatch origin, retaining terminal-scoped bindings instead of querying a closed inspector's context.
 - Shared the inspector-closing/origin-restoration path with configured-command and layout-preset pickers, preserving nested Memory → Settings closure order. Their Escape target now follows the same restored terminal context as the main command palette.
 - Desktop compilation and diff checks passed. These additional picker transitions still need native interaction acceptance; the earlier verified Settings → main palette → Next Pane flow remains the reference behavior. No rebuild, release or deployment.
+
+### Bash login bootstrap investigation resolved
+
+- Reproduced the missing ENV bootstrap on the installed macOS Bash 3.2.57 with both interactive and interactive-login invocations. The child retained ENV and reported POSIX mode enabled; explicitly sourcing that same private fixture worked. Equal real/effective user IDs ruled out privileged startup suppression.
+- Apple's published bash-3.2/shell.c, run_startup_files, locally forces posixly_correct to zero around interactive startup selection. This explains why the POSIX/ENV technique cannot bootstrap this binary as assumed in earlier experiments. Source: https://raw.githubusercontent.com/apple-oss-distributions/bash/main/bash-3.2/shell.c (lines 1040–1093 at review time).
+- Automatic Bash login integration remains open. Do not retry the same ENV bootstrap on the bundled Apple Bash or remove the login guard without a compatible startup design. Existing non-login --rcfile integration and manual login sourcing remain available. No shell files, shell selection, tool installations or launch behavior changed.
