@@ -10599,3 +10599,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 
 - Shared native/demo rename form shows the normalized character count and a correction message above 128 characters. Save is dimmed and ignored while overlong; Enter also preserves the draft instead of silently truncating it. Editing the draft refreshes the feedback immediately. Empty drafts still restore automatic titles.
 - Storage/API normalization remains bounded and compatible. Focused Unicode/count normalization test passed; native and WASM compilation passed for the form and submit guards. Visual and end-to-end correction/focus acceptance remain pending.
+
+### Rename interaction review and field scroll correction
+
+- Reviewed the actual WASM demo at 1280×720: 129-character draft remains open after Enter, counter/error and disabled Save are visible, correction updates the counter, Control+Enter does not submit, Enter saves, and Escape discards a later draft and returns typing to the terminal.
+- Found and fixed stale horizontal field offsets after replacing long text with short text. Scroll now clamps to current shaped content width as well as caret visibility; the shared native/browser field also handles widening without retaining an obsolete offset.
+- One combined WASM build/review plus a rebuild justified by the discovered clipping bug passed. Follow-up screenshot confirms all of “Build logs” is visible after replacing an overlong name. Evidence: target/tab-rename-limit.jpg and target/tab-rename-corrected.jpg. Mac access was rechecked and remains locked; no native visual acceptance or user-session changes claimed.

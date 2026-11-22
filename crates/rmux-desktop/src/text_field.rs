@@ -362,7 +362,10 @@ impl Render for TextField {
                                     this.scroll_x = this
                                         .scroll_x
                                         .min(caret)
-                                        .max((caret - bounds.size.width + px(3.)).max(px(0.)));
+                                        .max((caret - bounds.size.width + px(3.)).max(px(0.)))
+                                        // A shorter replacement or wider field must not
+                                        // retain an offset beyond its current content.
+                                        .min((line.width() - bounds.size.width + px(3.)).max(px(0.)));
                                     line
                                 })
                             },
