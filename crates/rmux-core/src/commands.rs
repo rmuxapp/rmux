@@ -14,6 +14,9 @@ macro_rules! commands {
     };
 }
 commands! {
+    OpenUserGuide => "Open User Guide",
+    ReportIssue => "Report an Issue…",
+    OpenWebsite => "Open rmux Website",
     NewWorkspace => "New Workspace",
     NewTab => "New Terminal Tab",
     CopySelection => "Copy",
@@ -157,4 +160,17 @@ commands! {
     CloseWorkspace => "Close Workspace",
     CloseWindow => "Close Window",
     ImportTerminalTheme => "Import Terminal Theme…",
+}
+
+impl CommandId {
+    /// Public help destinations shared by desktop and demo hosts. Opening these
+    /// links never attaches terminal contents, diagnostics or configuration.
+    pub const fn help_url(self) -> Option<&'static str> {
+        match self {
+            Self::OpenUserGuide => Some("https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md"),
+            Self::ReportIssue => Some("https://github.com/rmuxapp/rmux/issues/new"),
+            Self::OpenWebsite => Some("https://rmux.app"),
+            _ => None,
+        }
+    }
 }

@@ -41,6 +41,9 @@ mod split_presentation;
 const COMMANDS: &[CommandId] = &[
     CommandId::CopySelection, CommandId::Paste, CommandId::NextPane, CommandId::PreviousPane,
     CommandId::ShowKeyboardShortcuts,
+    CommandId::OpenUserGuide,
+    CommandId::ReportIssue,
+    CommandId::OpenWebsite,
     CommandId::NewWorkspace, CommandId::NewTab, CommandId::RenameTab, CommandId::CloseOtherTabs, CommandId::CloseTabsToRight, CommandId::ToggleSidebar,
     CommandId::Find, CommandId::FindOlder, CommandId::FindNewer,
     CommandId::MoveWorkspaceUp, CommandId::MoveWorkspaceDown,
@@ -384,6 +387,11 @@ impl InputProbe {
             return;
         }
         let command = COMMANDS[index];
+        if let Some(url) = command.help_url() {
+            self.close_palette(window, cx);
+            cx.open_url(url);
+            return;
+        }
         if command == CommandId::ShowKeyboardShortcuts {
             self.shortcuts_only = true;
             self.input.update(cx, |input, cx| {

@@ -345,6 +345,9 @@ impl CommandPalette {
         command!(ShowSshConnection);
         command!(ToggleSettings);
         command!(ShowKeyboardShortcuts);
+        command!(OpenUserGuide);
+        command!(ReportIssue);
+        command!(OpenWebsite);
         if pending.workspace { command!(CancelNewWorkspace); }
         command!(RefreshTerminalMemory);
         command!(CycleTerminalMemorySort);

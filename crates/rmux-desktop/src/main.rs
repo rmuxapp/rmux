@@ -395,6 +395,9 @@ actions!(
         ShowDefaultFontPicker,
         ShowCommandPalette,
         ShowKeyboardShortcuts,
+        OpenUserGuide,
+        ReportIssue,
+        OpenWebsite,
         NewWindow,
         CloseWindow,
         CloseWorkspace,
@@ -3664,6 +3667,9 @@ fn main() {
         browser_window::initialize(cx);
         shortcuts::initialize(cx);
         cx.on_action(|_: &Quit, cx| request_quit(cx));
+        cx.on_action(|_: &OpenUserGuide, cx| cx.open_url(rmux_core::commands::CommandId::OpenUserGuide.help_url().unwrap()));
+        cx.on_action(|_: &ReportIssue, cx| cx.open_url(rmux_core::commands::CommandId::ReportIssue.help_url().unwrap()));
+        cx.on_action(|_: &OpenWebsite, cx| cx.open_url(rmux_core::commands::CommandId::OpenWebsite.help_url().unwrap()));
         cx.on_action(|_: &NewWindow, cx| {
             if let Err(error) = open_window(None, cx) {
                 eprintln!("open rmux window: {error:#}");
@@ -3852,6 +3858,16 @@ fn main() {
                     MenuItem::action("Show Listening Ports", ShowListeningPorts),
                     MenuItem::action("Show / Refresh Terminal Memory", RefreshTerminalMemory),
                     MenuItem::action("Previous Workspace", PreviousWorkspace),
+                ],
+            },
+            Menu {
+                name: "Help".into(),
+                items: vec![
+                    MenuItem::action("rmux User Guide", OpenUserGuide),
+                    MenuItem::action("Keyboard Shortcuts…", ShowKeyboardShortcuts),
+                    MenuItem::separator(),
+                    MenuItem::action("Report an Issue…", ReportIssue),
+                    MenuItem::action("rmux Website", OpenWebsite),
                 ],
             },
         ]);

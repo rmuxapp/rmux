@@ -1,3 +1,15 @@
+Help discovery batch: native Help menu now links to the user guide, searchable
+keyboard shortcuts, issue reporting and rmux.app. Shared command identities and
+fixed public URLs also expose guide/issue/website actions in native and WASM
+palettes; native custom shortcuts support open_user_guide/report_issue/open_website.
+No terminal contents or diagnostics are attached. User guide documents the flow.
+Desktop offline cargo check and one WASM build passed. On fresh localhost:4322,
+searching "user guide" shows the shared command and Enter dismisses the palette
+with input focus restored. Screenshot: `target/help-palette.png`. The browser
+harness did not expose a new destination tab, so external-link opening remains
+unverified; native Help-menu interaction also awaits a working native UI harness.
+The older localhost:4319 browser view retained stale assets despite reload.
+
 Settings pointer/keyboard continuity: footer clicks now select the action they
 activate, so a subsequent Enter no longer acts on an unrelated setting. Modified
 keys are ignored except Shift+Tab navigation. Focused settings tests passed.

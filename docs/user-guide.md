@@ -21,6 +21,7 @@ and scripting instructions have their own pages.
 - [Save and restore your layout](#save-and-restore-your-layout)
 - [Customize rmux](#customize-rmux)
 - [Notifications and diagnostics](#notifications-and-diagnostics)
+- [Help and feedback](#help-and-feedback)
 - [More detailed guides](#more-detailed-guides)
 
 ## Try the browser demo
@@ -215,6 +216,18 @@ external browser. **Terminal Memory** shows diagnostic snapshots. Error banners
 can be dismissed; they do not imply that a failed action succeeded.
 
 [Notifications →](guide/notifications.md) · [Ports and diagnostics →](guide/diagnostics.md)
+
+## Help and feedback
+
+Use **Help → rmux User Guide** to open this guide, or **Help → Keyboard
+Shortcuts…** to search the commands and keys available in your current context.
+The command palette also includes **Open User Guide**, **Report an Issue…**,
+and **Open rmux Website**, including in the browser demo.
+
+**Report an Issue…** opens a new GitHub issue for you to fill in. Include your
+rmux version, operating system, and the steps that reproduce the problem.
+Screenshots help with layout issues. The command does not upload logs or terminal
+contents; review anything you choose to attach for private information.
 
 ## More detailed guides
 
