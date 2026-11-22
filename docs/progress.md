@@ -1,3 +1,17 @@
+Release 0.1.7 delivered from 6270ce5 via GitHub run 44989719214; preflight,
+macOS signing/notarization, Linux and Windows packaging, and publication passed.
+Assets include macOS DMG/ZIP, Linux tarball, Windows ZIP, checksums and appcast.
+Sparkle feed update 2938bd5 advertises 0.1.7. Shared WASM run 44989719845 passed
+and was imported into the private site. Cloudflare deployment 2633462e published
+the updated demo/downloads and https://rmux.app/vscode/ with canonical/social
+metadata, sitemap and robots.txt. Desktop/mobile preview and the live landing
+page were checked; the live macOS download link targets 0.1.7. Repo workflow
+guide: docs/guide/vscode.md. Website source remains off GitHub. Cmd+Left/Right
+and Cmd+Backspace use configurable terminal-only control-sequence bindings;
+shortcut text now respects IME composition. Those additions passed compilation;
+their native key-path acceptance and cross-Space switching remain pending.
+No installed user app or sessions were replaced.
+
 Native VS Code external-terminal support supersedes the extension approach below.
 rmux now receives macOS folder-open events through GPUI, validates local folders
 off the UI thread, and shares the existing serialized asynchronous workspace
