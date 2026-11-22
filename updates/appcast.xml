@@ -3,50 +3,33 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.13</title>
-            <pubDate>Sun, 22 Nov 2026 13:43:21 +0000</pubDate>
+            <title>0.1.14</title>
+            <pubDate>Sun, 22 Nov 2026 19:19:26 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.13</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.13</sparkle:version>
-            <sparkle:shortVersionString>0.1.13</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.14</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.14</sparkle:version>
+            <sparkle:shortVersionString>0.1.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.13 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.14
 
-This release improves project commands, Settings, and keyboard focus.
+Themes now apply to the entire rmux window, including the sidebar, tabs, command palette, menus and Settings.
 
-## Project and editor workflows
+- All seven built-in themes are supported, including Solarized Dark and Solarized Light. Imported themes and explicit color overrides also style the surrounding interface.
+- Theme changes apply live across windows, with matching selection, border and accent colors and readable text in light and dark themes.
+- Settings, Notifications and Memory replace one another consistently and preserve the terminal return-focus target.
+- An invalid external-editor setting no longer prevents startup. rmux disables that optional editor and displays repair guidance without changing the configuration file.
+- Browser-demo palette search uses the same field-aware matching as the native app.
 
-- Configured commands accept `{project_dir}` as a complete argument. Your VS Code return shortcut can target the original project even after changing terminal directories or renaming the workspace.
-- Local commands that open a dedicated build or test workspace retain that project identity. Both command pickers preview the resolved target and explain missing project context.
-- Settings includes a VS Code editor configuration example and an option to open the settings file without the configured editor, useful when repairing its path.
+## Downloads
 
-## Interface and navigation
+GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
 
-- Sidebar directory labels show the folder name, with the full path in the tooltip.
-- Settings has a compact footer with two aligned rows of actions.
-- Opening the command palette from an inspector restores terminal context. Shortcuts, configured commands and layout pickers use that same context.
-- Palette search keeps command abbreviations while avoiding unrelated matches from scattered letters in long paths.
-- Pull-request lookup prefers open PRs and reports ambiguous matches instead of choosing an arbitrary result.
+Focused theme/contrast and editor-recovery tests passed. Native review covered Catppuccin Latte, light palette input, and live switching to Nord. Shared WASM compilation passed. Windows runtime validation remains deferred.
 
-## Performance
-
-- Bash and zsh reuse encoded working-directory text between prompts when the directory has not changed. Prompt and directory reporting still runs on every prompt.
-
-## Downloads and validation
-
-GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux
-x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
-
-Focused matcher, configured-command, Settings, PR lookup and shell-integration
-checks passed during development. Native review covered the compact Settings
-layout and Settings → command palette → next terminal focus. Broader native
-interaction, multi-window VS Code focus, and Windows runtime validation remain
-pending. Automatic Bash login integration remains unsupported.
-
-[VS Code setup](https://rmux.app/vscode/) · [Browser demo](https://rmux.app)
+[User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.13/rmux-0.1.13-macos-arm64.zip" length="7377865" type="application/octet-stream" sparkle:edSignature="y/bLaxPtmDWV0gMsj5nSQICutHA/xdEZSZ/mWkkKmmeShbaYF67mZaSJzdazLkEQQlGahzTqPf2C6g1eOY4kDw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.14/rmux-0.1.14-macos-arm64.zip" length="7407389" type="application/octet-stream" sparkle:edSignature="horPVnnUxxTAEGaDZakgMnXiH20gbXcr/v2+HDDEir2310iAAq/3rPdP7L43P5f4eEcR/tBVVVOoOfFuhik5BQ=="/>
         </item>
     </channel>
 </rss>
