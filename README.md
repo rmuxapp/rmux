@@ -52,6 +52,9 @@ in progress; they do not yet have automatic updates. Every archive includes
 
 ## Start here
 
+Use VS Code? [Set up rmux as your external terminal workspace](docs/guide/vscode.md)
+and open or reuse the current project with Cmd+Shift+C on macOS (v0.1.7+).
+
 Open a workspace for each project, split terminals for related tasks, and use the
 command palette to find actions without memorizing every shortcut. **⌘,** opens
 Settings. See [Getting started](docs/trying-rmux.md) for navigation, session

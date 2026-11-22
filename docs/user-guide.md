@@ -235,6 +235,7 @@ contents; review anything you choose to attach for private information.
 
 | Topic | What you’ll find |
 | --- | --- |
+| [VS Code workflow](guide/vscode.md) | Open project workspaces with Cmd+Shift+C and switch back to your editor |
 | [Workspaces and panes](guide/workspaces.md) | Groups, transfers, tab pickers, resizing, and close behavior |
 | [Terminal and clipboard](guide/terminal.md) | Search, copy mode, buffers, selection, and input limits |
 | [Files and Markdown](guide/files.md) | Directory browsing, previews, and external editors |

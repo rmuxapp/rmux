@@ -402,6 +402,11 @@ standard Emacs/readline or zle bindings. rmux sends Meta-b/Meta-f for these keys
 applications that negotiate the Kitty keyboard protocol keep the original
 modified arrow events. Custom shell bindings can change the resulting movement.
 
+Cmd+Left/Right sends Ctrl+A/Ctrl+E for shell line-start/line-end navigation.
+Cmd+Backspace sends Ctrl+U to clear the shell input according to its bindings.
+These terminal-only defaults can be remapped or disabled through `keybindings`.
+They do not run while composing IME text or editing a palette/search field.
+
 On macOS, Settings → **Option key behavior** switches between **Terminal Alt**
 and **Native text** immediately; use Save these settings to keep your choice.
 In JSON, `macos_option_as_alt` defaults to `true`. Set it to `false` to leave

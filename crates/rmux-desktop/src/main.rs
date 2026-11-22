@@ -1953,7 +1953,7 @@ impl Render for TerminalView {
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(|this, action: &SendShortcutText, window, cx| {
                 cx.stop_propagation();
-                if !this.focus.is_focused(window) || this.copy_mode.is_some() || this.find.is_some() || this.ports.visible
+                if !this.focus.is_focused(window) || !this.composition.text.is_empty() || this.copy_mode.is_some() || this.find.is_some() || this.ports.visible
                     || cx.global::<PromptGate>().is_active() || cx.global::<Shutdowns>().quitting || cx.global::<Shutdowns>().quit_prompt { return; }
                 this.input(action.text.as_bytes(), cx);
             }))
@@ -3610,6 +3610,9 @@ fn main() {
                 KeyBinding::new("cmd-v", Paste, Some("Terminal")),
                 KeyBinding::new("cmd-c", CopySelection, Some("Terminal")),
                 KeyBinding::new("cmd-a", EditorSelectAll, Some("Terminal")),
+                KeyBinding::new("cmd-left", SendShortcutText { text: "\u{1}".into() }, Some("Terminal")),
+                KeyBinding::new("cmd-right", SendShortcutText { text: "\u{5}".into() }, Some("Terminal")),
+                KeyBinding::new("cmd-backspace", SendShortcutText { text: "\u{15}".into() }, Some("Terminal")),
                 KeyBinding::new("cmd-up", PreviousPrompt, Some("Terminal")),
                 KeyBinding::new("cmd-down", NextPrompt, Some("Terminal")),
                 KeyBinding::new("cmd-=", IncreaseFontSize, Some("Terminal")),
