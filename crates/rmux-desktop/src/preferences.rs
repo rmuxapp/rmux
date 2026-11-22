@@ -892,6 +892,32 @@ mod tests {
     }
 
     #[test]
+    fn appearance_revert_restores_loaded_theme_without_reading_changed_file() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("theme");
+        std::fs::write(&path, "background=123456\nselection-background=334455\npalette=2=#abcdef\n")?;
+        let baseline = Preferences::default().import_theme(path.clone())?;
+        let mut current = baseline.clone();
+        current.select_theme(TerminalTheme::Nord);
+        current.foreground_color = Some(HexColor(0xfedcba));
+        assert!(AppearanceBaseline(baseline.clone()).has_changes(&current));
+        // A broken or moved file must not make an in-session revert depend on I/O.
+        std::fs::write(&path, "background=invalid\n")?;
+        current.restore_appearance(&baseline);
+        assert_eq!(current.terminal_colors()[1], Some(rmux_terminal::Color(0x12, 0x34, 0x56)));
+        assert_eq!(current.terminal_palette(), baseline.terminal_palette());
+        assert_eq!(current.selection_background(), baseline.selection_background());
+        assert_eq!(current.foreground_color, Some(HexColor(0xfedcba)));
+        assert!(!AppearanceBaseline(baseline.clone()).has_changes(&current));
+        std::fs::remove_file(&path)?;
+        current.select_theme(TerminalTheme::Light);
+        current.restore_appearance(&baseline);
+        assert_eq!(current.terminal_colors()[1], baseline.terminal_colors()[1]);
+        assert_eq!(current.theme_file.as_ref(), Some(&path));
+        Ok(())
+    }
+
+    #[test]
     fn socket_directory_is_opt_in_and_requires_absolute_path() -> Result<()> {
         assert!(Preferences::decode(b"{}")?.socket_directory.is_none());
         for value in ["", "relative/rmux"] {

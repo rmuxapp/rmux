@@ -64,7 +64,9 @@ does not clear the status. It does not monitor external edits to the JSON file.
 successfully saved values across all windows. It keeps commands, shortcuts,
 explicit color overrides and environment-controlled close policy, and does not
 read or write the settings file. Imported theme colors are restored from the
-loaded snapshot. Revert is unavailable during save/reload operations. The menu
+loaded snapshot, even if the theme file has changed or disappeared. It does not
+repair that file; restore the file or choose a bundled theme before the next
+reload/restart. Revert is unavailable during save/reload operations. The menu
 and palette call this **Revert Unsaved Settings**; custom shortcuts can bind
 `revert_settings`. This does not undo a previous save on disk.
 

@@ -1,3 +1,11 @@
+Imported-theme recovery acceptance: a focused test now exercises switching from
+an imported theme to a bundled theme, breaking and then deleting the source file,
+and reverting from the in-memory baseline. Background, palette and selection
+colors restore without file I/O; a newer explicit foreground override survives.
+The unsaved marker clears after restoration. The test passed; no production
+behavior change, app bundle rebuild or release was needed. The guide distinguishes
+session restoration from repairing an absent theme file for future reloads.
+
 Socket notification acceptance follow-up: the prior unread assertion depended
 on OS window focus after pane zoom/unzoom. Focused-terminal notifications are
 intentionally stored as read. The fixture now focuses a different pane and
