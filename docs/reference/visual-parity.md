@@ -89,3 +89,15 @@ named shell-line actions in the palette, relative Markdown/text/directory link
 activation by click and keyboard, and return focus after leaving a preview.
 Focused local-link tests exercise actual preview/directory loaders, including
 encoded spaces, uppercase Markdown extensions, file URLs and missing-file errors.
+
+Browser review at `75b359d`: one combined debug WASM build passed. At 1280×720,
+Option+Left followed by insertion changed `echo alpha beta` to
+`echo alpha new beta`, and Enter produced `alpha new beta`. Cmd+Left/Right
+moved to the draft edges; Backspace deleted at the new position. Escape closed
+the palette and returned keyboard input to the terminal. Switching between
+rmux/website retained separate session output. Two nested splits left independent
+drafts editable; a long draft containing CJK and combining text scrolled within
+the narrow pane while its caret remained visible. Local screenshots:
+`target/demo-palette-current.png` and `target/demo-narrow-pane-editing.png`.
+These are browser sample-session screenshots, not native acceptance evidence.
+The temporary review tab/server were closed; the public demo was not deployed.
