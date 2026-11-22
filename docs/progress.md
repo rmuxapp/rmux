@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Settings workflow completion: fixed-footer actions now include Reload from file
+and Keyboard Shortcuts alongside Save/Open settings file. A shared footer-action
+mapping drives pointer and keyboard activation; Tab, arrow and Home/End navigation
+includes all four controls. The reload tooltip explains replacement of session
+settings and preservation on invalid input, reusing the existing asynchronous
+reload path. Focused settings navigation/bounds test passes. Native visual and
+pointer acceptance remain for the next combined review; no app bundle rebuilt.
+
+
 Accumulated-polish native reliability check (0241f26): one desktop build followed
 by `smoke-live-rpc.py --live-shell` and `smoke-session-restore.py`, with isolated
 config/layout/session files and fixture shells. Both passed. Live transfers and

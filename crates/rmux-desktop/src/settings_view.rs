@@ -11,12 +11,22 @@ pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "curso
     #[cfg(target_os = "macos")] "option_as_alt",
     "selection_opacity", "import_theme", "file_editor",
 ];
+pub const FOOTER_COUNT: usize = 4;
+pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
+    Some(match index {
+        0 => Box::new(SaveAppearanceSettings),
+        1 => Box::new(OpenSettingsFile),
+        2 => Box::new(ReloadSettings),
+        3 => Box::new(ShowKeyboardShortcuts),
+        _ => return None,
+    })
+}
 // The heading precedes the settings. Save/editor controls live in a fixed footer.
 pub fn scroll_index(control: usize) -> usize {
     control + 1
 }
 pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
-    let count = KEYS.len() + 2;
+    let count = KEYS.len() + FOOTER_COUNT;
     match key {
         "up" => Some((selected + count - 1) % count),
         "down" => Some((selected + 1) % count),
@@ -225,20 +235,33 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))
                 .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(chrome_style::SELECTED_HOVER))))
                 .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(SaveAppearanceSettings), cx); } }).child(save_label))
-            .child(div().id("settings-json").when(state.selected == KEYS.len() + 1, |s| s.bg(rgb(chrome_style::SELECTED))).py_1().text_sm().text_color(rgb(if busy { 0x777777 } else { chrome_style::ACCENT }))
-                .when(!busy, |link| link.cursor_pointer())
-                .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(OpenSettingsFile), cx); } }).child("Open all settings in editor")))
+            .child(div().flex().flex_wrap().gap_2().children([
+                (1, "settings-json", "Open settings file", "Edit all settings in your editor"),
+                (2, "settings-reload", "Reload from file", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
+                (3, "settings-shortcuts", "Keyboard Shortcuts…", "Search command shortcuts available in the current context"),
+            ].into_iter().map(|(index, id, label, hint)| {
+                div().id(id).px_2().py_1().rounded_sm().text_xs().border_1()
+                    .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
+                    .text_color(rgb(if busy { 0x777777 } else { chrome_style::ACCENT }))
+                    .when(!busy, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
+                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
+                    .on_click(move |event, window, cx| {
+                        if !busy && event.standard_click() {
+                            if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); }
+                        }
+                    }).child(label)
+            }))))
         .into_any_element()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{adjust, next_control, Preferences, close_policy, workspace_groups, KEYS};
+    use super::{adjust, next_control, Preferences, close_policy, workspace_groups, KEYS, FOOTER_COUNT};
     #[test]
     fn keyboard_navigation_wraps_and_adjustments_stay_in_bounds() {
-        assert_eq!(next_control(0, "tab", true), Some(KEYS.len() + 1));
-        assert_eq!(next_control(KEYS.len() + 1, "down", false), Some(0));
-        assert_eq!(next_control(3, "end", false), Some(KEYS.len() + 1));
+        assert_eq!(next_control(0, "tab", true), Some(KEYS.len() + FOOTER_COUNT - 1));
+        assert_eq!(next_control(KEYS.len() + FOOTER_COUNT - 1, "down", false), Some(0));
+        assert_eq!(next_control(3, "end", false), Some(KEYS.len() + FOOTER_COUNT - 1));
         assert_eq!(next_control(3, "a", false), None);
         let original = Preferences::default();
         let mut option = original.clone();

@@ -50,6 +50,11 @@ to keep the default across launches.
 ## Use the Settings panel
 
 Open Settings with Cmd+, on macOS (Ctrl+, elsewhere), the app menu or palette.
+
+The fixed footer keeps **Save**, **Open settings file**, **Reload from file** and
+**Keyboard Shortcuts…** available while scrolling. Reload replaces session
+settings with the saved file; an invalid file leaves the current settings intact.
+Use Tab or the arrow keys to select controls, then Enter to activate them.
 The side panel adjusts text-size defaults, terminal padding/theme, unfocused
 cursor, copy-on-select and close confirmation. Choose Active tasks, Always or Never
 for close confirmation. Active tasks also requests confirmation when terminal

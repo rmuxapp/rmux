@@ -1198,7 +1198,7 @@ impl WorkspaceWindow {
         let key = event.keystroke.key.as_str();
         if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt { return; }
         let next = if matches!(key, "pageup" | "pagedown") {
-            command_palette::paged_result(state.selected, settings_view::KEYS.len() + 2,
+            command_palette::paged_result(state.selected, settings_view::KEYS.len() + settings_view::FOOTER_COUNT,
                 key == "pageup", f32::from(state.scroll.bounds().size.height), |index| {
                     let item = settings_view::scroll_index(index);
                     let Some(bounds) = state.scroll.bounds_for_item(item) else { return 1.; };
@@ -1249,7 +1249,9 @@ impl WorkspaceWindow {
                 }
                 cx.notify();
             } else if matches!(key, "enter" | "space") {
-                if selected == settings_view::KEYS.len() { self.save_appearance_settings(cx); } else { self.open_settings_file(cx); }
+                if let Some(action) = settings_view::footer_action(selected - settings_view::KEYS.len()) {
+                    window.dispatch_action(action, cx);
+                }
             }
         }
         // Plain typing belongs to this panel, never the shell behind it.
