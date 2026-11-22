@@ -10660,3 +10660,5 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Shared the desktop branch/directory row with the WASM sidebar. Sample sessions own a stable directory; new tabs and splits inherit it, and moved sessions retain it. Added matching sample pwd and Git commands.
 - The focused sample-context test and desktop compilation passed. Packaging the accumulated polish since 0.1.11 through GitHub release builds; native visual and Windows runtime acceptance remain pending.
 - Existing repository VS Code guide and private-site /vscode/ landing page already document native external-terminal integration.
+
+- Browser acceptance for the release batch: switched from rmux to website, ran `pwd`, and split the website terminal. Both website panes reported `/home/demo/projects/website`; the shared sidebar context remained visible. Screenshot: target/release-demo-project-context.jpg. Temporary browser/server closed.
