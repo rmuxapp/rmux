@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+The GitHub-built e06bf79 demo (successful run 44970452287) is deployed to rmux.app
+via Cloudflare deployment 60250455. The first Cloudflare request returned internal
+error 8000000; one retry succeeded. Live browser inspection confirms the versioned
+artifact URL, highlighted workspace matches and Escape dismissal. Screenshot:
+target/live-palette-highlights.jpg. Website source remains local/off GitHub.
+The later contextual Greek fix e3fc657 is committed but not in this deployment.
+
 Shared match highlighting now uses whole-string lowercase like search ranking,
 fixing contextual Greek final sigma (ΟΣ). A regression first reproduced the
 missing highlight, then passed with original UTF-8 ranges preserved, including
