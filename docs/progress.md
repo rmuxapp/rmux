@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Palette/picker keyboard consistency: the native command palette, native tab
+picker and WASM palette now share a plain-arrow/PageUp/PageDown classifier.
+Modified keys remain available to editing/configured bindings rather than
+silently changing the selected result. Plain list-navigation keys are consumed
+even with no matches; IME composition retains its existing bypass. A focused
+regression covers all four navigation keys with Shift/Control/Alt/Command and
+excludes editing/submission keys. The test and WASM target check pass. Native
+and browser interaction acceptance remains for the next combined UI review.
+
+
 Palette redraw cost: result-area measurement now stops when the 320 px panel
 is filled instead of scanning every matching command/file-preview line on each
 redraw. The production renderer now uses the bounded helper previously present

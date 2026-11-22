@@ -1316,7 +1316,9 @@ impl Render for CommandPalette {
                 if this.input.read(cx).is_composing() {
                     return;
                 }
-                let key = event.keystroke.key.as_str();
+                let Some(key) = palette_view::navigation_key(&event.keystroke) else { return; };
+                // An empty search still owns its plain navigation keys.
+                cx.stop_propagation();
                 let selected = if matches!(key, "pageup" | "pagedown") {
                     paged_result(this.selected, this.search.matches.len(), key == "pageup",
                         f32::from(this.scroll.viewport_bounds().size.height),

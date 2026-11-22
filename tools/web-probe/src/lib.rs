@@ -552,7 +552,8 @@ impl Render for InputProbe {
                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                 .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                     if this.input.read(cx).is_composing() { return; }
-                    let key = event.keystroke.key.as_str();
+                    let Some(key) = palette_view::navigation_key(&event.keystroke) else { return; };
+                    cx.stop_propagation();
                     let next = if matches!(key, "pageup" | "pagedown") {
                         palette_view::paged_result(this.selected, this.search.matches.len(), key == "pageup",
                             f32::from(this.scroll.viewport_bounds().size.height), |_| 36.)

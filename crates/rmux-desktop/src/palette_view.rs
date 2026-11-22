@@ -4,6 +4,13 @@ pub(crate) fn top_inset(height: f32) -> f32 {
     if height >= 480. { 48. } else { 8. }
 }
 
+// Modified arrows belong to text editing or configured shortcuts, not list navigation.
+pub(crate) fn navigation_key(key: &Keystroke) -> Option<&str> {
+    let modifiers = key.modifiers;
+    if modifiers.platform || modifiers.control || modifiers.alt || modifiers.shift { return None; }
+    matches!(key.key.as_str(), "up" | "down" | "pageup" | "pagedown").then_some(key.key.as_str())
+}
+
 pub(crate) fn navigated_result(selected: usize, count: usize, key: &str) -> Option<usize> {
     if count == 0 { return None; }
     let selected = selected.min(count - 1);
@@ -82,4 +89,24 @@ pub(crate) fn paged_result(selected: usize, count: usize, backwards: bool, viewp
         if occupied >= viewport { break; }
     }
     Some(next)
+}
+
+#[cfg(test)]
+mod keyboard_tests {
+    use super::navigation_key;
+    use gpui::Keystroke;
+    #[test]
+    fn result_navigation_leaves_modified_keys_to_their_bindings() {
+        for name in ["up", "down", "pageup", "pagedown"] {
+            let key = Keystroke::parse(name).unwrap();
+            assert_eq!(navigation_key(&key), Some(name));
+            for prefix in ["shift", "ctrl", "alt", "cmd"] {
+                let key = Keystroke::parse(&format!("{prefix}-{name}")).unwrap();
+                assert_eq!(navigation_key(&key), None);
+            }
+        }
+        for name in ["left", "right", "home", "end", "enter", "escape", "a"] {
+            assert_eq!(navigation_key(&Keystroke::parse(name).unwrap()), None);
+        }
+    }
 }
