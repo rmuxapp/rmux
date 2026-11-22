@@ -1,0 +1,9 @@
+{"terminals": 1, "scenario": "identical_ascii", "frames": 200, "rust_alloc_calls": 0, "rust_requested_bytes": 0, "snapshot_total_us": 3462}
+{"terminals": 1, "scenario": "late_ascii_edit", "frames": 200, "rust_alloc_calls": 800, "rust_requested_bytes": 1206400, "snapshot_total_us": 4003}
+{"terminals": 1, "scenario": "large_grapheme_style", "frames": 200, "rust_alloc_calls": 1000, "rust_requested_bytes": 1222600, "snapshot_total_us": 3023}
+{"terminals": 8, "scenario": "identical_ascii", "frames": 1600, "rust_alloc_calls": 0, "rust_requested_bytes": 0, "snapshot_total_us": 21119}
+{"terminals": 8, "scenario": "late_ascii_edit", "frames": 1600, "rust_alloc_calls": 6400, "rust_requested_bytes": 9651200, "snapshot_total_us": 23104}
+{"terminals": 8, "scenario": "large_grapheme_style", "frames": 1600, "rust_alloc_calls": 8000, "rust_requested_bytes": 9780800, "snapshot_total_us": 18001}
+{"terminals": 32, "scenario": "identical_ascii", "frames": 6400, "rust_alloc_calls": 0, "rust_requested_bytes": 0, "snapshot_total_us": 71454}
+{"terminals": 32, "scenario": "late_ascii_edit", "frames": 6400, "rust_alloc_calls": 25600, "rust_requested_bytes": 38604800, "snapshot_total_us": 89369}
+{"terminals": 32, "scenario": "large_grapheme_style", "frames": 6400, "rust_alloc_calls": 32000, "rust_requested_bytes": 39123200, "snapshot_total_us": 74575}

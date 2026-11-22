@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Snapshot allocation checkpoint (505b6c5): the existing debug allocation benchmark
+at 1/8/32 terminals exactly matches prior allocation counts/bytes. Identical ASCII
+rewrites require zero Rust allocations; changed ASCII rows require four calls and
+6,032 requested bytes per snapshot; long combining-grapheme style changes require
+five calls and 6,113 bytes. Recorded in
+`docs/benchmarks/snapshot-allocations-polish-2026-11-21.jsonl`. These are allocation
+traffic measurements, not retained memory, total process RSS or latency budgets;
+setup/parser writes and non-Rust allocations are excluded. Single-run timing is
+not a speedup claim. No snapshot-cache change justified by this checkpoint.
+
+
 Settings workflow completion: fixed-footer actions now include Reload from file
 and Keyboard Shortcuts alongside Save/Open settings file. A shared footer-action
 mapping drives pointer and keyboard activation; Tab, arrow and Home/End navigation
