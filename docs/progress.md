@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Event replay now includes `surface.created` and `surface.closed`. A small
+ownership token publishes closure once on explicit close, with a drop fallback;
+it moves with the terminal, so tab transfers do not invent new lifetimes. Native
+smoke initially exposed delayed GPUI entity release, confirming that entity-drop
+notifications alone were insufficient. The revised smoke passes creation,
+cross-workspace transfer without false close/create, and closure of both terminal
+owners while another workspace remains alive. The journal remains UI-thread-local
+and bounded; no process/client lock or timer is added.
+
 Added live `events.read` metadata replay with a 512-record journal, 128-record
 page cap and process-scoped cursors. Notification receive/read/dismiss/clear and
 process exits publish small records without client IO or terminal-output copies.

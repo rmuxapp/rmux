@@ -45,6 +45,8 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
         try:
             assert "events.read" in call("system.capabilities")["methods"]
             surface = call("surface.list")["surfaces"][0]["id"]
+            initial = call("events.read")
+            assert sum(e["kind"] == "surface.created" and e["surface_id"] == surface for e in initial["events"]) == 1
             before = call("events.read")["cursor"]
             call("notification.send", {"surface_id": surface, "title": "Replay 世界", "body": "private body"})
             received = call("events.read", {"after": before, "limit": 1})
@@ -58,9 +60,28 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert any(e["kind"] == "notification.dismissed" and e["notification_id"] == event["notification_id"] for e in page["events"])
             assert call("events.read", {"after": page["cursor"]})["events"] == []
             assert call("events.read", {"after": "0-0:0"})["gap"] == "restart"
+            window = call("window.list")["windows"][0]["id"]
+            original_workspace = call("workspace.list")["workspaces"][0]["id"]
+            boundary = call("events.read")["cursor"]
+            call("workspace.create", {"window_id": window, "name": "Event lifetime fixture"})
+            destination = next(w["id"] for w in call("workspace.list")["workspaces"] if w["id"] != original_workspace)
+            created_surface = next(s["id"] for s in call("surface.list")["surfaces"] if s["id"] != surface)
+            created = call("events.read", {"after": boundary})
+            assert sum(e["kind"] == "surface.created" and e["surface_id"] == created_surface for e in created["events"]) == 1
+            call("surface.move_to_workspace", {"surface_id": created_surface, "workspace_id": original_workspace})
+            moved = call("events.read", {"after": created["cursor"]})
+            assert not any(e["kind"] in ("surface.created", "surface.closed") and e["surface_id"] == created_surface for e in moved["events"])
+            # Keep another workspace alive so the application can answer after
+            # closing both original terminal entities.
+            call("workspace.create", {"window_id": window, "name": "Survivor"})
+            boundary = call("events.read")["cursor"]
+            call("workspace.close", {"workspace_id": original_workspace})
+            closed = call("events.read", {"after": boundary})
+            for target in (surface, created_surface):
+                assert sum(e["kind"] == "surface.closed" and e["surface_id"] == target for e in closed["events"]) == 1, closed
             call("system.quit")
             assert process.wait(timeout=5) == 0
-            print("PASS native notification event replay, dismissal, empty replay and restart gap")
+            print("PASS notification replay and surface create/move/close lifetimes")
         finally:
             if process.poll() is None:
                 process.terminate()

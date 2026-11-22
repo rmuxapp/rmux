@@ -549,6 +549,7 @@ actions!(
 );
 
 struct TerminalView {
+    event_lifetime: events::SurfaceLifetime,
     font_family: SharedString,
     default_font_family: SharedString,
     default_font_size: f32,
@@ -637,6 +638,7 @@ impl TerminalView {
     /// Closing ownership must stop the process even if GPUI retains a rendered
     /// entity or event callback until a later frame. Transfers never call this.
     fn request_process_close(&self) {
+        self.event_lifetime.close();
         if let Err(error) = self.session.shutdown_handle().request() {
             eprintln!("terminal close: {error}");
         }
@@ -823,6 +825,7 @@ impl TerminalView {
     }
     fn from_prepared(prepared: PreparedTerminal, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let PreparedTerminal { session, frame, applied_colors, applied_palette, color_error, .. } = prepared;
+        let event_lifetime = cx.global::<events::Journal>().surface(cx.entity_id());
         let snapshot_directory = session.initial_directory().map(std::path::Path::to_path_buf);
         register_shutdown(session.shutdown_handle(), cx);
         let (focus, subscriptions) = Self::window_focus(window, cx);
@@ -948,6 +951,7 @@ impl TerminalView {
             }
         });
         Self {
+            event_lifetime,
             cells: CellMetrics::new(cx.global::<Preferences>().font_size),
             font_family: cx.global::<Preferences>().font_family.clone().into(),
             default_font_family: cx.global::<Preferences>().font_family.clone().into(),

@@ -312,13 +312,17 @@ individual read and dismissal events also include `notification_id` as a decimal
 string corresponding to the notification API's numeric `revision`.
 Supported kinds are `notification.received`, `notification.read`,
 `notification.all_read`, `notification.dismissed`, `notification.cleared` and
-`surface.exited`. These are invalidation signals: use `notification.list` or
+`surface.created`, `surface.closed` and `surface.exited`. Creation and closure
+follow terminal ownership: moving a tab retains its surface ID and emits neither.
+Closure is reported when ownership ends, even if rendering retains the old view;
+process exit is a separate event and does not mean the tab has closed.
+These are invalidation signals: use `notification.list` or
 `surface.list` to fetch current state. Retained events can refer to surfaces or
 notifications that have since closed or been removed. Titles, bodies and terminal
 output are not copied into the journal.
 
 This is an on-demand replay API. Push subscriptions, long polling, resource
-creation/movement events and the full cmux event contract are not implemented.
+workspace/pane lifecycle and movement events and the full cmux event contract are not implemented.
 Readers use the existing bounded RPC queue; publishing never waits for clients.
 
 ## Create and close workspaces
