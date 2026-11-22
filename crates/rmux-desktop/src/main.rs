@@ -541,6 +541,9 @@ actions!(
         PreviousPrompt,
         NextPrompt,
         LastPrompt,
+        MoveToLineStart,
+        MoveToLineEnd,
+        DeleteToLineStart,
         ScrollToTop,
         ScrollToBottom,
         Find,
@@ -651,6 +654,13 @@ struct PreparedTerminal {
 struct TabMetadataChanged;
 impl EventEmitter<TabMetadataChanged> for TerminalView {}
 impl TerminalView {
+    fn send_shortcut_text(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        cx.stop_propagation();
+        if !self.focus.is_focused(window) || !self.composition.text.is_empty() || self.copy_mode.is_some() || self.find.is_some() || self.ports.visible
+            || cx.global::<PromptGate>().is_active() || cx.global::<Shutdowns>().quitting || cx.global::<Shutdowns>().quit_prompt { return; }
+        self.input(text.as_bytes(), cx);
+    }
+
     /// Closing ownership must stop the process even if GPUI retains a rendered
     /// entity or event callback until a later frame. Transfers never call this.
     fn request_process_close(&self) {
@@ -1952,11 +1962,11 @@ impl Render for TerminalView {
             .on_drop(cx.listener(Self::drop_files))
             .on_action(cx.listener(Self::paste))
             .on_action(cx.listener(|this, action: &SendShortcutText, window, cx| {
-                cx.stop_propagation();
-                if !this.focus.is_focused(window) || !this.composition.text.is_empty() || this.copy_mode.is_some() || this.find.is_some() || this.ports.visible
-                    || cx.global::<PromptGate>().is_active() || cx.global::<Shutdowns>().quitting || cx.global::<Shutdowns>().quit_prompt { return; }
-                this.input(action.text.as_bytes(), cx);
+                this.send_shortcut_text(&action.text, window, cx);
             }))
+            .on_action(cx.listener(|this, _: &MoveToLineStart, window, cx| this.send_shortcut_text("\u{1}", window, cx)))
+            .on_action(cx.listener(|this, _: &MoveToLineEnd, window, cx| this.send_shortcut_text("\u{5}", window, cx)))
+            .on_action(cx.listener(|this, _: &DeleteToLineStart, window, cx| this.send_shortcut_text("\u{15}", window, cx)))
             .on_action(cx.listener(|this, _: &EnterCopyMode, window, cx| {
                 if let Some(mode) = &this.copy_mode { mode.read(cx).focus.focus(window); return; }
                 this.selecting = false;
@@ -3610,9 +3620,9 @@ fn main() {
                 KeyBinding::new("cmd-v", Paste, Some("Terminal")),
                 KeyBinding::new("cmd-c", CopySelection, Some("Terminal")),
                 KeyBinding::new("cmd-a", EditorSelectAll, Some("Terminal")),
-                KeyBinding::new("cmd-left", SendShortcutText { text: "\u{1}".into() }, Some("Terminal")),
-                KeyBinding::new("cmd-right", SendShortcutText { text: "\u{5}".into() }, Some("Terminal")),
-                KeyBinding::new("cmd-backspace", SendShortcutText { text: "\u{15}".into() }, Some("Terminal")),
+                KeyBinding::new("cmd-left", MoveToLineStart, Some("Terminal")),
+                KeyBinding::new("cmd-right", MoveToLineEnd, Some("Terminal")),
+                KeyBinding::new("cmd-backspace", DeleteToLineStart, Some("Terminal")),
                 KeyBinding::new("cmd-up", PreviousPrompt, Some("Terminal")),
                 KeyBinding::new("cmd-down", NextPrompt, Some("Terminal")),
                 KeyBinding::new("cmd-=", IncreaseFontSize, Some("Terminal")),

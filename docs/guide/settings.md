@@ -406,6 +406,14 @@ Cmd+Left/Right sends Ctrl+A/Ctrl+E for shell line-start/line-end navigation.
 Cmd+Backspace sends Ctrl+U to clear the shell input according to its bindings.
 These terminal-only defaults can be remapped or disabled through `keybindings`.
 They do not run while composing IME text or editing a palette/search field.
+The same actions are available in the command palette as **Move to Start of
+Shell Line**, **Move to End of Shell Line**, and **Delete to Start of Shell Line**.
+Use `move_to_line_start`, `move_to_line_end`, or `delete_to_line_start` to bind
+them to another shortcut on any platform, without specifying control codes:
+
+```json
+{"key":"alt-home","action":"move_to_line_start","context":"terminal"}
+```
 
 On macOS, Settings → **Option key behavior** switches between **Terminal Alt**
 and **Native text** immediately; use Save these settings to keep your choice.

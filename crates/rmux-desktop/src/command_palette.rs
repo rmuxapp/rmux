@@ -450,6 +450,9 @@ impl CommandPalette {
         command!(PreviousPrompt);
         command!(NextPrompt);
         command!(LastPrompt);
+        command!(MoveToLineStart);
+        command!(MoveToLineEnd);
+        command!(DeleteToLineStart);
         command!(ScrollToTop);
         command!(ScrollToBottom);
         command!(IncreaseFontSize);
