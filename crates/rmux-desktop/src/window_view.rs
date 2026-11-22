@@ -258,7 +258,7 @@ impl WorkspaceWindow {
                     let typed = if !modifiers.control && !modifiers.alt && !modifiers.platform && !modifiers.function {
                         menu.typeahead.select(&event.keystroke.key, &labels, &[true; 6], menu.selected, std::time::Instant::now())
                     } else { None };
-                    match event.keystroke.key.as_str() {
+                    match crate::menu_navigation::action_key(&event.keystroke).unwrap_or("") {
                         "up" => menu.selected = (menu.selected + 5) % 6,
                         "down" => menu.selected = (menu.selected + 1) % 6,
                         "home" => menu.selected = 0,

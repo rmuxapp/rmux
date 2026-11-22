@@ -4,6 +4,18 @@ use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
 use web_time::Instant;
 
+/// Modified keys must not accidentally activate a menu item. Function-modified
+/// navigation is allowed for compact keyboards that synthesize Home/End.
+pub fn action_key(key: &gpui::Keystroke) -> Option<&str> {
+    let modifiers = key.modifiers;
+    if modifiers.control || modifiers.alt || modifiers.platform || modifiers.shift { return None; }
+    match key.key.as_str() {
+        "up" | "down" | "home" | "end" => Some(key.key.as_str()),
+        "enter" | "space" | "escape" if !modifiers.function => Some(key.key.as_str()),
+        _ => None,
+    }
+}
+
 /// Resolve menu navigation against current availability, including a selection
 /// that became stale while the menu was open. No enabled item means no target.
 pub fn navigate(key: &str, current: usize, enabled: &[bool]) -> Option<usize> {
@@ -61,6 +73,20 @@ impl Typeahead {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn modified_menu_keys_never_activate_or_move_selection() {
+        for name in ["up", "down", "home", "end", "enter", "space", "escape"] {
+            let plain = gpui::Keystroke::parse(name).unwrap();
+            assert_eq!(action_key(&plain), Some(name));
+            for modifier in ["ctrl", "alt", "cmd", "shift"] {
+                assert_eq!(action_key(&gpui::Keystroke::parse(&format!("{modifier}-{name}")).unwrap()), None);
+            }
+            let mut function = plain; function.modifiers.function = true;
+            assert_eq!(action_key(&function), if matches!(name, "up" | "down" | "home" | "end") { Some(name) } else { None });
+        }
+        assert_eq!(action_key(&gpui::Keystroke::parse("c").unwrap()), None);
+    }
 
     #[test]
     fn navigation_revalidates_availability_and_wraps_only_to_enabled_items() {

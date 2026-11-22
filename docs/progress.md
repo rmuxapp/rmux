@@ -10449,3 +10449,19 @@ used End to select Close, and Escape to dismiss with terminal focus restored.
 Screenshot: `target/workspace-menu-context.jpg`. Native appearance and group-menu
 runtime acceptance remain pending. The temporary review tab/server were closed;
 no deployment or installed application changes were made.
+
+
+### Consistent modified-key handling in context menus — 2026-11-22
+
+Fixed workspace, terminal-tab and terminal context menus in both native and WASM
+hosts ignoring modifiers when interpreting navigation/activation keys. Ctrl,
+Option/Alt, Command/platform and Shift combinations no longer accidentally move
+selection or execute a selected item as plain Enter/Space. A shared classifier
+keeps the six handlers consistent. Shift-assisted printable typeahead remains
+available; function-modified navigation remains available for compact-keyboard
+Home/End. Menu input remains contained rather than reaching a terminal.
+
+All three focused menu-navigation checks passed, including modifier combinations,
+disabled-item traversal and typeahead cycling. Desktop test compilation and WASM
+compilation passed. No visual geometry changed, so no repeat screenshot/build or
+release was performed; native runtime acceptance remains pending.

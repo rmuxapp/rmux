@@ -77,7 +77,7 @@ impl BrowserHost {
                     let typed = if !mods.control && !mods.alt && !mods.platform && !mods.function {
                         menu.typeahead.select(&event.keystroke.key, &labels, &[true; 6], menu.selected, web_time::Instant::now())
                     } else { None };
-                    match event.keystroke.key.as_str() {
+                    match crate::menu_navigation::action_key(&event.keystroke).unwrap_or("") {
                         "up" | "down" | "home" | "end" => {
                             if let Some(selected) = crate::menu_navigation::navigate(&event.keystroke.key, menu.selected, &[true; 6]) { menu.selected = selected; }
                         }

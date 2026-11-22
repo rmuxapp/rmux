@@ -101,7 +101,7 @@ impl TerminalSample {
                     let typed = if !mods.control && !mods.alt && !mods.platform && !mods.function {
                         menu.typeahead.select(&event.keystroke.key, MENU_LABELS, &enabled, menu.selected, web_time::Instant::now())
                     } else { None };
-                    match event.keystroke.key.as_str() {
+                    match crate::menu_navigation::action_key(&event.keystroke).unwrap_or("") {
                         "up" | "down" | "home" | "end" => {
                             if let Some(selected) = crate::menu_navigation::navigate(&event.keystroke.key, menu.selected, &enabled) {
                                 menu.selected = selected;
