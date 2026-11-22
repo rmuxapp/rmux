@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Reduced unnecessary Shared WASM CI builds by excluding eight additional native
+modules: RPC/events, recovery/restore/snapshots, preferences/settings and native
+pane ownership. The browser supplies its own hosts for these responsibilities.
+A fresh WASM cargo check passes; rustc dependency files confirm all 11 excluded
+modules are absent. A CI guard now checks those exclusions against the optimized
+artifact's dependency file and fails if a future shared import makes one unsafe.
+The guard also passed a negative fixture that adds an excluded dependency.
+Shared source edits still trigger builds; no build-speed percentage is claimed.
+
 Event replay now reports terminal title, directory, program-status revision and
 progress changes. Repeated shell title/directory values do not generate duplicate
 events; local/remote directory updates coalesce within one delivered batch.

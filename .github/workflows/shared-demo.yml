@@ -7,14 +7,23 @@ on:
       - tools/web-probe/**
       - crates/rmux-core/**
       - crates/rmux-desktop/src/**
-      # The web host supplies its own entry point, window owner and clipboard.
-      # Native-only edits here do not change the shared UI artifact.
+      # The web host supplies these native responsibilities independently.
+      # check-wasm-triggers.py verifies exclusions against rustc dependencies.
       - '!crates/rmux-desktop/src/main.rs'
       - '!crates/rmux-desktop/src/window_view.rs'
       - '!crates/rmux-desktop/src/clipboard.rs'
+      - '!crates/rmux-desktop/src/automation.rs'
+      - '!crates/rmux-desktop/src/events.rs'
+      - '!crates/rmux-desktop/src/recovery.rs'
+      - '!crates/rmux-desktop/src/preferences.rs'
+      - '!crates/rmux-desktop/src/settings_view.rs'
+      - '!crates/rmux-desktop/src/pane_view.rs'
+      - '!crates/rmux-desktop/src/snapshot.rs'
+      - '!crates/rmux-desktop/src/restore.rs'
       - crates/rmux-desktop/assets/**
       - scripts/build-ghostty-source.sh
       - scripts/release-notices.py
+      - scripts/check-wasm-triggers.py
       - release/ghostty-notices.txt
       - mise.toml
       - .github/workflows/shared-demo.yml
@@ -55,6 +64,8 @@ jobs:
           restore-keys: shared-demo-${{ runner.os }}-
       - name: Build optimized shared UI
         run: mise run build-release
+      - name: Check excluded native files against compiler dependencies
+        run: mise exec -- python ../../scripts/check-wasm-triggers.py target/wasm32-unknown-unknown/release/rmux_web_probe.d
       - name: Check optional font loader
         run: mise run check-fonts
       - name: Check startup ordering
