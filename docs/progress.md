@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Shared palette ranking now counts Unicode scalar positions consistently for
+contiguous and fuzzy matches, so a multibyte workspace-name prefix does not
+artificially lower its rank. Identical case-normalized queries reuse their prior
+ranking. Six focused core search tests pass, including Unicode prefix ordering,
+case-only edits and incremental/full-ranking equivalence. Desktop and WASM use
+this shared matcher; no input-latency improvement is claimed from these tests.
+
 The WASM workflow no longer rebuilds for changes confined to the native command
 palette or Markdown parser. A fresh WASM compilation and rustc dependency-file
 check confirm all 14 explicit native exclusions are outside the compiled demo.

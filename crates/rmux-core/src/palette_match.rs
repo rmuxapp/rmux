@@ -6,7 +6,9 @@ pub fn score(title: &str, words: &[&str]) -> Option<(usize, usize, usize)> {
     let mut starts = 0;
     for word in words {
         if let Some(start) = title.find(word) {
-            starts += start;
+            // Use the same scalar positions as the subsequence path. UTF-8
+            // byte lengths must not penalize names with non-ASCII prefixes.
+            starts += title[..start].chars().count();
             continue;
         }
         fuzzy += 1;
@@ -64,6 +66,7 @@ impl RankedSearch {
     }
     pub fn update(&mut self, query: &str) {
         let normalized = query.to_lowercase();
+        if normalized == self.query { return; }
         let words: Vec<_> = normalized.split_whitespace().collect();
         if words.is_empty() {
             self.matches.clear();
@@ -88,6 +91,19 @@ impl RankedSearch {
 #[cfg(test)]
 mod tests {
     use super::{score, tab_score, RankedSearch};
+
+    #[test]
+    fn unicode_prefixes_use_character_positions_for_contiguous_and_fuzzy_words() {
+        assert_eq!(score("界 build", &["build"]), score("x build", &["build"]));
+        assert_eq!(score("界 build", &["bld"]), score("x build", &["bld"]));
+        let mut search = RankedSearch::new(vec!["界 build".into(), "xx build".into()]);
+        search.update("build");
+        assert_eq!(search.matches, [0, 1]);
+        search.update("BUILD");
+        assert_eq!(search.matches, [0, 1]);
+        search.update("");
+        assert_eq!(search.matches, [0, 1]);
+    }
 
     #[test]
     fn incremental_search_matches_full_ranking_through_edits() {
