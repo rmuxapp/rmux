@@ -72,7 +72,15 @@ fn exchange(request: Request) -> Result<Value, String> {
         os::unix::net::UnixStream,
         time::Duration,
     };
-    let mut stream = UnixStream::connect(request.socket).map_err(|e| format!("connect: {e}"))?;
+    let mut stream = UnixStream::connect(&request.socket).map_err(|error| {
+        let help = match error.kind() {
+            std::io::ErrorKind::NotFound => "Start rmux with socket automation enabled and check --socket or RMUX_SOCKET_DIR.",
+            std::io::ErrorKind::ConnectionRefused => "No app is accepting connections here. Check that rmux is running and that this is its current endpoint.",
+            std::io::ErrorKind::PermissionDenied => "Use an endpoint owned by your current user; check the directory permissions.",
+            _ => "Check the endpoint path and whether rmux is running with socket automation enabled.",
+        };
+        format!("Could not connect to {:?}: {error}. {help} No request was sent.", request.socket)
+    })?;
     stream
         .set_read_timeout(Some(Duration::from_secs(7)))
         .map_err(|e| e.to_string())?;
@@ -81,25 +89,29 @@ fn exchange(request: Request) -> Result<Value, String> {
         .map_err(|e| e.to_string())?;
     stream
         .write_all(&request.body)
-        .map_err(|e| format!("write: {e}; request outcome may be unknown"))?;
+        .map_err(|e| uncertain_outcome(format!("Could not send the complete request: {e}")))?;
     // Bound allocation even if the endpoint is not an rmux server.
     const LIMIT: u64 = 8 * 1024 * 1024;
     let mut line = Vec::new();
     BufReader::new(stream)
         .take(LIMIT + 1)
         .read_until(b'\n', &mut line)
-        .map_err(|e| format!("read: {e}; request outcome may be unknown"))?;
+        .map_err(|e| uncertain_outcome(format!("Could not read the reply: {e}")))?;
     if line.len() as u64 > LIMIT || !line.ends_with(b"\n") {
-        return Err("incomplete or oversized reply; request outcome may be unknown".into());
+        return Err(uncertain_outcome("Incomplete or oversized reply"));
     }
-    let reply: Value = serde_json::from_slice(&line).map_err(|e| format!("invalid reply: {e}"))?;
+    let reply: Value = serde_json::from_slice(&line).map_err(|e| uncertain_outcome(format!("Invalid reply: {e}")))?;
     if reply.get("jsonrpc") != Some(&json!("2.0"))
         || reply.get("id") != Some(&json!(1))
         || (reply.get("result").is_some() == reply.get("error").is_some())
     {
-        return Err("invalid JSON-RPC response envelope".into());
+        return Err(uncertain_outcome("Invalid JSON-RPC response envelope"));
     }
     Ok(reply)
+}
+#[cfg(unix)]
+fn uncertain_outcome(reason: impl std::fmt::Display) -> String {
+    format!("{reason}; request outcome may be unknown. Check rmux's state before repeating a command that changes it. The request was not retried.")
 }
 #[cfg(not(unix))]
 fn exchange(_: Request) -> Result<Value, String> {
@@ -227,6 +239,30 @@ mod tests {
             )
             .is_err()
         );
+    }
+    #[cfg(unix)]
+    #[test]
+    fn transport_errors_distinguish_unsent_requests_from_unknown_outcomes() {
+        use std::{io::{BufRead, BufReader, Write}, os::unix::net::UnixListener};
+        let directory = tempfile::tempdir().unwrap();
+        let path = directory.path().join("rpc.sock");
+        let request = || parse([OsString::from("--socket"), path.as_os_str().to_owned(), "workspace.open".into(), r#"{"name":"test"}"#.into()], None).unwrap().unwrap();
+        let error = exchange(request()).unwrap_err();
+        assert!(error.contains("No request was sent"), "{error}");
+        assert!(error.contains("socket automation enabled"), "{error}");
+        let listener = UnixListener::bind(&path).unwrap();
+        let worker = std::thread::spawn(move || {
+            let (mut stream, _) = listener.accept().unwrap();
+            let mut body = String::new();
+            BufReader::new(&stream).read_line(&mut body).unwrap();
+            assert_eq!(serde_json::from_str::<Value>(&body).unwrap()["method"], "workspace.open");
+            stream.write_all(b"{\"jsonrpc\":\"2.0\",\"id\":99,\"result\":{}}\n").unwrap();
+        });
+        let error = exchange(request()).unwrap_err();
+        assert!(error.contains("outcome may be unknown"), "{error}");
+        assert!(error.contains("not retried"), "{error}");
+        assert!(!error.contains("No request was sent"), "{error}");
+        worker.join().unwrap();
     }
     #[cfg(unix)]
     #[test]

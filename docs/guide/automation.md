@@ -207,6 +207,13 @@ help without opening that path. `rmuxctl --version` prints the client build vers
 Help flags are recognized in these dedicated forms; text after `--` remains literal
 input for commands such as `send`.
 
+Connection failures identify the endpoint and state that no request was sent.
+Check the running app, configured socket path and current-user permissions.
+Once sending starts, a timeout, broken connection or malformed reply can leave
+the result unknown. Inspect app state before repeating a command that changes it;
+rmuxctl does not automatically retry. Transport failures exit with code 2 and
+write diagnostics to stderr, leaving stdout for JSON responses.
+
 ## Shell completion
 
 `rmuxctl completions bash|zsh|fish` prints shell setup without requiring a running

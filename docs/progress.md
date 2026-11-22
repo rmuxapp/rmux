@@ -1,3 +1,12 @@
+CLI failure-path polish: connection errors identify the endpoint, explain
+missing/refused/permission-denied cases and explicitly state no request was sent.
+Write/read failures and malformed/incomplete/wrong-ID replies consistently state
+that the result may be unknown, recommend inspecting app state and confirm no
+retry. JSON stdout and exit codes are unchanged. All 34 lightweight CLI tests
+passed, including a real local socket that consumes a workspace.open request
+then returns a mismatched reply ID, plus a missing-endpoint case. No desktop
+bundle or release was built.
+
 Imported-theme recovery acceptance: a focused test now exercises switching from
 an imported theme to a bundled theme, breaking and then deleting the source file,
 and reverting from the in-memory baseline. Background, palette and selection
