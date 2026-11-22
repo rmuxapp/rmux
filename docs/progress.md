@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+The WASM workflow no longer rebuilds for changes confined to the native command
+palette or Markdown parser. A fresh WASM compilation and rustc dependency-file
+check confirm all 14 explicit native exclusions are outside the compiled demo.
+Shared palette presentation and text-input files still trigger browser builds.
+GitHub native/browser runs for `77cc11a` and `dd6cff4` passed; newer native runs
+were still active/queued at inspection. No build-duration improvement is claimed
+until subsequent CI runs provide measurements.
+
 Surface location invalidations now cover attachment to existing/new panes,
 workspace owner changes and window rebinding. Clients can refresh current
 window/workspace/pane IDs without restarting or polling the terminal. Events
