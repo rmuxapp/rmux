@@ -1,3 +1,14 @@
+Release 0.1.6 delivered from commit 2662511 via GitHub run 44985734410.
+macOS signing/notarization, Linux and Windows packaging, and publication passed.
+The published assets include macOS DMG/ZIP, Linux tarball, Windows ZIP,
+SHA256SUMS and the Sparkle appcast; main's feed now advertises 0.1.6.
+Shared WASM run 44985734945 passed and its artifact was imported into the private
+website project. Cloudflare deployment e8696c3c published the demo and 0.1.6
+links; HTTP 200 checks of rmux.app and the deployment URL confirmed both the
+release links and commit-addressed demo. The site remains off GitHub. Existing
+native Linux/Windows UI and native pointer acceptance limits still apply.
+No installed app or user session was replaced during delivery.
+
 External-editor launch polish: editors now start in the selected file's parent
 directory, with the absolute file path still passed as one literal argument.
 Path validation runs before metadata access, rejects NULs, and file/launch errors
