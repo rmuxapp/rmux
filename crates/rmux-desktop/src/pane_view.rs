@@ -1433,7 +1433,7 @@ impl Render for PaneView {
                             cx.stop_propagation();
                             if event.standard_click() { this.dismiss_tab_picker(window, cx); }
                         }))))
-                    .child(crate::palette_view::search(input))
+                    .child(crate::palette_view::search(input, cx))
                     .child(if matches.is_empty() {
                         div().p_3().text_sm().text_color(rgb(0xaaaaaa)).child("No matching tabs").into_any_element()
                     } else {

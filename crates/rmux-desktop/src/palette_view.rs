@@ -39,9 +39,26 @@ pub(crate) fn close_button() -> Stateful<Div> {
         .cursor_pointer().hover(|style| style.bg(rgb(0x454545)).text_color(rgb(0xffffff)))
         .child("Close ×")
 }
-pub(crate) fn search(input: impl IntoElement) -> Div {
+pub(crate) fn search(input: Entity<crate::text_field::TextField>, cx: &App) -> Div {
+    let can_clear = !input.read(cx).value().is_empty() && !input.read(cx).is_composing();
     div().w_full().min_w_0().flex_shrink_0().p_3().child(div().w_full().min_w_0().px_3().py_2().rounded_md()
-        .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
+        .flex().items_center().gap_2()
+        .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a))
+        .child(div().flex_1().min_w_0().child(input.clone()))
+        .when(can_clear, |field| field.child(div().id("clear-palette-search")
+            .flex_shrink_0().w(px(24.)).h(px(24.)).flex().items_center().justify_center()
+            .rounded_sm().text_sm().text_color(rgb(0xbcbcc4)).cursor_pointer()
+            .hover(|style| style.bg(rgb(0x353535)).text_color(rgb(0xffffff)))
+            .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Clear search".into())).into())
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+            .on_click(move |event, window, cx| {
+                cx.stop_propagation();
+                if !event.standard_click() { return; }
+                input.update(cx, |input, cx| {
+                    input.replace_draft("", cx);
+                    crate::text_layout::focus(&input.focus, window, cx);
+                });
+            }).child("×"))))
 }
 pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {
     div().id(("command", id)).w_full().min_w_0().px_3().h(px(height))

@@ -1425,7 +1425,7 @@ impl Render for CommandPalette {
                         .tooltip({ let url = url.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(url.clone().into())).into() })
                         .on_click(cx.listener(|this, event: &ClickEvent, _, cx| { if event.standard_click() { cx.stop_propagation(); this.open_preview_link(cx); } }))
                         .child(url))))
-            .child(palette_view::search(self.input.clone()))
+            .child(palette_view::search(self.input.clone(), cx))
             .child(if self.search.matches.is_empty() {
                 palette_view::empty_state(self.empty_message).into_any_element()
             } else {

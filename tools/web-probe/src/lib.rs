@@ -613,7 +613,7 @@ impl Render for InputProbe {
                         if event.standard_click() { this.dismiss_palette(window, cx); }
                         cx.stop_propagation();
                     }))))
-                .child(palette_view::search(self.input.clone()))
+                .child(palette_view::search(self.input.clone(), cx))
                 .child({
                     let entity = cx.entity();
                     list(self.scroll.clone(), move |row, _window, cx| {

@@ -1,3 +1,12 @@
+Shared palette search polish: native palettes, the tab picker and WASM command
+palette now show an inline clear control for nonempty search text. Clearing uses
+the text editor's undo path, restores input focus and updates results through
+the normal change event. It is hidden while composing text. The local WASM build
+passed; browser interaction verified clearing restores the full command list
+without closing the palette and Cmd+Z restores the query and filtered results.
+Screenshot: `target/palette-clear-search.png`. Native compile checking passed;
+native pointer/IME acceptance remains pending. No release or deployment.
+
 Native tab-picker lifecycle polish: asynchronous terminal creation, keyboard
 reordering, tab transfers out, and single/batch closing now reconcile an open
 picker immediately. Previously only metadata updates refreshed its list state,
