@@ -9,6 +9,7 @@ pub const HELP: &str = "Commands (JSON output except pipe-pane; explicit opaque 
   paste-buffer --surface ID [--name NAME] [--bracketed]
   notify --surface ID [--title TITLE] [--body BODY]
   list-notifications [--window ID] [--workspace ID]
+  read-events [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]
   dismiss-notification --surface ID --revision NUMBER
   read-notification --surface ID --revision NUMBER
   close-workspace --workspace ID
@@ -41,6 +42,7 @@ whole process unless narrowed with --window (workspaces/panes/panels) or
 
 pub fn help(command: &str) -> Result<String, String> {
     let (arguments, description) = match command {
+        "read-events" => ("[--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. Does not automatically retry or stream forever."),
         "pipe-pane" => ("--surface ID [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]", "Capture retained history (up to 1 MiB), optionally its last 1–65536 logical lines with --lines N or selected text with --selection, and feed it once to a local /bin/sh command via stdin. Truncated captures are rejected. Runs in the CLI working directory, forwards command stdout/stderr and returns its exit status. The CLI waits for the command; use normal shell interruption for long-running commands. Does not stream future output."),
         "paste-buffer" => ("--surface ID [--name NAME] [--bracketed]", "Queue a retained buffer to an explicit terminal without changing focus or scroll position. --bracketed uses terminal paste encoding. The buffer is retained; requests are never retried."),
         "rename-buffer" => ("[--name NAME] NEW_NAME", "Rename a retained buffer without copying its contents. Source defaults to default; an existing destination is never overwritten."),
@@ -93,6 +95,7 @@ pub fn expand_with_input(command: &str, args: Vec<OsString>, mut input: impl std
 
 pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), String> {
     let (method, target, positional) = match command {
+        "read-events" => ("events.read", None, None),
         "pipe-pane" => ("surface.read_text", Some(("--surface", "surface_id")), Some("command")),
         "paste-buffer" => ("buffer.paste", Some(("--surface", "surface_id")), None),
         "set-buffer" => ("buffer.set", None, Some("text")),
@@ -171,6 +174,22 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             continue;
         }
         if !literal && arg.starts_with('-') && !(command == "set-buffer" && arg == "-") {
+            if command == "read-events" && matches!(arg.as_str(), "--after" | "--limit" | "--wait-ms") {
+                let raw = args.next().ok_or_else(|| format!("{arg} requires a value"))?.into_string().map_err(|_| "event option must be UTF-8")?;
+                let (key, value) = if arg == "--after" {
+                    // Keep the server's cursor opaque; do not split or coerce it
+                    // through a numeric representation in the client.
+                    if raw.is_empty() || raw.len() > 96 || raw.chars().any(char::is_whitespace) { return Err("invalid event cursor".into()); }
+                    ("after", Value::String(raw))
+                } else {
+                    let (key, min, max) = if arg == "--limit" { ("limit", 1, 128) } else { ("wait_ms", 0, 3000) };
+                    let number: u16 = raw.parse().map_err(|_| format!("{arg} requires an integer from {min} to {max}"))?;
+                    if !raw.bytes().all(|byte| byte.is_ascii_digit()) || !(min..=max).contains(&number) { return Err(format!("{arg} requires an integer from {min} to {max}")); }
+                    (key, Value::from(number))
+                };
+                if params.insert(key.into(), value).is_some() { return Err(format!("duplicate {arg}")); }
+                continue;
+            }
             if matches!(command, "capture-pane" | "pipe-pane") && arg == "--lines" {
                 let raw = args.next().ok_or("--lines requires a count")?.into_string().map_err(|_| "count must be UTF-8")?;
                 let lines: usize = raw.parse().map_err(|_| "--lines requires an integer from 1 to 65536")?;
@@ -402,6 +421,21 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn event_read_preserves_cursor_and_rejects_ambiguous_bounds() {
+        assert_eq!(expand("read-events", args(&[])).unwrap(), ("events.read".into(), serde_json::json!({})));
+        let cursor = "123-1795305738132856000:18446744073709551615";
+        assert_eq!(expand("read-events", args(&["--after", cursor, "--limit", "128", "--wait-ms", "3000"])).unwrap(),
+            ("events.read".into(), serde_json::json!({"after":cursor,"limit":128,"wait_ms":3000})));
+        for options in [vec!["--limit", "0"], vec!["--limit", "129"], vec!["--limit", "1.5"],
+            vec!["--wait-ms", "3001"], vec!["--wait-ms", "-1"], vec!["--wait-ms", "+1"],
+            vec!["--after", ""], vec!["--after"], vec!["--limit", "1", "--limit", "2"],
+            vec!["--after", cursor, "--after", cursor], vec!["--wait-ms", "0", "--wait-ms", "1"],
+            vec!["--follow"], vec!["unexpected"]] {
+            assert!(expand("read-events", args(&options)).is_err(), "{options:?}");
+        }
+        assert_eq!(expand("read-events", args(&["--wait-ms", "0"])).unwrap().1["wait_ms"], 0);
+    }
     #[test]
     fn focus_history_commands_require_a_window_and_preserve_activation() {
         for (command, direction) in [("focus-back", "back"), ("focus-forward", "forward")] {

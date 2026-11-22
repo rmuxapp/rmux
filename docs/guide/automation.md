@@ -289,6 +289,18 @@ as `notification` (or null).
 
 ## Replay events
 
+Read one page with the CLI:
+
+```sh
+rmuxctl read-events --limit 128
+rmuxctl read-events --after 'CURSOR_FROM_PREVIOUS_RESULT' --wait-ms 3000
+```
+
+Commands print the JSON-RPC response, with the page under `result`. Keep the
+returned `result.cursor` as a string; use it for subsequent calls. This command
+does not run a permanent subscription or retry failed requests. Offline help
+and Bash/Zsh/Fish completions include its options.
+
 Live stdio and Unix socket clients can call `events.read`:
 
 ```json

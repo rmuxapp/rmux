@@ -63,6 +63,12 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             page = call("events.read", {"after": received["cursor"]})
             assert any(e["kind"] == "notification.dismissed" and e["notification_id"] == event["notification_id"] for e in page["events"])
             assert call("events.read", {"after": page["cursor"]})["events"] == []
+            cli = subprocess.run([str(Path("target/debug/rmuxctl").resolve()), "read-events",
+                                  "--after", page["cursor"], "--limit", "16", "--wait-ms", "0"],
+                                 env=env, capture_output=True, timeout=8)
+            assert cli.returncode == 0, cli.stderr.decode()
+            cli_page = json.loads(cli.stdout)["result"]
+            assert cli_page["cursor"] == page["cursor"] and cli_page["events"] == []
             start = time.monotonic()
             timed = call("events.read", {"after": page["cursor"], "wait_ms": 100})
             assert timed["events"] == [] and time.monotonic() - start >= 0.05

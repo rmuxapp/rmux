@@ -2,6 +2,12 @@
 
 ## Current implementation focus
 
+Added `rmuxctl read-events --after CURSOR --limit N --wait-ms N`, preserving
+opaque cursors exactly and validating page/wait bounds and duplicate flags.
+Offline help and Bash/Zsh/Fish option completion expose the command. The native
+event smoke now invokes the CLI against the isolated app's socket to confirm
+cursor continuation and empty replay through the actual client transport.
+
 `events.read` now supports bounded `wait_ms` long polling (0–3000 ms). An empty
 read registers its wake-up in the same UI update, then waits in a separate task
 so the shared RPC dispatcher can handle other requests. Up to 16 waiters each
