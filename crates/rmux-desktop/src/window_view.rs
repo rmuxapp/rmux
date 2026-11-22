@@ -381,6 +381,7 @@ impl WorkspaceWindow {
         cx.notify();
     }
     fn refresh_memory(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.memory_rows.is_none() { self.close_inspectors(window, cx); }
         if !self.memory_focus.as_ref().is_some_and(|focus| focus.is_focused(window)) {
             self.memory_previous_focus = window.focused(cx);
         }
@@ -1289,7 +1290,7 @@ impl WorkspaceWindow {
                 if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.workspace_state.active, window, cx); }
             }
         } else {
-            if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
+            self.close_inspectors(window, cx);
             self.remember_focus(window, cx);
             let state = settings_view::State { focus: cx.focus_handle(), origin: window.focused(cx), selected: 0, scroll: ScrollHandle::new() };
             state.focus.focus(window);
@@ -2153,7 +2154,8 @@ impl WorkspaceWindow {
                 if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.workspace_state.active, window, cx); }
             }
         } else {
-            if self.settings_state.is_some() { self.toggle_settings(window, cx); }
+            self.close_inspectors(window, cx);
+            self.remember_focus(window, cx);
             let state = NotificationNavigation { expanded: None, unread_only: false, focus: cx.focus_handle(), origin: window.focused(cx),
                 selected: self.notification_targets(cx).first().map(|row| (row.1, row.2)), scroll: ScrollHandle::new() };
             state.focus.focus(window);
@@ -2582,14 +2584,17 @@ impl WorkspaceWindow {
         (!context.is_empty()).then(|| context.join(" · "))
     }
 
-    fn command_palette_origin(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<FocusHandle> {
-        // Replace window inspectors before capturing the palette's dispatch
-        // origin. Otherwise terminal actions are sent back to an inspector.
-        if self.memory_focus.as_ref().is_some_and(|focus| focus.is_focused(window)) {
-            self.close_memory(window, cx);
-        }
+    fn close_inspectors(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        // Unwind focus before replacing an inspector. Memory may have captured
+        // an older inspector as its origin; close it first to restore that chain.
+        // The toggle close branches take their state and never call this helper.
+        if self.memory_rows.is_some() { self.close_memory(window, cx); }
         if self.settings_state.is_some() { self.toggle_settings(window, cx); }
         if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
+    }
+
+    fn command_palette_origin(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<FocusHandle> {
+        self.close_inspectors(window, cx);
         window.focused(cx)
     }
     fn show_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
