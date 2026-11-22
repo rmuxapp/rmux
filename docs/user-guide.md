@@ -222,7 +222,9 @@ can be dismissed; they do not imply that a failed action succeeded.
 Use **Help → rmux User Guide** to open this guide, or **Help → Keyboard
 Shortcuts…** to search the commands and keys available in your current context.
 The command palette also includes **Open User Guide**, **Report an Issue…**,
-and **Open rmux Website**, including in the browser demo.
+and **Open rmux Website**, including in the browser demo. If your browser blocks
+a new tab, the demo shows a link you can open directly; Escape or Close returns
+to the demo.
 
 **Report an Issue…** opens a new GitHub issue for you to fill in. Include your
 rmux version, operating system, and the steps that reproduce the problem.

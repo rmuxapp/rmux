@@ -3,6 +3,11 @@
 use gpui::{prelude::*, *};
 use std::ops::Range;
 const FONT_FAMILY: &str = "Inter";
+#[wasm_bindgen::prelude::wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = rmuxHelp, js_name = open)]
+    fn open_help_link(url: &str, label: &str);
+}
 #[path = "../../../crates/rmux-desktop/src/control_hint.rs"]
 mod control_hint;
 #[path = "../../../crates/rmux-desktop/src/menu_navigation.rs"]
@@ -389,7 +394,7 @@ impl InputProbe {
         let command = COMMANDS[index];
         if let Some(url) = command.help_url() {
             self.close_palette(window, cx);
-            cx.open_url(url);
+            open_help_link(url, command.title());
             return;
         }
         if command == CommandId::ShowKeyboardShortcuts {

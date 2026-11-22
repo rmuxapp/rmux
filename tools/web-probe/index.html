@@ -1,7 +1,15 @@
 <!doctype html>
 <html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>rmux demo</title>
-<style>html,body{margin:0;height:100%;overflow:hidden;background:#252525}canvas{position:fixed;inset:0}#status{color:#ddd;font:14px system-ui;padding:16px}</style>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#252525}canvas{position:fixed;inset:0}#status{color:#ddd;font:14px system-ui;padding:16px}
+#rmux-help-link{box-sizing:border-box;width:min(440px,calc(100vw - 32px));padding:24px;border:1px solid #454545;border-radius:10px;background:#242424;color:#ddd;font:14px/1.5 system-ui;box-shadow:0 16px 48px #0008}
+#rmux-help-link::backdrop{background:#0008}
+#rmux-help-link h2{margin:0 0 12px;font-size:16px}
+#rmux-help-link p{margin:0 0 20px;color:#aaa}
+#rmux-help-link a{color:#c2b5ff}
+#rmux-help-link button{float:right;padding:5px 12px;border:1px solid #555;border-radius:5px;background:#353535;color:#ddd;font:inherit;cursor:pointer}
+#rmux-help-link :focus-visible{outline:2px solid #b3a2ee;outline-offset:4px}
+</style>
 <p id="status">Loading rmux…</p>
 <script type="module">
 import init from './rmux_web_probe.js';

@@ -6,6 +6,7 @@ export function isMacPlatform(platform = globalThis.navigator?.userAgentData?.pl
 }
 export async function initializeEngine() {
   globalThis.rmuxFonts = {loadFont};
+  globalThis.rmuxHelp = {open: openHelpLink};
   globalThis.rmuxClipboard = {readText: readTerminalClipboard};
   const response=await fetch(new URL('./native-ghostty-vt.wasm',import.meta.url));
   if (!response.ok) throw new Error(`Loading libghostty-vt failed: ${response.status}`);
@@ -44,4 +45,49 @@ export function copyTerminalSelection(event,engine,report = message=>console.war
     event.preventDefault();
     report('Could not copy terminal selection. Maximum size is 1 MiB.');
   }
+}
+
+// Canvas actions may run after browser user activation expires. Keep a real
+// keyboard-accessible link available when opening a new tab is blocked.
+export function openHelpLink(url, label, browser = globalThis.window, doc = globalThis.document) {
+  let opened;
+  try {
+    opened = browser.open('about:blank', '_blank');
+    if (opened) {
+      opened.opener = null;
+      opened.location.replace(url);
+      return;
+    }
+  } catch { opened?.close(); }
+  doc.getElementById('rmux-help-link')?.close();
+  const origin = doc.activeElement;
+  const dialog = doc.createElement('dialog');
+  dialog.id = 'rmux-help-link';
+  dialog.setAttribute('aria-labelledby', 'rmux-help-title');
+  const title = doc.createElement('h2');
+  title.id = 'rmux-help-title';
+  title.textContent = label;
+  const text = doc.createElement('p');
+  text.textContent = 'Your browser did not open a new tab. Use this link to continue.';
+  const link = doc.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = label;
+  const close = doc.createElement('button');
+  close.textContent = 'Close';
+  close.type = 'button';
+  close.addEventListener('click', () => dialog.close());
+  // Keep modal keystrokes out of the canvas/terminal handlers, including Tab
+  // and Escape. The browser still handles native focus traversal and cancel.
+  dialog.addEventListener('keydown', event => event.stopPropagation());
+  dialog.addEventListener('keyup', event => event.stopPropagation());
+  dialog.addEventListener('close', () => {
+    dialog.remove();
+    if (origin?.isConnected) origin.focus({preventScroll: true});
+  }, {once: true});
+  dialog.append(title, text, link, close);
+  doc.body.append(dialog);
+  dialog.showModal();
+  link.focus();
 }

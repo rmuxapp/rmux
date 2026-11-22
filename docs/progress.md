@@ -1,3 +1,12 @@
+Browser help resilience: help commands now use an opener-isolated new tab and
+show a native HTML link dialog when tab creation returns null or throws. The
+fallback has a labelled heading, keyboard-accessible link/Close control, native
+Escape dismissal and origin-focus restoration, with no uploaded app data.
+Three focused Node tests cover successful navigation/opener removal and both
+blocked paths with link attributes and focus restoration. WASM build passed.
+The public user guide destination was observed in a separate browser tab; the
+modal fallback has unit coverage but still needs rendered/embedded acceptance.
+
 Help discovery batch: native Help menu now links to the user guide, searchable
 keyboard shortcuts, issue reporting and rmux.app. Shared command identities and
 fixed public URLs also expose guide/issue/website actions in native and WASM
