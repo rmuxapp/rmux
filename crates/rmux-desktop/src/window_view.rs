@@ -1121,8 +1121,13 @@ impl WorkspaceWindow {
         Ok(serde_json::json!({"surface_id":focus.surface_id,"workspace_id":workspace.to_string(),"selected":true}))
     }
     fn automation_available(&self, cx: &App) -> Result<(), automation::Failure> {
+        self.interaction_available(false, cx)
+    }
+    // Preview-owned navigation may retain its own palette. External automation
+    // still uses the strict guard and cannot replace an active interaction.
+    fn interaction_available(&self, allow_palette: bool, cx: &App) -> Result<(), automation::Failure> {
         if self.benchmark || self.restore_job.is_some() || self.window_close_prompt
-            || self.close_prompt.is_some() || self.rename.is_some() || self.palette.is_some() || self.workspace_menu.is_some()
+            || self.close_prompt.is_some() || self.rename.is_some() || (self.palette.is_some() && !allow_palette) || self.workspace_menu.is_some()
             || cx.global::<Shutdowns>().quitting || cx.global::<Shutdowns>().quit_prompt
             || cx.global::<PromptGate>().is_active()
             || self.workspace_state.entries.iter().any(|entry| entry.workspace.read(cx).panes.iter().any(|pane| pane.read(cx).automation_busy(cx))) {
@@ -2994,7 +2999,7 @@ impl WorkspaceWindow {
         self.preview_file_kind(path, hex, false, window, cx);
     }
     fn preview_history(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
-        if self.file_browser_job.is_some() || self.automation_available(cx).is_err() { return; }
+        if self.file_browser_job.is_some() || self.interaction_available(true, cx).is_err() { return; }
         if let Some((index, state)) = self.preview_history.adjacent(forward) {
             let (path, hex, markdown) = state.target();
             if let Some((palette, _)) = self.palette.as_ref()

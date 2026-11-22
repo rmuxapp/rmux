@@ -1667,6 +1667,13 @@ impl Render for CommandPalette {
             .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.preview_history.is_some() { "CommandPalette FilePreview" } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
             .on_action(cx.listener(|this, _: &PreviewBack, _, cx| this.navigate_document(false, cx)))
             .on_action(cx.listener(|this, _: &PreviewForward, _, cx| this.navigate_document(true, cx)))
+            // Inline links dispatch actions through the focus tree. Route them
+            // through the same handoff as keyboard links, so the window captures
+            // reading state and releases palette focus before starting a load.
+            .on_action(cx.listener(|_, action: &PreviewLocalFile, _, cx| cx.emit(PaletteEvent::Run(action.boxed_clone()))))
+            .on_action(cx.listener(|_, action: &PreviewMarkdownFile, _, cx| cx.emit(PaletteEvent::Run(action.boxed_clone()))))
+            .on_action(cx.listener(|_, action: &PreviewLinkedMarkdown, _, cx| cx.emit(PaletteEvent::Run(action.boxed_clone()))))
+            .on_action(cx.listener(|_, action: &BrowseDirectory, _, cx| cx.emit(PaletteEvent::Run(action.boxed_clone()))))
             .on_action(cx.listener(|this, action: &JumpPreviewHeading, _, cx| this.jump_preview_heading(&action.fragment, cx)))
             .on_action(cx.listener(|this, _: &OpenPreviewLink, _, cx| this.open_preview_link(cx)))
             .on_action(cx.listener(|this, _: &NextPreviewLink, _, cx| this.cycle_preview_link(1, cx)))

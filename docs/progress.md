@@ -10531,3 +10531,22 @@ tab header, disabled entries, Close styling, Ctrl+Enter leaving New Tab uninvoke
 and Escape returning terminal focus. Screenshot: `target/tab-menu-context.jpg`.
 The review tab and local server were closed. Native link-header and short-window
 visual acceptance remain pending; no releases or user sessions were changed.
+
+
+### Correct preview-owned navigation routing — 2026-11-22
+
+Inspection of the combined preview work exposed two integration defects that
+parser/history tests did not cover. In-place heading Back/Forward called the
+strict automation guard, which rejected the open palette itself. Split that guard
+so preview-owned history can retain its palette while all other busy conditions
+and external automation restrictions remain intact. Inline file/directory links
+also dispatched straight to window loaders, hitting the same strict guard before
+releasing palette focus. Added palette action handlers that forward these links
+through the established keyboard-link event handoff: capture source state, close
+the old palette, restore origin focus, then start the asynchronous load.
+
+Desktop compilation passed. Source inspection confirms the relaxed palette check
+is used only by preview history; external automation remains strict. These are
+integration corrections, not a claim of native runtime acceptance. Native link
+clicking and history navigation still need an unlocked desktop review. No user
+sessions, release artifacts or website deployments changed.
