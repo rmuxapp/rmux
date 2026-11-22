@@ -8,6 +8,7 @@ pub(super) struct Menu {
     selected: usize,
     scroll: ScrollHandle,
     link: Option<String>,
+    file: Option<terminal_link::Location>,
     typeahead: menu_navigation::Typeahead,
 }
 const LABELS: &[&str] = &["Copy", "Copy with Line Breaks", "Paste", "Select All", "Find…", "Copy Working Directory", "Reveal Working Directory", "Clear Scrollback", "Copy Link Address", "Open Link",
@@ -20,7 +21,7 @@ impl TerminalView {
         let selection = self.frame.selections.iter().any(Option::is_some);
         let link = self.terminal_menu.as_ref().and_then(|menu| menu.link.as_deref());
         let local = self.session.remote_destination().is_none();
-        [selection, selection, !self.session.paste_pending(), true, true, local || self.remote_directory_label.is_some(), local, true, link.is_some(), link.is_some_and(|uri| self.can_open_terminal_link(uri)),
+        [selection, selection, !self.session.paste_pending(), true, true, local || self.remote_directory_label.is_some(), local, true, link.is_some(), link.is_some_and(openable_uri) || self.terminal_menu.as_ref().is_some_and(|menu| menu.file.is_some()),
             #[cfg(all(target_os = "macos", feature = "browser"))]
             link.is_some_and(browser_window::can_open_link),
         ]
@@ -34,6 +35,7 @@ impl TerminalView {
             self.session.hyperlink_at((f32::from(point.x) / self.cells.width) as u16,
                 (f32::from(point.y) / self.cells.height) as u32, self.frame.revision).ok().flatten()
         } else { None };
+        let file = link.as_deref().and_then(|link| self.local_link_file(link));
         let focus = cx.focus_handle();
         let token = focus.clone();
         self.terminal_menu_blur = Some(cx.on_blur(&focus, window, move |this, _, cx| {
@@ -47,7 +49,7 @@ impl TerminalView {
         focus.focus(window);
         let scroll = ScrollHandle::new();
         scroll.scroll_to_item(selected);
-        self.terminal_menu = Some(Menu { position, focus, selected, scroll, link, typeahead: Default::default() });
+        self.terminal_menu = Some(Menu { position, focus, selected, scroll, link, file, typeahead: Default::default() });
         cx.notify();
     }
     fn dismiss_terminal_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -61,6 +63,7 @@ impl TerminalView {
         if self.terminal_menu.is_none() || !self.menu_enabled().get(item).copied().unwrap_or(false) { return; }
         // Freeze the clicked target, rather than looking up potentially changed output.
         let link = self.terminal_menu.as_ref().and_then(|menu| menu.link.clone());
+        let file = self.terminal_menu.as_ref().and_then(|menu| menu.file.clone());
         self.dismiss_terminal_menu(window, cx);
         match item {
             0 => self.copy(&CopySelection, window, cx),
@@ -72,7 +75,11 @@ impl TerminalView {
             6 => self.lookup_working_directory(false, cx),
             7 => self.clear_scrollback(&ClearScrollback, window, cx),
             8 => { if let Some(link) = link { clipboard::write(ClipboardItem::new_string(link), cx); } },
-            9 => { if let Some(link) = link { self.open_terminal_link(&link, window, cx); } },
+            9 => {
+                if let Some(file) = file {
+                    window.dispatch_action(Box::new(EditLocalFile { path: file.path, line: file.line, column: file.column }), cx);
+                } else if let Some(link) = link.filter(|link| openable_uri(link)) { cx.open_url(&link); }
+            },
             #[cfg(all(target_os = "macos", feature = "browser"))]
             10 => {
                 if let Some(link) = link {
@@ -124,6 +131,7 @@ impl TerminalView {
                     .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(LABELS.iter().enumerate().map(|(index, label)| {
+                    let destination = (index == 9).then(|| menu.file.as_ref().map(|file| file.label()).or_else(|| menu.link.clone())).flatten();
                     div().id(("terminal-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
@@ -137,6 +145,7 @@ impl TerminalView {
                             if event.standard_click() { this.activate_terminal_menu(index, window, cx); }
                             cx.stop_propagation();
                         }))
+                        .when_some(destination, |row, target| row.tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(target.clone().into())).into()))
                         .child(div().flex_1().min_w_0().truncate().child(*label))
                         .when_some(hints[index].clone(), |row, hint| row.child(
                             div().id(("terminal-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(rgb(0xa0a0a0))

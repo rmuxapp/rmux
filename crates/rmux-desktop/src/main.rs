@@ -1409,9 +1409,6 @@ impl TerminalView {
     fn local_link_file(&self, uri: &str) -> Option<terminal_link::Location> {
         terminal_link::local_target(uri, self.snapshot_directory.as_deref(), self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
     }
-    fn can_open_terminal_link(&self, uri: &str) -> bool {
-        openable_uri(uri) || self.local_link_file(uri).is_some()
-    }
     fn open_terminal_link(&mut self, uri: &str, window: &mut Window, cx: &mut Context<Self>) {
         if openable_uri(uri) { cx.open_url(uri); }
         else if let Some(location) = self.local_link_file(uri) {
@@ -2033,10 +2030,18 @@ impl Render for TerminalView {
                 else { this.clear_link_hover(cx); }
             }))
             .when_some(self.link_hover.as_ref().filter(|(revision, _)| *revision == self.frame.revision).map(|(_, uri)| uri.clone()), |root, uri| {
-                let allowed = self.can_open_terminal_link(&uri);
-                let target: SharedString = uri.into();
+                let file = self.local_link_file(&uri);
+                let allowed = openable_uri(&uri) || file.is_some();
+                let caption: SharedString = if file.is_some() {
+                    if cx.global::<Preferences>().file_editor.is_none() { "Configure an external editor in Settings".into() }
+                    else if cfg!(target_os = "macos") { "Cmd-click to open in editor".into() }
+                    else { "Ctrl-click to open in editor".into() }
+                } else if !allowed { "Unsupported or remote file target".into() }
+                else if cfg!(target_os = "macos") { "Cmd-click to open link".into() }
+                else { "Ctrl-click to open link".into() };
+                let target: SharedString = file.map(|file| file.label()).unwrap_or(uri).into();
                 root.when(allowed, |root| root.cursor_pointer())
-                    .tooltip(move |_, cx| cx.new(|_| LinkHint { target: target.clone(), allowed }).into())
+                    .tooltip(move |_, cx| cx.new(|_| LinkHint { target: target.clone(), caption: caption.clone() }).into())
             })
             .child(
                 canvas(
@@ -2522,15 +2527,13 @@ impl Element for TerminalElement {
         }
     }
 }
-struct LinkHint { target: SharedString, allowed: bool }
+struct LinkHint { target: SharedString, caption: SharedString }
 impl Render for LinkHint {
     fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
         div().w(px(520.).min((window.viewport_size().width - px(24.)).max(px(1.))))
             .px_2().py_1().rounded_md().bg(rgb(0x383838)).text_color(rgb(0xe5e5e5))
             .child(div().text_xs().text_color(rgb(0xa0a0a0)).truncate().child(
-                if !self.allowed { "Unsupported link target" }
-                else if cfg!(target_os = "macos") { "Cmd-click to open link" }
-                else { "Ctrl-click to open link" }))
+                self.caption.clone()))
             .child(div().text_sm().truncate().child(self.target.clone()))
     }
 }

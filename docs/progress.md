@@ -1,3 +1,11 @@
+Terminal-link destination polish: modifier-hover now identifies editor actions,
+shows the resolved absolute path plus line/column, and explains missing editor
+configuration. Context-menu Open Link captures the resolved local destination
+when the menu opens, preventing shell cwd changes from redirecting activation;
+its tooltip shows the captured destination. Web targets retain their browser
+routing and copied addresses retain the original output token. Desktop check
+passed; native hover/menu visual acceptance remains pending. No release/deploy.
+
 Terminal compiler-path navigation (T10): on-demand visible-line detection now
 recognizes path-shaped output and filename:line[:column] references, including
 soft wraps and wide Unicode cells. Local targets resolve against the terminal's

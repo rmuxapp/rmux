@@ -23,6 +23,15 @@ pub struct Location {
     pub column: Option<u32>,
 }
 
+impl Location {
+    pub fn label(&self) -> String {
+        let mut label = self.path.display().to_string();
+        if let Some(line) = self.line { label.push_str(&format!(":{line}")); }
+        if let Some(column) = self.column { label.push_str(&format!(":{column}")); }
+        label
+    }
+}
+
 pub fn local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Option<Location> {
     if remote || text.len() > 8192 || text.chars().any(char::is_control) { return None; }
     if text.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("file://")) {
@@ -60,6 +69,7 @@ mod tests {
         let location = local_target("src/世界/main.rs:42:7", Some(&cwd), false).unwrap();
         assert_eq!(location.path, cwd.join("src/世界/main.rs"));
         assert_eq!((location.line, location.column), (Some(42), Some(7)));
+        assert_eq!(location.label(), format!("{}:42:7", cwd.join("src/世界/main.rs").display()));
         let location = local_target("main.rs:12", Some(&cwd), false).unwrap();
         assert_eq!((location.line, location.column), (Some(12), None));
         for text in ["src/main.rs:0", "src/main.rs:1:0", "src/main.rs:999999999999", "//server/a", "~/a", "https://example.com/a", "src/a\n"] {

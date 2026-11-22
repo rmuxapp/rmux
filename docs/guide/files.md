@@ -176,7 +176,10 @@ thread. Editors are independent applications and are not closed with the preview
 Command-click on macOS (Ctrl-click elsewhere), or use **Open Link** in the
 terminal context menu, to open `file://` links and path-shaped output such as
 `src/main.rs:42:7`, `./tests/check.rs:12`, or an absolute file path. The first
-number is the line and the second is the column. Relative paths resolve from
+number is the line and the second is the column. Modifier-hover shows the resolved
+file path and location, with an editor configuration hint when needed. The context
+menu captures the resolved destination when opened, so later shell directory
+changes cannot redirect that action. Relative paths resolve from
 the terminal's last reported working directory, falling back to its launch
 directory; enable shell integration so directory changes stay current.
 
