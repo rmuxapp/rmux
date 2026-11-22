@@ -332,6 +332,10 @@ impl Session {
         rows: u16,
         scrollback_bytes: usize,
     ) -> Result<Self> {
+        Self::spawn_with_history(command, columns, rows, scrollback_bytes, None)
+    }
+    fn spawn_with_history(command: CommandBuilder, columns: u16, rows: u16, scrollback_bytes: usize,
+        history: Option<&rmux_core::shell_history::History>) -> Result<Self> {
         // portable-pty falls back to HOME for a missing Unix cwd. Reject an
         // invalid explicit target before allocating an engine or starting work.
         if let Some(directory) = command.get_cwd() {
@@ -347,6 +351,7 @@ impl Session {
         let initial_directory = command.get_cwd().map(std::path::absolute).transpose()?;
         let mut engine = Terminal::new(columns, rows)?;
         engine.set_scrollback_limit(scrollback_bytes)?;
+        if let Some(history) = history { engine.initialize_shell_history(history.clone()); }
         let report_all_keys = Arc::new(AtomicBool::new(engine.reports_all_keys()?));
         let reader_report_all_keys = report_all_keys.clone();
         let mouse_tracking = Arc::new(AtomicBool::new(engine.mouse_tracking()?));
@@ -520,6 +525,10 @@ impl Session {
         directory: Option<&std::path::Path>,
         scrollback_bytes: usize,
     ) -> Result<Self> {
+        Self::shell_in_with_history(columns, rows, directory, scrollback_bytes, None)
+    }
+    pub fn shell_in_with_history(columns: u16, rows: u16, directory: Option<&std::path::Path>,
+        scrollback_bytes: usize, history: Option<&rmux_core::shell_history::History>) -> Result<Self> {
         let shell = select_shell(
             std::env::var_os("RMUX_SHELL"),
             std::env::var_os(if cfg!(windows) { "COMSPEC" } else { "SHELL" }),
@@ -577,7 +586,14 @@ impl Session {
         if !cfg!(windows) && !(powershell && integration.is_some()) {
             command.args(unix_shell_flags(&shell, login));
         }
-        let mut session = Self::spawn_with_scrollback(command, columns, rows, scrollback_bytes)?;
+        if let Some(history) = history {
+            let wrapper = integration.as_ref().ok_or_else(|| anyhow::anyhow!("shell history requires enabled shell integration"))?;
+            let shell_name = std::path::Path::new(&shell).file_name().and_then(|name| name.to_str()).unwrap_or("");
+            let path = crate::shell_integration::write_history_import(wrapper.path(), shell_name, history)?;
+            command.env("RMUX_HISTORY_IMPORT", path);
+            command.env("RMUX_SESSION_HISTORY", "1");
+        }
+        let mut session = Self::spawn_with_history(command, columns, rows, scrollback_bytes, history)?;
         session._shell_integration = integration;
         Ok(session)
     }

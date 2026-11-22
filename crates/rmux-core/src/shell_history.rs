@@ -4,7 +4,7 @@ pub const ENTRY_LIMIT: usize = 512;
 pub const TEXT_LIMIT: usize = 128 * 1024;
 pub const COMMAND_LIMIT: usize = 8 * 1024;
 
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Clone, Default, Debug, PartialEq, Eq)]
 pub struct History {
     entries: VecDeque<String>,
     bytes: usize,

@@ -24,6 +24,21 @@ _rmux_bash_capture_status() {
 _rmux_bash_history_report() {
     [[ ${RMUX_SESSION_HISTORY-0} == 1 && -n ${HISTFILE-} && $HISTFILE != /dev/null ]] || return 0
     [[ -o history ]] || return 0
+    if [[ -n ${RMUX_HISTORY_IMPORT-} ]]; then
+        local import_file=$RMUX_HISTORY_IMPORT
+        unset RMUX_HISTORY_IMPORT
+        # Import as history data, never source/eval or terminal input.
+        if [[ -r $import_file ]]; then
+            # Flush genuinely new entries first. Mark the imported entries as
+            # already written so normal exit/history -a does not duplicate them.
+            builtin history -a || return 0
+            local imported_command
+            while IFS= read -r -d '' imported_command; do
+                builtin history -s -- "$imported_command"
+            done < "$import_file"
+            builtin history -a /dev/null
+        fi
+    fi
     local listing sequence command LC_ALL=C encoded='' character hex byte index
     listing=$(HISTTIMEFORMAT= builtin history 1)
     if [[ -z $listing ]]; then

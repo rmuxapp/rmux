@@ -10180,3 +10180,28 @@ records. No live shell is assigned an ID or enabled for capture yet. Remaining
 integration includes history-directory ownership and active-ID leases, asynchronous
 save coalescing/flush on exit, shell-native import without global duplication,
 cleanup, and native restore acceptance. No GUI build or release was needed.
+
+
+### Shell history import compatibility — 2026-11-22
+
+Added a seeded Session startup path and private history import files for Bash
+and zsh. The terminal receives the bounded saved history before its reader
+starts, preventing initial output from racing the restored state. Shell hooks
+consume the import once at the first eligible prompt, respecting capture opt-out
+and disabled history. Unsupported shells/integration configurations return an
+error instead of silently discarding the requested import.
+
+Real-shell checks exposed and fixed two compatibility issues: macOS Bash 3.2
+splits multiline native history files, so Bash imports NUL-separated records
+through quoted `history -s` arguments; zsh native files require escaping its
+internal token bytes to preserve some Unicode and emoji. Bash flushes genuine
+new history first and marks imported entries already written so exit does not
+append them to global history again. Nothing is sourced or evaluated from the
+import file.
+
+A focused real Bash/zsh test verifies recalled multiline/Unicode/backslash data,
+non-execution, unchanged existing global history, no imported global duplicates,
+and continued saving of new commands. Capture/reset checks and desktop
+compilation passed. This API is not yet activated by the desktop: private-store
+ownership, active-ID leases, asynchronous saves, cleanup, and end-to-end restore
+remain pending. No app bundle build or release was needed.

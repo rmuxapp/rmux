@@ -3,6 +3,34 @@ use anyhow::Result;
 use portable_pty::CommandBuilder;
 use std::ffi::OsStr;
 
+/// Encode history data in a private startup directory. Never executable.
+pub(crate) fn write_history_import(directory: &std::path::Path, shell: &str, history: &rmux_core::shell_history::History) -> Result<std::path::PathBuf> {
+    use std::io::Write;
+    anyhow::ensure!(matches!(shell, "bash" | "zsh"), "history import requires Bash or zsh");
+    let mut file = tempfile::NamedTempFile::new_in(directory)?;
+    for command in history.entries() {
+        if shell == "bash" {
+            // Bash 3.2 splits multiline native files. NUL records are read
+            // into history -s as a single quoted argument, never executed.
+            file.write_all(command.as_bytes())?;
+            file.write_all(&[0])?;
+        } else {
+            file.write_all(b": 1:0;")?;
+            // zsh's history reader unescapes its internal Meta byte (0x83).
+            // Escape zsh internal token bytes so UTF-8 survives unchanged.
+            for byte in command.bytes() {
+                if (0x83..=0xa2).contains(&byte) { file.write_all(&[0x83, byte ^ 32])?; }
+                else if byte == b'\n' { file.write_all(b"\\\n")?; }
+                else { file.write_all(&[byte])?; }
+            }
+            file.write_all(b"\n")?;
+        }
+    }
+    let path = directory.join("session-history");
+    file.persist_noclobber(&path)?;
+    Ok(path)
+}
+
 const RESTORE: &str = r#"
 if [[ $RMUX_ZSH_ORIGINAL_SET == 1 ]]; then
     export ZDOTDIR=$RMUX_ZSH_ORIGINAL
@@ -117,6 +145,53 @@ unset RMUX_ZSH_ORIGINAL_SET RMUX_ZSH_ORIGINAL RMUX_ZSH_WRAPPER
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
     use super::*;
+    #[test]
+    fn restored_history_is_data_and_does_not_duplicate_global_history() -> Result<()> {
+        use std::io::Write;
+        use std::process::{Command, Stdio};
+        for shell in ["bash", "zsh"] {
+            let temporary = tempfile::tempdir()?;
+            let root = temporary.path();
+            let mut history = rmux_core::shell_history::History::default();
+            for entry in ["touch \"$RMUX_TEST_EXECUTED\"", "printf '%s\\n' '世界\nsecond line'", "echo BACK\\SLASH", "echo Ã 🎃", "echo \\\ncontinued"] {
+                history.record(entry);
+            }
+            let import = write_history_import(root, shell, &history)?;
+            let global = root.join("global");
+            std::fs::write(&global, "echo GLOBAL_SENTINEL\n")?;
+            let mut command = Command::new(format!("/bin/{shell}"));
+            if shell == "bash" { command.args(["--noprofile", "--norc", "--noediting", "-i"]); }
+            else { command.args(["-d", "-f", "-i"]); }
+            let integration = if shell == "bash" { include_str!("../../../shell-integration/bash/rmux.bash") }
+                else { include_str!("../../../shell-integration/zsh/rmux.zsh") };
+            std::fs::write(root.join("integration"), integration)?;
+            let dump = if shell == "bash" { "HISTTIMEFORMAT= history > \"$HOME/dump\"" } else { "print -rl -- \"${(@v)history}\" > \"$HOME/dump\"" };
+            let startup = if shell == "zsh" { "setopt rcs" } else { ":" };
+            let input = format!("HISTSIZE=200; SAVEHIST=100; {startup}\nsource \"$HOME/integration\"\n{dump}\necho NEW_SENTINEL\nexit 0\n");
+            let mut child = command.env("HOME", root).env("HISTFILE", &global)
+                .env("RMUX_TEST_EXECUTED", root.join("executed"))
+                .env("RMUX_HISTORY_IMPORT", import).env("RMUX_SESSION_HISTORY", "1")
+                .env("TERM_PROGRAM", "rmux").env("RMUX_SHELL_INTEGRATION", "1")
+                .env_remove("BASH_ENV").env_remove("ZDOTDIR")
+                .stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn()?;
+            child.stdin.take().unwrap().write_all(input.as_bytes())?;
+            let output = child.wait_with_output()?;
+            assert!(output.status.success(), "{shell}: {:?}", output.stderr);
+            assert!(!root.join("executed").exists(), "{shell} executed imported history");
+            let recalled = std::fs::read_to_string(root.join("dump"))?;
+            assert!(recalled.contains("touch \"$RMUX_TEST_EXECUTED\""), "{shell}: {recalled}");
+            assert!(recalled.contains("世界\nsecond line"), "{shell}: {recalled}");
+            for entry in history.entries() {
+                assert!(recalled.contains(entry), "{shell} lost {entry:?}: {recalled}");
+            }
+            let saved_bytes = std::fs::read(global)?;
+            let saved = String::from_utf8_lossy(&saved_bytes);
+            assert!(!saved.contains("RMUX_TEST_EXECUTED"), "{shell} duplicated imported history: {saved}");
+            assert!(saved.contains("GLOBAL_SENTINEL"), "{shell}: {saved}");
+            assert!(saved.contains("NEW_SENTINEL"), "{shell} lost new global history: {saved}");
+        }
+        Ok(())
+    }
     #[test]
     fn automatic_nonlogin_bash_preserves_user_rc_and_cleans_wrapper() -> Result<()> {
         let home = tempfile::tempdir()?;

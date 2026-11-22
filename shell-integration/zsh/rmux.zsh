@@ -29,6 +29,12 @@ _rmux_report_directory() {
 _rmux_zsh_history_report() {
     [[ ${RMUX_SESSION_HISTORY-0} == 1 && -n ${HISTFILE-} && $HISTFILE != /dev/null ]] || return 0
     (( ${SAVEHIST:-0} > 0 )) || return 0
+    if [[ -n ${RMUX_HISTORY_IMPORT-} ]]; then
+        local import_file=$RMUX_HISTORY_IMPORT
+        unset RMUX_HISTORY_IMPORT
+        # Import as history data, never source/eval or terminal input.
+        [[ ! -r $import_file ]] || builtin fc -R "$import_file"
+    fi
     local listing sequence command encoded='' character hex byte
     local -i index
     zmodload -F zsh/parameter p:history 2>/dev/null || return 0

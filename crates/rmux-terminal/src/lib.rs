@@ -578,6 +578,11 @@ impl Terminal {
         }
     }
 
+    pub(crate) fn initialize_shell_history(&mut self, history: rmux_core::shell_history::History) {
+        self.callbacks.shell_history_revision = u64::from(history.entries().len() > 0);
+        self.callbacks.shell_history = history;
+    }
+
     /// Snapshot only when shell-approved commands changed. No screen parsing.
     pub fn shell_history_since(&self, revision: u64) -> Option<(u64, &rmux_core::shell_history::History)> {
         (revision != self.callbacks.shell_history_revision).then_some((self.callbacks.shell_history_revision, &self.callbacks.shell_history))
