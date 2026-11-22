@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Notification panel polish: pointer-down on a card now selects its stable message
+identity, including when interacting with More/Copy/Mark read controls, so later
+keyboard actions target that card. Home/End selects the first/last message.
+Keyboard guidance stays in a fixed footer; list scroll indices were adjusted
+for removal of the old hint child. Panel width, heading and accent match Settings.
+One native bundle build passed, and the rendered panel was inspected in the
+isolated synthetic workspace. Screenshot: `target/notifications-polish.png`.
+The UI tool reset during interaction checks; multi-message pointer/keyboard
+selection, paging and unread-filter removal still need native acceptance.
+
+
 Settings polish: Save, the settings-file link and keyboard guidance now stay
 visible in a fixed footer while settings scroll. The panel uses the shared
 purple selection/accent colors, gives labels more room, explains session-only

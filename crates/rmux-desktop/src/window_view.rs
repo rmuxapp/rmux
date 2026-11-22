@@ -1813,8 +1813,7 @@ impl WorkspaceWindow {
                 if let Some(state) = &mut self.notification_navigation {
                     let index = index.min(targets.len().saturating_sub(1));
                     state.selected = targets.get(index).map(|row| (row.1, row.2));
-                    // The first scroll child is the navigation hint.
-                    state.scroll.scroll_to_item(if targets.is_empty() { 0 } else { index + 1 });
+                    state.scroll.scroll_to_item(index);
                     cx.notify();
                 }
             }
@@ -1940,7 +1939,7 @@ impl WorkspaceWindow {
         let state = self.notification_navigation.as_mut().expect("open notification panel");
         let index = targets.iter().position(|row| Some((row.1, row.2)) == state.selected).unwrap_or(0);
         state.selected = targets.get(index).map(|row| (row.1, row.2));
-        state.scroll.scroll_to_item(if targets.is_empty() { 0 } else { index + 1 });
+        state.scroll.scroll_to_item(index);
         cx.notify();
     }
     fn notification_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
@@ -1959,20 +1958,21 @@ impl WorkspaceWindow {
         let destination = if matches!(direction, "pageup" | "pagedown") {
             command_palette::paged_result(selected, targets.len(), direction == "pageup",
                 f32::from(state.scroll.bounds().size.height), |index| {
-                    // Child zero is the keyboard hint. Include the inter-card gap
-                    // in the measured stride; expanded cards can exceed a viewport.
-                    state.scroll.bounds_for_item(index + 1).map(|bounds| {
-                        state.scroll.bounds_for_item(index + 2)
+                    // Include the inter-card gap; expanded cards can exceed a viewport.
+                    state.scroll.bounds_for_item(index).map(|bounds| {
+                        state.scroll.bounds_for_item(index + 1)
                             .map(|next| f32::from(next.top() - bounds.top()))
                             .unwrap_or_else(|| f32::from(bounds.size.height) + 8.)
                     }).unwrap_or(1.).max(1.)
                 })
+        } else if !targets.is_empty() && matches!(direction, "home" | "end") {
+            Some(if direction == "home" { 0 } else { targets.len() - 1 })
         } else {
             command_palette::navigated_result(selected, targets.len(), direction)
         };
         if let Some(index) = destination {
             state.selected = Some((targets[index].1, targets[index].2));
-            state.scroll.scroll_to_item(index + 1);
+            state.scroll.scroll_to_item(index);
             cx.notify();
         } else if key == "escape" {
             self.toggle_notifications(window, cx);
@@ -2045,8 +2045,8 @@ impl WorkspaceWindow {
             .on_mouse_down(MouseButton::Left, { let focus = navigation.focus.clone(); move |_, window, _| focus.focus(window) })
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| this.notification_key(event, window, cx)))
             .on_action(cx.listener(|this, _: &CopySelection, _, cx| this.copy_selected_notification(cx)))
-            .w(px(340.))
-            .max_w(relative(0.45))
+            .w(px(380.))
+            .max_w(relative(0.50))
             .h_full()
             .flex_shrink_0()
             .flex()
@@ -2056,13 +2056,13 @@ impl WorkspaceWindow {
             .border_color(rgb(0x383838))
             .child(
                 div()
-                    .h(px(36.))
+                    .h(px(44.))
                     .px_3()
                     .flex_shrink_0()
                     .flex()
                     .items_center()
                     .justify_between()
-                    .child(div().flex_1().min_w_0().truncate().child(format!("Notifications ({})", messages.len())))
+                    .child(div().flex_1().min_w_0().truncate().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).child("Notifications"))
                     .when(total_count > 0, |header| header.child(
                         div().id("dismiss-all-notifications").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
                             .hover(|style| style.bg(rgb(0x353535)))
@@ -2092,7 +2092,7 @@ impl WorkspaceWindow {
                 })))
             .when(has_unread, |panel| panel.child(
                         div().id("mark-all-read").flex_shrink_0().mx_3().mb_2().px_2().py_1().rounded_sm().text_xs()
-                            .text_color(rgb(0x8ebfff)).cursor_pointer().hover(|style| style.bg(rgb(0x353535)))
+                            .text_color(rgb(crate::chrome_style::ACCENT)).cursor_pointer().hover(|style| style.bg(rgb(0x353535)))
                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Acknowledge all alerts in this window; keep messages".into())).into())
                             .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                 if event.standard_click() { this.mark_all_read(cx); }
@@ -2107,13 +2107,6 @@ impl WorkspaceWindow {
                     .overflow_y_scroll()
                     .track_scroll(&navigation.scroll)
                     .p_2()
-                    .child(
-                        div()
-                            .text_xs()
-                            .text_color(rgb(0xa0a0a0))
-                            .mb_2()
-                            .child("↑↓ / Tab to navigate · U to filter · R to mark read · E to expand · Enter to open · Delete to dismiss · Esc to close"),
-                    )
                     .when(messages.is_empty(), |list| {
                         list.child(div().p_3().text_sm().child(if navigation.unread_only { "No unread notifications" } else { "No notifications to show" }))
                     })
@@ -2131,6 +2124,12 @@ impl WorkspaceWindow {
                                 .cursor_pointer()
                                 .bg(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::SELECTED) } else { rgb(0x292929) })
                                 .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, _, cx| {
+                                    if let Some(state) = &mut this.notification_navigation {
+                                        state.selected = Some((terminal, revision));
+                                        cx.notify();
+                                    }
+                                }))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
                                     this.notification_navigation = None;
@@ -2219,6 +2218,10 @@ impl WorkspaceWindow {
                         },
                     )),
             )
+            .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838))
+                .text_xs().text_color(rgb(0xa0a0a0))
+                .child("↑↓ / Tab select · Home/End first/last · Enter open")
+                .child(div().mt_1().child("U filter · R mark read · E expand · Delete dismiss · Esc close")))
             .into_any_element()
     }
     fn activate_workspace(&mut self, index: usize) {
