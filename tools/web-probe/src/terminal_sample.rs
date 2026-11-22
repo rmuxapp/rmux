@@ -175,7 +175,13 @@ impl TerminalSample {
     fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if !self.focus.is_focused(window) || !self.composition.text.is_empty() { return; }
         let key = &event.keystroke;
-        if key.modifiers.platform { return; }
+        if key.modifiers.platform {
+            if crate::terminal_engine::is_mac() && !key.modifiers.alt && !key.modifiers.control && !key.modifiers.shift {
+                let input = match key.key.as_str() { "left" => Some("\x01"), "right" => Some("\x05"), "backspace" => Some("\x15"), _ => None };
+                if let Some(input) = input { self.accept(input, cx); cx.stop_propagation(); }
+            }
+            return;
+        }
         if key.modifiers.shift && !key.modifiers.control && !key.modifiers.alt {
             if let Some(scroll) = rmux_core::scroll::navigation(&key.key, self.frame.rows.len()) {
                 self.scroll(scroll,cx);

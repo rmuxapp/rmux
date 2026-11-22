@@ -48,6 +48,13 @@ lines and leaves the final unfinished line ready to edit. Sample input is limite
 to 4 KiB. If the browser denies menu clipboard access, use your keyboard paste
 shortcut instead.
 
+Sample command lines support **Left/Right**, **Home/End**, **Backspace**, and
+**Delete**, including insertion in the middle of a line. **Option+Left/Right**
+on macOS (Alt or Ctrl+Left/Right elsewhere) moves by word. On macOS,
+**Cmd+Left/Right** moves to the start/end and **Cmd+Backspace** deletes back to
+the start. **Ctrl+A/E** also moves to the start/end; **Ctrl+U/K** deletes from
+the cursor to the start/end. Long drafts scroll within the pane as you move.
+
 Rename a workspace with **Cmd+Shift+R** (Ctrl+Shift+R elsewhere) or double-click
 its sidebar name. Use the palette to pin workspaces or create, rename, and close
 workspace groups. Closing a group removes its sample sessions.

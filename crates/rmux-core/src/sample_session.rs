@@ -55,12 +55,20 @@ impl SampleSession {
                 });
                 self.draft.clear();
             }
-            "\x7f" | "\x08" => self.draft.backspace(),
+            "\x7f" | "\x08" => self.draft.delete(true, measure)?,
+            "\x1b[3~" | "\x04" => self.draft.delete(false, measure)?,
+            "\x1b[D" | "\x1bOD" | "\x02" => self.draft.move_cursor(true, false),
+            "\x1b[C" | "\x1bOC" | "\x06" => self.draft.move_cursor(false, false),
+            "\x1bb" | "\x1b[1;3D" | "\x1b[1;5D" => self.draft.move_cursor(true, true),
+            "\x1bf" | "\x1b[1;3C" | "\x1b[1;5C" => self.draft.move_cursor(false, true),
+            "\x01" | "\x1b[H" | "\x1bOH" | "\x1b[1~" => self.draft.edge(false),
+            "\x05" | "\x1b[F" | "\x1bOF" | "\x1b[4~" => self.draft.edge(true),
             "\x03" => {
                 output.push_str(&format!("\r\x1b[2K$ {}^C\r\n", self.draft.text()));
                 self.draft.clear();
             }
-            "\x15" => self.draft.clear(),
+            "\x15" => self.draft.erase_to_edge(false, measure)?,
+            "\x0b" => self.draft.erase_to_edge(true, measure)?,
             text => {
                 if text.is_empty() || text.chars().any(char::is_control) { return Ok(None); }
                 self.draft.append(text, measure)?;
@@ -76,6 +84,31 @@ mod tests {
     use super::*;
     fn send(session: &mut SampleSession, input: &str) -> String {
         session.input(input, 80, |_| panic!("ASCII requires no measurement")).unwrap().unwrap()
+    }
+    #[test]
+    fn cursor_editing_and_word_navigation_preserve_the_command() {
+        let mut session = SampleSession::default();
+        send(&mut session, "echo alpha beta");
+        send(&mut session, "\x1bb");
+        send(&mut session, "new ");
+        send(&mut session, "\x1bf");
+        send(&mut session, "!");
+        assert!(send(&mut session, "\r").contains("\r\nalpha new beta!\r\n"));
+        send(&mut session, "echo old");
+        send(&mut session, "\x01");
+        for _ in 0..5 { send(&mut session, "\x1b[C"); }
+        send(&mut session, "\x1b[3~");
+        send(&mut session, "\x05");
+        send(&mut session, "\x7f");
+        assert!(send(&mut session, "\r").contains("\r\nl\r\n"));
+        send(&mut session, "discard echo keep discard");
+        send(&mut session, "\x01");
+        for _ in 0..8 { send(&mut session, "\x06"); }
+        send(&mut session, "\x15");
+        send(&mut session, "\x05");
+        send(&mut session, "\x1bb");
+        send(&mut session, "\x0b");
+        assert!(send(&mut session, "\r").contains("\r\nkeep \r\n"));
     }
     #[test]
     fn sessions_keep_independent_drafts_and_interrupt_without_execution() {
