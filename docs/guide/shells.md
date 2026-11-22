@@ -56,8 +56,11 @@ your prompt. The macOS bundle includes it under
 `Contents/Resources/shell-integration/powershell/`.
 The wrapper preserves prompt output and emits OSC 7 plus OSC 133 A/B. When an
 existing console line reader is available, it delegates to that reader and emits
-OSC 133 C for nonempty commands, then D at the next prompt. Completion has no exit
-code: LASTEXITCODE can be stale after PowerShell commands. Empty or thrown/canceled
+OSC 133 C for nonempty commands, then D at the next prompt. Completion reports
+normalized shell success (`0`) or failure (`1`) from `$?`, captured before the
+user prompt runs while preserving the status that prompt sees. It does not report
+exact native exit codes: `LASTEXITCODE` can be stale after PowerShell commands.
+Empty or thrown/canceled
 reads emit no command markers. Existing PSReadLine bindings remain in charge. A real macOS PowerShell PTY fixture
 covers profile loading, Unicode directory changes and prompt navigation. Windows,
 complex prompt themes and native PSReadLine interaction remain unvalidated.

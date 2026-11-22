@@ -44,8 +44,13 @@ try {
         Get-Item -LiteralPath (Join-Path $root 'missing') -ErrorAction SilentlyContinue
         $result = prompt
         if ($script:promptSawSuccess) { throw 'Completion marker changed prompt status' }
-        if (!$result.StartsWith("$escape]133;D$bell")) { throw 'Command completion missing' }
+        if (!$result.StartsWith("$escape]133;D;1$bell")) { throw 'Command completion missing' }
         if ((prompt).Contains("]133;D")) { throw 'Completion was emitted twice' }
+        $null = PSConsoleHostReadLine
+        $global:LASTEXITCODE = 23
+        $result = prompt
+        if (!$script:promptSawSuccess -or !$result.StartsWith("$escape]133;D;0$bell")) { throw 'Successful command inherited a stale native failure' }
+        if ($global:LASTEXITCODE -ne 23) { throw 'Completion changed native exit status' }
         $capture.GetStringBuilder().Clear() | Out-Null
         $script:nextLine = '   '
         $null = PSConsoleHostReadLine

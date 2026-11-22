@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+PowerShell command completion now reports normalized success/failure from `$?`
+without changing the status seen by the original prompt. The paired expression
+is evaluated before assignment can reset status. Focused PowerShell 7.5.4 checks
+pass for failed commands, successful commands after stale LASTEXITCODE, original
+prompt preservation, idempotence and canceled/empty input. Exact native exit-code
+reporting remains pending. Bash login auto-injection remains unresolved because
+login shells ignore --rcfile; the non-login wrapper is unchanged.
+
 Terminal input-focus transitions now publish `surface.focus_changed`, with current
 `input_focused` in `surface.list`. Publication uses the existing deduplicated
 focus path, including window activation and focus entering/leaving editors.

@@ -6,16 +6,16 @@ if (Test-Path variable:global:_rmux_original_prompt) { return }
 $global:_rmux_command_running = $false
 $global:_rmux_original_prompt = $function:prompt
 function global:prompt {
-    # Invoke the user's prompt before running our own commands. Do not replace
-    # its implementation or report a synthetic command exit status.
-    $promptText = & $global:_rmux_original_prompt
+    # Evaluate both expressions before assignment resets $?. The user prompt
+    # sees the same status we capture, even when its own commands succeed.
+    $commandSucceeded, $promptText = $?, (& $global:_rmux_original_prompt)
     $escape = [char]27
     $bell = [char]7
     $finished = ''
     if ($global:_rmux_command_running) {
-        # $? must reach the original prompt unchanged. Do not guess an exit code
-        # from LASTEXITCODE, which may belong to an earlier native command.
-        $finished = "$escape]133;D$bell"
+        # Report normalized shell success, not a potentially stale LASTEXITCODE.
+        $commandStatus = if ($commandSucceeded) { 0 } else { 1 }
+        $finished = "$escape]133;D;$commandStatus$bell"
         $global:_rmux_command_running = $false
     }
     $directory = ''
