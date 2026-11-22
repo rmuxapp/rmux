@@ -10,7 +10,7 @@ def check(root, remote=True):
     version = tomllib.loads((root / 'Cargo.toml').read_text())['workspace']['package']['version']
     tag = 'v' + version
     notes = root / 'docs/releases' / f'{tag}.md'
-    if not notes.is_file() or not notes.read_text().startswith(f'# rmux {version} — preview\n'):
+    if not notes.is_file() or not notes.read_text().startswith(f'# rmux {version}\n'):
         raise SystemExit(f'Missing or mismatched release notes: {notes}')
     for name in ('Cargo.lock', 'tools/web-probe/Cargo.lock'):
         packages = tomllib.loads((root / name).read_text())['package']

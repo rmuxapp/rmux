@@ -46,9 +46,9 @@ tag_sha = subprocess.check_output(['git', 'rev-parse', 'FETCH_HEAD^{commit}'], t
 if tag_sha != source_sha:
     raise SystemExit(f'Release tag {tag} points to {tag_sha}, expected built commit {source_sha}')
 run('gh', 'release', 'create', tag, *(str(path) for path in assets), str(checksums),
-    '--repo', repo, '--verify-tag', '--title', f'rmux {version} — preview',
-    '--notes-file', f'docs/releases/{tag}.md', '--prerelease', '--draft')
-run('gh', 'release', 'edit', tag, '--repo', repo, '--draft=false')
+    '--repo', repo, '--verify-tag', '--title', f'rmux {version}',
+    '--notes-file', f'docs/releases/{tag}.md', '--draft')
+run('gh', 'release', 'edit', tag, '--repo', repo, '--draft=false', '--prerelease=false', '--latest')
 # Source development can advance main between fetch and feed push. Reapply only
 # the generated feed on the latest main; never force-push or replay other edits.
 run('git', 'config', 'user.name', 'github-actions[bot]')
