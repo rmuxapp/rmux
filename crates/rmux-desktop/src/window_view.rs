@@ -3019,7 +3019,7 @@ impl WorkspaceWindow {
         if self.file_browser_job.is_some() || self.automation_available(cx).is_err() { return; }
         let source = self.preview_restore.take().or_else(|| self.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx)));
         if let Some(state) = &source { self.preview_history.update(state.clone()); }
-        let restore = navigation.as_ref().map(|(_, state)| state.clone()).or_else(|| source.filter(|state| state.matches(&path, hex, markdown)));
+        let restore = navigation.as_ref().map(|(_, state)| state.clone()).or_else(|| source.and_then(|state| state.for_mode(&path, hex, markdown)));
         let navigation = navigation.map(|(index, _)| index);
         let Some(focus) = window.focused(cx) else { return; };
         let permit = match file_browser::Permit::acquire() {

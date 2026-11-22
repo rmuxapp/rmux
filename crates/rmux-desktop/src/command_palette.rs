@@ -247,6 +247,10 @@ struct Command {
     shortcut: Option<String>,
 }
 impl Command {
+    fn source_line(&self) -> Option<u32> {
+        match &self.target { PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().and_then(|line| line.source_line), _ => None }
+    }
+
     fn markdown_kind(&self) -> Option<markdown_preview::Kind> {
         match &self.target { PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().and_then(|line| line.markdown), _ => None }
     }
@@ -312,13 +316,29 @@ pub struct PreviewState {
     query: String,
     wrapped: bool,
     command: Option<usize>,
+    source_line: Option<u32>,
 }
 impl PreviewState {
     pub fn new(path: std::path::PathBuf, hex: bool, markdown: bool) -> Self {
-        Self { path, hex, markdown, query: String::new(), wrapped: false, command: None }
+        Self { path, hex, markdown, query: String::new(), wrapped: false, command: None, source_line: None }
+    }
+    pub fn for_mode(mut self, path: &std::path::Path, hex: bool, markdown: bool) -> Option<Self> {
+        if self.path != path { return None; }
+        if self.hex == hex && self.markdown == markdown { return Some(self); }
+        if self.hex || hex { return None; }
+        self.markdown = markdown;
+        self.query.clear();
+        self.command = None;
+        self.wrapped = markdown;
+        Some(self)
     }
     pub fn target(&self) -> (std::path::PathBuf, bool, bool) { (self.path.clone(), self.hex, self.markdown) }
     pub fn matches(&self, path: &std::path::Path, hex: bool, markdown: bool) -> bool { self.path == path && self.hex == hex && self.markdown == markdown }
+}
+
+// Prefer the containing/preceding block, then the first available source line.
+fn source_row(rows: impl Iterator<Item = (usize, u32)>, target: u32) -> Option<usize> {
+    rows.min_by_key(|(_, line)| if *line <= target { (0, target - *line) } else { (1, *line - target) }).map(|(row, _)| row)
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Action)]
@@ -363,6 +383,21 @@ impl PreviewHistory {
 mod preview_history_tests {
     use super::{PreviewHistory, PreviewState};
     fn state(name: &str) -> PreviewState { PreviewState::new(name.into(), false, true) }
+    #[test]
+    fn mode_switches_keep_source_locations_without_reusing_unrelated_row_indices() {
+        let mut reading = state("a.md"); reading.command = Some(9); reading.source_line = Some(42);
+        reading.query = "visible text".into(); reading.wrapped = true;
+        let source = reading.clone().for_mode(std::path::Path::new("a.md"), false, false).unwrap();
+        assert_eq!(source.source_line, Some(42));
+        assert_eq!(source.command, None); assert!(source.query.is_empty()); assert!(!source.wrapped);
+        assert_eq!(reading.clone().for_mode(std::path::Path::new("a.md"), false, true), Some(reading.clone()));
+        assert!(reading.clone().for_mode(std::path::Path::new("b.md"), false, true).is_none());
+        assert!(reading.for_mode(std::path::Path::new("a.md"), true, false).is_none());
+        assert_eq!(super::source_row([(0, 1), (1, 20), (2, 50)].into_iter(), 42), Some(1));
+        assert_eq!(super::source_row([(0, 10), (1, 20)].into_iter(), 1), Some(0));
+        assert_eq!(super::source_row([(0, 10), (1, 20)].into_iter(), 20), Some(1));
+        assert_eq!(super::source_row(std::iter::empty(), 20), None);
+    }
     #[test]
     fn heading_jumps_share_document_history_and_restore_search_state() {
         let mut history = PreviewHistory::default();
@@ -1188,7 +1223,7 @@ impl CommandPalette {
     }
     pub fn preview_state(&self, cx: &App) -> Option<PreviewState> {
         let (path, hex) = self.preview_navigation.as_ref()?;
-        Some(PreviewState { path: path.clone(), hex: *hex, markdown: self.markdown_preview, query: self.input.read(cx).value().to_owned(), wrapped: self.wrap_preview, command: self.search.matches.get(self.selected).copied() })
+        Some(PreviewState { path: path.clone(), hex: *hex, markdown: self.markdown_preview, query: self.input.read(cx).value().to_owned(), wrapped: self.wrap_preview, command: self.search.matches.get(self.selected).copied(), source_line: self.selected_source_line() })
     }
     pub fn restore_preview(&mut self, state: PreviewState, cx: &mut Context<Self>) {
         if !self.preview_navigation.as_ref().is_some_and(|(path, hex)| state.matches(path, *hex, self.markdown_preview)) { return; }
@@ -1200,7 +1235,10 @@ impl CommandPalette {
         let entity = cx.entity();
         cx.defer(move |cx| entity.update(cx, |this, cx| {
             this.search.update(&state.query);
-            this.selected = state.command.and_then(|command| this.search.matches.iter().position(|index| *index == command)).unwrap_or(0);
+            this.selected = state.command.and_then(|command| this.search.matches.iter().position(|index| *index == command))
+                .or_else(|| state.source_line.and_then(|line| source_row(this.search.matches.iter().enumerate()
+                    .filter_map(|(row, command)| this.commands[*command].source_line().map(|source| (row, source))), line)))
+                .unwrap_or(0);
             this.scroll.reset(this.search.matches.len());
             crate::list_navigation::reveal(&this.scroll, this.selected);
             cx.notify();
@@ -1212,9 +1250,7 @@ impl CommandPalette {
         else { result_row_height(self.commands[command].subtitle.is_some()) }
     }
     fn selected_source_line(&self) -> Option<u32> {
-        let command = self.commands.get(*self.search.matches.get(self.selected)?)?;
-        let PaletteEvent::Run(action) = &command.target else { return None; };
-        action.as_any().downcast_ref::<CopyPreviewLine>()?.source_line
+        self.commands.get(*self.search.matches.get(self.selected)?)?.source_line()
     }
     fn edit_selected_file(&mut self, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
@@ -1293,6 +1329,7 @@ impl CommandPalette {
         let source = state.clone();
         state.query.clear();
         state.command = Some(command);
+        state.source_line = self.commands[command].source_line();
         self.preview_link = None;
         self.feedback = None;
         if record { cx.emit(PaletteEvent::Run(Box::new(RecordPreviewJump { source, target: state.clone() }))); }

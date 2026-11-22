@@ -10499,3 +10499,19 @@ check passed. Tests cover encoded spaces/Unicode, absolute file links, rejection
 cases, parser retention and action path/fragment identity. Native clicking,
 Back/Forward and async error/retry acceptance remain pending; no release build
 or session changes were made.
+
+
+### Keep reading position across Markdown/source modes — 2026-11-22
+
+Preview state now retains the selected source line in addition to row identity.
+Switching between text and rendered Markdown for the same file maps that line
+to a destination row, preferring the nearest preceding reading block. It clears
+the filter to reveal that destination and adopts appropriate wrapping for the
+new mode. Existing history retains the source mode/query/selection; refresh and
+same-mode navigation keep their prior state. Hex and different files do not
+reuse text line locations. Heading jumps update their stored source location.
+
+All three focused preview-history tests and desktop test compilation passed,
+covering same-mode preservation, mode conversion, path/hex boundaries and source
+row selection. Native navigation acceptance remains pending. No release, browser
+rebuild or user-session changes were made.

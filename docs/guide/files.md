@@ -138,6 +138,10 @@ open. Back and Forward restore heading jumps as well as file navigation,
 including the previous search and selected block. On macOS use Cmd+[ / Cmd+];
 elsewhere use Alt+Left / Alt+Right, or the preview's Back/Forward buttons.
 Same-document history navigation reuses the loaded preview; Refresh reloads it.
+Switching between Read Markdown and View Source follows the selected source
+line, choosing the nearest preceding reading block when needed. The mode switch
+clears filtering so the destination is visible. Back restores the previous mode,
+query and selection. Hex mode does not map byte offsets to text lines.
 A missing heading reports “Heading not found in this preview”; it may be
 outside a truncated document. A bare `#` returns to the first reading block.
 
