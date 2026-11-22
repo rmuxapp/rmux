@@ -1146,6 +1146,7 @@ impl TerminalView {
             return;
         }
         self.input_focused = focused;
+        events::publish("surface.focus_changed", cx.entity_id(), None, cx);
         self.refresh_input_mode(cx);
         if !focused {
             self.schedule_compression(cx);

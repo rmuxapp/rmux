@@ -59,7 +59,10 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert event_api["version"] == 1 and event_api["max_page_records"] == 128
             assert event_api["max_wait_ms"] == 3000 and not event_api["push_subscriptions"]
             assert "surface.directory_changed" in event_api["kinds"]
-            surface = call("surface.list")["surfaces"][0]["id"]
+            assert "surface.focus_changed" in event_api["kinds"]
+            surfaces = call("surface.list")["surfaces"]
+            assert all(isinstance(item["input_focused"], bool) for item in surfaces)
+            surface = surfaces[0]["id"]
             initial = call("events.read")
             assert sum(e["kind"] == "surface.created" and e["surface_id"] == surface for e in initial["events"]) == 1
             before = call("events.read")["cursor"]

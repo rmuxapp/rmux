@@ -15,7 +15,7 @@ impl Default for Read {
     fn default() -> Self { Self { after: None, limit: default_limit(), wait_ms: 0, surface_id: None, kinds: Vec::new() } }
 }
 const KINDS: &[&str] = &["notification.received", "notification.read", "notification.all_read", "notification.dismissed", "notification.cleared",
-    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed"];
+    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed"];
 pub fn capabilities() -> serde_json::Value {
     serde_json::json!({
         "version":1, "method":"events.read", "kinds":KINDS,

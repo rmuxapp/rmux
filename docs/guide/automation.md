@@ -277,8 +277,10 @@ the exact identifiers returned by `list-notifications`. It returns
 not clear newer messages or switch focus. Revisions are unsigned 64-bit integers.
 
 `list-notifications` lists non-dismissed messages
-and accepts optional `--window`/`--workspace` filters. These are in-app messages;
-native OS notification delivery is not implemented yet. The raw methods are
+and accepts optional `--window`/`--workspace` filters. These are in-app messages.
+Optional OS banners are controlled by `native_notifications` and the notification
+focus policy in Settings; OS permission and delivery support still apply.
+The raw methods are
 `notification.send`, `notification.list`, and `notification.dismiss`; dismissal
 requires `surface_id` and the returned `revision`, and returns `dismissed:false`
 if the message was dismissed, evicted by the history limit, or is unknown. Shell OSC notifications and RPC messages
@@ -367,6 +369,13 @@ event. Local/remote directory changes in one delivered update produce one event.
 Program status reports signal a new status revision; progress signals a changed
 value. These events describe metadata delivered to the UI, not every intermediate
 escape sequence in a burst of terminal output.
+
+`surface.focus_changed` reports changes to terminal keyboard focus, including
+window activation/deactivation and focus moving into an editor or palette.
+Repeated reports of the same focus state do not emit events. Fetch
+`surface.list` and read its boolean `input_focused` to resolve current state;
+`selected` only means the selected tab within its pane, even in an inactive window.
+The event is an invalidation, not a historical focus value.
 
 `surface.list` includes `program_status` (null or the current summary with `id`,
 `count`, `state`, `kind`, `progress`, `app`, `title`, and `message`) and `progress`

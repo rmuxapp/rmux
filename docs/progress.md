@@ -2,14 +2,26 @@
 
 ## Current implementation focus
 
+Terminal input-focus transitions now publish `surface.focus_changed`, with current
+`input_focused` in `surface.list`. Publication uses the existing deduplicated
+focus path, including window activation and focus entering/leaving editors.
+Selected tabs and actual keyboard focus remain distinct. Native build and the
+isolated event smoke pass, including capability discovery and boolean snapshot
+shape. Native focus transition interaction acceptance remains pending.
+
+The shared text-editing WASM artifact from GitHub run 44966016000 (a9f2dde)
+is deployed to rmux.app (Cloudflare deployment 45cdcaf4). Live browser checks
+verified palette dismissal through Close, Escape and clicking the backdrop,
+then terminal typing. Evidence: `target/live-palette-dismissal.jpg`.
+
 Shared text fields now support macOS Control-A/E/B/F/H/D/K editing through the
 existing Unicode movement, deletion and undo paths. Control+Option combinations
 and active IME composition remain with the input system. Native cargo check and
 the local WASM build pass. Browser interaction verified edge movement and
 character movement/deletion, including `alpha beta` → `pha bet`, and truncating
 `new workspace` to `new` with Control-K. Screenshot:
-`target/palette-control-editing.jpg`. Native visual acceptance and deployment of
-this browser change remain pending; public downloads are unchanged.
+`target/palette-control-editing.jpg`. Native visual acceptance remains pending; the browser change is deployed as
+recorded above. Public downloads are unchanged.
 
 `system.capabilities` now describes the live event API: protocol version, event
 kinds, filters, page/retention/wait limits, gap reasons and lack of push streams.
