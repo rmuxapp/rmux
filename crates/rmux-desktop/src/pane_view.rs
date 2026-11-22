@@ -321,10 +321,21 @@ impl PaneView {
         )).with_priority(2).into_any_element()
     }
 
+    fn dismiss_tab_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.tab_picker = None;
+        self.tab_picker_blur = None;
+        self.focus(window, cx);
+        cx.notify();
+    }
+
     fn show_tab_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminals.is_empty() || self.rename.is_some() || self.close_prompt.is_some() { return; }
         if let Some((input, _, _)) = &self.tab_picker { input.read(cx).focus.focus(window); return; }
-        let input = cx.new(|cx| text_field::TextField::new("", cx));
+        let input = cx.new(|cx| {
+            let mut input = text_field::TextField::new("", cx);
+            input.placeholder = Some("Search tabs by name or directory…");
+            input
+        });
         let focus = input.read(cx).focus.clone();
         let token = focus.clone();
         self.tab_picker_blur = Some(cx.on_blur(&focus, window, move |this, _, cx| {
@@ -352,7 +363,7 @@ impl PaneView {
                             .or_else(|| matches.first()).copied() { this.select(index, window, cx); }
                     }
                 }
-                text_field::EditEvent::Cancelled => { this.tab_picker = None; this.tab_picker_blur = None; this.focus(window, cx); }
+                text_field::EditEvent::Cancelled => this.dismiss_tab_picker(window, cx)
             }
             cx.notify();
         }).detach();
@@ -367,15 +378,23 @@ impl PaneView {
         let directory: Option<SharedString> = terminal.read(cx).snapshot_directory.as_ref()
             .map(|path| path.to_string_lossy().into_owned().into());
         let hint: SharedString = directory.as_ref().map(|directory| format!("{title}\n{directory}").into()).unwrap_or_else(|| title.clone());
-        div().id(("choose-tab", id)).flex().items_center().gap_2().px_3().h(px(52.)).text_sm().line_height(px(20.)).cursor_pointer()
+        let query = self.tab_picker.as_ref().map(|(input, _, _)| input.read(cx).value()).unwrap_or("");
+        let highlighted = |text: SharedString| {
+            let ranges = palette_match::fuzzy_highlights(&text, query);
+            StyledText::new(text).with_highlights(ranges.into_iter().map(|range| (
+                range, HighlightStyle { color: Some(rgb(crate::chrome_style::ACCENT).into()),
+                    font_weight: Some(FontWeight::BOLD), ..Default::default() }
+            )))
+        };
+        div().id(("choose-tab", id)).w_full().min_w_0().flex().items_center().gap_2().px_3().h(px(52.)).text_sm().line_height(px(20.)).cursor_pointer()
             .tooltip(move |_, cx| cx.new(|_| ControlHint(hint.clone())).into())
             .when(Some(id) == selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
-            .hover(|row| row.bg(rgb(0x40516c)))
+            .hover(|row| row.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
             .child(div().w(px(16.)).flex_shrink_0().child(if index == self.terminals.active_index() { "✓" } else { "" }))
             .child(div().w(px(24.)).flex_shrink_0().text_xs().text_color(rgb(0xaaaaaa)).child((index + 1).to_string()))
             .child(div().flex_1().min_w_0().flex().flex_col().gap_1()
-                .child(div().truncate().child(title))
-                .when_some(directory, |column, directory| column.child(div().text_xs().line_height(px(16.)).text_color(rgb(0xaaaaaa)).truncate().child(directory))))
+                .child(div().truncate().child(highlighted(title)))
+                .when_some(directory, |column, directory| column.child(div().text_xs().line_height(px(16.)).text_color(rgb(0xaaaaaa)).truncate().child(highlighted(directory)))))
             .when(terminal.read(cx).attention.any(), |row| row.child(div().w(px(6.)).h(px(6.)).rounded_full().bg(rgb(0xf0b85b))))
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 if !event.standard_click() { return; }
@@ -1369,7 +1388,7 @@ impl Render for PaneView {
                     .or_else(|| matches.first().map(|index| self.terminals[*index].entity_id()));
                 root.child(deferred(div().absolute().top(px(30.)).bottom_0().left_0().right_0()
                     .flex().flex_col().min_h_0()
-                    .child(div().id("tab-picker-container").occlude().min_h_0().flex().flex_col()
+                    .child(div().id("tab-picker-container").occlude().w(px(520.)).max_w_full().min_w_0().min_h_0().overflow_hidden().flex().flex_col()
                     .bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md()
                     .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                     .on_mouse_down(MouseButton::Middle, |_, _, cx| cx.stop_propagation())
@@ -1379,7 +1398,7 @@ impl Render for PaneView {
                     .on_mouse_up(MouseButton::Right, |_, _, cx| cx.stop_propagation())
                     .on_mouse_move(|_, _, cx| cx.stop_propagation())
                     .on_scroll_wheel(|_, _, cx| cx.stop_propagation())
-                    .on_mouse_down_out(cx.listener(|this, _, window, cx| { this.tab_picker = None; this.tab_picker_blur = None; this.focus(window, cx); cx.notify(); }))
+                    .on_mouse_down_out(cx.listener(|this, _, window, cx| { this.dismiss_tab_picker(window, cx); }))
                     .on_key_down(cx.listener(|this, event: &KeyDownEvent, _, cx| {
                         let key = event.keystroke.key.as_str();
                         if !matches!(key, "up" | "down" | "pageup" | "pagedown") { return; }
@@ -1401,9 +1420,12 @@ impl Render for PaneView {
                             cx.stop_propagation(); cx.notify();
                         }
                     }))
-                    .child(div().px_3().pt_2().text_xs().text_color(rgb(0xaaaaaa))
-                        .child(format!("{} of {} tabs · Search title or directory · ↑↓ choose · Enter open · Esc cancel", matches.len(), self.terminals.len())))
-                    .child(div().flex_shrink_0().p_2().child(input))
+                    .child(crate::palette_view::header(format!("Terminal tabs · {} of {}", matches.len(), self.terminals.len()),
+                        crate::palette_view::close_button().on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
+                            cx.stop_propagation();
+                            if event.standard_click() { this.dismiss_tab_picker(window, cx); }
+                        }))))
+                    .child(crate::palette_view::search(input))
                     .child(if matches.is_empty() {
                         div().p_3().text_sm().text_color(rgb(0xaaaaaa)).child("No matching tabs").into_any_element()
                     } else {
@@ -1414,7 +1436,9 @@ impl Render for PaneView {
                             entity.update(cx, |pane, cx| pane.render_tab_picker_row(index, selected, cx))
                         }).with_sizing_behavior(ListSizingBehavior::Auto)
                             .w_full().min_h_0().h(height).into_any_element()
-                    }))).with_priority(1))
+                    })
+                    .child(crate::palette_view::footer().child("↑↓ choose · Enter open · Esc close"))
+                    )).with_priority(1))
             })
     }
 }

@@ -33,7 +33,7 @@ pub(crate) fn close_button() -> Stateful<Div> {
         .child("Close ×")
 }
 pub(crate) fn search(input: impl IntoElement) -> Div {
-    div().flex_shrink_0().p_3().child(div().w_full().px_3().py_2().rounded_md()
+    div().w_full().min_w_0().flex_shrink_0().p_3().child(div().w_full().min_w_0().px_3().py_2().rounded_md()
         .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
 }
 pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {

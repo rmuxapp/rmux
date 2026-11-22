@@ -2,6 +2,29 @@
 
 ## Current implementation focus
 
+Tab chooser sizing is now visually verified: a fixed preferred width with a
+pane-width maximum, explicit search-wrapper width/minimum and clipped panel keep
+the input inside the 520 px chooser. Rows fill its width. Native review caught
+and corrected the previous max-width-only field overflow; the final debug bundle
+renders correctly in the 12-tab fixture. Screenshot: target/tab-chooser-final.png.
+Earlier native search/Enter selection evidence still applies; no shortcut mapping
+was changed. This completes the local chooser presentation batch.
+
+Tab chooser native review: debug bundle build passes. In an isolated 12-tab
+fixture, Cmd+Shift+T opens the chooser, query 07 highlights Terminal 07, and
+Enter selects it and scrolls the tab strip to expose it. Screenshot:
+target/tab-picker-polish.png. Visual review exposed an overly wide panel and
+content-width selection backgrounds; follow-up styling caps the panel at 520 px
+within its pane and gives result rows full width. These final sizing edits have
+not been rebuilt. Fixture shutdown completed cleanly; no user sessions changed.
+
+Native tab chooser polish: a heading/count, explicit Close control, search
+placeholder, padded field and separate keyboard footer replace the dense single
+instruction line. Titles and directories highlight fuzzy matches with the same
+Unicode-aware matcher as the command palette. Hover colors follow shared chrome;
+Escape, outside click and Close share dismissal/focus restoration. Desktop cargo
+check passes. Visual/narrow-pane review is pending with the next native batch.
+
 Find/focus batch accepted for browser interaction: desktop cargo check and the
 combined WASM build pass. Browser review confirms populated field/clear control,
 empty placeholder and dim navigation, Clear retaining focus, Cmd+Z restoring the
