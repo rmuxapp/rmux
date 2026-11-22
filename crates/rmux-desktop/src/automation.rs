@@ -503,6 +503,9 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                 continue;
             }
             if let Some(create) = request.workspace_create.as_ref() {
+                // Keep the caller's scope: resolution fills window_id with the
+                // launch destination, which must not narrow the final name check.
+                let original_scope = create.clone();
                 let mut create = create.clone();
                 let prepared = cx.update(|cx| {
                     if !request.pending.start() { return Err(Failure { code: -32001, message: "Request expired before execution" }); }
@@ -538,9 +541,21 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                                 super::TerminalView::prepare(session, colors, palette)
                             }).await;
                         }
-                        handle.update(cx, |view, window, cx| view.automation_finish_workspace(&create, prepared, window, cx))
-                            .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })
-                            .and_then(|result| result)
+                        cx.update(|cx| {
+                            // Manual UI changes can happen while terminal preparation
+                            // yields. Recheck all originally eligible windows in the
+                            // same foreground turn as publishing the new workspace.
+                            handle.update(cx, |view, _, _| view.automation_end_workspace_startup())
+                                .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?;
+                            if create.reuse {
+                                let mut scope = original_scope;
+                                if let Some(workspace) = resolve_open_workspace(&mut scope, cx)? {
+                                    return Ok(workspace);
+                                }
+                            }
+                            handle.update(cx, |view, window, cx| view.automation_finish_workspace(&create, prepared, window, cx))
+                                .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })?
+                        }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }))
                     }
                     Err(error) => Err(error),
                 };

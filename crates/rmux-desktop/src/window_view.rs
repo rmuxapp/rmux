@@ -569,6 +569,9 @@ impl WorkspaceWindow {
             TerminalView::prepare(session, colors, palette)
         }))
     }
+    pub(super) fn automation_end_workspace_startup(&mut self) {
+        self.command_launching = false;
+    }
     pub(super) fn automation_finish_workspace(&mut self, create: &automation::WorkspaceCreate, prepared: Result<PreparedTerminal>, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.command_launching = false;
         if create.reuse {

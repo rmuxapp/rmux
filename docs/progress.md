@@ -1,3 +1,20 @@
+Editor handoff release follow-up: workspace.open now preserves the original
+window search scope and rechecks it after asynchronous terminal preparation,
+in the same foreground update as publication. A workspace added manually in
+another eligible window can be reused; newly ambiguous names fail instead of
+publishing a duplicate. The launch window's busy flag is cleared even when
+reuse or ambiguity discards the prepared terminal. One desktop build and the
+isolated named-workspace smoke passed (creation, retained IDs/PIDs/Unicode/cwd,
+ambiguity and explicit-window lookup). The manual cross-window startup race
+was reviewed in code, not reproduced through UI automation.
+
+Native review at cf3598c used a uniquely identified disposable app bundle.
+Cmd+Option+V executed the configured background marker command successfully;
+the workspace/tab layout remained unchanged in the captured window. Settings
+shortcut/menu actions did not produce an observable panel through the UI tool,
+so settings interaction acceptance remains unresolved. The disposable fixture
+was stopped; the installed app and user sessions were left running.
+
 Shortcut search polish: modifier/key queries in the dedicated shortcut view
 now require real binding tokens rather than fuzzy letters from command titles.
 An all-key query must fit one alias, preventing cross-alias false combinations;
