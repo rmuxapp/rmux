@@ -27,9 +27,15 @@ with tempfile.TemporaryDirectory(prefix="rmux-bash-") as temporary:
         f"cd -- {shlex.quote(str(directory))}",
         "printf 'HOOK:%s:END\\n' \"$PROMPT_COMMAND\"",
         "PS1='replacement> '",
+        f"cd -- {shlex.quote(temporary)}",
+        "printf 'same-directory-prompt\\n'",
+        f"cd -- {shlex.quote(str(directory))}",
         "printf 'ready\\n'",
     ]))
     expected = b"\x1b]7;file://localhost" + quote(str(directory), safe="/._~-").encode() + b"\x07"
+    other_directory = b"\x1b]7;file://localhost" + quote(temporary, safe="/._~-").encode() + b"\x07"
+    assert output.count(other_directory) >= 2, "unchanged directories still emit reports"
+    assert output.count(expected) >= 2, "returning to a previous directory refreshes the encoded path"
     assert expected in output, "OSC 7 must encode UTF-8, spaces and controls"
     assert b"old-hook\r\n" in output or b"old-hook\n" in output
     assert b"\n_rmux_bash_precmd:END" in output, "hook must append after a newline"

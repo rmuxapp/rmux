@@ -4,24 +4,29 @@
 
 typeset -g _rmux_integration_loaded=1
 typeset -g _rmux_command_running=0
+typeset -g _rmux_directory_path='' _rmux_directory_encoded=''
 typeset -g _rmux_prompt_end=$'%{\e]133;B\a%}'
 
 _rmux_report_directory() {
     emulate -L zsh
     # Encode bytes, including UTF-8, rather than Unicode code points. Keeping
     # controls encoded prevents paths from terminating or injecting OSCs.
-    local LC_ALL=C
-    local encoded='' character hex byte
-    local -i index
-    for (( index = 1; index <= ${#PWD}; index++ )); do
-        character=${PWD[index]}
-        case $character in
-            [a-zA-Z0-9/._~-]) encoded+=$character ;;
-            *) builtin printf -v hex '%02X' "'$character"
-               encoded+="%$hex" ;;
-        esac
-    done
-    builtin printf '\e]7;file://localhost%s\a' "$encoded"
+    if [[ $_rmux_directory_path != "$PWD" ]]; then
+        local LC_ALL=C
+        local encoded='' character hex byte
+        local -i index
+        for (( index = 1; index <= ${#PWD}; index++ )); do
+            character=${PWD[index]}
+            case $character in
+                [a-zA-Z0-9/._~-]) encoded+=$character ;;
+                *) builtin printf -v hex '%02X' "'$character"
+                   encoded+="%$hex" ;;
+            esac
+        done
+        _rmux_directory_path=$PWD
+        _rmux_directory_encoded=$encoded
+    fi
+    builtin printf '\e]7;file://localhost%s\a' "$_rmux_directory_encoded"
 }
 
 

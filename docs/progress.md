@@ -10710,3 +10710,8 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Opening the main command palette now closes focused Memory first, then Settings/Notifications, using their existing origin-focus restoration before capturing command context. This avoids dispatching terminal actions back into an inspector and keeps Escape's return target usable. Memory closes first because its origin may itself be Settings.
 - Existing palette toggle behavior is retained. The keyboard-handler review found existing Ctrl/Cmd/Alt/Shift guards in Settings, Memory and Ports; no speculative modifier rewrite was added.
 - Desktop compilation passed; final diff reordered the same close calls to respect nested focus ownership. Native Settings → Cmd+P → terminal action / Escape, Notifications and Memory transitions remain runtime acceptance items. No build/deployment or changes to user sessions.
+
+### Shell prompt directory encoding cache
+
+- Bash and zsh now retain only the latest raw/encoded working directory and skip the per-byte encoding loop when PWD is unchanged. They still emit OSC 7 and prompt/status markers every prompt, preserving shell reporting and resynchronization behavior. A directory change (including returning to an earlier directory) recomputes the encoded value. No subprocess, timer, disk write, or unbounded cache added.
+- The focused Bash/zsh integration scripts passed using existing shells with user startup files disabled. Added directory-change/return/repeated-prompt scenarios alongside existing UTF-8/control-byte encoding, user hook preservation, idempotence, command status and opt-out checks. No native rebuild needed for this script-only batch; no numerical latency claim made.
