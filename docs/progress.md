@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Shared text fields now support macOS Control-A/E/B/F/H/D/K editing through the
+existing Unicode movement, deletion and undo paths. Control+Option combinations
+and active IME composition remain with the input system. Native cargo check and
+the local WASM build pass. Browser interaction verified edge movement and
+character movement/deletion, including `alpha beta` → `pha bet`, and truncating
+`new workspace` to `new` with Control-K. Screenshot:
+`target/palette-control-editing.jpg`. Native visual acceptance and deployment of
+this browser change remain pending; public downloads are unchanged.
+
 `system.capabilities` now describes the live event API: protocol version, event
 kinds, filters, page/retention/wait limits, gap reasons and lack of push streams.
 The values share constants with validation and admission; standalone discovery

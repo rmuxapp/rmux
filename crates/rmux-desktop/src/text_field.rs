@@ -100,25 +100,34 @@ impl TextField {
         } else {
             key.modifiers.control
         };
-        match key.key.as_str() {
+        // Cocoa-style field editing also applies in the browser on macOS.
+        // Keep Control+Option combinations available to the input system.
+        let control_edit = mac && key.modifiers.control && !key.modifiers.alt && !key.modifiers.platform;
+        let name = if control_edit {
+            match key.key.as_str() {
+                "a" => "home", "e" => "end", "b" => "left", "f" => "right",
+                "h" => "backspace", "d" | "k" => "delete", other => other,
+            }
+        } else { key.key.as_str() };
+        match name {
             "escape" => cx.emit(EditEvent::Cancelled),
             "enter" => cx.emit(EditEvent::Submitted {
                 text: self.text.text.clone(),
                 reverse: key.modifiers.shift,
             }),
             "backspace" | "delete" => {
-                let range = if mac && key.modifiers.platform {
-                    self.text.edge_deletion_range(key.key == "backspace")
+                let range = if (mac && key.modifiers.platform) || (control_edit && key.key == "k") {
+                    self.text.edge_deletion_range(name == "backspace")
                 } else if word {
-                    self.text.word_deletion_range(key.key == "backspace")
+                    self.text.word_deletion_range(name == "backspace")
                 } else {
-                    self.text.deletion_range(key.key == "backspace")
+                    self.text.deletion_range(name == "backspace")
                 };
                 self.insert(Some(range), "", cx);
             }
             "left" | "right" | "home" | "end" => {
-                let backwards = matches!(key.key.as_str(), "left" | "home");
-                let edge = matches!(key.key.as_str(), "home" | "end") || key.modifiers.platform;
+                let backwards = matches!(name, "left" | "home");
+                let edge = matches!(name, "home" | "end") || key.modifiers.platform;
                 if word && !edge {
                     self.text.move_caret_by(
                         backwards,

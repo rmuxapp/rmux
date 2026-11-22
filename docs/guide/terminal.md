@@ -377,6 +377,12 @@ these keys delete the selection. Command-Z undoes the edit. Option-Backspace
 continues to delete by word; on Linux and Windows, use Control-Backspace for
 word deletion.
 
+On macOS, Control-A/E moves to the start/end, Control-B/F moves one character,
+Control-H/D deletes backward/forward, and Control-K deletes to the end (or the
+selection when selected). Shift extends movement selections; Command-Z undoes
+deletion. These shortcuts also work in the WASM demo's shared text fields on
+macOS. They do not change terminal input bindings or run during IME composition.
+
 ## Exited terminals and restarting
 
 When a terminal process exits, its output stays available and a status strip shows
