@@ -3,53 +3,43 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.8</title>
-            <pubDate>Sun, 22 Nov 2026 06:17:54 +0000</pubDate>
+            <title>0.1.9</title>
+            <pubDate>Sun, 22 Nov 2026 06:55:18 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.8</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.8</sparkle:version>
-            <sparkle:shortVersionString>0.1.8</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.9</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.9</sparkle:version>
+            <sparkle:shortVersionString>0.1.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.8 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.9 — preview
 
-This release makes returning to a project more reliable and improves keyboard
-navigation, document previews, and the browser demo.
+This release polishes command search and keyboard focus in the app and browser demo.
 
-## Project workspaces
+## Command palette
 
-- Opening a project from VS Code now reuses its resolved folder path. Two projects named `api` get separate workspaces, and renaming a workspace no longer breaks reuse.
-- Existing terminals keep their processes, layout, and working directories. Project identity survives saved sessions and moves between windows; symlink aliases resolve to the same project.
-- Matching older workspaces are adopted when their name and original launch directory agree. Ambiguous matches are reported instead of guessed.
-- Workspace search results and sidebar tooltips show the project path. Sidebar shortcut hints follow your configured bindings.
+- Search native workspaces by project path, group, or description, including workspaces in other windows. The current workspace is marked in results.
+- Workspace shortcut hints follow your configured bindings.
+- The browser palette follows the native command order, with New Workspace and New Tab near the top. Page navigation accounts for two-line workspace results.
+- Shell line-start, line-end, and delete-to-start actions share bindings and command names across the native app and demo.
 
-See the [VS Code setup guide](../guide/vscode.md) for the single-setting setup.
+## Keyboard focus
 
-## Keyboard navigation and previews
+- Canceling the terminal tab chooser returns focus to where you opened it, including Find. Choosing a tab focuses that terminal.
+- Opening the chooser from its toolbar no longer steals focus before saving the return target.
 
-- Shell line-start, line-end, and delete-to-start actions can be found in the command palette and assigned shortcuts.
-- Shortcut configuration catches conflicting sequence prefixes in overlapping contexts. Keyboard Shortcuts also lists configured literal terminal-text bindings.
-- Markdown previews can follow local document and directory links. Document preview Back/Forward history retains search and display state, and replacing a preview preserves the original terminal focus target.
+## Availability
 
-## Browser demo
+GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux
+x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
+The [browser demo](https://rmux.app) uses bundled sample sessions, not real shells.
+The [VS Code guide](https://rmux.app/vscode/) explains how to open and reuse a
+project workspace with VS Code’s external-terminal command.
 
-- Edit sample commands with cursor movement, word navigation, Home/End, and deletion, including Unicode text and narrow panes.
-- Recall previous sample commands with Up/Down or Ctrl+P/N, then return to your unfinished draft. History is bounded and separate for each session.
-
-## Availability and checks
-
-GitHub builds the macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and
-Windows x86-64 ZIP. macOS is signed and notarized, with Sparkle updates.
-
-Focused checks cover shortcut conflicts, preview loading/history, sample command
-editing/history, and project identity. A native smoke check confirmed that
-reopening and renaming projects retains the same terminal process. Browser
-editing and workspace switching were reviewed; the latest history addition and
-native visual changes still need a visual pass. Cross-Space focus remains
-unverified, and native Windows runtime validation remains deferred. The browser
-demo uses sample sessions, not real shells.
+Focused compilation and browser interaction checks cover the polish changes.
+Native visual review and native Windows runtime validation remain pending.
+Per-terminal persistent shell history is still under development and is not enabled.
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.8/rmux-0.1.8-macos-arm64.zip" length="7249285" type="application/octet-stream" sparkle:edSignature="nuLHGg1gNmdmEMoy5+u6l3f52bd2dH2cRcujq9AX0Ox7+UrsDdJyuckBJqahkMeKAKE+lpWR9IleEgfsaom+Aw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.9/rmux-0.1.9-macos-arm64.zip" length="7258002" type="application/octet-stream" sparkle:edSignature="oQGSv+8ugNr2qJX4kjt/VH9yGJLOV+d8iNXvoO7kEwm7Ryi2B7Eh1tGI3XnxkSxD/PnCWFecb+fFaOTYWrucBw=="/>
         </item>
     </channel>
 </rss>
