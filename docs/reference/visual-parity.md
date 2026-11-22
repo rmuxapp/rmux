@@ -148,3 +148,21 @@ used Cmd+Right to append ` done`, and observed `alpha beta done` as sample outpu
 Up recalled the command; Cmd+Backspace cleared it before `echo cleared` produced
 `cleared`. Screenshot: `target/palette-shell-actions.png`. Native runtime review
 of these shared handlers remains pending. No installed app/session was changed.
+
+
+### Native workspace search context (2026-11-22, after v0.1.8)
+
+Native palette workspace and tab-transfer destinations now include group and
+workspace description alongside project identity, including destinations in
+other windows. The selected workspace is explicitly marked Current workspace.
+Search already indexes subtitles, so group and description become useful search
+terms without per-frame work. Numeric shortcut hints resolve against the opening
+focus and actual keymap; the last-workspace action is used as a fallback when
+applicable, including lists longer than nine entries. They are also discoverable
+in Keyboard Shortcuts.
+
+`cargo check -p rmux-desktop` passed. Native review availability was checked and
+reported that the Mac remains locked; no native build was performed solely for
+an unavailable visual review. Appearance, remapped/disabled shortcut presentation,
+and cross-window search interaction remain pending. Existing user sessions were
+not touched.

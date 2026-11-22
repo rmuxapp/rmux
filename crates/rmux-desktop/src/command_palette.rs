@@ -642,7 +642,7 @@ impl CommandPalette {
         }
         commands.extend(cx.global::<Preferences>().commands.iter().map(custom_command));
         commands.extend(cx.global::<Preferences>().layout_presets.iter().map(preset_command));
-        if let Some(focus) = origin_focus {
+        if let Some(focus) = origin_focus.as_ref() {
             for command in &mut commands {
                 let PaletteEvent::Run(action) = &command.target else {
                     continue;
@@ -650,12 +650,20 @@ impl CommandPalette {
                 command.shortcut = shortcuts::hint(action.as_ref(), &focus, window);
             }
         }
+        let workspace_order: Vec<_> = workspaces.iter().map(|(id, _, _)| *id).collect();
         for (index, (id, name, project)) in workspaces.into_iter().enumerate() {
+            let shortcut = origin_focus.as_ref().and_then(|focus| (1..=9).find_map(|number| {
+                if rmux_core::workspace_groups::numbered_target(&workspace_order, number) != Some(id) { return None; }
+                shortcuts::hint(&SelectWorkspaceNumber { number }, focus, window)
+            }));
+            let context = if id == active_workspace {
+                Some(project.as_ref().map_or_else(|| "Current workspace".into(), |context| format!("Current workspace · {context}")))
+            } else { project.clone() };
             commands.push(Command {
                 title: format!("Switch to Workspace {}: {name}", index + 1),
                 target: PaletteEvent::SelectWorkspace(id),
-                shortcut: None,
-                subtitle: project.clone(),
+                shortcut,
+                subtitle: context,
             });
             if id != active_workspace {
                 commands.push(Command {

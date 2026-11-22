@@ -2524,6 +2524,19 @@ impl WorkspaceWindow {
             cx.notify();
         }
     }
+    // Build searchable context only when opening the palette, not on each frame.
+    fn workspace_palette_context(&self, entry: &Entry) -> Option<String> {
+        let mut context = Vec::new();
+        if let Some(group) = self.workspace_state.groups.containing(entry.workspace.entity_id()) {
+            context.push(format!("Group: {}", group.name));
+        }
+        if !entry.description.is_empty() { context.push(entry.description.clone()); }
+        if let Some(path) = &entry.project_directory {
+            context.push(format!("Project · {}", path.display()));
+        }
+        (!context.is_empty()).then(|| context.join(" · "))
+    }
+
     fn show_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_some() {
             self.close_palette(window, cx);
@@ -2532,7 +2545,7 @@ impl WorkspaceWindow {
         let focus = window.focused(cx);
         let workspaces = self.workspace_order(true)
             .into_iter()
-            .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone(), entry.project_directory.as_ref().map(|path| format!("Project · {}", path.display()))) })
+            .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone(), self.workspace_palette_context(entry)) })
             .collect();
         let active_workspace = self.workspace_state.entries[self.workspace_state.active].workspace.entity_id();
         let workspace = self.workspace_state.entries[self.workspace_state.active].workspace.read(cx);
@@ -2575,7 +2588,7 @@ impl WorkspaceWindow {
             let root = handle.downcast::<Self>()?.read(cx).ok()?;
             if root.benchmark { return None; }
             for entry in &root.workspace_state.entries {
-                external_workspaces.push((handle, entry.workspace.entity_id(), format!("Window {} / Workspace: {}", index + 1, entry.name), entry.project_directory.as_ref().map(|path| format!("Project · {}", path.display()))));
+                external_workspaces.push((handle, entry.workspace.entity_id(), format!("Window {} / Workspace: {}", index + 1, entry.name), root.workspace_palette_context(entry)));
                 for (pane_index, pane) in entry.workspace.read(cx).panes.iter().enumerate() {
                     let pane = pane.read(cx);
                     for (tab, terminal) in pane.terminals.iter().enumerate() {
