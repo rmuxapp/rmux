@@ -4707,17 +4707,7 @@ impl Render for WorkspaceWindow {
                                                         })
 
                                                         .when_some(Self::entry_directory(entry, window, cx), |column, (branch, directory)| {
-                                                            let hint: SharedString = [branch.as_deref(), directory.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n").into();
-                                                            let has_branch = branch.is_some();
-                                                            column.child(gpui::div().id(("workspace-context", target)).flex().items_center().gap_1().min_w_0().text_size(px(11.))
-                                                                .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
-                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
-                                                                .when_some(branch, |row, branch| row
-                                                                    .child(icons::icon("branch"))
-                                                                    .child(gpui::div().min_w_0().max_w(relative(0.45)).truncate().child(branch)))
-                                                                .when_some(directory, |row, directory| row
-                                                                    .when(has_branch, |row| row.child(gpui::div().flex_shrink_0().px_1().text_color(rgb(0x74717c)).child("·")))
-                                                                    .child(gpui::div().flex_1().min_w_0().truncate().child(sidebar_presentation::directory_label(&directory)))))
+                                                            column.child(sidebar_presentation::context_row(("workspace-context", target), branch, directory, selected))
                                                         })
                                                         .children(Self::entry_pane(entry, window, cx).map(|pane| pane.read(cx).sidebar_details(cx)).unwrap_or_default()
                                                             .into_iter().enumerate().map(|(index, (detail, url))| {

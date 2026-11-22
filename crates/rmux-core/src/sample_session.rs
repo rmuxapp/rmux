@@ -7,6 +7,7 @@ const HISTORY_BYTES: usize = 16 * 1024;
 
 #[derive(Clone, Default)]
 pub struct SampleSession {
+    directory: String,
     draft: SampleInput,
     history: VecDeque<String>,
     history_bytes: usize,
@@ -14,6 +15,13 @@ pub struct SampleSession {
     unfinished: Option<SampleInput>,
 }
 impl SampleSession {
+    pub fn in_directory(directory: String) -> Self { Self { directory, ..Self::default() } }
+    pub fn directory(&self) -> &str { if self.directory.is_empty() { "/home/demo" } else { &self.directory } }
+    pub fn project_directory(name: &str) -> String {
+        let name: String = name.chars().filter(|ch| ch.is_alphanumeric() || matches!(ch, '-' | '_' | '.')).take(64).collect();
+        let name = if name.is_empty() || matches!(name.as_str(), "." | "..") { "workspace" } else { &name };
+        format!("/home/demo/projects/{name}")
+    }
     pub fn display(&self, columns: u16) -> String { self.draft.display(columns) }
 
     fn remember(&mut self) {
@@ -87,9 +95,12 @@ impl SampleSession {
                 if self.draft.text().trim() == "logs" {
                     for line in 1..=80 { output.push_str(&format!("Sample log {line:03}: workspace ready\r\n")); }
                 }
+                if self.draft.text().trim() == "pwd" { output.push_str(self.directory()); output.push_str("\r\n"); }
                 output.push_str(match self.draft.text().trim() {
-                    "help" => "Sample commands: help, clear, ls, logs, echo <text>\r\nNo shell or server access.\r\n",
-                    "logs" | "" => "",
+                    "help" => "Sample commands: help, clear, ls, pwd, git status, git branch --show-current, logs, echo <text>\r\nNo shell or server access.\r\n",
+                    "logs" | "pwd" | "" => "",
+                    "git branch --show-current" => "main\r\n",
+                    "git status" => "On branch main\r\nNothing to commit, working tree clean (sample session)\r\n",
                     "ls" => "\x1b[34mcrates/  docs/  scripts/\x1b[0m  Cargo.toml\r\n",
                     "clear" => "\x1b[2J\x1b[H",
                     _ if self.draft.text().starts_with("echo ") => "",
@@ -131,6 +142,18 @@ mod tests {
     use super::*;
     fn send(session: &mut SampleSession, input: &str) -> String {
         session.input(input, 80, |_| panic!("ASCII requires no measurement")).unwrap().unwrap()
+    }
+    #[test]
+    fn sample_project_context_matches_commands_and_survives_clone() {
+        let directory = SampleSession::project_directory("site / 世界");
+        assert_eq!(directory, "/home/demo/projects/site世界");
+        assert_eq!(SampleSession::project_directory(".."), "/home/demo/projects/workspace");
+        let mut session = SampleSession::in_directory(directory.clone());
+        send(&mut session, "pwd");
+        assert!(send(&mut session, "\r").contains(&format!("{directory}\r\n")));
+        send(&mut session, "git branch --show-current");
+        assert!(send(&mut session, "\r").contains("main\r\n"));
+        assert_eq!(session.clone().directory(), directory);
     }
     #[test]
     fn history_restores_unfinished_cursor_and_keeps_sessions_independent() {

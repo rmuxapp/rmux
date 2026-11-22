@@ -75,3 +75,17 @@ pub(crate) fn group_add(id: impl Into<ElementId>) -> Stateful<Div> {
         .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("New Workspace in Group".into())).into())
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
 }
+
+/// Branch/directory geometry shared with the browser's explicit sample sessions.
+pub(crate) fn context_row(id: impl Into<ElementId>, branch: Option<String>, directory: Option<String>, selected: bool) -> Stateful<Div> {
+    let hint: SharedString = [branch.as_deref(), directory.as_deref()].into_iter().flatten().collect::<Vec<_>>().join("\n").into();
+    let has_branch = branch.is_some();
+    div().id(id).flex().items_center().gap_1().min_w_0().text_size(px(11.))
+        .text_color(rgb(if selected { SELECTED_DETAIL } else { 0x969696 }))
+        .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
+        .when_some(branch, |row, branch| row.child(crate::icons::icon("branch"))
+            .child(div().min_w_0().max_w(relative(0.45)).truncate().child(branch)))
+        .when_some(directory, |row, directory| row
+            .when(has_branch, |row| row.child(div().flex_shrink_0().px_1().text_color(rgb(0x74717c)).child("·")))
+            .child(div().flex_1().min_w_0().truncate().child(directory_label(&directory))))
+}

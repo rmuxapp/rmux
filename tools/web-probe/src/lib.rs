@@ -159,6 +159,7 @@ mod clipboard {
 }
 struct InputProbe {
     name: String,
+    project_directory: String,
     empty_focus: FocusHandle,
     input: Entity<text_field::TextField>,
     search: palette_match::RankedSearch,
@@ -229,18 +230,24 @@ impl InputProbe {
                 cx.notify();
             }).detach();
             let samples = std::collections::HashMap::new();
-            let mut host = InputProbe { name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), group_context: (false, 0), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, shortcuts_only: false, palette_open: false };
+            let mut host = InputProbe { project_directory: rmux_core::sample_session::SampleSession::project_directory(&name), name, empty_focus: cx.focus_handle(), palette_origin: None, result_hints: Vec::new(), split_drag: None, scroll: ListState::new(COMMANDS.len(), ListAlignment::Top, px(96.)), workspace_results: Vec::new(), group_results: Vec::new(), group_context: (false, 0), samples, input, search: palette_match::RankedSearch::new(COMMANDS.iter().map(|title| title.title().to_lowercase()).collect()), selected: 0, feedback: None, pane_state: rmux_core::pane_commands::State { layout: Some(PaneTree::Pane(0)), ..Default::default() }, focused: 0, rendered_zoom: None, next_pane: 1, shortcuts_only: false, palette_open: false };
             host.add_pane(0, window, cx);
             host
 
     }
 
+    fn context_directory(&self, cx: &App) -> String {
+        self.samples.get(&self.focused).and_then(|pane| pane.read(cx).active_directory(cx))
+            .unwrap_or_else(|| self.project_directory.clone())
+    }
     fn add_pane(&mut self, id: usize, window: &mut Window, cx: &mut Context<Self>) {
         let font_size = self.samples.get(&self.focused).map_or(14., |pane| pane.read(cx).active_font_size(cx));
-        let pane = cx.new(|cx| sample_pane::SamplePane::new(font_size, window,cx));
+        let directory = self.context_directory(cx);
+        let pane = cx.new(|cx| sample_pane::SamplePane::new(font_size, directory, window,cx));
         self.register_pane(id, pane, window, cx);
     }
     fn register_pane(&mut self, id: usize, pane: Entity<sample_pane::SamplePane>, window: &mut Window, cx: &mut Context<Self>) {
+        cx.observe(&pane, |_, _, cx| cx.notify()).detach();
         let scope = cx.entity_id();
         pane.update(cx, |pane, _| pane.scope = Some(scope));
         cx.subscribe_in(&pane, window, move |this, destination, event: &sample_pane::TabDrop, window, cx| {

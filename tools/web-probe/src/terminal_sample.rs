@@ -36,6 +36,8 @@ pub(crate) struct TerminalSample {
 pub(crate) struct SearchChanged;
 impl EventEmitter<SearchChanged> for TerminalSample {}
 impl TerminalSample {
+    pub fn directory(&self) -> &str { self.session.directory() }
+
     fn refresh_frame(&mut self) {
         self.frame = self.engine.frame((!self.frame_released).then_some(&self.frame));
         self.frame_released = false;
@@ -119,7 +121,7 @@ impl TerminalSample {
         self.cursor_cache = Default::default();
     }
     pub fn focus(&self, window: &mut Window, cx: &mut App) { self.focus.focus(window, cx); }
-    pub fn new(font_size: f32, window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(font_size: f32, directory: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let focus = cx.focus_handle();
         cx.on_blur(&focus, window, |this, _, cx| {
             this.release_pressed(cx);
@@ -132,7 +134,7 @@ impl TerminalSample {
         let engine = TerminalEngine::new(52, 16);
         engine.write("\x1b[?2027hrmux shared renderer\r\n\x1b[32mLive Ghostty parser\x1b[0m\r\nSample session: help, clear, ls\r\n$ ");
         let frame = engine.frame(None);
-        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, frame_released: false, font_revision: 0, measured_cells: None, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: Default::default(), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
+        Self { menu: None, menu_blur: None, clipboard_read: None, engine, custom_title: None, find: None, find_history: Default::default(), last_find_query: String::new(), frame, frame_released: false, font_revision: 0, measured_cells: None, font_size: CellMetrics::new(font_size).font_size, rows: Default::default(), cursor_cache: Default::default(), focus, session: rmux_core::sample_session::SampleSession::in_directory(directory), input_error: None, pressed_keys: Default::default(), composition: Default::default(), cursor_bounds: Default::default(), selection_geometry: None, selecting: false, scroll_remainder: 0., selection_pointer: None, selection_scroll: None, scrollbar_drag: None }
     }
     fn select(&mut self, action: &str, position: Point<Pixels>, rectangle: bool, clicks: usize, cx: &mut Context<Self>) {
         let Some((bounds,cells)) = self.selection_geometry else { return; };

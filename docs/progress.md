@@ -10654,3 +10654,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - New/restored terminal histories now serialize their final initial contents into one private temporary file, sync once, acquire the writer lease, and publish without clobbering. Removed the previous blank-file publication followed by a second atomic save/fsync. Existing snapshot histories are still read-only sources and each restore gets a new identity.
 - Lock/write failure before publication removes the temporary JSON instead of leaving an allocated blank history. Stable lock sidecars are deliberately not unlinked, preserving locking identity; a failed publication can still leave an empty lock sidecar. This is not automatic retention cleanup: exported layouts can reference old histories outside rmux's known state, so age alone cannot prove a file unused.
 - Nine focused shell-history tests passed, including isolated shell import/restore, independent leases, corruption/missing-source behavior and failed-save retry. One child-only helper test is intentionally invoked through its isolated parent. No release build or native UI action performed.
+
+### Release 0.1.12 preparation and sample project context
+
+- Shared the desktop branch/directory row with the WASM sidebar. Sample sessions own a stable directory; new tabs and splits inherit it, and moved sessions retain it. Added matching sample pwd and Git commands.
+- The focused sample-context test and desktop compilation passed. Packaging the accumulated polish since 0.1.11 through GitHub release builds; native visual and Windows runtime acceptance remain pending.
+- Existing repository VS Code guide and private-site /vscode/ landing page already document native external-terminal integration.

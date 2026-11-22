@@ -151,11 +151,14 @@ impl SamplePane {
         }
         cx.notify();
     }
+    pub fn active_directory(&self, cx: &App) -> Option<String> {
+        self.terminals.active().map(|terminal| terminal.read(cx).directory().to_owned())
+    }
     pub fn active_font_size(&self, cx: &App) -> f32 {
         self.terminals.active().map_or(14., |terminal| terminal.read(cx).font_size)
     }
-    pub fn new(font_size: f32, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let terminal = cx.new(|cx| TerminalSample::new(font_size, window,cx));
+    pub fn new(font_size: f32, directory: String, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let terminal = cx.new(|cx| TerminalSample::new(font_size, directory, window,cx));
         let labels = [(terminal.entity_id(), "Terminal 1".into())].into_iter().collect();
         Self { scope: None, menu: None, menu_blur: None, picker: None, picker_blur: None, rename: None, terminals: rmux_core::tabs::Tabs::new(vec![terminal], 0), labels, next_number: 2, tab_scroll: ScrollHandle::new() }
     }
@@ -180,7 +183,8 @@ impl SamplePane {
     fn add(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.terminals.len() >= 16 { return; }
         let font_size = self.active_font_size(cx);
-        let terminal = cx.new(|cx| TerminalSample::new(font_size, window,cx));
+        let directory = self.active_directory(cx).unwrap_or_else(|| "/home/demo".into());
+        let terminal = cx.new(|cx| TerminalSample::new(font_size, directory, window,cx));
         self.labels.insert(terminal.entity_id(), format!("Terminal {}",self.next_number));
         self.next_number += 1;
         self.terminals.push(terminal);

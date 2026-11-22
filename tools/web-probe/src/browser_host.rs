@@ -52,6 +52,7 @@ impl BrowserHost {
     }
     fn new_workspace_view(name: String, window: &mut Window, cx: &mut Context<Self>) -> Entity<InputProbe> {
         let entity = cx.new(|cx| InputProbe::new(name, window, cx));
+        cx.observe(&entity, |_, _, cx| cx.notify()).detach();
         cx.subscribe_in(&entity, window, |this, _, command: &WorkspaceCommand, window, cx| {
             crate::workspace_actions::WorkspaceCommandHost::run_workspace_command(this, command.0, window, cx);
         }).detach();
@@ -432,6 +433,8 @@ impl Render for BrowserHost {
                                     .truncate().child(format!("{count} {}", if count == 1 { "workspace" } else { "workspaces" })))
                             })
                             .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
+                            .child(sidebar_presentation::context_row(("workspace-context", target), Some("main".into()),
+                                Some(entity.read(cx).context_directory(cx)), selected))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 crate::metadata_presets::editor(input, self.editor_hint.clone(), self.editor_presets, cx)))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
