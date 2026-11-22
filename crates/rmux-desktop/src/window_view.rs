@@ -1210,9 +1210,10 @@ impl WorkspaceWindow {
         };
         if let Some(index) = next {
             state.selected = index;
-            // The scroll container has a heading before the setting controls, then
-            // the hint, Save and editor link.
-            state.scroll.scroll_to_item(settings_view::scroll_index(index));
+            // Footer actions stay visible without moving the settings list.
+            if index < settings_view::KEYS.len() {
+                state.scroll.scroll_to_item(settings_view::scroll_index(index));
+            }
             cx.notify();
         } else if key == "escape" {
             self.toggle_settings(window, cx);

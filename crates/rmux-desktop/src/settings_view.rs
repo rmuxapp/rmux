@@ -11,10 +11,9 @@ pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "curso
     #[cfg(target_os = "macos")] "option_as_alt",
     "selection_opacity", "import_theme", "file_editor",
 ];
-// Each control owns its explanatory content. Only the heading and footer hint
-// are separate non-control children of the scroll container.
+// The heading precedes the settings. Save/editor controls live in a fixed footer.
 pub fn scroll_index(control: usize) -> usize {
-    control + if control < KEYS.len() { 1 } else { 2 }
+    control + 1
 }
 pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
     let count = KEYS.len() + 2;
@@ -70,8 +69,8 @@ pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
         _ => {}
     }
 }
-fn button(id: String, label: String, key: &'static str, delta: i32) -> impl IntoElement {
-    let hint: SharedString = label.clone().into();
+fn button(id: String, label: String, hint: String, key: &'static str, delta: i32) -> impl IntoElement {
+    let hint: SharedString = hint.into();
     div().id(SharedString::from(id)).min_w_0().max_w_full().px_2().py_1().rounded_sm().cursor_pointer()
         .bg(rgb(0x353535)).hover(|s| s.bg(rgb(0x454545))).text_size(px(12.))
         .on_click(move |event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(AdjustSetting { key: key.into(), delta }), cx); } })
@@ -81,12 +80,12 @@ fn button(id: String, label: String, key: &'static str, delta: i32) -> impl Into
 fn row(label: &'static str, key: &'static str, value: String, stepper: bool, selected: bool, readonly: bool) -> impl IntoElement {
     div().id(SharedString::from(format!("setting-row-{key}"))).min_w_0().px_1().py_3()
         .on_mouse_down(MouseButton::Left, move |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: key.into() }), cx))
-        .when(selected, |s| s.bg(rgb(0x303b4a))).border_b_1().border_color(rgb(0x383838))
+        .when(selected, |s| s.bg(rgb(chrome_style::SELECTED))).border_b_1().border_color(rgb(0x383838))
         .flex().flex_wrap().items_center().gap_2()
         .child(div().flex_1().w(px(120.)).min_w_0().max_w_full().text_size(px(13.)).child(label))
         .child(div().flex().flex_wrap().items_center().gap_2().min_w_0().max_w_full()
             .when(stepper, |controls| controls
-                .child(button(format!("{key}-less"), "−".into(), key, -1)))
+                .child(button(format!("{key}-less"), "−".into(), format!("Decrease {label}"), key, -1)))
             .child(if readonly {
                 div().id(SharedString::from(format!("{key}-readonly")))
                     .px_2().py_1().text_size(px(12.)).text_color(rgb(0xa0a0a0))
@@ -95,10 +94,10 @@ fn row(label: &'static str, key: &'static str, value: String, stepper: bool, sel
             } else if stepper {
                 div().min_w(px(44.)).text_center().text_size(px(12.)).child(value).into_any_element()
             } else {
-                button(format!("{key}-value"), value, key, 1).into_any_element()
+                button(format!("{key}-value"), value, format!("Change {label}"), key, 1).into_any_element()
             })
             .when(stepper, |controls| controls
-                .child(button(format!("{key}-more"), "+".into(), key, 1))))
+                .child(button(format!("{key}-more"), "+".into(), format!("Increase {label}"), key, 1))))
 }
 // Configuration-only preview: never creates a terminal or reads a running session.
 fn theme_preview(settings: &Preferences) -> impl IntoElement {
@@ -151,28 +150,28 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
     div().track_focus(&state.focus).key_context("Settings")
         .on_mouse_down(MouseButton::Left, { let focus = state.focus.clone(); move |_, window, _| { focus.focus(window); } })
         .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| this.settings_key(event, window, cx)))
-        .w(px(340.)).max_w(relative(0.45)).h_full().flex_shrink_0().flex().flex_col()
+        .w(px(380.)).max_w(relative(0.50)).h_full().flex_shrink_0().flex().flex_col()
         .bg(rgb(0x242424)).border_l_1().border_color(rgb(0x383838))
-        .child(div().h(px(36.)).px_3().flex().items_center().gap_2().flex_shrink_0()
+        .child(div().h(px(44.)).px_3().flex().items_center().gap_2().flex_shrink_0()
             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).child("Settings"))
             .child(pane_view::pane_control("close-settings", "Close Settings")
                 .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSettings), cx); } }).child(icons::icon("close"))))
         .child(div().id("settings-scroll").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_3()
-            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("TERMINAL & BEHAVIOR"))
+            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Changes apply immediately to this session. Save to keep them for next time."))
             .child(row("Default text size", "font", format!("{} pt", settings.font_size), true, state.selected == 0, false))
             .child(row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, state.selected == 1, false))
             .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(rgb(0x383838))
                 .on_mouse_down(MouseButton::Left, |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: "theme".into() }), cx))
-                .when(state.selected == 2, |row| row.bg(rgb(0x303b4a)))
+                .when(state.selected == 2, |row| row.bg(rgb(chrome_style::SELECTED)))
                 .child(div().mb_2().text_size(px(13.)).child("Terminal theme"))
                 .child(div().flex().flex_wrap().gap_2().children(
                     preferences::TerminalTheme::ALL.into_iter().enumerate().map(|(index, theme)| {
                         let selected = settings.theme_file.is_none() && settings.terminal_theme == theme;
                         div().id(("theme-choice", index)).px_2().py_1().rounded_sm().cursor_pointer()
                             .text_size(px(12.)).border_1()
-                            .border_color(rgb(if selected { 0x4599ef } else { 0x454545 }))
+                            .border_color(rgb(if selected { chrome_style::ACCENT } else { 0x454545 }))
                             .bg(rgb(if selected { crate::chrome_style::SELECTED } else { 0x292929 }))
-                            .hover(|style| style.bg(rgb(0x40516c)))
+                            .hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER)))
                             .on_click(move |event, window, cx| {
                                 if event.standard_click() { window.dispatch_action(Box::new(SetTerminalTheme { theme }), cx); }
                             }).child(theme.label())
@@ -210,7 +209,7 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
             .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, state.selected == KEYS.len() - 3, false))
-                .child(button("selection-opacity-reset".into(), "Use theme default".into(), "selection_opacity", 0)))
+                .child(button("selection-opacity-reset".into(), "Use theme default".into(), "Reset selection opacity to the theme default".into(), "selection_opacity", 0)))
             .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, state.selected == KEYS.len() - 2, false))
             .child(div()
                 .child(row("External editor", "file_editor", "Configure…".into(), false, state.selected == KEYS.len() - 1, false))
@@ -219,12 +218,14 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                     .tooltip({ let program: SharedString = settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "No external editor configured".into()).into();
                         move |_, cx| cx.new(|_| pane_view::ControlHint(program.clone())).into() })
                     .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
-            .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Tab / ↑↓ to navigate · ←→ to change · Enter to activate · Esc to close. Changes apply to this session. Font family and text size update terminals using the previous defaults. Per-terminal zoom stays unchanged; Reset Font Size rejoins the default. Custom colors in your config override the theme."))
-            .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(0x007aff) }).px_3().py_2().rounded_sm().text_sm()
-                .bg(rgb(if busy { 0x353535 } else { 0x007aff }))
-                .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(0x1685ff))))
+            .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
+        .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838)).flex().flex_col().gap_2()
+            .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ / Tab select · ←→ change · Enter activate · Esc close"))
+            .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(chrome_style::SELECTED_BORDER) }).px_3().py_2().rounded_sm().text_sm()
+                .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))
+                .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(chrome_style::SELECTED_HOVER))))
                 .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(SaveAppearanceSettings), cx); } }).child(save_label))
-            .child(div().id("settings-json").when(state.selected == KEYS.len() + 1, |s| s.bg(rgb(0x303b4a))).py_3().text_sm().text_color(rgb(if busy { 0x777777 } else { 0x8ebfff }))
+            .child(div().id("settings-json").when(state.selected == KEYS.len() + 1, |s| s.bg(rgb(chrome_style::SELECTED))).py_1().text_sm().text_color(rgb(if busy { 0x777777 } else { chrome_style::ACCENT }))
                 .when(!busy, |link| link.cursor_pointer())
                 .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(OpenSettingsFile), cx); } }).child("Open all settings in editor")))
         .into_any_element()

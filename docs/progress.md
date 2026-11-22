@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Settings polish: Save, the settings-file link and keyboard guidance now stay
+visible in a fixed footer while settings scroll. The panel uses the shared
+purple selection/accent colors, gives labels more room, explains session-only
+changes at the top, and names the setting in stepper tooltips. Keyboard navigation
+to footer actions no longer scrolls the list. One native bundle build passed;
+an isolated native session verified Cmd+, opening, End then Shift+Tab selecting
+Save without scrolling, and Escape returning terminal focus. Screenshot:
+`target/settings-polish.png`. No user settings were saved or sessions replaced.
+
+
 Tab chooser sizing is now visually verified: a fixed preferred width with a
 pane-width maximum, explicit search-wrapper width/minimum and clipped panel keep
 the input inside the 520 px chooser. Rows fill its width. Native review caught
