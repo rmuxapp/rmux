@@ -11,7 +11,11 @@ pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "curso
     #[cfg(target_os = "macos")] "option_as_alt",
     "selection_opacity", "import_theme", "file_editor",
 ];
-pub const FOOTER_COUNT: usize = 4;
+pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts"];
+pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
+pub fn control_index(key: &str) -> Option<usize> {
+    KEYS.iter().chain(FOOTER_KEYS).position(|candidate| *candidate == key)
+}
 pub fn footer_action(index: usize) -> Option<Box<dyn Action>> {
     Some(match index {
         0 => Box::new(SaveAppearanceSettings),
@@ -26,6 +30,7 @@ pub fn scroll_index(control: usize) -> usize {
     control + 1
 }
 pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
+    if shift && key != "tab" { return None; }
     let count = KEYS.len() + FOOTER_COUNT;
     match key {
         "up" => Some((selected + count - 1) % count),
@@ -234,6 +239,9 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
             .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(chrome_style::SELECTED_BORDER) }).px_3().py_2().rounded_sm().text_sm()
                 .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))
                 .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(chrome_style::SELECTED_HOVER))))
+                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                    if !busy { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[0].into() }), cx); }
+                })
                 .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(SaveAppearanceSettings), cx); } }).child(save_label))
             .child(div().flex().flex_wrap().gap_2().children([
                 (1, "settings-json", "Open settings file", "Edit all settings in your editor"),
@@ -245,6 +253,9 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                     .text_color(rgb(if busy { 0x777777 } else { chrome_style::ACCENT }))
                     .when(!busy, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
                     .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
+                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
+                        if !busy { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); }
+                    })
                     .on_click(move |event, window, cx| {
                         if !busy && event.standard_click() {
                             if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); }

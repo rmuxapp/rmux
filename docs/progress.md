@@ -1,3 +1,12 @@
+Settings pointer/keyboard continuity: footer clicks now select the action they
+activate, so a subsequent Enter no longer acts on an unrelated setting. Modified
+keys are ignored except Shift+Tab navigation. Focused settings tests passed.
+Combined native bundle through b08061f passed; the isolated preview rendered the
+workspace layout, but UI automation did not apply menu/keyboard interactions, so
+settings/footer/notification pointer acceptance remains unverified. Saved native
+overview at `target/native-polish-overview.png`; preview quit cleanly and the
+installed app was left running. No release or deployment.
+
 Notification interaction polish: selected cards now have an accent outline;
 empty filters explain how to return to earlier messages. Clearing history or
 acknowledging all unread messages resets stale selection/expansion and scroll

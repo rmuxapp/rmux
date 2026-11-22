@@ -1196,7 +1196,8 @@ impl WorkspaceWindow {
     pub(super) fn settings_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let Some(state) = &mut self.settings_state else { return; };
         let key = event.keystroke.key.as_str();
-        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt { return; }
+        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt
+            || (event.keystroke.modifiers.shift && key != "tab") { return; }
         let next = if matches!(key, "pageup" | "pagedown") {
             command_palette::paged_result(state.selected, settings_view::KEYS.len() + settings_view::FOOTER_COUNT,
                 key == "pageup", f32::from(state.scroll.bounds().size.height), |index| {
@@ -4173,7 +4174,7 @@ impl Render for WorkspaceWindow {
             }))
             .on_action(cx.listener(|this, selected: &SelectSetting, window, cx| {
                 if let Some(state) = &mut this.settings_state {
-                    if let Some(index) = settings_view::KEYS.iter().position(|key| *key == selected.key) {
+                    if let Some(index) = settings_view::control_index(&selected.key) {
                         state.selected = index;
                         state.focus.focus(window);
                         cx.notify();
