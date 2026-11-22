@@ -4090,22 +4090,33 @@ impl Render for WorkspaceWindow {
             window.set_background_appearance(background);
             self.rendered_background = Some(background);
         }
-        let navigation_order = self.workspace_order(true);
-        // Read cached notification state once per workspace, including hidden
-        // members. This neither touches terminal parser locks nor acknowledges it.
-        let unread_workspaces: std::collections::HashSet<_> = self.workspace_state.entries.iter()
-            .filter(|entry| entry.workspace.read(cx).needs_attention(cx))
-            .map(|entry| entry.workspace.entity_id()).collect();
+        // Sidebar-only summaries must not scan hidden terminals when the sidebar
+        // is closed. A visible sidebar reads each terminal's cached metadata once.
+        let mut navigation_positions = Vec::new();
+        let mut unread_workspaces = std::collections::HashSet::new();
         let mut notification_previews = std::collections::HashMap::new();
         if self.sidebar {
+            navigation_positions.resize(self.workspace_state.entries.len(), 0);
+            for (position, index) in self.workspace_order(true).into_iter().enumerate() {
+                navigation_positions[index] = position;
+            }
             for entry in &self.workspace_state.entries {
-                let preview = entry.workspace.read(cx).panes.iter().flat_map(|pane| {
-                    pane.read(cx).terminals.iter().filter_map(|terminal| {
-                        terminal.read(cx).notifications.unread_preview()
-                            .map(|(arrival, message)| (arrival, message.clone()))
-                    })
-                }).max_by_key(|(arrival, _)| *arrival);
-                if let Some(preview) = preview { notification_previews.insert(entry.workspace.entity_id(), preview); }
+                let mut unread = false;
+                let mut preview = None;
+                for pane in &entry.workspace.read(cx).panes {
+                    for terminal in &pane.read(cx).terminals {
+                        let terminal = terminal.read(cx);
+                        unread |= terminal.attention.any();
+                        if let Some(candidate) = terminal.notifications.unread_preview()
+                            && preview.as_ref().is_none_or(|(arrival, _)| candidate.0 > *arrival) {
+                            preview = Some(candidate);
+                        }
+                    }
+                }
+                if unread { unread_workspaces.insert(entry.workspace.entity_id()); }
+                if let Some((arrival, message)) = preview {
+                    notification_previews.insert(entry.workspace.entity_id(), (arrival, message.clone()));
+                }
             }
         }
         let current = self
@@ -4393,7 +4404,7 @@ impl Render for WorkspaceWindow {
                                 .overflow_y_scroll()
                                 .track_scroll(&self.workspace_scroll)
                                 .children(self.sidebar_order().into_iter().map(|index| {
-                                    let position = navigation_order.iter().position(|candidate| *candidate == index).unwrap_or(index);
+                                    let position = navigation_positions[index];
                                     let entry = &self.workspace_state.entries[index];
                                     let group = self.workspace_state.groups.containing(entry.workspace.entity_id());
                                     let header = group.filter(|group| group.members.first() == Some(&entry.workspace.entity_id()));
