@@ -16,18 +16,28 @@ impl Editor {
     }
     fn command(&self, path: &Path) -> Result<Command> {
         self.validate()?;
-        ensure!(path.is_absolute() && path.as_os_str().len() <= 8192, "Editor file path must be absolute and up to 8192 bytes");
+        ensure!(path.is_absolute() && path.as_os_str().len() <= 8192
+            && !path.as_os_str().as_encoded_bytes().contains(&0), "Editor file path must be absolute and up to 8192 bytes without NULs");
         let mut command = Command::new(&self.program);
+        command.current_dir(path.parent().context("Editor file path has no parent directory")?);
         for arg in &self.args {
             if arg == "{file}" { command.arg(path); } else { command.arg(arg); }
         }
         command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
+        #[cfg(windows)] {
+            use std::os::windows::process::CommandExt;
+            command.creation_flags(0x08000000); // CREATE_NO_WINDOW for CLI editor launchers.
+        }
         Ok(command)
     }
     pub fn launch(&self, path: &Path) -> Result<RunningEditor> {
         let permit = Permit::acquire()?;
-        ensure!(std::fs::symlink_metadata(path)?.is_file(), "External editing requires a regular file, not a directory or symbolic link");
-        let child = self.command(path)?.spawn()?;
+        let mut command = self.command(path)?;
+        let metadata = std::fs::symlink_metadata(path)
+            .with_context(|| format!("Could not access editor file {}", path.display()))?;
+        ensure!(metadata.is_file(), "External editing requires a regular file, not a directory or symbolic link: {}", path.display());
+        let child = command.spawn()
+            .with_context(|| format!("Could not launch editor {} for {}", self.program.display(), path.display()))?;
         Ok(RunningEditor { child, _permit: permit })
     }
 }
@@ -64,7 +74,7 @@ mod tests {
         std::fs::write(&path, "This file is data, not an executable script")?;
         for code in [0, 7] {
             let editor = Editor { program: "/bin/sh".into(), args: vec![
-                "-c".into(), format!("[ \"$1\" = \"$2\" ] || exit 99; exit {code}"), "fixture".into(), "{file}".into(), path.to_str().unwrap().into()
+                "-c".into(), format!("[ \"$1\" = \"$2\" ] || exit 99; [ \"$(pwd -P)\" = \"$3\" ] || exit 98; exit {code}"), "fixture".into(), "{file}".into(), path.to_str().unwrap().into(), root.path().canonicalize()?.to_str().unwrap().into()
             ] };
             let mut running = editor.launch(&path)?;
             // Waiting here is test-only; production reaping uses a timer.
@@ -77,6 +87,14 @@ mod tests {
         let link = root.path().join("link");
         std::os::unix::fs::symlink(&path, &link)?;
         assert!(editor.launch(&link).is_err());
+        let missing = root.path().join("missing-file");
+        let error = editor.launch(&missing).err().unwrap();
+        assert!(error.to_string().contains("Could not access editor file"));
+        assert!(error.to_string().contains("missing-file"));
+        let missing_editor = Editor { program: root.path().join("missing-editor"), args: vec!["{file}".into()] };
+        let error = missing_editor.launch(&path).err().unwrap();
+        assert!(error.to_string().contains("Could not launch editor"));
+        assert!(error.to_string().contains("missing-editor"));
         Ok(())
     }
     #[test]
@@ -84,6 +102,7 @@ mod tests {
         let editor = Editor { program: std::env::current_exe()?, args: vec!["--".into(), "{file}".into()] };
         let path = std::env::temp_dir().join("spaces $(touch nope); 'quoted'.sh");
         let command = editor.command(&path)?;
+        assert_eq!(command.get_current_dir(), path.parent());
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, [std::ffi::OsStr::new("--"), path.as_os_str()]);
         for args in [vec![], vec!["{file}", "{file}"], vec!["prefix{file}"], vec!["{file}", "bad\0arg"]] {

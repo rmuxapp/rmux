@@ -1,3 +1,13 @@
+External-editor launch polish: editors now start in the selected file's parent
+directory, with the absolute file path still passed as one literal argument.
+Path validation runs before metadata access, rejects NULs, and file/launch errors
+identify the affected file or executable without echoing argv/environment.
+Windows CLI editor launchers use CREATE_NO_WINDOW; runtime validation remains
+deferred. Both focused editor tests passed, including a real macOS child process
+checking its physical working directory, literal metacharacter path, success and
+failure exits, missing files/executables, and directory/symlink rejection. No
+app bundle or release was built.
+
 Local file links (T10): modifier-click and terminal-menu Open Link now route
 local `file://` URLs through the configured external editor; hover uses the same
 eligibility rules. The terminal's bounded visible-line lookup also detects

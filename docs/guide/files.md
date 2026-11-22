@@ -155,7 +155,10 @@ by rmux). Exactly one argument must be the literal `{file}` placeholder; rmux
 replaces it with the absolute file path as one argument. It does not interpolate
 shell expressions, expand environment variables, or choose a file association.
 Paths with spaces, quotes or shell punctuation remain data. Directories and
-symbolic links are rejected. The configured program controls editing and saving;
+symbolic links are rejected. The editor starts in the file's parent directory,
+so relative editor resources resolve there rather than rmux's launch directory.
+Missing-file and launch errors identify the affected file or editor executable.
+The configured program controls editing and saving;
 rmux does not yet provide an embedded editor, save-conflict detection, or automatic
 preview refresh after external edits. Launching the editor keeps the current browser
 or preview open, including its filter, selection, wrapping and scroll position.
