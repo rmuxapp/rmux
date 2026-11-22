@@ -585,7 +585,14 @@ impl CommandPalette {
         palette.input.update(cx, |input, _| input.placeholder = Some("Type a command or workspace name…"));
         palette
     }
-    pub fn show_shortcuts(&mut self, cx: &mut Context<Self>) {
+    pub fn show_shortcuts(&mut self, focus: Option<&FocusHandle>, window: &Window, cx: &mut Context<Self>) {
+        if let Some(focus) = focus {
+            for command in &mut self.commands {
+                if let PaletteEvent::Run(action) = &command.target {
+                    command.shortcut = crate::shortcut_label::binding_aliases(action.as_ref(), focus, window, cfg!(target_os = "macos"));
+                }
+            }
+        }
         self.commands.retain(|command| command.shortcut.is_some());
         self.commands.sort_by_cached_key(|command| command.title.to_lowercase());
         self.search = palette_match::RankedSearch::new(self.commands.iter().map(Command::search_text).collect());

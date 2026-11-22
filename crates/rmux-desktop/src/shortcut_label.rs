@@ -7,6 +7,22 @@ pub(crate) fn binding_hint(action: &dyn gpui::Action, focus: &gpui::FocusHandle,
             .collect::<Vec<_>>().join(" "))
 }
 
+/// All effective aliases, highest precedence first. Shadowed/disabled bindings
+/// are filtered by GPUI; equivalent display spellings appear only once.
+pub(crate) fn binding_aliases(action: &dyn gpui::Action, focus: &gpui::FocusHandle, window: &gpui::Window, mac: bool) -> Option<String> {
+    let labels = window.bindings_for_action_in(action, focus).into_iter().rev().map(|binding|
+        binding.keystrokes().iter().map(|key| format_key_parts(key.key(), *key.modifiers(), mac))
+            .collect::<Vec<_>>().join(" "));
+    join_aliases(labels)
+}
+fn join_aliases(labels: impl IntoIterator<Item = String>) -> Option<String> {
+    let mut unique = Vec::new();
+    for label in labels {
+        if !unique.contains(&label) { unique.push(label); }
+    }
+    (!unique.is_empty()).then(|| unique.join(" / "))
+}
+
 pub(crate) fn format_key_parts(key: &str, modifiers: Modifiers, mac: bool) -> String {
     let mut parts = Vec::with_capacity(6);
     if modifiers.function { parts.push("Fn".to_owned()); }
@@ -57,8 +73,15 @@ pub(crate) fn search_terms(label: &str) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{format_key_parts, search_terms};
+    use super::{format_key_parts, search_terms, join_aliases};
     use gpui::Modifiers;
+    #[test]
+    fn aliases_preserve_precedence_and_deduplicate_display_spellings() {
+        assert_eq!(join_aliases(["⌘]", "⌘⌥→", "⌘]"].map(str::to_owned)), Some("⌘] / ⌘⌥→".into()));
+        assert_eq!(join_aliases([]), None);
+        let words = search_terms(&join_aliases(["⌘]", "⌘⌥→"].map(str::to_owned)).unwrap());
+        assert!(words.contains("right") && words.contains("option"));
+    }
     #[test]
     fn shifted_aliases_display_the_base_key_once() {
         let mac = Modifiers { platform: true, shift: true, ..Default::default() };

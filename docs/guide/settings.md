@@ -253,7 +253,11 @@ Supported action names: `new_workspace`, `new_window`, `new_tab`, `new_local_tab
 `reset_font_size`, `use_configured_font`,
 `palette`, `toggle_zoom`, `toggle_sidebar`, `settings`, `notifications`,
 `next_unread`, `mark_all_read`, `find`, `reload_settings`, and `disabled`. Graphical binding editing,
-full conflict explanations and complete upstream shortcut coverage remain pending.
+complete upstream shortcut coverage remain pending. Invalid custom bindings identify
+their zero-based `keybindings` array index and context. Duplicate and chord-prefix
+errors also identify the conflicting entry; bindings in different scopes remain
+valid. The shortcut browser lists all effective aliases for each listed command,
+with shadowed bindings omitted. Ordinary menu hints keep one preferred binding.
 Numbered navigation is also configurable: `select_tab_1`…`select_tab_9`,
 `select_pane_1`…`select_pane_9`, and `select_workspace_1`…`select_workspace_9`.
 For example, `{"key":"ctrl-k 3","action":"select_tab_3"}` selects the third

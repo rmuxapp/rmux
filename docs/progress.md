@@ -1,3 +1,13 @@
+Shortcut discovery batch: native and WASM shortcut views now collect every
+effective alias for each listed command from GPUI, highest precedence first,
+and deduplicate equivalent display spellings. All aliases are searchable;
+ordinary palette/menu hints keep a single preferred binding. Custom-binding
+validation errors identify the zero-based binding index and scope, with the
+other entry identified for duplicate/chord-prefix conflicts. Existing scope
+precedence and disabled-binding behavior are unchanged. Twenty-one focused
+shortcut/configuration tests and one WASM build passed. Visual alias layout and
+native shortcut-list interaction remain pending.
+
 Browser help acceptance (d863079): an isolated sandboxed iframe without
 allow-popups reproduced blocked tab creation. The labelled fallback rendered
 correctly, focused its guide link, and Escape removed the dialog and restored

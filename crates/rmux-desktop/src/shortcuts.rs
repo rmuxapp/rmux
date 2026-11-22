@@ -1,5 +1,5 @@
 use super::*;
-use anyhow::{Result, ensure};
+use anyhow::{Context as _, Result, ensure};
 
 /// macOS reports shifted punctuation as its resulting character (`{` / `}`),
 /// without the Shift modifier. Keep explicit Shift bindings for other layouts.
@@ -191,9 +191,10 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
 }
 pub fn compile(settings: &Preferences) -> Result<Vec<KeyBinding>> {
     ensure!(settings.keybindings.len() <= 128, "at most 128 custom keybindings are allowed");
-    let mut used = std::collections::HashSet::new();
-    let mut sequences: Vec<(Option<&str>, Vec<String>)> = Vec::new();
-    settings.keybindings.iter().map(|binding| {
+    let mut used = std::collections::HashMap::new();
+    let mut sequences: Vec<(Option<&str>, Vec<String>, usize)> = Vec::new();
+    settings.keybindings.iter().enumerate().map(|(binding_index, binding)| {
+        let result = (|| -> Result<KeyBinding> {
         ensure!(binding.key.len() <= 128, "keybinding exceeds 128 bytes");
         let strokes = binding.key.split_whitespace().map(Keystroke::parse).collect::<std::result::Result<Vec<_>, _>>()?;
         ensure!((1..=2).contains(&strokes.len()), "keybinding requires one or two strokes");
@@ -207,14 +208,16 @@ pub fn compile(settings: &Preferences) -> Result<Vec<KeyBinding>> {
         }
         let sequence: Vec<_> = strokes.iter().map(ToString::to_string).collect();
         let canonical = sequence.join(" ");
-        ensure!(used.insert((binding.context.context(), canonical.clone())), "duplicate shortcut in the same context: {canonical}");
-        for (scope, previous) in &sequences {
+        if let Some(previous) = used.insert((binding.context.context(), canonical.clone()), binding_index) {
+            anyhow::bail!("duplicate shortcut {canonical}; also assigned by keybindings[{}]", previous);
+        }
+        for (scope, previous, previous_index) in &sequences {
             if *scope == binding.context.context() && previous.len() != sequence.len()
                 && (previous.starts_with(&sequence) || sequence.starts_with(previous)) {
-                anyhow::bail!("shortcut prefix conflict in the same context: {} and {canonical}", previous.join(" "));
+                anyhow::bail!("shortcut prefix conflict with keybindings[{previous_index}]: {} and {canonical}; use distinct strokes or two chords sharing the prefix", previous.join(" "));
             }
         }
-        sequences.push((binding.context.context(), sequence));
+        sequences.push((binding.context.context(), sequence, binding_index));
         let target = match (&binding.action, &binding.command, &binding.text, &binding.preset) {
             (Some(name), None, None, None) => action(name).ok_or_else(|| anyhow::anyhow!("unknown shortcut action: {name}"))?,
             (None, Some(name), None, None) => {
@@ -234,6 +237,8 @@ pub fn compile(settings: &Preferences) -> Result<Vec<KeyBinding>> {
         };
         let context = binding.context.context().map(|context| KeyBindingContextPredicate::parse(context).unwrap().into());
         Ok(KeyBinding::load(&binding.key, target, context, false, None, &DummyKeyboardMapper)?)
+        })();
+        result.with_context(|| format!("keybindings[{binding_index}] ({:?}, {} context)", binding.key, binding.context.context().unwrap_or("Window")))
     }).collect()
 }
 pub fn initialize(cx: &mut App) {
@@ -552,6 +557,23 @@ mod tests {
             serde_json::json!({"key":"ctrl-k t","text":"hello","command":"Tests"}),
         ] { assert!(compile(&settings(serde_json::json!({"keybindings":[binding]}))).is_err()); }
         assert!(compile(&settings(serde_json::json!({"keybindings":[{"key":"ctrl-k t","text":"x".repeat(16384)}]}))).is_ok());
+    }
+
+    #[test]
+    fn conflict_errors_identify_both_entries_and_scope() {
+        for second in ["ctrl-k", "ctrl-k t"] {
+            let prefs = settings(serde_json::json!({"keybindings":[
+                {"key":"ctrl-k","action":"settings","context":"find"},
+                {"key":second,"action":"palette","context":"find"}
+            ]}));
+            let error = format!("{:#}", compile(&prefs).err().expect("conflict"));
+            assert!(error.contains("keybindings[1]") && error.contains("keybindings[0]") && error.contains("FindInput context"), "{error}");
+        }
+        let prefs = settings(serde_json::json!({"keybindings":[
+            {"key":"ctrl-k","action":"settings","context":"find"},
+            {"key":"ctrl-k","action":"palette","context":"terminal"}
+        ]}));
+        assert_eq!(compile(&prefs).unwrap().len(), 2);
     }
 
     #[test]

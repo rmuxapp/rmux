@@ -348,11 +348,11 @@ impl InputProbe {
             Box::new(SelectWorkspaceNumber { number })
         };
         let focus = self.palette_origin.as_ref()?;
-        window.highest_precedence_binding_for_action_in(action.as_ref(), focus).map(|binding| {
-            let mac = terminal_engine::is_mac();
-            binding.keystrokes().iter().map(|key|
-                shortcut_label::format_key_parts(key.key(), *key.modifiers(), mac)).collect::<Vec<_>>().join(" ")
-        })
+        if self.shortcuts_only {
+            shortcut_label::binding_aliases(action.as_ref(), focus, window, terminal_engine::is_mac())
+        } else {
+            shortcut_label::binding_hint(action.as_ref(), focus, window, terminal_engine::is_mac())
+        }
     }
     fn result_title(&self, index: usize) -> &str {
         if let Some(command) = COMMANDS.get(index) { command.title() }
@@ -399,6 +399,11 @@ impl InputProbe {
         }
         if command == CommandId::ShowKeyboardShortcuts {
             self.shortcuts_only = true;
+            self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
+                .map(|index| self.result_hint(index, window, cx)).collect();
+            self.search = palette_match::RankedSearch::new((0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+                .map(|index| format!("{} {}", self.result_title(index), self.result_hints.get(index)
+                    .and_then(|hint| hint.as_deref()).map(shortcut_label::search_terms).unwrap_or_default()).to_lowercase()).collect());
             self.input.update(cx, |input, cx| {
                 input.placeholder = Some("Search commands or keys, e.g. cmd shift…");
                 input.replace_draft("", cx);

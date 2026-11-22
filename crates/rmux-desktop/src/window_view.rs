@@ -2446,9 +2446,10 @@ impl WorkspaceWindow {
     }
     fn show_keyboard_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_some() { self.close_palette(window, cx); }
+        let origin = window.focused(cx);
         self.show_palette(window, cx);
         if let Some((palette, _)) = &self.palette {
-            palette.update(cx, |palette, cx| palette.show_shortcuts(cx));
+            palette.update(cx, |palette, cx| palette.show_shortcuts(origin.as_ref(), window, cx));
         }
     }
     fn show_workspace_merge_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
