@@ -10698,3 +10698,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Main and configured-command palettes now render the resolved project-directory argument rather than a literal placeholder. Missing project identity is visible as unavailable context before activation; execution still performs its own current-workspace resolution and error handling. Preview text retains its existing bounds and omits environment values.
 - Corrected the configured-command picker footer: background commands no longer claim they open a new workspace. Background launch now uses the same focused/remembered/first-pane lookup as sidebar context, retaining the expected local directory when Settings or another overlay owns keyboard focus.
 - Desktop compilation and diff checks passed. No new rendering surfaces or WASM changes; native visual acceptance remains pending while the Mac is locked. No release or deployment.
+
+### Remember terminal context across overlay focus
+
+- Terminal focus recording now updates the workspace's remembered pane immediately, not only on workspace switches/snapshots. Opening Settings also captures the current pane before its focus moves. Sidebar context and background command fallback therefore retain the recently used pane.
+- Browse Terminal Files and Use Current Terminal Directory for Group now use the shared focused/remembered/first-pane selection, preserving their local-directory target when window-level UI owns focus. Terminal-scoped operations retain their existing focus guards; merely adding them to an overlay palette would not make their action dispatch work.
+- Desktop compilation passed; final diff restores the unchanged terminal-scoped palette availability path. Native multi-pane/overlay acceptance remains pending. No release, deployment, or user-session changes.

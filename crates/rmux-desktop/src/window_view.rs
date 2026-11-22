@@ -727,8 +727,7 @@ impl WorkspaceWindow {
             self.notice = Some("Select a workspace in a group first.".into()); cx.notify(); return;
         };
         let directory = if reset { None } else {
-            let workspace = entry.workspace.read(cx);
-            let Some(directory) = workspace.focused_index(window, cx).and_then(|index| workspace.panes.get(index))
+            let Some(directory) = Self::entry_pane(entry, window, cx)
                 .and_then(|pane| pane.read(cx).cached_directory(cx)) else {
                 self.notice = Some("The current terminal has not reported its directory yet.".into()); cx.notify(); return;
             };
@@ -1282,6 +1281,7 @@ impl WorkspaceWindow {
             }
         } else {
             if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
+            self.remember_focus(window, cx);
             let state = settings_view::State { focus: cx.focus_handle(), origin: window.focused(cx), selected: 0, scroll: ScrollHandle::new() };
             state.focus.focus(window);
             self.settings_state = Some(state);
@@ -1668,6 +1668,8 @@ impl WorkspaceWindow {
         let Some(id) = workspace.panes[index].read(cx).active_terminal_id() else {
             return;
         };
+        let pane_id = workspace.panes[index].entity_id();
+        self.workspace_state.entries[self.workspace_state.active].last_pane = Some(pane_id);
         self.record_terminal_visit(id);
     }
 
@@ -4367,8 +4369,7 @@ impl Render for WorkspaceWindow {
             }))
             .on_action(cx.listener(|this, _: &BrowseTerminalFiles, window, cx| {
                 let directory = this.workspace_state.entries.get(this.workspace_state.active).and_then(|entry| {
-                    let workspace = entry.workspace.read(cx);
-                    workspace.focused_index(window, cx).and_then(|index| workspace.panes.get(index))
+                    Self::entry_pane(entry, window, cx)
                         .and_then(|pane| pane.read(cx).cached_directory(cx))
                 });
                 if let Some(path) = directory { this.browse_directory(path, window, cx); }
