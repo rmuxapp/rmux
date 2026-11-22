@@ -188,7 +188,7 @@ mod navigation_tests {
         assert!(!title.contains("Needle"));
         let command = super::Command { title, subtitle: Some("Line 1".into()), shortcut: None,
             target: super::PaletteEvent::Run(Box::new(crate::CopyPreviewLine { text: text.clone(), source_line: Some(7), markdown: None, spans: Vec::new(), links: Default::default() })) };
-        let mut search = crate::palette_match::RankedSearch::new(vec![command.search_text()]);
+        let mut search = crate::palette_match::RankedSearch::document(vec![command.search_text()]);
         search.update("NEEDLE 世界");
         assert_eq!(search.matches, [0]);
         let excerpt = crate::file_browser::preview_line_title(command.preview_line().unwrap(), "NEEDLE 世界");
@@ -974,6 +974,7 @@ impl CommandPalette {
                 target: PaletteEvent::Run(Box::new(CopyPreviewLine { text, source_line: (!preview.hex).then_some((index + 1) as u32), markdown: None, spans: Vec::new(), links: Default::default() })) }
         }));
         let mut palette = Self::with_commands(commands, if preview.hex && preview.truncated { "Hex preview · First 8 KiB / 1,024 rows" } else if preview.hex { "Hex preview · Search bytes or ASCII · Read only" } else if preview.truncated { "Text preview · Limited to 64 KiB / 512 lines" } else if empty { "Text preview · Empty file" } else { "Text preview · Search lines · Read only" }, "No matching preview lines", window, cx);
+        palette.search = palette_match::RankedSearch::document(palette.commands.iter().map(Command::search_text).collect());
         palette.hex_preview = preview.hex;
         palette.preview_navigation = Some(navigation);
         palette.location = Some(location);
@@ -1013,7 +1014,7 @@ impl CommandPalette {
                 }
             }
         }
-        palette.search = palette_match::RankedSearch::with_shortcuts(palette.commands.iter().map(Command::search_text).collect(), palette.commands.iter().map(Command::shortcut_text).collect());
+        palette.search = palette_match::RankedSearch::document(palette.commands.iter().map(Command::search_text).collect());
         palette.headings = markdown_preview::heading_targets(palette.commands.iter().enumerate().filter_map(|(index, command)|
             matches!(command.markdown_kind(), Some(markdown_preview::Kind::Heading(_))).then(|| (index, command.preview_line().unwrap_or("")))));
         palette.table_scroll = table_scroll_handles(palette.commands.iter().map(Command::markdown_kind));

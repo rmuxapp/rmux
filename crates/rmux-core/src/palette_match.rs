@@ -56,6 +56,7 @@ pub fn tab_score(number: usize, title: &str, directory: &str, words: &[&str]) ->
 /// narrow previous matches; exact shortcut tokens must reconsider candidates.
 pub struct RankedSearch {
     titles: Vec<String>,
+    document: bool,
     shortcuts: Vec<String>,
     query: String,
     complete_candidates: bool,
@@ -64,7 +65,12 @@ pub struct RankedSearch {
 }
 impl RankedSearch {
     pub fn new(titles: Vec<String>) -> Self {
-        Self { matches: (0..titles.len()).collect(), titles, shortcuts: Vec::new(), query: String::new(), complete_candidates: true, ranked: Vec::new() }
+        Self { matches: (0..titles.len()).collect(), titles, document: false, shortcuts: Vec::new(), query: String::new(), complete_candidates: true, ranked: Vec::new() }
+    }
+    /// Literal word filtering for document rows. Preserve reading order and
+    /// use the same contiguous matches as preview highlighting.
+    pub fn document(titles: Vec<String>) -> Self {
+        Self { document: true, ..Self::new(titles) }
     }
     /// Shortcut aliases are exact tokens, never fuzzy continuations of a title.
     pub fn with_shortcuts(titles: Vec<String>, shortcuts: Vec<String>) -> Self {
@@ -103,7 +109,11 @@ impl RankedSearch {
         let normalized = query.to_lowercase();
         if self.complete_candidates && normalized == self.query { return; }
         let words: Vec<_> = normalized.split_whitespace().collect();
-        if words.is_empty() {
+        if self.document {
+            self.matches.clear();
+            self.matches.extend(self.titles.iter().enumerate().filter_map(|(index, title)|
+                words.iter().all(|word| title.contains(word)).then_some(index)));
+        } else if words.is_empty() {
             self.matches.clear();
             self.matches.extend(0..self.titles.len());
         } else {
@@ -145,6 +155,30 @@ fn command_score(title: &str, shortcuts: Option<&str>, words: &[&str]) -> Option
 #[cfg(test)]
 mod tests {
     use super::{score, tab_score, RankedSearch};
+
+    #[test]
+    fn document_search_keeps_source_order_and_literal_unicode_matches() {
+        let mut search = RankedSearch::document(vec![
+            "prefix needle 世界".into(), "needle 世界".into(),
+            "n e e d l e 世界".into(), "needle unrelated".into(),
+        ]);
+        search.update("NEEDLE");
+        assert_eq!(search.matches, [0, 1, 3]);
+        search.update("NEEDLE 世界");
+        assert_eq!(search.matches, [0, 1]);
+        search.update("NEEDLE 世界");
+        assert_eq!(search.matches, [0, 1]);
+        search.update("needle");
+        assert_eq!(search.matches, [0, 1, 3]);
+        search.update("missing");
+        assert!(search.matches.is_empty());
+        search.update("");
+        assert_eq!(search.matches, [0, 1, 2, 3]);
+        // Ordinary command search still prefers the earlier contiguous match.
+        let mut commands = RankedSearch::new(vec!["prefix needle".into(), "needle".into()]);
+        commands.update("needle");
+        assert_eq!(commands.matches, [1, 0]);
+    }
 
     #[test]
     fn clearing_filtered_search_preserves_order_and_refreshes_availability() {

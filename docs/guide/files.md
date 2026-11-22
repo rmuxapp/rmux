@@ -27,7 +27,10 @@ Select a regular file and press **Shift+Enter**, or use the **Preview as Hex**
 footer button, to inspect bytes directly without first loading a text preview.
 Plain Enter continues to preview text. Text and hex previews keep **Directory**,
 **View as Text/Hex**, and **Refresh** above the search field, including when no
-lines match. Refresh retains the current preview mode.
+lines match. Preview searches match literal, case-insensitive words and keep
+matching lines or Markdown blocks in source order. Every query word must occur
+in the same row; searches do not use fuzzy subsequences. Refresh retains the
+current preview mode.
 **Preview as Hex** is also available in
 text previews and file-preview errors, including
 binary/invalid-encoding errors. It displays the first 8 KiB as searchable eight-byte

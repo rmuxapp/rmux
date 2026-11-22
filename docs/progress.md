@@ -10582,3 +10582,9 @@ renderer color type. Browser review with three sample tabs confirmed highlighted
 “term” matches, Down selecting row two, “2 of 3” feedback and Escape dismissal.
 Screenshot: `target/tab-picker-search-polish.jpg`. Paging in short viewports and
 native runtime acceptance remain pending. Review tab/server closed; no deployment.
+
+### Preview search reading order
+
+- Text, hex and Markdown preview searches now use literal case-insensitive word matching and preserve source order. Filtering no longer ranks later lines above earlier ones or admits unhighlighted fuzzy subsequences. Commands and directory browsing retain fuzzy ranking.
+- Search mode lives with the immutable search snapshot, so input changes and restored preview history use identical matching. Existing full captured text and row metadata remain searchable.
+- Validation: 13 focused core palette-match tests passed, including query extension/deletion, empty results, clearing, Unicode and source ordering; desktop cargo check passed. Native visual/runtime acceptance remains pending. No release build or deployment for this batch.
