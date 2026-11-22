@@ -73,13 +73,14 @@ fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
     let mut path = text;
     let mut line = None;
     let mut column = None;
-    if let Some((prefix, coordinates)) = path.strip_suffix(')').and_then(|path| path.rsplit_once('(')) {
-        let parts: Vec<_> = coordinates.split(',').collect();
-        if (1..=2).contains(&parts.len()) && parts.iter().all(|part|
-            !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())) {
+    if let Some((prefix, coordinates)) = path.strip_suffix(')').and_then(|path| path.rsplit_once('('))
+        && prefix.rsplit(['/', '\\']).next().is_some_and(|name| name.contains('.')) {
+        let (row, col) = coordinates.split_once(',').map_or((coordinates, None), |(row, col)| (row, Some(col)));
+        let numeric = |part: &str| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit());
+        if numeric(row) && col.is_none_or(numeric) {
             let number = |part: &str| part.parse::<u32>().ok().filter(|number| *number > 0).ok_or(Unsupported);
-            line = Some(number(parts[0])?);
-            column = parts.get(1).map(|part| number(part)).transpose()?;
+            line = Some(number(row)?);
+            column = col.map(number).transpose()?;
             path = prefix;
         }
     }
@@ -129,6 +130,11 @@ mod tests {
             assert_eq!((target.line, target.column), (Some(12), Some(3)));
         }
         assert_eq!(resolve_with_home("main.cs(42)", Some(&cwd), false, None).unwrap().line, Some(42));
+        for literal in ["reports/report(2026)", "folder.name/report(2026)", "src/main.rs(draft)"] {
+            let target = resolve_with_home(literal, Some(&cwd), false, None).unwrap();
+            assert_eq!(target.path, cwd.join(literal));
+            assert_eq!((target.line, target.column), (None, None));
+        }
         for text in ["main.cs(0)", "main.cs(12,0)", "main.cs(999999999999)"] {
             assert_eq!(resolve_with_home(text, Some(&cwd), false, None), Err(LinkError::Unsupported));
         }
