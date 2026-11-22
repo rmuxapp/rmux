@@ -18,7 +18,7 @@ impl EventEmitter<Closed> for FindBar {}
 impl FindBar {
     pub fn navigate(&mut self, direction: Direction, cx: &App) {
         let query = self.input.read(cx).value();
-        if query.is_empty() || self.status_error { return; }
+        if query.is_empty() || self.status_error || self.input.read(cx).is_composing() { return; }
         self.history.remember(query);
         // The worker retains navigation while the initial scan runs.
         self.worker.navigate(direction);

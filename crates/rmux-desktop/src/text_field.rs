@@ -77,12 +77,17 @@ impl TextField {
         }
         self.rejected_edit = false;
         let text = text.replace(['\r', '\n'], " ");
-        if self.text.marked.is_none() && self.text.text[bytes] != text {
+        let composing = self.is_composing();
+        let changed = self.text.text[bytes] != text;
+        if !composing && changed {
             self.history.record(&self.text, self.reversed);
         }
         self.text.insert(Some(range), &text);
         self.reversed = false;
-        self.changed(cx);
+        // Selection can change without a text edit. Do not restart search or
+        // reset palette selection for an empty deletion / identical replacement.
+        // Committing preedit must still publish its value to subscribers.
+        if changed || composing { self.changed(cx); } else { cx.notify(); }
     }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.pointer_anchor = None;

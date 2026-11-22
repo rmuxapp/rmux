@@ -49,7 +49,7 @@ fn control(id: &'static str, hint: &'static str) -> Stateful<Div> {
 pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_error: bool, cx: &mut Context<V>) -> Div {
         let has_query = !input.read(cx).value().is_empty();
         let can_clear = has_query && !input.read(cx).is_composing();
-        let can_navigate = has_query && !status_error;
+        let can_navigate = can_clear && !status_error;
         div()
             .key_context("FindInput")
             .on_key_down(cx.listener(history_key::<V>))

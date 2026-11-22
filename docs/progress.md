@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Find/input polish: identical replacements and boundary deletions now update
+caret/selection without publishing a false text-change event, avoiding needless
+search restarts and palette-selection resets. IME commits still publish the
+committed value even when it equals the preedit buffer. Native and browser Find
+navigation refuse unfinished composition, and shared match buttons dim while
+composition is active. Native and WASM compile checks pass; live IME and no-op
+editing acceptance remains for the combined input review. No app bundle rebuilt.
+
+
 Palette/picker keyboard consistency: the native command palette, native tab
 picker and WASM palette now share a plain-arrow/PageUp/PageDown classifier.
 Modified keys remain available to editing/configured bindings rather than

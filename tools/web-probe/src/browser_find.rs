@@ -88,7 +88,7 @@ impl FindHost for FindBar {
     fn focus_find(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.input.read(cx).focus.clone().focus(window, cx); }
     fn close_find(&mut self, cx: &mut Context<Self>) { cx.emit(Closed); }
     fn navigate_find(&mut self, older: bool, cx: &mut Context<Self>) {
-        if self.error || self.input.read(cx).value().is_empty() { return; }
+        if self.error || self.input.read(cx).value().is_empty() || self.input.read(cx).is_composing() { return; }
         self.history.remember(self.input.read(cx).value());
         if self.pending {
             if self.navigation.len() < 64 { self.navigation.push_back(older); }
