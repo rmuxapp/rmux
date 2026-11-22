@@ -1,3 +1,14 @@
+Combined native main review: launch exposed a regression in b00361b: the shared
+title helper already attached a tooltip, and the deferred native title callback
+attached a second one, triggering GPUI's runtime assertion. Split title geometry
+into title_frame and attach exactly one tooltip per host. Rebuilt the native
+bundle and launched main with a real shell and temporary config in a separately
+identified app, preserving the installed app/session. Native Cmd+P opened the
+polished palette; Escape restored real terminal input (RMUX_FOCUS_OK printed).
+Screenshot: target/native-main-palette.png. The inherited Metal HUD is visible;
+its numbers are not a benchmark. Review app exited cleanly through its isolated
+RPC channel. No release/deployment. The initial startup crash was local only.
+
 Shared sidebar group controls: desktop and demo now use one title component
 with full-label tooltips and one group-add control. Demo group headers show the
 member count and add a workspace to the clicked group, honoring the sample limit

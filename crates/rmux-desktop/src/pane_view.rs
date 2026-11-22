@@ -1308,7 +1308,7 @@ impl Render for PaneView {
                                             })
                                             .child({
                                                 let fallback = display_title.clone();
-                                                crate::tab_presentation::title(("tab-title", target), display_title, fallback.clone())
+                                                crate::tab_presentation::title_frame(("tab-title", target)).child(display_title)
                                                     .tooltip(move |_, cx| {
                                                         let detail = hint_pane.upgrade().and_then(|pane| {
                                                             let pane = pane.read(cx);

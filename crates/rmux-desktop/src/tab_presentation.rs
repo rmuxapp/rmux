@@ -60,8 +60,11 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div 
         .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Leave empty for automatic title · Enter saves · Esc cancels"))
 }
 
-pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {
+pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {
     div().id(id).min_w(px(48.)).max_w(px(220.)).truncate()
+}
+pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {
+    title_frame(id)
         .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
         .child(title)
 }
