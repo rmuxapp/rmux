@@ -3634,6 +3634,12 @@ impl WorkspaceWindow {
     }
 
     pub(super) fn layout_snapshot(&mut self, window: &Window, cx: &App) -> Result<snapshot::WindowSnapshot> {
+        let mut saved = self.window_session_snapshot(window, cx)?;
+        saved.clear_shell_history();
+        Ok(saved)
+    }
+
+    fn window_session_snapshot(&mut self, window: &Window, cx: &App) -> Result<snapshot::WindowSnapshot> {
         self.remember_focus(window, cx);
         Ok(snapshot::WindowSnapshot {
                 groups: self.workspace_state.groups.entries().iter().map(|group| group.map_members(|id| {
@@ -3684,12 +3690,12 @@ impl WorkspaceWindow {
         for handle in cx.windows() {
             let Some(typed) = handle.downcast::<Self>() else { continue; };
             let saved = if handle == current {
-                self.layout_snapshot(window, cx)?
+                self.window_session_snapshot(window, cx)?
             } else {
                 if typed.read(cx).is_ok_and(|view| view.benchmark) { continue; }
                 typed.update(cx, |view, window, cx| -> Result<_> {
                     view.automation_available(cx).map_err(|failure| anyhow::anyhow!(failure.message))?;
-                    view.layout_snapshot(window, cx)
+                    view.window_session_snapshot(window, cx)
                 })??
             };
             if active == Some(handle) { snapshot.active_window = Some(snapshot.windows.len()); }

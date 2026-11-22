@@ -10161,3 +10161,22 @@ clear-message split), and the private-store tests passed. This does not implemen
 arbitrary deletion of individual shell history entries or stack merge semantics.
 Capture remains disabled by default; persistent identity, asynchronous saving,
 shell-native import and cleanup remain the next integration work.
+
+
+### Session history identities and layout separation — 2026-11-22
+
+T19 now carries a validated opaque history ID on a local Session and optional
+TabSnapshot field. Session saves retain it and background restore attaches it to
+the prepared shell before publication. Transfers retain the Session object and
+therefore the ID. Standalone layout exports and imports strip these references;
+command text is never embedded in layout/session JSON. Older snapshots without
+an ID remain valid. The private store allocates distinct 32-hex references using
+tempfile randomness, private staging files, and no-clobber persistence.
+
+Desktop compilation and five focused history/snapshot tests passed, covering
+identity allocation, session encode/decode, layout import stripping, path-like
+ID rejection, bounded storage, malformed files, and replacing history with empty
+records. No live shell is assigned an ID or enabled for capture yet. Remaining
+integration includes history-directory ownership and active-ID leases, asynchronous
+save coalescing/flush on exit, shell-native import without global duplication,
+cleanup, and native restore acceptance. No GUI build or release was needed.

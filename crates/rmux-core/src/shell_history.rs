@@ -30,3 +30,8 @@ impl History {
     }
 }
 
+
+/// History references are opaque IDs, never paths from a session document.
+pub fn valid_identity(id: &str) -> bool {
+    id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit() && !byte.is_ascii_uppercase())
+}

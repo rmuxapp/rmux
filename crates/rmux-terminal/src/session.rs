@@ -62,6 +62,7 @@ impl Interactions {
 
 pub struct Session {
     initial_directory: Option<std::path::PathBuf>,
+    shell_history_id: Option<String>,
     remote_destination: Option<String>,
     child_pid: Option<u32>,
     direct_command: bool,
@@ -396,6 +397,7 @@ impl Session {
             child_pid,
             direct_command: false,
             _shell_integration: None,
+            shell_history_id: None,
             terminal,
             master: pair.master,
             writer,
@@ -625,6 +627,14 @@ impl Session {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .current_directory()
+    }
+    pub fn shell_history_id(&self) -> Option<&str> { self.shell_history_id.as_deref() }
+    /// Attach a validated local-session identity before publishing the terminal.
+    pub fn set_shell_history_id(&mut self, id: Option<String>) -> Result<()> {
+        anyhow::ensure!(id.as_deref().is_none_or(rmux_core::shell_history::valid_identity), "invalid terminal history identity");
+        anyhow::ensure!(id.is_none() || (self.remote_destination.is_none() && !self.direct_command), "history identity requires a local shell");
+        self.shell_history_id = id;
+        Ok(())
     }
     /// Explicit spawn directory, without consulting the terminal parser.
     pub fn initial_directory(&self) -> Option<&std::path::Path> {

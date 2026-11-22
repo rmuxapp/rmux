@@ -115,6 +115,8 @@ pub enum Node {
 
 #[derive(Debug, Serialize, Deserialize, PartialEq)]
 pub struct TabSnapshot {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shell_history_id: Option<String>,
     pub label: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ssh_destination: Option<String>,
@@ -131,13 +133,25 @@ fn default_font_size() -> f32 {
 }
 
 impl WindowSnapshot {
+    pub fn clear_shell_history(&mut self) {
+        fn clear(node: &mut Node) {
+            match node {
+                Node::Pane { tabs, .. } => for tab in tabs { tab.shell_history_id = None; },
+                Node::Split { children, .. } => for child in children { clear(child); },
+            }
+        }
+        for workspace in &mut self.workspaces { clear(&mut workspace.layout); }
+    }
+
     pub fn load(path: &std::path::Path) -> Result<Self> {
         use std::io::Read;
         let mut bytes = Vec::new();
         std::fs::File::open(path)?
             .take(MAX_BYTES as u64 + 1)
             .read_to_end(&mut bytes)?;
-        Self::decode(&bytes)
+        let mut saved = Self::decode(&bytes)?;
+        saved.clear_shell_history();
+        Ok(saved)
     }
     pub fn save(&self, path: &std::path::Path) -> Result<()> {
         atomic_save(path, &self.encode()?)
@@ -221,6 +235,7 @@ impl Node {
                 *total_tabs += tabs.len();
                 ensure!(*total_tabs <= 256, "layout exceeds 256 tabs");
                 for tab in tabs {
+                    ensure!(tab.shell_history_id.as_deref().is_none_or(rmux_core::shell_history::valid_identity), "invalid terminal history identity");
                     if let Some(destination) = &tab.ssh_destination {
                         ensure!(crate::ssh::command(destination).is_ok(), "invalid saved SSH destination");
                     }
@@ -284,10 +299,30 @@ impl Node {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn shell_history_identity_survives_sessions_but_not_layout_imports() -> Result<()> {
+        let mut window = fixture();
+        let Node::Split { children, .. } = &mut window.workspaces[0].layout else { unreachable!() };
+        let Node::Pane { tabs, .. } = &mut children[0] else { unreachable!() };
+        tabs[0].shell_history_id = Some("0123456789abcdef0123456789abcdef".into());
+        let session = SessionSnapshot { version: 1, active_window: Some(0), windows: vec![window] };
+        let encoded = session.encode()?;
+        assert_eq!(SessionSnapshot::decode(&encoded)?, session);
+        let temporary = tempfile::tempdir()?;
+        let path = temporary.path().join("layout.json");
+        session.windows[0].save(&path)?;
+        let layout = WindowSnapshot::load(&path)?;
+        assert!(!String::from_utf8(layout.encode()?)?.contains("shell_history_id"));
+        let mut invalid: serde_json::Value = serde_json::from_slice(&encoded)?;
+        invalid["windows"][0]["workspaces"][0]["layout"]["children"][0]["tabs"][0]["shell_history_id"] = "../../private".into();
+        assert!(SessionSnapshot::decode(&serde_json::to_vec(&invalid)?).is_err());
+        Ok(())
+    }
     fn fixture() -> WindowSnapshot {
         let pane = || Node::Pane {
             active_tab: 0,
             tabs: vec![TabSnapshot {
+                shell_history_id: None,
                 ssh_destination: None,
                 custom_title: None,
                 font_family: None,
@@ -350,6 +385,7 @@ mod tests {
     #[test]
     fn live_split_depth_boundary_round_trips() -> Result<()> {
         let leaf = || Node::Pane { active_tab: 0, tabs: vec![TabSnapshot {
+                shell_history_id: None,
                 ssh_destination: None,
             label: "Shell".into(), custom_title: None, font_family: None,
             directory: None, font_size: 14.,

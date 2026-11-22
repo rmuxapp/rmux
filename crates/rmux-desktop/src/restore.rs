@@ -87,6 +87,7 @@ impl Prepared {
                     for tab in tabs {
                         check_cancelled(token)?;
                         sessions.push_back(spawn(tab)?);
+                        sessions.back_mut().unwrap().set_shell_history_id(tab.shell_history_id.clone())?;
                     }
                 }
                 snapshot::Node::Split { children, .. } => {
@@ -335,6 +336,7 @@ mod tests {
         let pane = |path| snapshot::Node::Pane {
             active_tab: 0,
             tabs: vec![snapshot::TabSnapshot {
+                shell_history_id: None,
                 ssh_destination: None,
                 custom_title: None,
                 font_family: None,

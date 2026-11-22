@@ -21,8 +21,33 @@ pub(crate) struct Store { directory: PathBuf }
 impl Store {
     pub fn new(directory: PathBuf) -> Self { Self { directory } }
     fn path(&self, id: &str) -> Result<PathBuf> {
-        ensure!(id.len() == 32 && id.bytes().all(|byte| byte.is_ascii_hexdigit()), "invalid terminal history identity");
-        Ok(self.directory.join(format!("{}.json", id.to_ascii_lowercase())))
+        ensure!(rmux_core::shell_history::valid_identity(id), "invalid terminal history identity");
+        Ok(self.directory.join(format!("{id}.json")))
+    }
+    pub fn allocate(&self) -> Result<String> {
+        use std::io::Write;
+        self.prepare_directory()?;
+        // tempfile supplies collision-resistant randomness and creates mode 0600.
+        // Encode the random ASCII basename as hex for the snapshot identity.
+        let mut file = tempfile::Builder::new().prefix("").rand_bytes(16).tempfile_in(&self.directory)?;
+        let name = file.path().file_name().unwrap().to_string_lossy();
+        let id: String = name.as_bytes().iter().map(|byte| format!("{byte:02x}")).collect();
+        let path = self.path(&id)?;
+        let bytes = serde_json::to_vec(&Saved { version: 1, commands: Vec::new() })?;
+        file.write_all(&bytes)?;
+        file.as_file().sync_all()?;
+        file.persist_noclobber(path)?;
+        Ok(id)
+    }
+    fn prepare_directory(&self) -> Result<()> {
+        let mut builder = std::fs::DirBuilder::new();
+        builder.recursive(true);
+        #[cfg(unix)] {
+            use std::os::unix::fs::DirBuilderExt;
+            builder.mode(0o700);
+        }
+        builder.create(&self.directory)?;
+        Ok(())
     }
     pub fn load(&self, id: &str) -> Result<History> {
         let path = self.path(id)?;
@@ -47,13 +72,7 @@ impl Store {
     }
     pub fn save(&self, id: &str, history: &History) -> Result<()> {
         let path = self.path(id)?;
-        let mut builder = std::fs::DirBuilder::new();
-        builder.recursive(true);
-        #[cfg(unix)] {
-            use std::os::unix::fs::DirBuilderExt;
-            builder.mode(0o700);
-        }
-        builder.create(&self.directory)?;
+        self.prepare_directory()?;
         let saved = Saved { version: 1, commands: history.entries().map(str::to_owned).collect() };
         let bytes = serde_json::to_vec(&saved)?;
         ensure!(bytes.len() <= FILE_LIMIT, "terminal history exceeds size limit");
@@ -66,6 +85,19 @@ mod tests {
     use super::*;
     const FIRST: &str = "0123456789abcdef0123456789abcdef";
     const SECOND: &str = "fedcba9876543210fedcba9876543210";
+    #[test]
+    fn allocated_histories_are_distinct_and_start_empty() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let store = Store::new(temporary.path().join("history"));
+        let first = store.allocate()?;
+        let second = store.allocate()?;
+        assert_ne!(first, second);
+        assert!(rmux_core::shell_history::valid_identity(&first));
+        assert_eq!(store.load(&first)?, History::default());
+        assert_eq!(store.load(&second)?, History::default());
+        assert_eq!(std::fs::read_dir(&store.directory)?.count(), 2);
+        Ok(())
+    }
     #[test]
     fn restore_keeps_multiline_unicode_and_terminal_histories_separate() -> Result<()> {
         let temporary = tempfile::tempdir()?;

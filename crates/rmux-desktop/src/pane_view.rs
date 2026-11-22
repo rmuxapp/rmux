@@ -772,6 +772,7 @@ impl PaneView {
                 .iter()
                 .zip(&self.labels)
                 .map(|(terminal, label)| snapshot::TabSnapshot {
+                    shell_history_id: terminal.read(cx).session.shell_history_id().map(str::to_owned),
                     label: label.clone(),
                     ssh_destination: terminal.read(cx).session.remote_destination().map(str::to_owned)
                         .or_else(|| terminal.read(cx).saved_ssh_destination.clone()),
