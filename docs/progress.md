@@ -1,3 +1,13 @@
+Shared sidebar group controls: desktop and demo now use one title component
+with full-label tooltips and one group-add control. Demo group headers show the
+member count and add a workspace to the clicked group, honoring the sample limit
+before changing selection. Native cargo check and WASM build passed. A combined
+browser pass verified group creation, pointer add with count/selection update,
+collapsed-header active selection, and a long renamed group that truncates without
+hiding disclosure/add controls. Local evidence: target/demo-group-header.png.
+Tooltip hover and native visual acceptance remain pending; screenshot is the
+sample-session browser demo. No app bundle, release or site deployment.
+
 Native tab hover cost: status-message and detailed title formatting now runs
 when a tooltip is requested rather than for every tab on every pane redraw.
 Callbacks hold weak pane/terminal references, resolve titles by stable identity,

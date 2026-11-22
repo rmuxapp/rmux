@@ -408,10 +408,23 @@ impl Render for BrowserHost {
                                 })
                                 .when_some(header.map_or(metadata.color, |group| group.color), |row, color| row.child(div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                 .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| metadata.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
-                                .child(div().min_w_0().flex_1().truncate().font_weight(FontWeight::SEMIBOLD)
-                                    .child(header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone())))
+                                .child(sidebar_presentation::title(("workspace-name", target), header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone()).into()))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(
-                                    sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some()))))
+                                    sidebar_presentation::pin(("workspace-pin", entity.entity_id()), selected, header.is_some())))
+                                .when(header.is_some(), |row| row.child(sidebar_presentation::group_add(("group-add", target))
+                                    .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                                        cx.stop_propagation();
+                                        if !event.standard_click() || this.workspace_state.entries.len() >= 16 { return; }
+                                        if let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.1.entity_id() == target) {
+                                            this.select(index, window, cx);
+                                            this.add_workspace(true, window, cx);
+                                        }
+                                    })))))
+                            .when_some(header, |row, group| {
+                                let count = group.members.len();
+                                row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 }))
+                                    .truncate().child(format!("{count} {}", if count == 1 { "workspace" } else { "workspaces" })))
+                            })
                             .when(!metadata.description.is_empty(), |row| row.child(div().text_xs().text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0xa0a0a0 })).truncate().child(metadata.description.clone())))
                             .when_some(self.rename.as_ref().filter(|(target, _)| *target == entity.entity_id()), |row, (_, input)| row.child(
                                 crate::metadata_presets::editor(input, self.editor_hint.clone(), self.editor_presets, cx)))

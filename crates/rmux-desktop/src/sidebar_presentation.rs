@@ -56,3 +56,19 @@ pub(crate) fn workspace_icon(custom: Option<String>, group: bool, selected: bool
         None => None,
     }
 }
+
+/// Shared title geometry and full-label access in compact sidebars.
+pub(crate) fn title(id: impl Into<ElementId>, text: SharedString) -> Stateful<Div> {
+    let hint = text.clone();
+    div().id(id).flex_1().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD)
+        .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
+        .child(text)
+}
+pub(crate) fn group_add(id: impl Into<ElementId>) -> Stateful<Div> {
+    div().id(id).w(px(24.)).h(px(24.)).flex_shrink_0()
+        .flex().items_center().justify_center().rounded_sm()
+        .child(crate::icons::icon("plus"))
+        .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+        .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("New Workspace in Group".into())).into())
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+}

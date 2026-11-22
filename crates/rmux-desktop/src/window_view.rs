@@ -4428,7 +4428,6 @@ impl Render for WorkspaceWindow {
                                     let target = entry.workspace.entity_id();
                                     let menu_group = header.map(|group| group.id);
                                     let selected = self.workspace_state.sidebar_selection.contains(&target) || index == self.workspace_state.active || header.is_some_and(|group| group.collapsed && self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
-                                    let title_hint: SharedString = display_name.clone().into();
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
                                     crate::sidebar_presentation::row(("workspace", entry.workspace.entity_id()), selected)
@@ -4512,16 +4511,11 @@ impl Render for WorkspaceWindow {
                                                         .child(gpui::div().flex_1().min_w_0().flex().items_center().gap_1()
                                                             .when_some(header.map(|group| group.color).unwrap_or(entry.color), |row, color| row.child(gpui::div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                                             .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| entry.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
-                                                            .child(gpui::div().id(("workspace-name", target)).flex_1().min_w_0().truncate()
-                                                                .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(title_hint.clone())).into())
-                                                                .font_weight(FontWeight::SEMIBOLD).child(display_name))
+                                                            .child(sidebar_presentation::title(("workspace-name", target), display_name.into()))
                                                             .when(header.map(|group| group.pinned).unwrap_or(entry.pinned), |row| row.child(
                                                                 sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
                                                     .when_some(header, |row, _| row.child(
-                                                        gpui::div().id(("group-add", target)).w(px(24.)).h(px(24.)).flex_shrink_0()
-                                                            .flex().items_center().justify_center().rounded_sm().child(icons::icon("plus"))
-                                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
-                                                            .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("New Workspace in Group".into())).into())
+                                                        sidebar_presentation::group_add(("group-add", target))
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                                                 if !event.standard_click() || this.automation_available(cx).is_err() { return; }
                                                                 cx.stop_propagation();
