@@ -2,6 +2,29 @@
 
 ## Current implementation focus
 
+Find/focus batch accepted for browser interaction: desktop cargo check and the
+combined WASM build pass. Browser review confirms populated field/clear control,
+empty placeholder and dim navigation, Clear retaining focus, Cmd+Z restoring the
+query, and palette Escape returning typing to Find without changing shell input.
+Screenshot: target/find-polish-batch.png. Shared native presentation compiles;
+native pointer interaction was not repeated. Batch committed locally, without
+release/deployment.
+
+Find-bar polish joins the held focus batch: shared native/WASM query construction
+adds a placeholder, the field gets a padded outline with an error tint, and a
+Clear action resets through the normal undoable edit path while keeping Find
+focused. Clear is hidden during composition; empty/error queries dim navigation
+controls. The empty-state duplicate status label is suppressed. Diff check passes;
+combined build and visual acceptance of this presentation change are pending.
+
+Palette focus polish: browser dismissal (Escape, Close, backdrop or toggle)
+restores the original focus handle, matching native behavior when invoked from
+Find. Command execution/layout transitions still focus the active terminal and
+clear the saved origin. WASM build passes. Browser flow verified: Cmd+F, type
+rmux, Cmd+P, Escape, type " focus" updates Find to "rmux focus" and leaves the
+shell prompt untouched. Screenshot: target/palette-find-focus.png. Held locally
+for the next product polish batch.
+
 Sidebar/tab batch review: native bundle and WASM compilation pass together.
 Native screenshot target/sidebar-batch-review.png confirms title-line controls,
 full-width details, readable single-line notification ellipses and full-height

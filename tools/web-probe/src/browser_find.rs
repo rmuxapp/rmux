@@ -16,7 +16,7 @@ pub(crate) struct FindBar {
 impl EventEmitter<Closed> for FindBar {}
 impl FindBar {
     pub fn new(parent: Entity<TerminalSample>, history: rmux_core::search_state::QueryHistory, query: &str, progress: Result<SearchProgress, String>, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let input = cx.new(|cx| TextField::new(query, cx));
+        let input = cx.new(|cx| crate::find_presentation::query_input(query, cx));
         input.read(cx).focus.clone().focus(window, cx);
         cx.subscribe(&input, |this, _, event: &EditEvent, cx| match event {
             EditEvent::Changed(query) => {

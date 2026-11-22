@@ -43,7 +43,7 @@ impl FindBar {
         history: QueryHistory,
         cx: &mut Context<Self>,
     ) -> Self {
-        let input = cx.new(|cx| TextField::new(initial_query, cx));
+        let input = cx.new(|cx| crate::find_presentation::query_input(initial_query, cx));
         let mut status_error = false;
         let status = if initial_query.is_empty() {
             "Find in terminal".into()

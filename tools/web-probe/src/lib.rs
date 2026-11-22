@@ -145,7 +145,7 @@ impl InputProbe {
                 match event {
                     text_field::EditEvent::Changed(query) => { this.search.update(query); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
                     text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
-                    text_field::EditEvent::Cancelled => this.close_palette(window, cx),
+                    text_field::EditEvent::Cancelled => this.dismiss_palette(window, cx),
                 }
                 cx.notify();
             }).detach();
@@ -280,7 +280,20 @@ impl InputProbe {
             cx.notify();
         }
     }
+    fn dismiss_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if !self.palette_open { return; }
+        self.palette_open = false;
+        if let Some(origin) = self.palette_origin.take() {
+            origin.focus(window, cx);
+        } else {
+            self.focus_terminal(window, cx);
+        }
+        cx.notify();
+    }
+    // Executing a command or changing the layout targets the current terminal.
+    // Dismissal instead restores the field that opened the palette (e.g. Find).
     fn close_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.palette_origin = None;
         self.palette_open = false;
         self.focus_terminal(window, cx);
         cx.notify();
@@ -335,7 +348,7 @@ impl InputProbe {
         else { &self.group_results[index - COMMANDS.len() - self.workspace_results.len()].1 }
     }
     fn open_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.palette_open { self.close_palette(window, cx); return; }
+        if self.palette_open { self.dismiss_palette(window, cx); return; }
         self.palette_origin = window.focused(cx);
         self.palette_open = true;
         cx.emit(PaletteRequest::Open);
@@ -532,7 +545,7 @@ impl Render for InputProbe {
             .when(self.palette_open, |root| root.child(div().absolute().inset_0().bg(rgba(0x00000066))
                 .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| {
                     cx.stop_propagation();
-                    this.close_palette(window, cx);
+                    this.dismiss_palette(window, cx);
                 }))
                 .flex().items_start().justify_center().pt(px(palette_view::top_inset(height)))
                 .child(palette_view::panel(height)
@@ -552,7 +565,7 @@ impl Render for InputProbe {
                 }))
                 .child(palette_view::header("Search commands and workspaces", palette_view::close_button()
                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
-                        if event.standard_click() { this.close_palette(window, cx); }
+                        if event.standard_click() { this.dismiss_palette(window, cx); }
                         cx.stop_propagation();
                     }))))
                 .child(palette_view::search(self.input.clone()))
