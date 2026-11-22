@@ -1,3 +1,13 @@
+Responsive inspector layout: Settings and Notifications now share a 380-point
+panel shell. When the viewport minus the visible sidebar cannot leave 400 points
+for terminals beside the panel, the panel overlays the right edge with occlusion
+and shadow instead of shrinking the terminal/PTY layout. Width is capped at the
+viewport, allowing the full panel width on compact windows rather than a 50%
+cap. One native bundle build passed. The isolated compact fixture stayed live,
+but UI control reported no available windows after capturing its initial state;
+visual acceptance is still pending. The fixture was stopped without touching the
+installed app. No additional test suite or release run was performed.
+
 Settings recovery batch: Revert Unsaved Settings restores panel-controlled
 values from the shared last-loaded/successfully-saved baseline without file I/O.
 It preserves commands, shortcuts, paths, explicit colors and environment policy,

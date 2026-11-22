@@ -50,6 +50,8 @@ to keep the default across launches.
 ## Use the Settings panel
 
 Open Settings with Cmd+, on macOS (Ctrl+, elsewhere), the app menu or palette.
+In narrow windows, Settings and Notifications overlay the right side instead of
+shrinking the terminal layout. Wider windows keep them alongside the terminals.
 
 The fixed footer keeps **Save**, **Open settings file**, **Reload from file** and
 **Keyboard Shortcuts…** available while scrolling. Reload replaces session

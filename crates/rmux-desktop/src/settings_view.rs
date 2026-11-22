@@ -174,7 +174,7 @@ fn theme_preview(settings: &Preferences) -> impl IntoElement {
         } else { "Preview of configured colors. Apps may override them." }))
 }
 
-pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::WorkspaceWindow>) -> AnyElement {
+pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<window_view::WorkspaceWindow>) -> AnyElement {
     let settings = cx.global::<Preferences>();
     let busy = cx.global::<preferences::ReloadState>().0;
     let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(settings);
@@ -183,11 +183,9 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
             .map(|key| format!("Save these settings · {key}"))
             .unwrap_or_else(|| "Save these settings".into())
     };
-    div().track_focus(&state.focus).key_context("Settings")
+    chrome_style::inspector(overlay).track_focus(&state.focus).key_context("Settings")
         .on_mouse_down(MouseButton::Left, { let focus = state.focus.clone(); move |_, window, _| { focus.focus(window); } })
         .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| this.settings_key(event, window, cx)))
-        .w(px(380.)).max_w(relative(0.50)).h_full().flex_shrink_0().flex().flex_col()
-        .bg(rgb(0x242424)).border_l_1().border_color(rgb(0x383838))
         .child(div().h(px(44.)).px_3().flex().items_center().gap_2().flex_shrink_0()
             .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).child("Settings"))
             .child(pane_view::pane_control("close-settings", "Close Settings")

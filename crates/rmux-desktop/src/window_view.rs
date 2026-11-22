@@ -2095,7 +2095,7 @@ impl WorkspaceWindow {
         }
     }
 
-    fn notification_panel(&self, cx: &mut Context<Self>) -> AnyElement {
+    fn notification_panel(&self, overlay: bool, cx: &mut Context<Self>) -> AnyElement {
         let navigation = self.notification_navigation.as_ref().expect("open notification panel").clone();
         let has_unread = self.workspace_state.entries.iter().any(|entry| entry.workspace.read(cx).needs_attention(cx));
         let mut messages = Vec::new();
@@ -2129,19 +2129,10 @@ impl WorkspaceWindow {
         }
         messages.sort_unstable_by_key(|row| std::cmp::Reverse(row.5));
         let selected = messages.iter().find(|row| Some((row.1, row.4.revision)) == navigation.selected).or_else(|| messages.first()).map(|row| (row.1, row.4.revision));
-        div().track_focus(&navigation.focus).key_context("Notifications")
+        chrome_style::inspector(overlay).track_focus(&navigation.focus).key_context("Notifications")
             .on_mouse_down(MouseButton::Left, { let focus = navigation.focus.clone(); move |_, window, _| focus.focus(window) })
             .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| this.notification_key(event, window, cx)))
             .on_action(cx.listener(|this, _: &CopySelection, _, cx| this.copy_selected_notification(cx)))
-            .w(px(380.))
-            .max_w(relative(0.50))
-            .h_full()
-            .flex_shrink_0()
-            .flex()
-            .flex_col()
-            .bg(rgb(0x242424))
-            .border_l_1()
-            .border_color(rgb(0x383838))
             .child(
                 div()
                     .h(px(44.))
@@ -4094,6 +4085,7 @@ impl Render for WorkspaceWindow {
         }
 
         let sidebar_width = crate::sidebar_interaction::visible_width(self.sidebar_width, window);
+        let overlay_inspector = chrome_style::overlay_inspector(f32::from(window.viewport_size().width), if self.sidebar { sidebar_width } else { 0. });
         div()
             .size_full()
             .relative()
@@ -4563,8 +4555,8 @@ impl Render for WorkspaceWindow {
                     .child(format!("{}  ·  Waiting for next key…", keys.iter().map(shortcuts::key_label).collect::<Vec<_>>().join(" ")))
             ))
             .when_some(self.workspace_menu.clone(), |root, menu| root.child(self.workspace_menu_element(menu, window, cx)))
-            .when_some(self.settings_state.clone(), |root, state| root.child(settings_view::panel(state, window, cx)))
-            .when(self.notification_navigation.is_some(), |root| root.child(self.notification_panel(cx)))
+            .when_some(self.settings_state.clone(), |root, state| root.child(settings_view::panel(state, overlay_inspector, window, cx)))
+            .when(self.notification_navigation.is_some(), |root| root.child(self.notification_panel(overlay_inspector, cx)))
             .when_some(self.palette.as_ref(), |root, (palette, _)| root.child(
                 div().id("command-palette-overlay").occlude().absolute().inset_0().flex().justify_center().items_start()
                     .pt(px(command_palette::top_inset(f32::from(window.viewport_size().height))))
