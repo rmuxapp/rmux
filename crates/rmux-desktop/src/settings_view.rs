@@ -9,7 +9,7 @@ pub struct State {
 }
 pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
-    "selection_opacity", "import_theme", "file_editor",
+    "selection_opacity", "import_theme", "file_editor", "shell_history",
 ];
 pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings", "undo_settings_save"];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
@@ -37,7 +37,7 @@ pub enum ControlInput {
 
 /// Arrow keys change values; they must never open a dialog or an editor.
 pub fn control_input(control: &str, key: &str) -> ControlInput {
-    let action = matches!(control, "file_editor" | "import_theme" | "font_family")
+    let action = matches!(control, "file_editor" | "import_theme" | "font_family" | "shell_history")
         || FOOTER_KEYS.contains(&control);
     match (action, key) {
         (true, "enter" | "space") => ControlInput::Activate,
@@ -192,7 +192,7 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .child(pane_view::pane_control("close-settings", "Close Settings")
                 .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSettings), cx); } }).child(icons::icon("close"))))
         .child(div().id("settings-scroll").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_3()
-            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Changes apply immediately to this session. Save to keep them for next time."))
+            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Appearance changes apply immediately. Save to keep them for next time. File settings below note when a restart is needed."))
             .child(row("Default text size", "font", format!("{} pt", settings.font_size), true, state.selected == 0, false))
             .child(row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, state.selected == 1, false))
             .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(rgb(0x383838))
@@ -226,8 +226,8 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                 workspace_groups::Placement::End => "Last",
             }.into(), false, state.selected == 8, false))
             .child(div()
-                .child(row("New terminal history", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 9, false))
-                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("History budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
+                .child(row("New terminal scrollback", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 9, false))
+                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Output history budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
             .child(div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, state.selected == 10, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.")))
             .child(row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, state.selected == 11, false))
@@ -243,16 +243,29 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .when(cfg!(target_os = "macos"), |panel| panel.child(div()
                 .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
-            .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, state.selected == KEYS.len() - 3, false))
+            .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, Some(state.selected) == control_index("selection_opacity"), false))
                 .child(button("selection-opacity-reset".into(), "Use theme default".into(), "Reset selection opacity to the theme default".into(), "selection_opacity", 0)))
-            .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, state.selected == KEYS.len() - 2, false))
+            .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, Some(state.selected) == control_index("import_theme"), false))
             .child(div()
-                .child(row("External editor", "file_editor", "Configure…".into(), false, state.selected == KEYS.len() - 1, false))
+                .child(row("External editor", "file_editor", "Configure…".into(), false, Some(state.selected) == control_index("file_editor"), false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Opens Settings JSON. Set file_editor.program and args, then Reload Settings."))
                 .child(div().id("settings-editor-program").pt_1().text_xs().min_w_0().truncate().text_color(rgb(0xb8b8b8))
                     .tooltip({ let program: SharedString = settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "No external editor configured".into()).into();
                         move |_, cx| cx.new(|_| pane_view::ControlHint(program.clone())).into() })
                     .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
+            .child(div()
+                .child(row("Saved command history", "shell_history", "Configure…".into(), false,
+                    Some(state.selected) == control_index("shell_history"), false))
+                .child(div().pt_2().text_xs().text_color(rgb(0xb8b8b8))
+                    .child(format!("{} · Experimental", shell_history::settings_status(&settings.shell_history_directory))))
+                .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0))
+                    .child("Recall commands when restoring a saved session. Supports zsh and non-login Bash. Set shell_history_directory in Settings JSON, then restart rmux."))
+                .when_some(settings.shell_history_directory.as_ref(), |row, path| {
+                    let path: SharedString = path.display().to_string().into();
+                    row.child(div().id("settings-history-directory").pt_1().text_xs().min_w_0().truncate().text_color(rgb(0xb8b8b8))
+                        .tooltip({ let path = path.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(path.clone())).into() })
+                        .child(path))
+                }))
             .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
         .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838)).flex().flex_col().gap_2()
             .child(div().text_xs().text_color(rgb(if unsaved { 0xe3bc78 } else { 0xa0a0a0 }))
@@ -297,7 +310,7 @@ mod tests {
     #[test]
     fn arrows_adjust_values_but_never_launch_actions() {
         use super::{control_input, ControlInput};
-        for control in ["file_editor", "import_theme", "font_family"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
+        for control in ["file_editor", "import_theme", "font_family", "shell_history"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
             assert_eq!(control_input(control, "left"), ControlInput::None);
             assert_eq!(control_input(control, "right"), ControlInput::None);
             assert_eq!(control_input(control, "enter"), ControlInput::Activate);

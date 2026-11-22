@@ -10283,3 +10283,20 @@ This remains experimental: zsh and non-login Bash are supported, integration
 must be enabled, automatic old-file cleanup and individual-entry deletion
 synchronization are still pending, and native GUI restore/quit/error-notice
 acceptance has not been performed. Settings documentation records these limits.
+
+
+### History settings discoverability — 2026-11-22
+
+Settings now labels the output-memory control “New terminal scrollback” and adds
+a separate “Saved command history” configuration row. It shows the running versus
+configured state (off, on, restart to enable/disable/change folder), marks the
+feature experimental, explains supported shells and session restore, and shows
+the configured path with a full-path tooltip. Configure opens Settings JSON via
+the existing editor action; Enter/Space activates it, while arrows do not launch
+an editor. The opening copy distinguishes immediate appearance changes from
+file settings that require restart. Trailing control selections use stable key
+lookup so adding this row does not shift their selection styling.
+
+Desktop test compilation and the focused settings keyboard-action test passed.
+Native screenshot review remains pending: CUA confirmed the Mac is locked. No
+installed app or user session was changed, and no release build was performed.

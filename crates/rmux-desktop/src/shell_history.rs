@@ -508,3 +508,14 @@ pub(crate) fn reload_notice(next: &Option<PathBuf>) -> Option<&'static str> {
     let running = SERVICE.get().map(|service| &service.store.directory);
     (running != next.as_ref()).then_some("Restart rmux to apply the shell history directory change.")
 }
+
+
+pub(crate) fn settings_status(next: &Option<PathBuf>) -> &'static str {
+    match (SERVICE.get(), next) {
+        (None, None) => "Off",
+        (None, Some(_)) => "Restart to enable",
+        (Some(_), None) => "Restart to disable",
+        (Some(service), Some(path)) if service.store.directory != *path => "Restart to change folder",
+        _ => "On",
+    }
+}

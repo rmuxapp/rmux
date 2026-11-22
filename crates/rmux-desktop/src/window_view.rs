@@ -1309,7 +1309,7 @@ impl WorkspaceWindow {
                 return;
             }
             if selected < settings_view::KEYS.len() {
-                if settings_view::KEYS[selected] == "file_editor" {
+                if matches!(settings_view::KEYS[selected], "file_editor" | "shell_history") {
                     self.open_settings_file(cx);
                     cx.stop_propagation();
                     return;
@@ -4424,7 +4424,7 @@ impl Render for WorkspaceWindow {
                     state.focus.focus(window);
                 }
                 let mut settings = cx.global::<Preferences>().clone();
-                if change.key == "file_editor" {
+                if matches!(change.key.as_str(), "file_editor" | "shell_history") {
                     this.open_settings_file(cx);
                     return;
                 }
