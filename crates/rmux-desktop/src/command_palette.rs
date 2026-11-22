@@ -1060,7 +1060,8 @@ impl CommandPalette {
         let subtitle = self.commands[command].subtitle.as_ref().map(|text| {
             let ranges = match &self.commands[command].target {
                 PaletteEvent::SearchTerminal { query, preview: true, .. } => literal_highlights(text, query),
-                _ => file_browser::preview_highlights(text, self.input.read(cx).value()),
+                _ if self.commands[command].preview_line().is_some() => file_browser::preview_highlights(text, self.input.read(cx).value()),
+                _ => rmux_core::palette_match::fuzzy_highlights(text, self.input.read(cx).value()),
             };
             StyledText::new(text.clone()).with_highlights(ranges.into_iter().map(|range| (
                 range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }

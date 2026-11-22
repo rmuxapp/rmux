@@ -194,11 +194,23 @@ fn match_highlights(text: &str, query: &str, fuzzy: bool) -> Vec<std::ops::Range
         boundaries.push((folded_start..folded_offset, start..start + ch.len_utf8()));
     }
     let mut marked = vec![false; boundaries.len()];
+    let mut mark = |matched: std::ops::Range<usize>| {
+        let first = boundaries.partition_point(|(range, _)| range.end <= matched.start);
+        let last = boundaries.partition_point(|(range, _)| range.start < matched.end);
+        marked[first..last].fill(true);
+    };
+    // Only fuzzy words need temporary ranges, so an incomplete subsequence
+    // can be discarded. Reuse that storage across words in this label.
+    let mut matches = Vec::new();
     for word in query.split_whitespace() {
         let word = word.to_lowercase();
-        let mut matches: Vec<_> = folded.match_indices(&word)
-            .map(|(start, matched)| start..start + matched.len()).collect();
-        if matches.is_empty() && fuzzy {
+        let mut contiguous = false;
+        for (start, matched) in folded.match_indices(&word) {
+            contiguous = true;
+            mark(start..start + matched.len());
+        }
+        if !contiguous && fuzzy {
+            matches.clear();
             let mut chars = folded.char_indices();
             for wanted in word.chars() {
                 let Some((start, ch)) = chars.find(|(_, ch)| *ch == wanted) else {
@@ -208,11 +220,7 @@ fn match_highlights(text: &str, query: &str, fuzzy: bool) -> Vec<std::ops::Range
                 };
                 matches.push(start..start + ch.len_utf8());
             }
-        }
-        for matched in matches {
-            let first = boundaries.partition_point(|(range, _)| range.end <= matched.start);
-            let last = boundaries.partition_point(|(range, _)| range.start < matched.end);
-            marked[first..last].fill(true);
+            for matched in &matches { mark(matched.clone()); }
         }
     }
     let mut ranges: Vec<std::ops::Range<usize>> = Vec::new();
@@ -235,6 +243,9 @@ mod highlight_tests {
         assert_eq!(ranges.iter().map(|range| &text[range.clone()]).collect::<Vec<_>>(), ["Spl", "t", "B", "l", "w"]);
         assert!(preview_highlights(text, "splt blw").is_empty());
         assert!(super::fuzzy_highlights(text, "spltz").is_empty());
+        assert_eq!(super::fuzzy_highlights(text, "splt blwz"), vec![0..3, 4..5]);
+        // Ranking greedily takes the first r (in work), even for the rmx word.
+        assert_eq!(super::fuzzy_highlights("/work/rmux", "wrk rmx"), vec![1..2, 3..5, 7..8, 9..10]);
         assert_eq!(super::fuzzy_highlights("s p l t splt", "splt"), vec![8..12]);
         assert_eq!(super::fuzzy_highlights("東京作業", "東業"), vec![0..3, 9..12]);
         assert_eq!(super::fuzzy_highlights("İ ΟΣ", "iς"), vec![0..2, 5..7]);

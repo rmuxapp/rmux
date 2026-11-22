@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Fuzzy highlighting now also covers palette result subtitles such as terminal
+directories. Literal terminal-search excerpts and document previews retain their
+existing behavior. Contiguous highlighting marks ranges directly without a new
+per-word match vector; fuzzy words reuse one scratch vector per label. Nine
+focused search tests and desktop compilation pass, including complete-word
+rollback and directory matching against the ranker's greedy subsequence.
+This is an allocation reduction by inspection, not a measured latency claim.
+
 Command labels now highlight fuzzy subsequences as well as contiguous words in
 the native and WASM palettes. For example, `splt blw` visibly marks the matching
 letters in Split Below using the same greedy path as ranking. Incomplete words
