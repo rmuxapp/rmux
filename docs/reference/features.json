@@ -83,7 +83,7 @@
       ],
       "acceptance": "Keep window, workspace, pane and surface identities distinct through all operations.",
       "rmux_status": "in_progress",
-      "implementation": "Sidebar workspaces and per-pane terminal tabs. Close Other Tabs provides a policy-aware batch close with stable target identities, keeper preservation and menu/palette/shortcut access.",
+      "implementation": "Sidebar workspaces and per-pane terminal tabs. Close Other Tabs provides a policy-aware batch close with stable target identities, keeper preservation and menu/palette/shortcut access. Shared tab rename controls show character limits and preserve overlong drafts for correction; context menus identify captured tab targets. Local post-v0.1.11 fixes tie rename cleanup to terminal close/move lifecycle and preserve drafts on same-tab clicks.",
       "remaining": "Full identity and interaction parity acceptance.",
       "implementation_sources": [
         "crates/rmux-desktop/src/pane_view.rs"
@@ -228,7 +228,7 @@
       ],
       "acceptance": "Search actions and workspaces; execute the same command path used by shortcuts and CLI.",
       "rmux_status": "in_progress",
-      "implementation": "Action palette, named workspace and terminal switching, numeric pane focus and tab-transfer destinations with ranked per-word fuzzy search and stable entity targeting. Terminal entries include workspace/pane/tab identity and custom titles. Native and WASM provide searchable effective command shortcuts using resolved bindings and shared key-name aliases. Copy, Paste and Previous/Next Pane are now exposed through the shared command catalog and existing action handlers.",
+      "implementation": "Action palette, named workspace and terminal switching, numeric pane focus and tab-transfer destinations with ranked per-word fuzzy search and stable entity targeting. Terminal entries include workspace/pane/tab identity and custom titles. Native and WASM provide searchable effective command shortcuts using resolved bindings and shared key-name aliases. Copy, Paste and Previous/Next Pane are now exposed through the shared command catalog and existing action handlers. File previews use literal case-insensitive word filtering in source order, independently of fuzzy command ranking. Shared text fields preserve platform editing combinations and leave unrelated modified keys for parent actions. Preview history/source navigation and context menu/tab chooser polish are implemented; interaction acceptance remains tracked separately.",
       "remaining": "Full upstream command configuration semantics, accessibility and complete native search/switching acceptance. Configured commands support named shortcuts, literal argv, cwd and child environment overrides; palette launches use background PTY preparation. rmux --command NAME also launches these definitions with the shared PTY command API. A macOS real-PTY smoke check verifies CLI argv/environment/cwd and missing-name failure; cross-platform runtime acceptance remains pending.",
       "implementation_sources": [
         "crates/rmux-desktop/src/command_palette.rs",
@@ -1741,11 +1741,15 @@
       ],
       "acceptance": "Signed installers/update paths per OS preserve sessions and isolate nightly state.",
       "rmux_status": "in_progress",
-      "implementation": "Local macOS and Windows bundle scripts.",
-      "remaining": "Installers, signing, updates and build-channel lifecycle.",
+      "implementation": "GitHub runner builds publish macOS Apple Silicon DMG/ZIP, Linux x86-64 tarball and Windows x86-64 ZIP. macOS packages are Developer ID signed and notarized, with Sparkle-signed updates and an app-menu Check for Updates action. Published v0.1.11 includes all native assets, checksums and appcast; the website links to the release.",
+      "remaining": "Native install/update lifecycle acceptance, session preservation through updates, Windows signing/installer and Linux installation integration, nightly channel/state isolation, additional architectures and cross-platform runtime acceptance. Published artifacts do not establish these remaining behaviors.",
       "implementation_sources": [
-        "scripts/bundle-macos.sh",
-        "scripts/bundle-windows.ps1"
+        ".github/workflows/release.yml",
+        "scripts/ci-sign-macos.py",
+        "scripts/publish-release.py",
+        "crates/rmux-desktop/src/updater.rs",
+        "updates/appcast.xml",
+        "docs/releases/v0.1.11.md"
       ],
       "progress_record": "docs/progress.md"
     },
@@ -1782,7 +1786,17 @@
         "CLI"
       ],
       "acceptance": "Publish rmux-specific automation guidance with tested examples and capability discovery.",
-      "rmux_status": "not_started"
+      "rmux_status": "in_progress",
+      "implementation": "User-facing README, getting-started guide, organized user guide and dedicated workflow pages cover terminal use, workspaces, files, settings, sessions, notifications, SSH, diagnostics, CLI automation and VS Code external-terminal integration. CLI automation documentation includes named workspace reuse, explicit targets, event replay and output capture examples.",
+      "remaining": "A packaged agent skill and complete command/capability documentation coverage; systematic validation of all published examples against current contracts and supported platforms. Existing guides alone do not satisfy full upstream documentation/skill parity.",
+      "implementation_sources": [
+        "README.md",
+        "docs/trying-rmux.md",
+        "docs/user-guide.md",
+        "docs/guide/automation.md",
+        "docs/guide/vscode.md"
+      ],
+      "progress_record": "docs/progress.md"
     },
     {
       "id": "E01",

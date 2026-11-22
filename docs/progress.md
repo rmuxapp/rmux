@@ -10611,3 +10611,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Clicking the already-selected tab now refocuses its rename field without discarding the draft, on native and sample hosts. Preservation is restricted to direct clicks, so selection after insertion/transfer cannot attach an old draft to a new active tab.
 - Closing an unrelated demo tab preserves the current rename draft. Closing the edited tab removes its editor and returns focus only if that editor held focus. Native single/batch close now applies the same cleanup; moving the edited native tab or draining its pane also removes the stale editor.
 - Native and WASM cargo checks passed for lifecycle changes; direct-click guard was subsequently scoped away from generic selection after code review. Runtime tab close/move scenarios remain pending; no release or user-session actions performed.
+
+### Roadmap evidence reconciliation after v0.1.11
+
+- Corrected P04: runner-built, signed/notarized macOS artifacts, portable Linux/Windows archives, Sparkle feed and update action are implemented and published. Platform install/update lifecycle, Windows signing/installers, nightly isolation and runtime acceptance remain open.
+- Corrected P07 from not_started to in_progress using the existing user guide, workflow pages and automation reference. Packaged agent skill and complete example/contract acceptance remain unproven.
+- W02/W10 now account for the recent rename, menu, preview filtering and text-field work without claiming full visual/native acceptance. This ledger review found no basis for marking an entire phase complete. Next substantive documented terminal gap is T09 PR/listening-port metadata; native interaction acceptance remains a separate obligation while Mac access is locked.
