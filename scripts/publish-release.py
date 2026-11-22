@@ -6,6 +6,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import tomllib
+from release_metadata import validate_appcast
 
 
 def run(*args):
@@ -21,6 +22,7 @@ assets.append(output / 'appcast.xml')
 for asset in assets:
     if not asset.is_file() or not asset.stat().st_size:
         raise SystemExit(f'Missing release artifact: {asset}')
+validate_appcast(output / 'appcast.xml', version, assets[0])
 checksums = output / 'SHA256SUMS'
 with checksums.open('w') as stream:
     for asset in assets:

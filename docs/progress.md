@@ -2,6 +2,26 @@
 
 ## Current implementation focus
 
+Next-release quality batch: the macOS packaging script supplies the existing
+Markdown release notes to Sparkle's pinned generate_appcast tool with
+--embed-release-notes and a version-specific full-history link. Publication now
+rejects a missing/duplicate version, incorrect display version/download URL/ZIP
+length, malformed Ed25519 signature metadata, empty notes or wrong history link
+before creating the GitHub release. A focused fixture checks valid metadata and
+seven failure cases; it and shell syntax checks pass, with no app build. The
+fixture also runs in release preflight. Actual generated notes and their native
+rendering still need the next release run; existing 0.1.5 assets/feed are unchanged.
+Signature shape checks are not cryptographic verification.
+
+Native release follow-up: the installed /Applications/rmux.app (0.1.3) successfully
+discovers 0.1.5 through rmux → Check for Updates. Sparkle displays the correct
+versions and app icon. Screenshot: target/sparkle-015-discovery.png. No install or
+Skip This Version action was taken; Escape/Cmd+W did not dismiss the update window,
+which remains open. This verifies update discovery only, not download, replacement
+or relaunch. Native app inspection is available again; earlier locked-Mac notes
+are historical. GitHub currently has no open issues. This note is held for the
+next batch commit rather than triggering another push/build.
+
 0.1.5 is published from GitHub release run 44972522111 at 61b52a1. All three
 platform builds and publication succeeded; the release includes macOS DMG/ZIP,
 Linux tar.gz, Windows ZIP, checksums and the appcast. The main-branch Sparkle feed

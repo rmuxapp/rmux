@@ -27,7 +27,9 @@ set -- --account rmux
 if [ -n "${RMUX_SPARKLE_KEY_FILE:-}" ]; then
     set -- --ed-key-file "$RMUX_SPARKLE_KEY_FILE"
 fi
-generate_appcast "$@" --maximum-deltas 0 \
+cp "docs/releases/v$version.md" "$output/rmux-$version-macos-arm64.md"
+generate_appcast "$@" --maximum-deltas 0 --embed-release-notes \
+    --full-release-notes-url "https://github.com/rmuxapp/rmux/releases/tag/v$version" \
     --download-url-prefix "https://github.com/rmuxapp/rmux/releases/download/v$version/" \
     --link "https://github.com/rmuxapp/rmux" "$output"
 # Keep Sparkle's feed pointed at the signed ZIP; create the installer afterward.

@@ -25,7 +25,9 @@ jobs:
             [tools]
             python = "3.13.15"
       - name: Check release version, notes and lockfiles
-        run: mise exec -- python scripts/check-release.py
+        run: |
+          mise exec -- python scripts/test_release_metadata.py
+          mise exec -- python scripts/check-release.py
   macos:
     needs: preflight
     if: inputs.reuse_run == ''
