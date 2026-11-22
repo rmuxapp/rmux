@@ -144,13 +144,17 @@ outside a truncated document. A bare `#` returns to the first reading block.
 Heading IDs use lowercase text, whitespace replaced with hyphens, and punctuation
 removed except underscores and hyphens. Unicode letters and digits are retained;
 repeated IDs receive `-1`, `-2`, and so on. Percent-encoded UTF-8 fragments work.
-Explicit HTML IDs and cross-file heading jumps are not supported yet.
+Explicit HTML IDs are not supported yet.
 
 Relative links resolve from the current document's folder. Links to Markdown
 files open in reading view; other local files open in text preview. Directory
 links ending in `/` open the file browser. Local `file://` links work the same
 way. Missing files show the preview loader's error; they do not launch another
-application. Links to other local files with anchors or query strings remain plain text.
+application. Links such as `guide.md#installation` open the local Markdown file
+and jump to its heading. Retry retains that destination if the file was missing.
+A loaded file with no matching heading remains open and reports the missing
+heading. Back returns to the source document's search and selection. Local query
+strings and fragments on non-Markdown files remain unsupported.
 
 Use **Back / Forward** in the preview toolbar to revisit documents, including
 returning from a missing-file error. **Cmd+[ / Cmd+]** on macOS (**Alt+Left /

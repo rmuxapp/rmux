@@ -30,6 +30,19 @@ pub fn fragment(uri: &str) -> Option<String> {
     (!value.chars().any(char::is_control)).then_some(value)
 }
 
+/// Resolve a heading link to another local Markdown document without I/O.
+pub fn local_heading_link(uri: &str, source: &std::path::Path) -> Option<(std::path::PathBuf, String)> {
+    if uri.len() > 8192 || uri.chars().any(char::is_control) { return None; }
+    let (file, anchor) = uri.split_once('#')?;
+    if file.is_empty() { return None; }
+    let anchor = fragment(&format!("#{anchor}"))?;
+    let resolved = link_destination(file, source)?;
+    let path = super::terminal_link::local_file(&resolved, false)?;
+    let extension = path.extension()?.to_str()?;
+    ["md", "markdown", "mdown", "mkd"].iter().any(|candidate| extension.eq_ignore_ascii_case(candidate))
+        .then_some((path, anchor))
+}
+
 pub fn heading_targets<'a>(headings: impl Iterator<Item = (usize, &'a str)>) -> std::collections::HashMap<String, usize> {
     let mut targets = std::collections::HashMap::new();
     for (index, text) in headings {
@@ -52,6 +65,7 @@ fn supported_link(uri: &str) -> bool {
     // absolute base here only to classify and reject unsupported destinations.
     let base = if cfg!(windows) { "C:/rmux/document.md" } else { "/rmux/document.md" };
     link_destination(uri, std::path::Path::new(base)).is_some()
+        || local_heading_link(uri, std::path::Path::new(base)).is_some()
 }
 
 pub const TABLE_VISIBLE_COLUMNS: usize = 8;
@@ -282,6 +296,20 @@ mod tests {
         }
         let (rows, _) = blocks("[local](../guide.md) [script](javascript:alert) [anchor](#part)");
         assert_eq!(rows[0].links, ["../guide.md", "#part"]);
+    }
+    #[test]
+    fn linked_document_headings_keep_paths_and_fragments_separate() {
+        let source = std::env::temp_dir().join("docs/sub/readme.md");
+        let (path, fragment) = local_heading_link("../other%20guide.MD#caf%C3%A9", &source).unwrap();
+        assert_eq!(path, std::env::temp_dir().join("docs/other guide.MD"));
+        assert_eq!(fragment, "café");
+        let url = url::Url::from_file_path(&path).unwrap();
+        assert_eq!(local_heading_link(&format!("{url}#intro"), &source).unwrap().0, path);
+        for uri in ["#intro", "other.txt#intro", "guide.md?query#intro", "//server/guide.md#intro", "file://server/guide.md#intro", "https://example.com/guide.md#intro", "guide.md#%00", "guide.md#%FF"] {
+            assert!(local_heading_link(uri, &source).is_none(), "{uri}");
+        }
+        let (rows, _) = blocks("[chapter](guide.md#intro) [invalid](guide.md#%00)");
+        assert_eq!(rows[0].links, ["guide.md#intro"]);
     }
     #[test]
     fn reading_blocks_retain_source_lines_across_blank_lines_and_markup() {

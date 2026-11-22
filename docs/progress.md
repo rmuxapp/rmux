@@ -10481,3 +10481,21 @@ Desktop test compilation and all 17 Markdown tests passed, including a mixed
 CRLF fixture with blank lines, inline formatting, code, rules, and table rows.
 Updated editor documentation with line-placeholder behavior. Actual external
 editor launching remains unreviewed; no user editor, files or sessions changed.
+
+
+### Cross-file Markdown heading links — 2026-11-22
+
+Completed local `guide.md#heading` routing through the asynchronous Markdown
+preview loader. The parser recognizes bounded relative/absolute local Markdown
+heading links; path and UTF-8 fragment decoding remain separate, and network file
+authorities, queries, invalid escapes and non-Markdown targets are rejected.
+Successful loads reveal the target without adding an extra intermediate history
+visit. Existing source query/selection capture applies, and missing-file Retry
+retains the requested fragment. A missing heading leaves the loaded file visible
+with feedback. No external browser/editor is used for these links.
+
+Desktop test compilation, all 18 Markdown tests and the local-link action/loader
+check passed. Tests cover encoded spaces/Unicode, absolute file links, rejection
+cases, parser retention and action path/fragment identity. Native clicking,
+Back/Forward and async error/retry acceptance remain pending; no release build
+or session changes were made.

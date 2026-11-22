@@ -170,6 +170,11 @@ struct PreviewHexFile { path: std::path::PathBuf }
 #[action(namespace = rmux, no_json)]
 struct PreviewMarkdownFile { path: std::path::PathBuf }
 
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct PreviewLinkedMarkdown { path: std::path::PathBuf, fragment: String }
+
+
 
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]

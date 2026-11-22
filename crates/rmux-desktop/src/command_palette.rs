@@ -7,6 +7,9 @@ struct JumpPreviewHeading { fragment: String }
 
 fn local_preview_link(uri: &str, source: Option<&std::path::Path>) -> Option<Box<dyn Action>> {
     if let Some(fragment) = markdown_preview::fragment(uri) { return Some(Box::new(JumpPreviewHeading { fragment })); }
+    if let Some((path, fragment)) = markdown_preview::local_heading_link(uri, source?) {
+        return Some(Box::new(PreviewLinkedMarkdown { path, fragment }));
+    }
     let resolved = markdown_preview::link_destination(uri, source?)?;
     let uri = resolved.as_str();
     let path = terminal_link::local_file(uri, false)?;
@@ -18,7 +21,7 @@ fn local_preview_link(uri: &str, source: Option<&std::path::Path>) -> Option<Box
 
 #[cfg(test)]
 mod local_link_tests {
-    use super::{local_preview_link, PreviewMarkdownFile, PreviewLocalFile, BrowseDirectory, file_browser};
+    use super::{local_preview_link, PreviewMarkdownFile, PreviewLinkedMarkdown, PreviewLocalFile, BrowseDirectory, file_browser};
     #[test]
     fn linked_files_use_preview_loaders_and_keep_errors_local() -> anyhow::Result<()> {
         let directory = tempfile::tempdir()?;
@@ -43,6 +46,10 @@ mod local_link_tests {
         assert!(file_browser::list_cancellable(path.clone(), &canceled)?.entries.iter().any(|entry| entry.path == target));
         assert!(local_preview_link("https://example.com", Some(&source)).is_none());
         assert!(local_preview_link("../other.md", None).is_none());
+        let action = local_preview_link("../other%20guide.MD#linked-guide", Some(&source)).unwrap();
+        let linked = action.as_any().downcast_ref::<PreviewLinkedMarkdown>().unwrap();
+        assert_eq!(linked.path, target);
+        assert_eq!(linked.fragment, "linked-guide");
         Ok(())
     }
 }
@@ -894,6 +901,14 @@ impl CommandPalette {
         palette.location = Some(location);
         palette
     }
+    pub fn linked_markdown_retry(&mut self, fragment: String) {
+        for command in &mut self.commands {
+            if let PaletteEvent::Run(action) = &command.target
+                && let Some(file) = action.as_any().downcast_ref::<PreviewLocalFile>() {
+                command.target = PaletteEvent::Run(Box::new(PreviewLinkedMarkdown { path: file.path.clone(), fragment: fragment.clone() }));
+            }
+        }
+    }
     pub fn file_preview(preview: file_browser::Preview, window: &mut Window, cx: &mut Context<Self>) -> Self {
         let location: SharedString = preview.path.display().to_string().into();
         let navigation = (preview.path.clone(), preview.hex);
@@ -1263,6 +1278,9 @@ impl CommandPalette {
         cx.notify();
     }
     fn jump_preview_heading(&mut self, fragment: &str, cx: &mut Context<Self>) {
+        self.reveal_preview_heading(fragment, true, cx);
+    }
+    pub fn reveal_preview_heading(&mut self, fragment: &str, record: bool, cx: &mut Context<Self>) {
         if !self.markdown_preview || self.input.read(cx).is_composing() { return; }
         let target = if fragment.is_empty() { self.commands.iter().position(|command| command.preview_line().is_some()) }
             else { self.headings.get(fragment).copied() };
@@ -1277,7 +1295,7 @@ impl CommandPalette {
         state.command = Some(command);
         self.preview_link = None;
         self.feedback = None;
-        cx.emit(PaletteEvent::Run(Box::new(RecordPreviewJump { source, target: state.clone() })));
+        if record { cx.emit(PaletteEvent::Run(Box::new(RecordPreviewJump { source, target: state.clone() }))); }
         self.restore_preview(state, cx);
     }
     fn open_preview_link(&mut self, cx: &mut Context<Self>) {

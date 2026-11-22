@@ -3008,14 +3008,14 @@ impl WorkspaceWindow {
                 });
                 return;
             }
-            self.preview_file_at(path, hex, markdown, Some((index, state)), window, cx);
+            self.preview_file_at(path, hex, markdown, Some((index, state)), None, window, cx);
         }
     }
     fn preview_file_kind(&mut self, path: std::path::PathBuf, hex: bool, markdown: bool, window: &mut Window, cx: &mut Context<Self>) {
-        self.preview_file_at(path, hex, markdown, None, window, cx);
+        self.preview_file_at(path, hex, markdown, None, None, window, cx);
     }
     fn preview_file_at(&mut self, path: std::path::PathBuf, hex: bool, markdown: bool,
-        navigation: Option<(usize, command_palette::PreviewState)>, window: &mut Window, cx: &mut Context<Self>) {
+        navigation: Option<(usize, command_palette::PreviewState)>, anchor: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         if self.file_browser_job.is_some() || self.automation_available(cx).is_err() { return; }
         let source = self.preview_restore.take().or_else(|| self.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx)));
         if let Some(state) = &source { self.preview_history.update(state.clone()); }
@@ -3052,7 +3052,8 @@ impl WorkspaceWindow {
                                     command_palette::CommandPalette::markdown_file(preview, blocks, limited, window, cx)
                                 } else { command_palette::CommandPalette::file_preview(preview, window, cx) };
                                 palette.set_preview_history(&this.preview_history);
-                                if let Some(state) = restore { palette.restore_preview(state, cx); }
+                                if let Some(anchor) = anchor { palette.reveal_preview_heading(&anchor, false, cx); }
+                                else if let Some(state) = restore { palette.restore_preview(state, cx); }
                                 palette
                             });
                             this.install_palette(palette, Some(focus), window, cx);
@@ -3060,6 +3061,7 @@ impl WorkspaceWindow {
                         Err(error) => {
                             let palette = cx.new(|cx| {
                                 let mut palette = command_palette::CommandPalette::file_error(target, format!("{error:#}"), false, window, cx);
+                                if let Some(anchor) = anchor { palette.linked_markdown_retry(anchor); }
                                 palette.set_preview_history(&this.preview_history);
                                 palette
                             });
@@ -3133,7 +3135,7 @@ impl WorkspaceWindow {
                     _ => None,
                 };
                 this.preview_restore = match event {
-                    command_palette::PaletteEvent::Run(action) if action.as_any().is::<PreviewLocalFile>() || action.as_any().is::<PreviewHexFile>() || action.as_any().is::<PreviewMarkdownFile>() || action.as_any().is::<PreviewBack>() || action.as_any().is::<PreviewForward>() =>
+                    command_palette::PaletteEvent::Run(action) if action.as_any().is::<PreviewLocalFile>() || action.as_any().is::<PreviewHexFile>() || action.as_any().is::<PreviewMarkdownFile>() || action.as_any().is::<PreviewLinkedMarkdown>() || action.as_any().is::<PreviewBack>() || action.as_any().is::<PreviewForward>() =>
                         this.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx)),
                     _ => None,
                 };
@@ -4357,6 +4359,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, action: &EditLocalFile, _, cx| this.edit_local_file(action.clone(), cx)))
             .on_action(cx.listener(|this, _: &PreviewBack, window, cx| this.preview_history(false, window, cx)))
             .on_action(cx.listener(|this, _: &PreviewForward, window, cx| this.preview_history(true, window, cx)))
+            .on_action(cx.listener(|this, action: &PreviewLinkedMarkdown, window, cx| this.preview_file_at(action.path.clone(), false, true, None, Some(action.fragment.clone()), window, cx)))
             .on_action(cx.listener(|this, action: &PreviewMarkdownFile, window, cx| this.preview_file_kind(action.path.clone(), false, true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewHexFile, window, cx| this.preview_file_mode(action.path.clone(), true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewLocalFile, window, cx| this.preview_local_file(action.path.clone(), window, cx)))
