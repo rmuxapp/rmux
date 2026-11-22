@@ -384,11 +384,45 @@ impl CodeViewport {
     }
 }
 
+// All rows in a table have identical horizontal bounds. Share only horizontal
+// scrolling; never use item navigation on these handles (rows are virtualized).
+fn table_scroll_handles(kinds: impl Iterator<Item = Option<markdown_preview::Kind>>) -> std::collections::HashMap<usize, ScrollHandle> {
+    let mut handles = std::collections::HashMap::new();
+    let mut current = None;
+    for (index, kind) in kinds.enumerate() {
+        if let Some(markdown_preview::Kind::Table { header, .. }) = kind {
+            if header || current.is_none() { current = Some(ScrollHandle::new()); }
+            handles.insert(index, current.as_ref().unwrap().clone());
+        } else { current = None; }
+    }
+    handles
+}
+
+#[cfg(test)]
+mod table_scroll_tests {
+use super::{table_scroll_handles, markdown_preview};
+use gpui::{point, px};
+#[test]
+fn table_rows_share_horizontal_position_without_linking_separate_tables() {
+    use markdown_preview::{Alignment, Kind, TABLE_VISIBLE_COLUMNS};
+    let row = |header| Some(Kind::Table { header, columns: 5, alignment: [Alignment::Left; TABLE_VISIBLE_COLUMNS] });
+    let handles = table_scroll_handles([row(true), row(false), row(true), row(false), None, row(false)].into_iter());
+    handles[&1].set_offset(point(px(-180.), px(0.)));
+    assert_eq!(handles[&0].offset().x, px(-180.));
+    assert_eq!(handles[&2].offset().x, px(0.));
+    handles[&2].set_offset(point(px(-40.), px(0.)));
+    assert_eq!(handles[&3].offset().x, px(-40.));
+    assert_eq!(handles[&5].offset().x, px(0.));
+    assert!(!handles.contains_key(&4));
+}
+}
+
 pub struct CommandPalette {
     location: Option<SharedString>,
     feedback: Option<&'static str>,
     preview_link: Option<(usize, usize)>,
     code_scroll: std::collections::HashMap<usize, CodeViewport>,
+    table_scroll: std::collections::HashMap<usize, ScrollHandle>,
     buffer_rename: Option<(String, u64)>,
     directory_input: bool,
     terminal_search_input: bool,
@@ -869,7 +903,7 @@ impl CommandPalette {
                     let label = match command.markdown_kind() {
                         Some(markdown_preview::Kind::Heading(level)) => format!("Heading H{level}"),
                         Some(markdown_preview::Kind::Code) => "Code · Scroll to read".into(),
-                        Some(markdown_preview::Kind::Table { header, columns, .. }) => format!("Table {} · {columns} columns{}", if header { "header" } else { "row" }, if columns > 8 { " · first 8 shown; copy for all" } else { "" }),
+                        Some(markdown_preview::Kind::Table { header, columns, .. }) => format!("Table {} · {columns} columns · Scroll sideways{}", if header { "header" } else { "row" }, if columns > 8 { " · first 8 shown; copy for all" } else { "" }),
                         Some(markdown_preview::Kind::List { checked: Some(true), .. }) => "Completed task".into(),
                         Some(markdown_preview::Kind::List { checked: Some(false), .. }) => "Pending task".into(),
                         _ => "Block".into(),
@@ -887,6 +921,7 @@ impl CommandPalette {
             }
         }
         palette.search = palette_match::RankedSearch::with_shortcuts(palette.commands.iter().map(Command::search_text).collect(), palette.commands.iter().map(Command::shortcut_text).collect());
+        palette.table_scroll = table_scroll_handles(palette.commands.iter().map(Command::markdown_kind));
         palette.markdown_preview = true;
         palette.wrap_preview = true;
         palette.heading = if truncated { "Markdown reading view · Partial document · Bounded source/blocks" } else { "Markdown reading view · Images and links are inert" };
@@ -1041,6 +1076,7 @@ impl CommandPalette {
             input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, preview_history: None, location: None,
             search: palette_match::RankedSearch::with_shortcuts(commands.iter().map(Command::search_text).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
+            table_scroll: Default::default(),
             commands,
             selected: 0,
         }
@@ -1193,11 +1229,13 @@ impl CommandPalette {
                 markdown_preview::excerpt_spans(&line.text, self.input.read(cx).value(), &line.spans, title.len() - excerpt_len)).unwrap_or_default(),
             _ => Vec::new(),
         };
-        let table = if let Some(markdown_preview::Kind::Table { header, alignment, .. }) = markdown {
+        let table = if let Some(markdown_preview::Kind::Table { header, alignment, columns }) = markdown {
             match &self.commands[command].target {
                 PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().map(|line| {
                     let cells = markdown_preview::table_cells(&line.text, &line.spans, self.input.read(cx).value());
-                    div().flex().w_full().min_w_0().border_b_1().border_color(rgb(0x637894))
+                    div().id(("table-scroll", command)).w_full().overflow_x_scroll()
+                        .track_scroll(&self.table_scroll[&command])
+                        .child(div().flex().w_full().min_w(px(columns.min(markdown_preview::TABLE_VISIBLE_COLUMNS) as f32 * 160.)).border_b_1().border_color(rgb(0x637894))
                         .when(header, |row| row.font_weight(FontWeight::BOLD))
                         .children(cells.into_iter().enumerate().map(|(column, (text, spans))| {
                             let search = file_browser::preview_highlights(&text, self.input.read(cx).value());
@@ -1210,7 +1248,7 @@ impl CommandPalette {
                                 .when(wrapped, |cell| cell.whitespace_normal().line_clamp(4).text_ellipsis())
                                 .when(!wrapped, |cell| cell.truncate())
                                 .child(PreviewStyledText { id: format!("preview-cell-{command}-{column}").into(), source: self.preview_navigation.as_ref().map(|(path, _)| path.clone()), links: line.links.clone(), styles: markdown_preview::merge_highlights(&spans, &search), text })
-                        })).into_any_element()
+                        }))).into_any_element()
                 }),
                 _ => None,
             }

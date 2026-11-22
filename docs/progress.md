@@ -10368,3 +10368,19 @@ old cached WASM module during review. Narrow viewport emulation changed canvas
 scale unexpectedly, so that observation is not narrow-layout acceptance. The
 viewport override was reset, temporary tab closed, and review server stopped.
 Native visual acceptance remains pending.
+
+
+### Wide Markdown table reading — 2026-11-22
+
+Following the completed v0.1.10 delivery, resumed F03 preview polish. Table
+columns now retain a 160 px minimum width and overflow horizontally rather than
+squeezing every column into the palette. Header and body rows in each table share
+horizontal scroll state, retained through filtering and virtualized row changes;
+separate tables remain independent. Vertical scrolling stays with the document.
+Added a sideways-scroll hint and updated the file guide. Existing eight-column
+rendering limit, copying, alignment and inline styles remain in place.
+
+Desktop test compilation and the focused shared-position/isolation check passed.
+The native Mac is still locked, confirmed through computer-use inventory, so
+actual trackpad behavior, column alignment and screenshots remain pending. No
+installed app or user sessions were changed; no release or demo rebuild needed.

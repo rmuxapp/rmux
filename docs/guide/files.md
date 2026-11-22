@@ -121,8 +121,10 @@ Each row shows up to eight equal-width columns; wider tables explicitly report
 that only the first eight are shown. Row copying retains all tab-separated cells,
 and Copy Markdown Source retains the original document. Empty cells remain blank.
 Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
-alignment markers; unspecified columns align left. Table horizontal scrolling,
-same-document anchors, images and document appearance controls
+alignment markers; unspecified columns align left. Wide tables scroll horizontally
+with a minimum column width; the header and body rows share the same horizontal
+position, including when filtering the document. Scroll sideways over a table to
+read its remaining columns. Same-document anchors, images and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
 
 Relative links resolve from the current document's folder. Links to Markdown
