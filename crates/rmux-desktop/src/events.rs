@@ -3,7 +3,11 @@ use serde::{Deserialize, Serialize};
 use std::collections::VecDeque;
 
 const CAPACITY: usize = 512;
-fn default_limit() -> usize { 128 }
+const MAX_PAGE: usize = 128;
+const MAX_WAIT_MS: u16 = 3000;
+const MAX_WAITERS: usize = 16;
+const MAX_KINDS: usize = 16;
+fn default_limit() -> usize { MAX_PAGE }
 #[derive(Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct Read { pub after: Option<String>, pub limit: usize, pub wait_ms: u16, pub surface_id: Option<String>, pub kinds: Vec<String> }
@@ -12,6 +16,16 @@ impl Default for Read {
 }
 const KINDS: &[&str] = &["notification.received", "notification.read", "notification.all_read", "notification.dismissed", "notification.cleared",
     "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed"];
+pub fn capabilities() -> serde_json::Value {
+    serde_json::json!({
+        "version":1, "method":"events.read", "kinds":KINDS,
+        "retention_records":CAPACITY, "max_page_records":MAX_PAGE,
+        "default_page_records":default_limit(), "max_wait_ms":MAX_WAIT_MS,
+        "max_pending_waits":MAX_WAITERS, "max_filter_kinds":MAX_KINDS,
+        "filters":["surface_id", "kinds"], "gap_reasons":["retention", "restart"],
+        "cursor_scope":"process", "push_subscriptions":false,
+    })
+}
 impl Read {
     fn matches(&self, event: &Event) -> bool {
         self.surface_id.as_ref().is_none_or(|id| id == &event.surface_id)
@@ -19,8 +33,8 @@ impl Read {
     }
     pub fn valid(&self) -> bool {
         self.surface_id.as_ref().is_none_or(|id| super::automation::target_id(id).is_ok())
-            && self.kinds.len() <= 16 && self.kinds.iter().enumerate().all(|(index, kind)| KINDS.contains(&kind.as_str()) && !self.kinds[..index].contains(kind))
-            && (1..=128).contains(&self.limit) && self.wait_ms <= 3000 && self.after.as_ref().is_none_or(|cursor| parse_cursor(cursor).is_some())
+            && self.kinds.len() <= MAX_KINDS && self.kinds.iter().enumerate().all(|(index, kind)| KINDS.contains(&kind.as_str()) && !self.kinds[..index].contains(kind))
+            && (1..=MAX_PAGE).contains(&self.limit) && self.wait_ms <= MAX_WAIT_MS && self.after.as_ref().is_none_or(|cursor| parse_cursor(cursor).is_some())
     }
 }
 fn parse_cursor(cursor: &str) -> Option<(&str, u64)> {
@@ -94,7 +108,7 @@ impl Journal {
     }
     pub fn subscribe(&self, filter: &Read) -> Result<Waiter, &'static str> {
         let mut state = self.0.borrow_mut();
-        if state.waiters.len() >= 16 { return Err("Too many pending event reads"); }
+        if state.waiters.len() >= MAX_WAITERS { return Err("Too many pending event reads"); }
         state.next_waiter += 1;
         let id = state.next_waiter;
         let (sender, receiver) = async_channel::bounded(1);

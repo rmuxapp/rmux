@@ -53,7 +53,12 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             return response["result"]
 
         try:
-            assert "events.read" in call("system.capabilities")["methods"]
+            capabilities = call("system.capabilities")
+            assert "events.read" in capabilities["methods"]
+            event_api = capabilities["events"]
+            assert event_api["version"] == 1 and event_api["max_page_records"] == 128
+            assert event_api["max_wait_ms"] == 3000 and not event_api["push_subscriptions"]
+            assert "surface.directory_changed" in event_api["kinds"]
             surface = call("surface.list")["surfaces"][0]["id"]
             initial = call("events.read")
             assert sum(e["kind"] == "surface.created" and e["surface_id"] == surface for e in initial["events"]) == 1

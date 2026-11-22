@@ -289,6 +289,12 @@ as `notification` (or null).
 
 ## Replay events
 
+Use `rmuxctl system.capabilities` to discover the running app's event API. Its
+`result.events` object lists the protocol version, supported kinds and filters,
+page/retention/wait limits, gap reasons and whether push subscriptions exist.
+Standalone discovery reports `events: null`; older releases may omit the field.
+Check capabilities before using a kind that may not exist in an older app.
+
 Read one page with the CLI:
 
 ```sh

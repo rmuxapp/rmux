@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+`system.capabilities` now describes the live event API: protocol version, event
+kinds, filters, page/retention/wait limits, gap reasons and lack of push streams.
+The values share constants with validation and admission; standalone discovery
+returns null rather than advertising unavailable live events. The focused RPC
+discovery test checks advertised options against request validation without
+queuing UI work. Native smoke also checks discovery before event operations.
+
 Event reads now accept a surface ID and a bounded list of event kinds, exposed
 as `rmuxctl read-events --surface ID --kind KIND` (repeatable kinds). Replay
 cursors advance over skipped records; waiting subscribers wake only on matching

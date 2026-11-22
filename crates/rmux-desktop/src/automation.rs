@@ -1445,6 +1445,7 @@ fn dispatch_inner(
             "mode":if live.is_some() { "live" } else { "standalone" },
             "live_workspace_access":live.is_some(), "read_only":live.is_none(),
             "methods":methods, "max_request_bytes":MAX_REQUEST_BYTES,
+            "events":live.is_some().then(super::events::capabilities),
         }),
         _ => {
             let (reply, receiver) = std::sync::mpsc::sync_channel(1);
@@ -1926,6 +1927,14 @@ mod tests {
         .unwrap();
         assert_eq!(response["result"]["methods"], json!(LIVE_METHODS));
         assert_eq!(response["result"]["live_workspace_access"], true);
+        let events = &response["result"]["events"];
+        assert_eq!(events["method"], "events.read");
+        assert_eq!(events["cursor_scope"], "process");
+        assert_eq!(events["push_subscriptions"], false);
+        let advertised = json!({"kinds":events["kinds"], "limit":events["max_page_records"], "wait_ms":events["max_wait_ms"]});
+        assert!(serde_json::from_value::<super::super::events::Read>(advertised).unwrap().valid());
+        let standalone = dispatch_inner(br#"{"jsonrpc":"2.0","id":1,"method":"system.capabilities"}"#, None).unwrap();
+        assert!(standalone["result"]["events"].is_null());
         assert!(
             dispatch_inner(
                 br#"{"jsonrpc":"2.0","method":"window.list"}"#,
