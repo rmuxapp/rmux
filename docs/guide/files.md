@@ -180,8 +180,10 @@ number is the line and the second is the column. Modifier-hover shows the resolv
 file path and location, with an editor configuration hint when needed. The context
 menu captures the resolved destination when opened, so later shell directory
 changes cannot redirect that action. Relative paths resolve from
-the terminal's last reported working directory, falling back to its launch
-directory; enable shell integration so directory changes stay current.
+the terminal's last reported working directory, falling back to an explicitly
+set launch directory; enable shell integration so directory changes stay current.
+If neither is known, rmux explains that it needs a working directory instead of
+guessing. Remote targets and unsupported paths have separate explanations.
 
 For editors that accept a combined location, configure their supported syntax.
 For example, a VS Code CLI configuration can use:

@@ -32,37 +32,64 @@ impl Location {
     }
 }
 
-pub fn local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Option<Location> {
-    if remote || text.len() > 8192 || text.chars().any(char::is_control) { return None; }
-    if text.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("file://")) {
-        return local_file(text, false).map(|path| Location { path, ..Default::default() });
+#[cfg(test)]
+fn local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Option<Location> {
+    resolve_local_target(text, cwd, remote).ok()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum LinkError { Remote, MissingDirectory, Unsupported }
+impl LinkError {
+    pub fn message(self) -> &'static str {
+        match self {
+            Self::Remote => "Remote files cannot be opened in a local editor",
+            Self::MissingDirectory => "Working directory unknown. Enable shell integration or open a terminal with an explicit directory",
+            Self::Unsupported => "Unsupported file target. Use a local path or file URL",
+        }
     }
-    if text.contains("://") || text.starts_with("//") || text.starts_with("\\\\") { return None; }
+}
+
+pub fn resolve_local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Result<Location, LinkError> {
+    use LinkError::*;
+    if remote { return Err(Remote); }
+    if text.len() > 8192 || text.chars().any(char::is_control) { return Err(Unsupported); }
+    if text.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("file://")) {
+        return local_file(text, false).map(|path| Location { path, ..Default::default() }).ok_or(Unsupported);
+    }
+    if text.contains("://") || text.starts_with("//") || text.starts_with("\\\\") { return Err(Unsupported); }
     let mut path = text;
     let mut line = None;
     let mut column = None;
     if let Some((prefix, suffix)) = path.rsplit_once(':')
         && !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()) {
-        line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0)?);
+        line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0).ok_or(Unsupported)?);
         path = prefix;
         if let Some((prefix, suffix)) = path.rsplit_once(':')
             && !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()) {
             column = line;
-            line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0)?);
+            line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0).ok_or(Unsupported)?);
             path = prefix;
         }
     }
-    if path.is_empty() || path.starts_with('~') { return None; }
+    if path.is_empty() || path.starts_with('~') { return Err(Unsupported); }
     #[cfg(not(windows))]
-    if path.contains('\\') || path.contains(':') { return None; }
+    if path.contains('\\') || path.contains(':') { return Err(Unsupported); }
     let path = PathBuf::from(path);
-    let path = if path.is_absolute() { path } else { cwd.filter(|p| p.is_absolute())?.join(path) };
-    (path.as_os_str().len() <= 8192).then_some(Location { path, line, column })
+    let path = if path.is_absolute() { path } else { cwd.filter(|p| p.is_absolute()).ok_or(MissingDirectory)?.join(path) };
+    (path.as_os_str().len() <= 8192).then_some(Location { path, line, column }).ok_or(Unsupported)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn unresolved_links_explain_the_missing_requirement() {
+        assert_eq!(resolve_local_target("src/main.rs:12", None, false), Err(LinkError::MissingDirectory));
+        assert_eq!(resolve_local_target("src/main.rs:12", Some(std::path::Path::new("relative")), false), Err(LinkError::MissingDirectory));
+        assert_eq!(resolve_local_target("src/main.rs:12", None, true), Err(LinkError::Remote));
+        assert_eq!(resolve_local_target("src/main.rs:0", None, false), Err(LinkError::Unsupported));
+        assert_eq!(resolve_local_target("file://remote.example/tmp/file", None, false), Err(LinkError::Unsupported));
+    }
     #[test]
     fn compiler_locations_resolve_without_io_and_require_local_context() {
         let cwd = std::env::temp_dir();

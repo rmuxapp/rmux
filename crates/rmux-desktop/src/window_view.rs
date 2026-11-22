@@ -1499,7 +1499,14 @@ impl WorkspaceWindow {
             let _ = cx.update(|cx| {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
                 match result {
-                    Ok(path) => cx.open_with_system(&path),
+                    Ok(path) => {
+                        let editor = external_editor::settings_editor(cx.global::<Preferences>().file_editor.as_ref());
+                        if let Some(editor) = editor {
+                            let _ = entity.update(cx, |this, cx| {
+                                this.launch_external_editor(editor, EditLocalFile { path, line: None, column: None }, cx);
+                            });
+                        } else { cx.open_with_system(&path); }
+                    },
                     Err(error) => {
                         let _ = entity.update(cx, |this, cx| {
                             this.notice = Some(format!("Could not open settings: {error:#}"));
@@ -2910,6 +2917,9 @@ impl WorkspaceWindow {
         let Some(editor) = cx.global::<Preferences>().file_editor.clone() else {
             self.notice = Some("Configure file_editor.program and file_editor.args in Settings first".into()); cx.notify(); return;
         };
+        self.launch_external_editor(editor, action, cx);
+    }
+    fn launch_external_editor(&mut self, editor: external_editor::Editor, action: EditLocalFile, cx: &mut Context<Self>) {
         let executor = cx.background_executor().clone();
         cx.spawn(async move |entity, cx| {
             let result = match executor.spawn(async move { editor.launch_at(&action.path, action.line, action.column) }).await {

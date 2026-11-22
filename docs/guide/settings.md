@@ -365,8 +365,9 @@ No configuration file is created automatically. Example:
 {"font_size": 16, "confirm_close": "active"}
 ```
 
-Open Settings File in the menu or palette opens that path with the system's
-default application for JSON. If missing, this explicit action creates a default
+Open Settings File in the menu or palette uses your configured `file_editor`.
+Without one, macOS uses TextEdit; other platforms use the system's default
+application for JSON. If missing, this explicit action creates a default
 file without overwriting an existing one. After editing, use Reload Settings.
 
 ## Scrollback budget
@@ -395,6 +396,11 @@ Reload Settings applies it to existing terminals. Application mouse reporting
 keeps its normal behavior; hold Shift to select locally in those applications.
 
 ## Option key and cursor behavior
+
+Option+Left/Right on macOS moves backward/forward by word in shells using
+standard Emacs/readline or zle bindings. rmux sends Meta-b/Meta-f for these keys;
+applications that negotiate the Kitty keyboard protocol keep the original
+modified arrow events. Custom shell bindings can change the resulting movement.
 
 On macOS, Settings → **Option key behavior** switches between **Terminal Alt**
 and **Native text** immediately; use Save these settings to keep your choice.

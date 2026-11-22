@@ -167,11 +167,14 @@ impl Terminal {
 
     /// Read negotiated report-all mode while the parser is exclusively owned.
     pub(crate) fn reports_all_keys(&self) -> Result<bool> {
+        Ok(self.keyboard_flags()? as u32 & GHOSTTY_KITTY_KEY_REPORT_ALL != 0)
+    }
+    fn keyboard_flags(&self) -> Result<GhosttyKittyKeyFlags> {
         let mut flags: GhosttyKittyKeyFlags = 0;
         // SAFETY: the documented query writes a uint8 flag value.
         unsafe { check(ghostty_terminal_get(self.terminal,
             GHOSTTY_TERMINAL_DATA_KITTY_KEYBOARD_FLAGS, out(&mut flags)))?; }
-        Ok(flags as u32 & GHOSTTY_KITTY_KEY_REPORT_ALL != 0)
+        Ok(flags)
     }
 
     pub fn encode_key_action_with_text(
@@ -181,6 +184,15 @@ impl Terminal {
         action: Action,
         native_text: Option<&str>,
     ) -> Result<Option<Vec<u8>>> {
+        // macOS terminal conventions: readline/zle understand Meta-b/f without
+        // shell-specific bindings for modified CSI arrows. Leave negotiated
+        // keyboard protocols untouched so full-screen apps receive real keys.
+        #[cfg(target_os = "macos")]
+        if mods.alt && !mods.control && !mods.shift && matches!(key, "left" | "right")
+            && self.keyboard_flags()? == 0 {
+            return Ok(Some(if action == Action::Release { Vec::new() }
+                else if key == "left" { b"\x1bb".to_vec() } else { b"\x1bf".to_vec() }));
+        }
         let Some(code) = key_code(key) else {
             return Ok(None);
         };
@@ -306,6 +318,25 @@ pub(crate) fn encode_paste(text: &str, bracketed: bool) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn option_arrows_move_words_without_overriding_negotiated_keys() -> Result<()> {
+        let mut terminal = Terminal::new(20, 3)?;
+        let mods = Modifiers { alt: true, ..Default::default() };
+        for (key, expected) in [("left", b"\x1bb"), ("right", b"\x1bf")] {
+            assert_eq!(terminal.encode_key_action(key, mods, Action::Press)?, Some(expected.to_vec()));
+            assert_eq!(terminal.encode_key_action(key, mods, Action::Repeat)?, Some(expected.to_vec()));
+            assert_eq!(terminal.encode_key_action(key, mods, Action::Release)?, Some(Vec::new()));
+        }
+        terminal.write(b"\x1b[>11u");
+        let encoded = terminal.encode_key_action("left", mods, Action::Press)?.unwrap();
+        assert_ne!(encoded, b"\x1bb");
+        assert!(encoded.starts_with(b"\x1b["));
+        assert!(!terminal.encode_key_action("left", mods, Action::Release)?.unwrap().is_empty());
+        terminal.write(b"\x1b[<u");
+        assert_eq!(terminal.encode_key_action("left", mods, Action::Press)?, Some(b"\x1bb".to_vec()));
+        Ok(())
+    }
     #[test]
     fn single_buffer_paste_matches_ghostty_output() -> Result<()> {
         let controls: String = (0u8..=127).map(char::from).collect();

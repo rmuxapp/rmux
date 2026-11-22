@@ -7,6 +7,15 @@ pub struct Editor {
     pub program: PathBuf,
     pub args: Vec<String>,
 }
+/// Settings must remain editable even when JSON is associated with an IDE.
+/// Honor the explicit editor before using the platform's text editor.
+pub fn settings_editor(configured: Option<&Editor>) -> Option<Editor> {
+    if let Some(editor) = configured { return Some(editor.clone()); }
+    #[cfg(target_os = "macos")]
+    return Some(Editor { program: "/usr/bin/open".into(), args: vec!["-a".into(), "TextEdit".into(), "{file}".into()] });
+    #[cfg(not(target_os = "macos"))]
+    None
+}
 impl Editor {
     pub fn validate(&self) -> Result<()> {
         ensure!(self.program.is_absolute() && self.program.as_os_str().len() <= 8192 && !self.program.as_os_str().as_encoded_bytes().contains(&0), "file_editor.program must be an absolute path up to 8192 bytes without NULs");

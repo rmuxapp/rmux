@@ -9,6 +9,7 @@ pub(super) struct Menu {
     scroll: ScrollHandle,
     link: Option<String>,
     file: Option<terminal_link::Location>,
+    link_error: Option<terminal_link::LinkError>,
     typeahead: menu_navigation::Typeahead,
 }
 const LABELS: &[&str] = &["Copy", "Copy with Line Breaks", "Paste", "Select All", "Find…", "Copy Working Directory", "Reveal Working Directory", "Clear Scrollback", "Copy Link Address", "Open Link",
@@ -35,7 +36,9 @@ impl TerminalView {
             self.session.hyperlink_at((f32::from(point.x) / self.cells.width) as u16,
                 (f32::from(point.y) / self.cells.height) as u32, self.frame.revision).ok().flatten()
         } else { None };
-        let file = link.as_deref().and_then(|link| self.local_link_file(link));
+        let resolved = link.as_deref().filter(|link| !openable_uri(link)).map(|link| self.local_link_file(link));
+        let link_error = resolved.as_ref().and_then(|result| result.as_ref().err().copied());
+        let file = resolved.and_then(Result::ok);
         let focus = cx.focus_handle();
         let token = focus.clone();
         self.terminal_menu_blur = Some(cx.on_blur(&focus, window, move |this, _, cx| {
@@ -49,7 +52,7 @@ impl TerminalView {
         focus.focus(window);
         let scroll = ScrollHandle::new();
         scroll.scroll_to_item(selected);
-        self.terminal_menu = Some(Menu { position, focus, selected, scroll, link, file, typeahead: Default::default() });
+        self.terminal_menu = Some(Menu { position, focus, selected, scroll, link, file, link_error, typeahead: Default::default() });
         cx.notify();
     }
     fn dismiss_terminal_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -131,7 +134,8 @@ impl TerminalView {
                     .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(LABELS.iter().enumerate().map(|(index, label)| {
-                    let destination = (index == 9).then(|| menu.file.as_ref().map(|file| file.label()).or_else(|| menu.link.clone())).flatten();
+                    let destination = (index == 9).then(|| menu.link_error.map(|error| error.message().to_owned())
+                        .or_else(|| menu.file.as_ref().map(|file| file.label())).or_else(|| menu.link.clone())).flatten();
                     div().id(("terminal-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))

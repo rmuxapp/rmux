@@ -1406,17 +1406,15 @@ impl TerminalView {
         self.link_hover_cell = None;
         if self.link_hover.take().is_some() { cx.notify(); }
     }
-    fn local_link_file(&self, uri: &str) -> Option<terminal_link::Location> {
-        terminal_link::local_target(uri, self.snapshot_directory.as_deref(), self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
+    fn local_link_file(&self, uri: &str) -> Result<terminal_link::Location, terminal_link::LinkError> {
+        terminal_link::resolve_local_target(uri, self.snapshot_directory.as_deref(), self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
     }
     fn open_terminal_link(&mut self, uri: &str, window: &mut Window, cx: &mut Context<Self>) {
         if openable_uri(uri) { cx.open_url(uri); }
-        else if let Some(location) = self.local_link_file(uri) {
-            window.dispatch_action(Box::new(EditLocalFile { path: location.path, line: location.line, column: location.column }), cx);
-        } else {
-            self.error = Some("Open Link supports HTTP(S) URLs and local file paths from local terminals. Remote files are not opened locally.".into());
-            cx.notify();
-        }
+        else { match self.local_link_file(uri) {
+            Ok(location) => window.dispatch_action(Box::new(EditLocalFile { path: location.path, line: location.line, column: location.column }), cx),
+            Err(error) => { self.error = Some(error.message().into()); cx.notify(); }
+        } }
     }
     fn update_link_hover(&mut self, position: Point<Pixels>, modifiers: Modifiers, cx: &mut Context<Self>) {
         let modifier = if cfg!(target_os = "macos") { modifiers.platform } else { modifiers.control };
@@ -2031,12 +2029,12 @@ impl Render for TerminalView {
             }))
             .when_some(self.link_hover.as_ref().filter(|(revision, _)| *revision == self.frame.revision).map(|(_, uri)| uri.clone()), |root, uri| {
                 let file = self.local_link_file(&uri);
-                let allowed = openable_uri(&uri) || file.is_some();
-                let caption: SharedString = if file.is_some() {
+                let allowed = openable_uri(&uri) || file.is_ok();
+                let caption: SharedString = if file.is_ok() {
                     if cx.global::<Preferences>().file_editor.is_none() { "Configure an external editor in Settings".into() }
                     else if cfg!(target_os = "macos") { "Cmd-click to open in editor".into() }
                     else { "Ctrl-click to open in editor".into() }
-                } else if !allowed { "Unsupported or remote file target".into() }
+                } else if !allowed { file.as_ref().unwrap_err().message().into() }
                 else if cfg!(target_os = "macos") { "Cmd-click to open link".into() }
                 else { "Ctrl-click to open link".into() };
                 let target: SharedString = file.map(|file| file.label()).unwrap_or(uri).into();

@@ -43,8 +43,9 @@ rmuxctl --socket /absolute/path/to/rpc.sock open-workspace \
 rmux must already be running with [socket automation](#unix-socket-automation)
 enabled. You can omit `--socket` when the caller has `RMUX_SOCKET_DIR` set.
 
-For a VS Code task, add an entry like this to `.vscode/tasks.json` after enabling
-the socket below. Set `--socket` to your actual endpoint and ensure `rmuxctl` is
+For all VS Code projects, use **Tasks: Open User Tasks** and add the task below.
+For a project-only setup, put it in `.vscode/tasks.json`. Enable the socket below,
+set `--socket` to your actual endpoint, and ensure `rmuxctl` is
 on the editor's PATH (or use its absolute path). On macOS, the bundled client is
 `/Applications/rmux.app/Contents/MacOS/rmuxctl`.
 

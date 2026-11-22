@@ -1,3 +1,22 @@
+Everyday macOS input/editor batch: Open Settings File now honors file_editor,
+falling back to TextEdit on macOS instead of the JSON file association (which
+opened Xcode). It shares the existing asynchronous launch/reaping/error path.
+Other platforms retain their system association when no editor is configured.
+Option+Left/Right sends Meta-b/f in legacy keyboard mode; negotiated Kitty flags
+retain original arrow encoding. Nine keyboard tests pass, covering repeats,
+releases and protocol changes. Four file-link tests pass with desktop test
+compilation. Unknown cwd, remote context and unsupported targets now have
+separate hover/click/context-menu explanations. User-task instructions cover
+global VS Code integration. This batch has no new native bundle or UI acceptance.
+
+Native editor navigation acceptance from the preceding combined review: a real
+shell reported its temporary directory through OSC 7; Cmd-click on quoted
+src/editor check.rs:42:7 launched the configured recorder with the expected
+absolute file path, line 42 and column 7 as separate arguments. Before directory
+reporting, the relative target correctly stayed blocked. The isolated review
+app exited cleanly and its temporary files were removed; installed sessions
+were preserved. This verifies modifier-click routing, not context-menu launch.
+
 Combined native main review: launch exposed a regression in b00361b: the shared
 title helper already attached a tooltip, and the deferred native title callback
 attached a second one, triggering GPUI's runtime assertion. Split title geometry
