@@ -108,13 +108,19 @@ The macOS PTY fixture verifies both zsh and non-login Bash directory reporting,
 Unicode path decoding, prompt navigation through scrollback and shell exit.
 
 
-Fish hooks are available in `shell-integration/fish/rmux.fish`, also copied
-into newly built macOS bundles. They report percent-encoded working directories,
-prompt start, command start/end and command exit status through fish events,
-without replacing prompt functions. Source only once per session; repeated
-sourcing is guarded, and `RMUX_SHELL_INTEGRATION=0` disables installation.
-These hooks do not emit a prompt-end/input-start marker or install automatically.
-`mise run test-fish-integration` uses an already-installed fish; runtime verification
-is pending because this machine has no fish executable. Event behavior follows
+Fish integration loads automatically after user configuration, in both login modes.
+Modern fish supplies OSC 7 directory reports and OSC 133 prompt/command markers;
+rmux leaves those native markers in charge instead of registering duplicate hooks,
+including when the user disables fish's `mark-prompt` feature. Fish versions before
+3.7 use the bundled event-hook fallback, which does not emit input-start markers.
+The script remains available at `shell-integration/fish/rmux.fish` for manual use.
+`RMUX_SHELL_INTEGRATION=0` disables rmux's script; it does not disable fish's own
+native terminal integration.
+
+`mise run test-fish-integration` uses pinned, mise-managed fish 4.9.3. Its startup
+checks pass on macOS, covering user configuration, login modes and avoiding duplicate
+hooks. `mise run test-fish-startup` passes a real macOS PTY fixture with Unicode cwd
+and prompt navigation. Older fish fallback and Linux runtime coverage remain pending.
+Event behavior follows
 the [fish event documentation](https://fishshell.com/docs/current/language.html#event-handlers)
 and [built-in URL escaping](https://fishshell.com/docs/current/cmds/string-escape.html).

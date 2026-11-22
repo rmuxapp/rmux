@@ -5,6 +5,19 @@ test "$TERM_PROGRAM" = rmux; or return
 test "$RMUX_SHELL_INTEGRATION" != 0; or return
 set -q _rmux_fish_loaded; and return
 set -g _rmux_fish_loaded 1
+
+# Modern fish owns OSC 7 and OSC 133 itself, including prompt-end markers.
+# Do not duplicate them or override an explicit no-mark-prompt preference.
+# Unknown feature (status 2) means an older fish needs the fallback hooks below.
+status test-feature mark-prompt 2>/dev/null
+set -l _rmux_mark_prompt_status $status
+if test $_rmux_mark_prompt_status -eq 0; or test $_rmux_mark_prompt_status -eq 1
+    return
+end
+# Fish 3.7+ also has built-in markers before the feature switch existed.
+if string match -rq '^([4-9]|[1-9][0-9]+)\.|^3\.([7-9]|[1-9][0-9]+)(\.|$)' -- "$version"
+    return
+end
 set -g _rmux_fish_running 0
 
 function _rmux_fish_directory --on-variable PWD

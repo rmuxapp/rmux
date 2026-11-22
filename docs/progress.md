@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Fish now defers to built-in directory/prompt integration in 3.7+ and respects the
+native mark-prompt feature switch, avoiding duplicate OSC 7/133 hooks. Pinned fish
+4.9.3 was installed through mise; startup tests and a real macOS PTY test pass for
+Unicode cwd and prompt navigation. Fixed the existing startup fixture's collision
+with a fish-created configuration directory. CI now runs the lightweight fish
+startup test. Older-version fallback and Linux runtime evidence remain pending.
+
+GitHub native/browser run 44967752333 (bfc37cf) passed, including the new AppKit
+quit routing probe. Manual native confirmation UI acceptance remains pending.
+
 `rmuxctl pipe-pane --json` captures child stdout/stderr and exit status as a JSON
 object. Two concurrent readers drain output while the captured terminal snapshot
 is written to stdin, retaining at most 1 MiB per output stream and reporting
@@ -14,7 +24,7 @@ checking cancellation, retry and final approval under a ten-second process timeo
 It shares the existing browser-feature build cache. The native-only quit module
 is excluded from shared WASM triggers; the compiler-dependency guard continues to
 check that exclusion. Theme commit 38431ed passed both native/browser and Shared
-WASM CI. The new CI probe's hosted-run result is pending.
+WASM CI. The hosted probe passed in run 44967752333.
 
 macOS AppKit termination requests now route through the existing quit confirmation
 and bounded session/process cleanup. Repeated requests coalesce. The original

@@ -150,8 +150,8 @@ description = "Short Unix native GUI/RPC check using an isolated process and imm
 run = ["cargo build -p rmux-desktop", "python3 scripts/smoke-live-rpc.py"]
 
 [tasks.test-fish-integration]
-description = "Check manual fish hooks using an already-installed fish"
-run = "python3 scripts/test-fish-integration.py"
+description = "Check fish startup and native-marker delegation with a pinned mise shell"
+run = "mise exec aqua:fish-shell/fish-shell@4.9.3 -- python scripts/test-fish-integration.py"
 
 [tasks.smoke-live-sessions]
 description = "Verify native workspace transfer preserves live fixture-shell PIDs"
@@ -217,3 +217,7 @@ run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-keyboa
 [tasks.smoke-native-quit]
 description = "Check AppKit quit routing, cancellation and approval in an isolated app"
 run = ["cargo build -p rmux-desktop --example native-quit-probe", "python scripts/smoke-native-quit.py"]
+
+[tasks.test-fish-startup]
+description = "Check automatic fish integration through a real macOS PTY"
+run = "mise exec aqua:fish-shell/fish-shell@4.9.3 -- cargo test -p rmux-terminal automatic_fish_reports -- --ignored"

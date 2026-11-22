@@ -155,12 +155,22 @@ mod tests {
     fn automatic_powershell_reports_directory_and_navigable_prompts_through_pty() -> Result<()> {
         check_prompt_navigation("pwsh")
     }
+    #[test]
+    #[ignore = "requires mise-managed fish"]
+    fn automatic_fish_reports_directory_and_navigable_prompts_through_pty() -> Result<()> {
+        check_prompt_navigation("fish")
+    }
     fn check_prompt_navigation(shell: &str) -> Result<()> {
         let home = tempfile::tempdir()?;
         let home_path = home.path().canonicalize()?;
         let destination = home_path.join("project 世界 % space");
         std::fs::create_dir(&destination)?;
         std::fs::write(home.path().join(format!(".{shell}rc")), "PS1='fixture> '\n")?;
+        if shell == "fish" {
+            let config = home.path().join(".config/fish");
+            std::fs::create_dir_all(&config)?;
+            std::fs::write(config.join("config.fish"), "function fish_prompt; printf 'fixture> '; end\n")?;
+        }
         let profile_dir = home.path().join(".config/powershell");
         if shell == "pwsh" {
             std::fs::create_dir_all(&profile_dir)?;
@@ -169,14 +179,18 @@ mod tests {
                 "function global:prompt { 'fixture> ' }\n$env:RMUX_TEST_USER_RC='loaded'\n",
             )?;
         }
-        let mut command = CommandBuilder::new(if shell == "pwsh" {
-            "pwsh".to_owned()
+        let mut command = CommandBuilder::new(if matches!(shell, "pwsh" | "fish") {
+            shell.to_owned()
         } else {
             format!("/bin/{shell}")
         });
         let _wrapper = if shell == "zsh" {
             command.args(["-d", "-i", "-l"]);
             prepare_zsh(&mut command, None)?
+        } else if shell == "fish" {
+            let wrapper = prepare_fish(&mut command)?;
+            command.args(["-i", "-l"]);
+            wrapper
         } else if shell == "pwsh" {
             prepare_powershell(&mut command, false)?
         } else {
@@ -222,6 +236,8 @@ mod tests {
         })?;
         if shell == "pwsh" {
             session.input(b"1..12 | ForEach-Object { Write-Output (\"line-\" + $_) }\r")?;
+        } else if shell == "fish" {
+            session.input(b"printf 'line-%s\\n' (seq 1 12)\r")?;
         } else {
             session.input(b"printf 'line-%s\\n' {1..12}\r")?;
         }
