@@ -1204,8 +1204,7 @@ impl WorkspaceWindow {
         };
         if command.mode == preferences::CommandMode::Background {
             let directory = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
-                let workspace = entry.workspace.read(cx);
-                workspace.focused_index(window, cx).and_then(|index| workspace.panes[index].read(cx).cached_directory(cx))
+                Self::entry_pane(entry, window, cx).and_then(|pane| pane.read(cx).cached_directory(cx))
             });
             let name = command.name.clone();
             let executor = cx.background_executor().clone();
@@ -2588,6 +2587,7 @@ impl WorkspaceWindow {
             .map(|index| workspace.panes[index].read(cx).pending_palette_operations(cx))
             .unwrap_or_default();
         let pending = command_palette::PaletteContext {
+            project_directory: self.workspace_state.entries[self.workspace_state.active].project_directory.clone(),
             workspace: self.workspace_launch_cancel.is_some(),
             split: workspace.spawning_split.is_some(), tab, paste, pull_request_loading, pull_request_available,
             file_loading: self.file_browser_job.is_some(),
@@ -3542,7 +3542,9 @@ impl WorkspaceWindow {
         if self.automation_available(cx).is_err() { return; }
         self.close_palette(window, cx);
         let focus = window.focused(cx);
-        let palette = cx.new(|cx| command_palette::CommandPalette::custom_commands(window, cx));
+        let project = self.workspace_state.entries.get(self.workspace_state.active)
+            .and_then(|entry| entry.project_directory.clone());
+        let palette = cx.new(|cx| command_palette::CommandPalette::custom_commands(project.as_deref(), window, cx));
         self.install_palette(palette, focus, window, cx);
     }
     fn show_layout_preset_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {

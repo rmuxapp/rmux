@@ -283,6 +283,7 @@ pub enum BufferMode { Paste, Delete, Rename, Copy }
 
 #[derive(Default)]
 pub struct PaletteContext {
+    pub project_directory: Option<std::path::PathBuf>,
     pub workspace: bool,
     pub tab: bool,
     pub split: bool,
@@ -764,7 +765,7 @@ impl CommandPalette {
                 subtitle: None,
             });
         }
-        commands.extend(cx.global::<Preferences>().commands.iter().map(custom_command));
+        commands.extend(cx.global::<Preferences>().commands.iter().map(|command| custom_command(command, pending.project_directory.as_deref())));
         commands.extend(cx.global::<Preferences>().layout_presets.iter().map(preset_command));
         if let Some(focus) = origin_focus.as_ref() {
             for command in &mut commands {
@@ -1090,15 +1091,15 @@ impl CommandPalette {
         if palette.commands.len() > 2 { palette.selected = 2; }
         palette
     }
-    pub fn custom_commands(window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let mut commands: Vec<_> = cx.global::<Preferences>().commands.iter().map(custom_command).collect();
+    pub fn custom_commands(project: Option<&std::path::Path>, window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let mut commands: Vec<_> = cx.global::<Preferences>().commands.iter().map(|command| custom_command(command, project)).collect();
         let empty = if commands.is_empty() { "No commands · Add commands in Settings, then Reload Settings" } else { "No matching configured commands" };
         if let Some(focus) = window.focused(cx) {
             for command in &mut commands {
                 if let PaletteEvent::Run(action) = &command.target { command.shortcut = shortcuts::hint(action.as_ref(), &focus, window); }
             }
         }
-        Self::with_commands(commands, "Run configured command · Opens a new workspace", empty, window, cx)
+        Self::with_commands(commands, "Run configured command · Enter runs · Esc cancels", empty, window, cx)
     }
     pub fn layout_presets(window: &mut Window, cx: &mut Context<Self>) -> Self {
         let mut commands: Vec<_> = cx.global::<Preferences>().layout_presets.iter().map(preset_command).collect();
@@ -1872,7 +1873,10 @@ fn reveal_local_path(path: &std::path::Path) -> Command {
         target: PaletteEvent::Run(Box::new(RevealLocalPath { path: path.to_owned() })) }
 }
 
-fn custom_command(command: &preferences::CustomCommand) -> Command {
+fn custom_command(command: &preferences::CustomCommand, project: Option<&std::path::Path>) -> Command {
+    let resolved = command.clone().resolve_project(project);
+    let problem = resolved.as_ref().err().map(|error| format!("Unavailable · {error} · "));
+    let command = resolved.as_ref().unwrap_or(command);
     // Quote ambiguous arguments for display only; launching always uses literal argv.
     // Keep long definitions bounded in tooltips and omit environment values.
     let argv = command.argv.iter().map(|arg| {
@@ -1883,7 +1887,7 @@ fn custom_command(command: &preferences::CustomCommand) -> Command {
     let directory = command.cwd.as_ref().map(|cwd| cwd.display().to_string())
         .unwrap_or_else(|| "Current terminal directory".into());
     let mode = if command.mode == preferences::CommandMode::Background { "Background · No terminal" } else { "New terminal workspace" };
-    let detail = format!("{mode} · {directory} · {argv}");
+    let detail = format!("{}{mode} · {directory} · {argv}", problem.as_deref().unwrap_or(""));
     let mut chars = detail.chars().map(|ch| if ch.is_control() { ' ' } else { ch });
     let mut subtitle: String = chars.by_ref().take(768).collect();
     if chars.next().is_some() { subtitle.push('…'); }

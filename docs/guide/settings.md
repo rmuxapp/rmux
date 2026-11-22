@@ -151,7 +151,9 @@ invoked inside rmux. Workspaces without a stored project identity, and standalon
 `rmux --command`, report an error instead of guessing. Use `{{project_dir}}` for
 a literal argument of that spelling. Embedded tokens, executable paths, `cwd`,
 and environment values are not expanded. Paths are passed as a single argument,
-never interpreted as shell source.
+never interpreted as shell source. Both command palettes preview the resolved
+project argument, or explain when project identity is missing. Execution resolves
+the active workspace again so an old preview cannot retarget a later command.
 Without `cwd`, the selected workspace's remembered terminal directory is used
 when available. Limits are 32 unique command names, 64 argv entries and 16 KiB
 of argument text per command, within the config's overall 64 KiB limit. Optional

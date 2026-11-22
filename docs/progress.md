@@ -10692,3 +10692,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Opened an isolated 800×540 native review instance built before the project-argument change. The shared sidebar showed useful working-folder labels alongside clipped long branches. Settings opened through Cmd+,; its fixed footer occupied about 224 logical pixels and left little room for the settings list.
 - Shortened footer labels and keyboard guidance, retained detailed action tooltips and existing focus/enablement handlers, and shortened the introductory copy. This reduces button wrapping at the standard 380-pixel inspector width without removing actions.
 - Native review was interrupted and subsequent access reported the Mac locked. Closed only the owned review process through its live script handle; installed user sessions were untouched. The editor-control review and revised footer screenshot remain pending. This label-only change was reviewed with diff checks; no redundant build or release.
+
+### Configured-command target clarity and focus fallback
+
+- Main and configured-command palettes now render the resolved project-directory argument rather than a literal placeholder. Missing project identity is visible as unavailable context before activation; execution still performs its own current-workspace resolution and error handling. Preview text retains its existing bounds and omits environment values.
+- Corrected the configured-command picker footer: background commands no longer claim they open a new workspace. Background launch now uses the same focused/remembered/first-pane lookup as sidebar context, retaining the expected local directory when Settings or another overlay owns keyboard focus.
+- Desktop compilation and diff checks passed. No new rendering surfaces or WASM changes; native visual acceptance remains pending while the Mac is locked. No release or deployment.
