@@ -56,7 +56,8 @@ def run(binary, live_shell=False):
                     if path.exists() and path.read_text() == expected:
                         return
                     time.sleep(0.01)
-                raise AssertionError(f"fixture did not report expected state in {path.name}")
+                actual = path.read_text() if path.exists() else "<missing>"
+                raise AssertionError(f"fixture state mismatch in {path.name}: expected {expected!r}, got {actual!r}")
 
             def send(method, params=None, notification=False):
                 nonlocal sequence
@@ -196,7 +197,11 @@ def run(binary, live_shell=False):
                     for surface_id, pid in original_processes.items():
                         text = f"set:state-{pid}-世界\nprobe\n"
                         assert send("surface.send_text", {"surface_id": surface_id, "text": text})["result"]["queued_bytes"] == len(text.encode())
-                        wait_file(Path(directory) / f"{pid}.state", f"state-{pid}-世界")
+                        try:
+                            wait_file(Path(directory) / f"{pid}.state", f"state-{pid}-世界")
+                        except AssertionError as error:
+                            screen = send("surface.read_text", {"surface_id": surface_id, "scope": "screen", "max_bytes": 4096})
+                            raise AssertionError(f"{error}; fixture screen: {screen}") from error
                     assert send("window.list")["result"] == before_input
                     assert [(item["id"], item["selected"]) for item in send("surface.list")["result"]["surfaces"]] == [(item["id"], item["selected"]) for item in all_surfaces]
                     checks.append("UTF-8 input reaches each PTY without changing workspace/tab selection")

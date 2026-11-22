@@ -1,3 +1,14 @@
+Release-quality follow-up (93fce70): the existing native live-shell transfer
+smoke passed on one diagnostic rerun, including UTF-8 delivery, seven retained
+shell PIDs/variables across merges and transfers, stale-target rejection and
+fixture child cleanup. The prior state timeout did not reproduce; its cause is
+not established. Failure-only diagnostics now report actual fixture state and
+bounded fixture screen contents instead of just a missing-state message.
+Using the existing WASM build, shortcut discovery rendered alternate bindings
+for Next Tab and Previous/Next Pane; searching `ctrl tab` matched the alternate
+pane bindings, and Escape restored terminal input focus. Screenshot saved at
+`target/shortcut-aliases.png`. No rebuild, release or deployment in this pass.
+
 Named workspace handoff: `rmuxctl open-workspace --name NAME [--window ID]
 [--cwd PATH] [--activate]` and `workspace.open` reuse exact normalized names
 across normal windows or create in the requested/active/fallback window. Selection
