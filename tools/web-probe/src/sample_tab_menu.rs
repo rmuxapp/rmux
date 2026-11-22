@@ -62,6 +62,9 @@ impl SamplePane {
     }
     fn menu_element(&self, menu: SampleTabMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let enabled = self.menu_enabled(menu.target);
+        let title = self.terminals.iter().find(|terminal| terminal.entity_id() == menu.target)
+            .map(|terminal| terminal.read(cx).custom_title.clone().unwrap_or_else(|| self.labels[&menu.target].clone()))
+            .unwrap_or_else(|| "Unavailable tab".into());
         deferred(anchored().position(menu.position).snap_to_window().child(
             tab_presentation::menu_frame(window).track_focus(&menu.focus).key_context("TabMenu")
                 .on_mouse_down_out(cx.listener(|this, _, window, cx| this.dismiss_menu(window, cx)))
@@ -90,10 +93,12 @@ impl SamplePane {
                     cx.stop_propagation();
                     cx.notify();
                 }))
-                .child(div().id("sample-tab-menu-scroll").max_h((window.viewport_size().height - px(26.)).max(px(1.)))
+                .child(crate::workspace_menu_view::target_header(title.into(), "Terminal tab"))
+                .child(div().id("sample-tab-menu-scroll").max_h((window.viewport_size().height - px(74.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(MENU_LABELS.iter().enumerate().map(|(index, label)| {
                         tab_presentation::menu_row(index, matches!(index, 1 | 2 | 4))
+                            .when(enabled[index] && index >= 4, |row| row.text_color(rgb(0xffa4a4)))
                             .when(enabled[index], |row| row.cursor_pointer()
                                 .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
                                 .on_mouse_move(cx.listener(move |this, _, _, cx| {

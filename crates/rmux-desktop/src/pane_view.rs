@@ -266,6 +266,8 @@ impl PaneView {
 
     fn tab_menu_element(&self, menu: TabMenu, window: &Window, cx: &mut Context<Self>) -> AnyElement {
         let enabled = self.tab_menu_enabled(menu.target, cx);
+        let title = self.terminals.iter().position(|terminal| terminal.entity_id() == menu.target)
+            .map(|index| self.tab_title(index, cx)).unwrap_or_else(|| "Unavailable tab".into());
         let inherits_ssh = self.terminals.iter().find(|terminal| terminal.entity_id() == menu.target)
             .is_some_and(|terminal| terminal.read(cx).session.remote_destination().is_some());
         let focus = self.terminals.iter().find(|terminal| terminal.entity_id() == menu.target).map(|terminal| terminal.read(cx).focus.clone());
@@ -300,14 +302,16 @@ impl PaneView {
                     cx.stop_propagation();
                     cx.notify();
                 }))
+                .child(crate::workspace_menu_view::target_header(title.into(), "Terminal tab"))
                 .child(div().id("tab-menu-scroll")
-                    .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
+                    .max_h((window.viewport_size().height - px(74.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(TAB_MENU_LABELS.iter().enumerate().map(|(index, label)| {
                     let label = if index == 0 && inherits_ssh { "New SSH Tab".to_owned() }
                         else if index == 9 { format!("Close Finished Tabs ({})…", self.finished_tab_count(menu.target, cx)) }
                         else { (*label).to_owned() };
                     tab_presentation::menu_row(index, matches!(index, 1 | 4 | 6))
+                        .when(enabled[index] && index >= 6, |row| row.text_color(rgb(0xffa4a4)))
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {

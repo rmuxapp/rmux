@@ -99,6 +99,8 @@ impl TerminalView {
         let actions: [Box<dyn Action>; 8] = [Box::new(CopySelection), Box::new(CopySelectionWithLineBreaks), Box::new(Paste), Box::new(EditorSelectAll), Box::new(Find), Box::new(CopyWorkingDirectory), Box::new(RevealWorkingDirectory), Box::new(ClearScrollback)];
         let mut hints: Vec<_> = actions.iter().map(|action| shortcuts::hint(action.as_ref(), &self.focus, window)).collect();
         hints.resize(LABELS.len(), None);
+        let destination = menu.file.as_ref().map(|file| file.label()).or_else(|| menu.link.clone());
+        let header_height = if destination.is_some() { 48. } else { 0. };
         deferred(anchored().position(menu.position).snap_to_window().child(
             div().id("terminal-context-menu").track_focus(&menu.focus).key_context("TerminalMenu")
                 .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.)))).py_1().bg(rgb(0x292929)).text_color(rgb(0xd6d6d6))
@@ -130,13 +132,15 @@ impl TerminalView {
                     cx.stop_propagation();
                     cx.notify();
                 }))
+                .when_some(destination, |menu, target| menu.child(crate::workspace_menu_view::target_header(target.into(), "Link destination")))
                 .child(div().id("terminal-menu-scroll")
-                    .max_h((window.viewport_size().height - px(26.)).max(px(1.)))
+                    .max_h((window.viewport_size().height - px(26. + header_height)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(LABELS.iter().enumerate().map(|(index, label)| {
                     let destination = (index == 9).then(|| menu.link_error.map(|error| error.message().to_owned())
                         .or_else(|| menu.file.as_ref().map(|file| file.label())).or_else(|| menu.link.clone())).flatten();
                     div().id(("terminal-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
+                        .when(matches!(index, 3 | 5 | 7 | 8), |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {

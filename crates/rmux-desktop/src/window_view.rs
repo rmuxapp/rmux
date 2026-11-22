@@ -271,7 +271,7 @@ impl WorkspaceWindow {
                     cx.stop_propagation();
                     cx.notify();
                 }))
-                .child(crate::workspace_menu_view::target_header(name.into(), menu.group.is_some()))
+                .child(crate::workspace_menu_view::target_header(name.into(), if menu.group.is_some() { "Workspace group" } else { "Workspace" }))
                 .child(div().id("workspace-menu-scroll")
                     .max_h((window.viewport_size().height - px(74.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)

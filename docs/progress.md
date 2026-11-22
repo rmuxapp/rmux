@@ -10515,3 +10515,19 @@ All three focused preview-history tests and desktop test compilation passed,
 covering same-mode preservation, mode conversion, path/hex boundaries and source
 row selection. Native navigation acceptance remains pending. No release, browser
 rebuild or user-session changes were made.
+
+
+### Tab and terminal menu context — 2026-11-22
+
+Extended the shared context header to tab menus, resolving the captured tab's
+current title in native and WASM. Enabled close actions use the same muted red
+as workspace Close, while disabled actions retain muted styling. Native terminal
+menus now show the clicked file/URL destination up front, with the complete value
+in a tooltip, and separate selection, directory, scrollback and link sections.
+Scrollable action areas reserve header space without changing keyboard indices.
+
+Native compilation and one WASM debug build passed. Browser review verified the
+tab header, disabled entries, Close styling, Ctrl+Enter leaving New Tab uninvoked,
+and Escape returning terminal focus. Screenshot: `target/tab-menu-context.jpg`.
+The review tab and local server were closed. Native link-header and short-window
+visual acceptance remain pending; no releases or user sessions were changed.

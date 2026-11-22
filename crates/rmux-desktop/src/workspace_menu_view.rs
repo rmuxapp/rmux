@@ -15,12 +15,12 @@ pub(crate) fn frame(window: &Window) -> Stateful<Div> {
         .w(px(340.).min((window.viewport_size().width - px(16.)).max(px(1.))))
         .py_1().bg(rgb(0x292929)).border_1().border_color(rgb(0x465063)).rounded_md().shadow_md().occlude()
 }
-pub(crate) fn target_header(name: SharedString, group: bool) -> Div {
+pub(crate) fn target_header(name: SharedString, kind: &'static str) -> Div {
     let hint = name.clone();
     div().h(px(48.)).flex_shrink_0().px_3().py_1().flex().flex_col().justify_center().gap_1()
         .border_b_1().border_color(rgb(0x414141))
-        .child(div().text_xs().text_color(rgb(0x96969e)).child(if group { "Workspace group" } else { "Workspace" }))
-        .child(div().id("workspace-menu-target").text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).truncate()
+        .child(div().text_xs().text_color(rgb(0x96969e)).child(kind))
+        .child(div().id("context-menu-target").text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).truncate()
             .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
             .child(name))
 }
