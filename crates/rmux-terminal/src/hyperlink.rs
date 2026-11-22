@@ -157,6 +157,19 @@ fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
     for (offset, character) in text.char_indices() {
         if let Some((start, delimiter)) = quote {
             if character == delimiter {
+                let after_quote = offset + character.len_utf8();
+                let suffix = &text[after_quote..];
+                let suffix = &suffix[..suffix.find(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | ')' | ']' | '}')).unwrap_or(suffix.len())];
+                let suffix = suffix.trim_end_matches(':');
+                let coordinates = suffix.split(':').skip(1);
+                let candidate = &text[start..offset];
+                if suffix.starts_with(':') && (1..=2).contains(&coordinates.clone().count())
+                    && coordinates.clone().all(|part| !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit()))
+                    && (path_shaped(candidate) || candidate.contains('.')) {
+                    let begin = start - delimiter.len_utf8();
+                    let end = after_quote + suffix.len();
+                    if clicked >= begin && clicked < end { return Some(&text[begin..end]); }
+                }
                 if clicked >= start && clicked < offset {
                     let candidate = &text[start..offset];
                     return path_shaped(candidate).then_some(candidate);
@@ -191,6 +204,17 @@ fn path_shaped(candidate: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn quoted_diagnostic_locations_include_external_coordinates() {
+        for text in [r#""src/my file.rs":12:3"#, "'main.rs':27", r#""~/my file.rs":8"#] {
+            for clicked in [1, text.len() - 1] {
+                assert_eq!(plain_path_at(text, clicked), Some(text));
+            }
+        }
+        let wrapped = r#"("src/my file.rs":12:3)"#;
+        assert_eq!(plain_path_at(wrapped, wrapped.rfind('3').unwrap()), Some(r#""src/my file.rs":12:3"#));
+        assert_eq!(plain_path_at("'ordinary words':12", 18), None);
+    }
     #[test]
     fn quoted_paths_preserve_spaces_punctuation_and_wide_cells() -> Result<()> {
         for text in ["File \"/tmp/my project/世界 (draft).rs\"", "error 'src/my file.rs:42:7'"] {

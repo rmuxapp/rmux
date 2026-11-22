@@ -51,7 +51,7 @@ impl LinkError {
 }
 
 pub fn resolve_local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Result<Location, LinkError> {
-    let home = if text.starts_with('~') {
+    let home = if text.trim_start_matches(['\'', '"']).starts_with('~') {
         #[cfg(windows)]
         let root = std::env::var_os("USERPROFILE").or_else(|| std::env::var_os("HOME"));
         #[cfg(not(windows))]
@@ -84,7 +84,10 @@ fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
             path = prefix;
         }
     }
-    if path.is_empty() { return Err(Unsupported); }
+    if let Some(quote) = path.chars().next().filter(|ch| matches!(ch, '\'' | '"')) {
+        path = path.strip_prefix(quote).and_then(|path| path.strip_suffix(quote)).ok_or(Unsupported)?;
+    }
+    if path.is_empty() || path.starts_with("//") || path.starts_with("\\\\") { return Err(Unsupported); }
     #[cfg(not(windows))]
     if path.contains('\\') || path.contains(':') { return Err(Unsupported); }
     let path = if path == "~" || path.starts_with("~/") {
@@ -107,6 +110,19 @@ fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn quoted_paths_with_external_locations_keep_literal_names() {
+        let cwd = std::env::temp_dir();
+        let target = resolve_with_home("\"src/my file.rs\":12:3", Some(&cwd), false, None).unwrap();
+        assert_eq!(target.path, cwd.join("src/my file.rs"));
+        assert_eq!((target.line, target.column), (Some(12), Some(3)));
+        let target = resolve_with_home("'~/my file.rs':8", None, false, Some(&cwd)).unwrap();
+        assert_eq!(target.path, cwd.join("my file.rs"));
+        assert_eq!(target.line, Some(8));
+        for text in ["'//server/file':12", "'src/file.rs':0", "'unfinished:12"] {
+            assert_eq!(resolve_with_home(text, Some(&cwd), false, None), Err(LinkError::Unsupported));
+        }
+    }
     #[test]
     fn home_paths_resolve_without_cwd_or_shell_expansion() {
         let home = std::env::temp_dir().join("local home 世界");

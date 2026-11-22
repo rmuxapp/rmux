@@ -10330,3 +10330,15 @@ passed, including Unicode/spaces, literal shell metacharacters and remote denial
 Updated the terminal/file guides and T10 roadmap to reflect existing plain/quoted
 path support and this addition. Native modifier-click/editor acceptance remains
 pending; no installed app or session was changed.
+
+
+### Quoted diagnostic locations — 2026-11-22
+
+Terminal path detection now retains numeric line/column suffixes outside closing
+quotes, including `"src/my file.rs":12:3` and quoted `~/` paths. Filename and
+coordinate clicks select the same complete target. The desktop resolver removes
+matching path quotes after parsing coordinates, preserves literal names, and
+rechecks network-path rejection after unquoting. Existing inside-quote locations
+remain supported. Eight terminal hyperlink checks and six desktop resolver
+checks passed; native editor-launch acceptance remains pending. Updated the file
+guide; no release or installed-app changes were made.
