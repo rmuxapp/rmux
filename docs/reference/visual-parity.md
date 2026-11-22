@@ -131,3 +131,20 @@ Down/Enter selecting the other workspace with terminal focus. Group/description
 search was not separately exercised. Screenshots: `target/palette-order-review.png`
 and `target/palette-workspaces-review.png`. These are browser screenshots, not
 native acceptance evidence. Changes remain local for the next polish batch.
+
+
+### Shared shell-line actions (2026-11-22, after v0.1.8)
+
+Native and browser terminal hosts now share action dispatch for Move to Start of
+Shell Line, Move to End of Shell Line, and Delete to Start of Shell Line. The
+browser exposes these in the palette and Keyboard Shortcuts, using the same
+macOS Cmd+Left/Right/Backspace bindings. Native input still passes through its
+existing focus, composition, copy-mode, modal, and shutdown guards; browser input
+requires terminal focus and no composition or find panel.
+
+Desktop compilation and one combined WASM build passed. At 1280×720, browser
+review invoked line-start from the palette, inserted `echo ` ahead of a draft,
+used Cmd+Right to append ` done`, and observed `alpha beta done` as sample output.
+Up recalled the command; Cmd+Backspace cleared it before `echo cleared` produced
+`cleared`. Screenshot: `target/palette-shell-actions.png`. Native runtime review
+of these shared handlers remains pending. No installed app/session was changed.

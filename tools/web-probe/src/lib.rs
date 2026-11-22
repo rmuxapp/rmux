@@ -114,6 +114,9 @@ const COMMANDS: &[CommandId] = &[
     CommandId::ShowTerminalMenu,
     CommandId::CopySelectionWithLineBreaks,
     CommandId::ClearScrollback,
+    CommandId::MoveToLineStart,
+    CommandId::MoveToLineEnd,
+    CommandId::DeleteToLineStart,
     CommandId::ScrollToTop,
     CommandId::ScrollToBottom,
     CommandId::IncreaseFontSize,
@@ -136,7 +139,7 @@ enum PaletteRequest { Open, SelectWorkspace(EntityId) }
 impl EventEmitter<PaletteRequest> for InputProbe {}
 
 
-actions!(rmux, [IncreaseFontSize, DecreaseFontSize, ResetFontSize, ShowWorkspaceMenu, EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabPicker, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
+actions!(rmux, [MoveToLineStart, MoveToLineEnd, DeleteToLineStart, IncreaseFontSize, DecreaseFontSize, ResetFontSize, ShowWorkspaceMenu, EditWorkspaceIcon, EditGroupIcon, EditWorkspaceColor, EditGroupColor, EditWorkspaceDescription, CloseWorkspaceGroup, ToggleWorkspacePin, RenameWorkspaceGroup, RenameWorkspace, ShowTerminalMenu, CopySelectionWithLineBreaks, ClearScrollback, ShowTabPicker, ShowTabMenu, Find, FindOlder, FindNewer, CloseWorkspace, UngroupWorkspaces, EditorUndo, EditorRedo, Paste, CopySelection, EditorCut, EditorSelectAll, CommandPalette, NextPane, PreviousPane, NewTab, RenameTab, CloseOtherTabs, CloseTabsToRight, NextTab, PreviousTab, MoveTabLeft, MoveTabRight, ClosePane, NewWorkspaceGroup, GroupCurrentWorkspace, GroupSelectedWorkspaces, ToggleGroupPin, RemoveWorkspaceFromGroup, SetGroupAnchor, MoveWorkspaceUp, MoveWorkspaceDown, NewWorkspace, ToggleSidebar, NextWorkspace, PreviousWorkspace, LastWorkspace, FocusLeft, FocusRight, FocusUp, FocusDown, Split, SplitBelow, TogglePaneZoom, SplitLeft, SplitAbove, EqualizePanes, ResizePaneLeft, ResizePaneRight, ResizePaneUp, ResizePaneDown, SwapPaneNext, SwapPaneLeft, SwapPaneRight, SwapPaneUp, SwapPaneDown, JoinPaneNext, JoinPaneLeft, JoinPaneRight, JoinPaneUp, JoinPaneDown, BreakTabRight, BreakTabBelow, BreakTabLeft, BreakTabAbove]);
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectWorkspaceNumber { number: usize }
@@ -748,6 +751,13 @@ pub fn start() {
             std::borrow::Cow::Borrowed(include_bytes!("../assets/FiraMono-Medium.ttf").as_slice()),
         ]).expect("bundled UI and terminal fonts");
         let mac = terminal_engine::is_mac();
+        if mac {
+            cx.bind_keys([
+                KeyBinding::new("cmd-left", MoveToLineStart, Some("Terminal")),
+                KeyBinding::new("cmd-right", MoveToLineEnd, Some("Terminal")),
+                KeyBinding::new("cmd-backspace", DeleteToLineStart, Some("Terminal")),
+            ]);
+        }
         cx.bind_keys(workspace_shortcuts::bindings(mac));
         cx.bind_keys(find_presentation::bindings(mac));
         cx.bind_keys(pane_shortcuts::tab_numbers(mac));

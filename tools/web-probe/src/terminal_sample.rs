@@ -175,13 +175,7 @@ impl TerminalSample {
     fn key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         if !self.focus.is_focused(window) || !self.composition.text.is_empty() { return; }
         let key = &event.keystroke;
-        if key.modifiers.platform {
-            if crate::terminal_engine::is_mac() && !key.modifiers.alt && !key.modifiers.control && !key.modifiers.shift {
-                let input = match key.key.as_str() { "left" => Some("\x01"), "right" => Some("\x05"), "backspace" => Some("\x15"), _ => None };
-                if let Some(input) = input { self.accept(input, cx); cx.stop_propagation(); }
-            }
-            return;
-        }
+        if key.modifiers.platform { return; }
         if key.modifiers.shift && !key.modifiers.control && !key.modifiers.alt {
             if let Some(scroll) = rmux_core::scroll::navigation(&key.key, self.frame.rows.len()) {
                 self.scroll(scroll,cx);
@@ -435,6 +429,11 @@ impl EntityInputHandler for TerminalSample {
 }
 
 impl crate::terminal_actions::TerminalCommandHost for TerminalSample {
+    fn send_terminal_control(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        cx.stop_propagation();
+        if !self.focus.is_focused(window) || !self.composition.text.is_empty() || self.find.is_some() { return; }
+        self.accept(text, cx);
+    }
     fn resize_terminal_font(&mut self, delta: Option<f32>, cx: &mut Context<Self>) {
         let next = CellMetrics::new(delta.map_or(14., |delta| self.font_size + delta)).font_size;
         if next == self.font_size { return; }

@@ -1932,6 +1932,9 @@ impl TerminalView {
     }
 }
 impl terminal_actions::TerminalCommandHost for TerminalView {
+    fn send_terminal_control(&mut self, text: &str, window: &mut Window, cx: &mut Context<Self>) {
+        self.send_shortcut_text(text, window, cx);
+    }
     fn resize_terminal_font(&mut self, delta: Option<f32>, cx: &mut Context<Self>) {
         self.set_font_size(delta.map_or(cx.global::<Preferences>().font_size, |delta| self.cells.font_size + delta), cx);
     }
@@ -1966,9 +1969,6 @@ impl Render for TerminalView {
             .on_action(cx.listener(|this, action: &SendShortcutText, window, cx| {
                 this.send_shortcut_text(&action.text, window, cx);
             }))
-            .on_action(cx.listener(|this, _: &MoveToLineStart, window, cx| this.send_shortcut_text("\u{1}", window, cx)))
-            .on_action(cx.listener(|this, _: &MoveToLineEnd, window, cx| this.send_shortcut_text("\u{5}", window, cx)))
-            .on_action(cx.listener(|this, _: &DeleteToLineStart, window, cx| this.send_shortcut_text("\u{15}", window, cx)))
             .on_action(cx.listener(|this, _: &EnterCopyMode, window, cx| {
                 if let Some(mode) = &this.copy_mode { mode.read(cx).focus.focus(window); return; }
                 this.selecting = false;
