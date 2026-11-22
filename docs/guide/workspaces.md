@@ -57,7 +57,9 @@ Use **Refresh Pull Request for Current Terminal** from the command palette to
 look up the current local branch with GitHub CLI. `gh` must already be available
 on the app's PATH and authenticated; rmux does not install it or prompt for login.
 The sidebar shows the returned PR number, state and title on a separate line below Git context;
-hover for the full text. **Open Current Pull Request** opens its HTTPS page.
+hover for the full text and destination URL. Click the PR summary to open the
+page without switching workspaces. **Open Current Pull Request** provides the
+same workflow from the keyboard through the command palette.
 Custom shortcut actions are `refresh_pull_request` and `open_pull_request`.
 
 Lookup is manual, limited to one request at a time, and times out after ten

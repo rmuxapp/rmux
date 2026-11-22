@@ -10629,3 +10629,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Separated PR context into its own truncated/tooltip row below branch/directory, preventing long PR titles from consuming the branch label. Shared entry-pane selection keeps both rows tied to the same focused/last pane and active terminal.
 - Existing explicit local port scans now cache a bounded sidebar summary: four unique sorted port numbers, overflow count and partial ownership/truncation marker. Loading and failure have separate labels. Closing the panel retains the successful snapshot; failed refresh clears it, terminal exit hides it, and remote contexts omit local sidebar details. No new polling or socket enumeration was added.
 - Focused deduplication/overflow/partial/empty snapshot test and desktop test compilation passed after correcting the nested GPUI element ID. Native visual and lifecycle acceptance remains pending; no synthetic screenshot substituted for native evidence.
+
+### Direct PR sidebar links
+
+- PR summary rows now expose their displayed HTTPS destination in the tooltip and open it on a standard click, with hover feedback. The click captures the URL belonging to the rendered terminal metadata, rather than dispatching through whichever terminal has focus later. Mouse-down/click propagation is contained so opening a PR does not also select or drag its workspace. Modified clicks do not launch a URL.
+- Pending/unavailable/no-result and port snapshot rows remain non-links. PR state labels use Open, Closed, Merged and Draft; the existing palette action remains the keyboard route.
+- Desktop cargo check passed. Native pointer/tooltip appearance and browser launch acceptance remain pending; no remote request or browser launch performed during this batch.

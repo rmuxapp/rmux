@@ -4720,11 +4720,22 @@ impl Render for WorkspaceWindow {
                                                                     .child(gpui::div().flex_1().min_w_0().truncate().child(sidebar_presentation::directory_label(&directory)))))
                                                         })
                                                         .children(Self::entry_pane(entry, window, cx).map(|pane| pane.read(cx).sidebar_details(cx)).unwrap_or_default()
-                                                            .into_iter().enumerate().map(|(index, detail)| {
-                                                                let hint: SharedString = detail.clone().into();
+                                                            .into_iter().enumerate().map(|(index, (detail, url))| {
+                                                                let hint: SharedString = match &url {
+                                                                    Some(url) => format!("{detail}\nOpen pull request in browser\n{url}"),
+                                                                    None => detail.clone(),
+                                                                }.into();
                                                                 gpui::div().id((if index == 0 { "workspace-extra-first" } else { "workspace-extra-second" }, target)).min_w_0().truncate().text_size(px(11.))
                                                                     .text_color(rgb(if selected { crate::sidebar_presentation::SELECTED_DETAIL } else { 0x969696 }))
-                                                                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).child(detail)
+                                                                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
+                                                                    .when_some(url, |row, url| row.cursor_pointer()
+                                                                        .hover(|style| style.text_color(rgb(0xc7dcff)))
+                                                                        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                                                                        .on_click(move |event, _, cx| {
+                                                                            cx.stop_propagation();
+                                                                            if event.standard_click() { cx.open_url(&url); }
+                                                                        }))
+                                                                    .child(detail)
                                                             }))
                                                     .into_any_element()
                                             },

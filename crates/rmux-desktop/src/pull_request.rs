@@ -11,7 +11,11 @@ impl Drop for Running { fn drop(&mut self) { let _ = self.0.kill(); let _ = self
 pub struct PullRequest { pub number: u64, pub title: String, pub state: String, pub url: String, pub is_draft: bool }
 impl PullRequest {
     pub fn label(&self) -> String {
-        format!("PR #{} · {} · {}", self.number, if self.is_draft && self.state == "OPEN" { "Draft" } else { self.state.as_str() }, self.title)
+        let state = match self.state.as_str() {
+            "OPEN" if self.is_draft => "Draft",
+            "OPEN" => "Open", "CLOSED" => "Closed", "MERGED" => "Merged", _ => "Unknown",
+        };
+        format!("PR #{} · {state} · {}", self.number, self.title)
     }
 }
 fn parse(bytes: &[u8]) -> Result<Option<PullRequest>> {

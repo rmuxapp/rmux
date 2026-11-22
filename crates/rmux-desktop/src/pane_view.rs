@@ -726,13 +726,14 @@ impl PaneView {
             .or_else(|| terminal.snapshot_directory.as_ref().map(|path| path.to_string_lossy().into_owned()));
         (terminal.git_branch.is_some() || directory.is_some()).then(|| (terminal.git_branch.clone(), directory))
     }
-    pub fn sidebar_details(&self, cx: &App) -> Vec<String> {
+    pub fn sidebar_details(&self, cx: &App) -> Vec<(String, Option<String>)> {
         let Some(terminal) = self.terminals.active() else { return Vec::new(); };
         let terminal = terminal.read(cx);
         if terminal.session.remote_destination().is_some() { return Vec::new(); }
-        let pr = terminal.pull_request.as_ref().map(pull_request::PullRequest::label)
-            .or_else(|| terminal.pull_request_status.clone());
-        let ports = terminal.process_exit.is_none().then(|| terminal.ports.sidebar_label()).flatten();
+        let pr = terminal.pull_request.as_ref().map(|pr| (pr.label(), Some(pr.url.clone())))
+            .or_else(|| terminal.pull_request_status.clone().map(|status| (status, None)));
+        let ports = terminal.process_exit.is_none().then(|| terminal.ports.sidebar_label()).flatten()
+            .map(|summary| (summary, None));
         pr.into_iter().chain(ports).collect()
     }
     pub fn needs_attention(&self, cx: &App) -> bool {
