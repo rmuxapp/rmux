@@ -3,43 +3,52 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.9</title>
-            <pubDate>Sun, 22 Nov 2026 06:55:18 +0000</pubDate>
+            <title>0.1.10</title>
+            <pubDate>Sun, 22 Nov 2026 07:38:26 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.9</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.9</sparkle:version>
-            <sparkle:shortVersionString>0.1.9</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.10</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.10</sparkle:version>
+            <sparkle:shortVersionString>0.1.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.9 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.10 — preview
 
-This release polishes command search and keyboard focus in the app and browser demo.
+This release improves command search, terminal file links, and Settings, and adds
+experimental per-terminal shell history restore.
 
-## Command palette
+## Everyday polish
 
-- Search native workspaces by project path, group, or description, including workspaces in other windows. The current workspace is marked in results.
-- Workspace shortcut hints follow your configured bindings.
-- The browser palette follows the native command order, with New Workspace and New Tab near the top. Page navigation accounts for two-line workspace results.
-- Shell line-start, line-end, and delete-to-start actions share bindings and command names across the native app and demo.
+- The command palette shows your position in filtered results in both the app and browser demo.
+- Clearing a palette search skips unnecessary scoring and sorting.
+- Terminal file links support local `~/` paths, quoted filenames with line and column suffixes, and compiler locations such as `src/main.rs(12,3)`.
+- Disabled Settings buttons now behave consistently with keyboard and mouse input. Settings distinguishes terminal scrollback from saved shell command history.
 
-## Keyboard focus
+## Optional shell history restore
 
-- Canceling the terminal tab chooser returns focus to where you opened it, including Find. Choosing a tab focuses that terminal.
-- Opening the chooser from its toolbar no longer steals focus before saving the return target.
+Enable `shell_history_directory` in Settings JSON and restart to save separate
+command histories for local zsh and non-login Bash terminals. Saved sessions
+restore those commands for shell history navigation without executing them.
+Writes run in the background, and restored terminals get independent copies.
 
-## Availability
+This feature is **off by default and experimental**. History files are private
+but unencrypted. Old files are not automatically cleaned up, and individual
+history-entry deletion is not synchronized. Missing history files produce an
+error rather than silently losing references. See the
+[configuration and limitations](https://github.com/rmuxapp/rmux/blob/v0.1.10/docs/guide/settings.md#restore-per-terminal-command-history-experimental).
+
+## Downloads and validation
 
 GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux
 x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
-The [browser demo](https://rmux.app) uses bundled sample sessions, not real shells.
-The [VS Code guide](https://rmux.app/vscode/) explains how to open and reuse a
-project workspace with VS Code’s external-terminal command.
+The [browser demo](https://rmux.app) uses bundled sample sessions.
+Use the [VS Code setup guide](https://rmux.app/vscode/) to open or reuse your
+project workspace through the standard external-terminal shortcut.
 
-Focused compilation and browser interaction checks cover the polish changes.
-Native visual review and native Windows runtime validation remain pending.
-Per-terminal persistent shell history is still under development and is not enabled.
+Focused tests cover history storage, shell import and shutdown, file-link
+resolution, and palette search. Browser interaction checks cover the palette
+footer. Native visual review and Windows runtime validation remain pending.
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.9/rmux-0.1.9-macos-arm64.zip" length="7258002" type="application/octet-stream" sparkle:edSignature="oQGSv+8ugNr2qJX4kjt/VH9yGJLOV+d8iNXvoO7kEwm7Ryi2B7Eh1tGI3XnxkSxD/PnCWFecb+fFaOTYWrucBw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.10/rmux-0.1.10-macos-arm64.zip" length="7302152" type="application/octet-stream" sparkle:edSignature="PuXM3bFHFwK6c8kovqFEEZXVl1+dxHqXHYJ6JkNgz2V8oC85IGkH0eVoaR9BO7G6FD24L+0fztmMOTMvVCk0AQ=="/>
         </item>
     </channel>
 </rss>
