@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Workspace merge acceptance now checks per-pane tab indices and selected tabs,
+plus complete notification records on a hidden tab, before and after both
+same-window and cross-window merges. Notifications retain their revision,
+Unicode title/body and unread state while ownership updates to the destination.
+The native live-shell smoke passes these assertions alongside seven retained
+shell PIDs/variables and source-window cleanup. This closes the narrow W15
+tab-order/unread evidence gap; graphical focus, groups, persistence and other
+platforms remain pending. No product behavior change was needed.
+
 Release-documentation review: N03 already correctly records the opt-in native
 notification dispatcher and its pending platform acceptance. README's blanket
 claim that native notifications are absent was stale; it now distinguishes main

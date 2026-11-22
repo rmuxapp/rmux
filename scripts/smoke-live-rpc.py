@@ -320,6 +320,15 @@ def run(binary, live_shell=False):
                     before = {item["id"]: item for item in send("workspace.list")["result"]["workspaces"]}
                     source, destination = before[source_id], before[destination_id]
                     terminals = send("surface.list")["result"]["surfaces"]
+                    # Use a hidden tab: focusing the merged workspace must not
+                    # acknowledge messages in a tab the user has not opened.
+                    hidden = next(item for item in terminals
+                                  if item["workspace_id"] in (source_id, destination_id) and not item["selected"])
+                    assert "result" in send("notification.send", {
+                        "surface_id": hidden["id"], "title": "Merge unread 世界", "body": source_id})
+                    messages_before = [item for item in send("notification.list")["result"]["notifications"]
+                                       if item["surface_id"] == hidden["id"]]
+                    assert messages_before and all(item["unread"] for item in messages_before)
                     params = {"workspace_id": source_id, "target_workspace_id": destination_id}
                     assert send("workspace.merge", params)["result"] == {**params, "merged": True}
                     after = {item["id"]: item for item in send("workspace.list")["result"]["workspaces"]}
@@ -329,6 +338,13 @@ def run(binary, live_shell=False):
                     assert merged["layout"]["children"] == [destination["layout"], source["layout"]]
                     assert merged["zoomed_pane_id"] is None
                     retained = send("surface.list")["result"]["surfaces"]
+                    def tab_positions(items):
+                        return {item["id"]: (item["pane_id"], item["index"], item["selected"]) for item in items}
+                    assert tab_positions(retained) == tab_positions(terminals)
+                    messages_after = [item for item in send("notification.list")["result"]["notifications"]
+                                      if item["surface_id"] == hidden["id"]]
+                    assert messages_after == [{**item, "workspace_id": destination_id,
+                                               "window_id": destination["window_id"]} for item in messages_before]
                     assert {item["id"]: item["process_id"] for item in retained} == {item["id"]: item["process_id"] for item in terminals}
                     moved_ids = {item["id"] for item in terminals if item["workspace_id"] in (source_id, destination_id)}
                     assert all(item["workspace_id"] == destination_id and item["window_id"] == destination["window_id"] for item in retained if item["id"] in moved_ids)
@@ -338,7 +354,7 @@ def run(binary, live_shell=False):
                     assert {item["id"]: item for item in send("workspace.list")["result"]["workspaces"]} == after
 
                 merge_and_check(workspaces[1]["id"], workspace["id"])
-                checks.append("same-window merge preserves layout subtrees and terminal identities; stale source rejected without mutation")
+                checks.append("same-window merge preserves layouts, tab positions/selections and hidden-tab unread messages; stale source rejected without mutation")
                 merge_window = send("window.create", {"activate": False})["result"]
                 merge_target = merge_window["selected_workspace_id"]
                 merge_tab = next(item for item in send("surface.list")["result"]["surfaces"] if item["workspace_id"] == merge_target)
@@ -360,7 +376,7 @@ def run(binary, live_shell=False):
                         assert "result" in send("surface.send_text", {"surface_id": item["id"], "text": "probe\n"})
                         wait_file(state, expected_states[pid])
                     checks.append("seven shell PIDs and Unicode variables survive same/cross-window merges and source-window closure")
-                checks.append("cross-window merge preserves nested layouts and removes the emptied source window")
+                checks.append("cross-window merge preserves layouts, tab positions/selections and hidden-tab unread messages, and removes the emptied source window")
                 process.stdin.close()
                 time.sleep(0.1)
                 assert process.poll() is None, "EOF unexpectedly closed the GUI"
