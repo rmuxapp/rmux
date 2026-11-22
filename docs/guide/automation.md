@@ -301,6 +301,16 @@ the same running app. Treat cursors as opaque strings. A request without `after`
 starts at the oldest retained record. Limits are 1–128 (default 128); when
 `has_more` is true, read the next page before waiting for new events.
 
+Set `wait_ms` to an integer from 0 to 3000 (default 0) to wait for a change when
+caught up. Available records and gap responses return immediately. A timeout
+returns an empty page with the same cursor; otherwise the new page contains the
+events that arrived. At most 16 reads may wait concurrently; excess waits return
+RPC error `-32000`. Each waiter holds one coalesced wake-up, not a separate copy
+of every event. Expiry or completion releases its slot. Disconnects may retain
+a slot until the bounded wait expires. Waiting does not block other clients;
+use a separate socket connection for commands while waiting, since requests on
+one connection are processed sequentially.
+
 The app retains the latest 512 metadata events. `gap` is `null` normally,
 `"retention"` if older events were evicted, or `"restart"` when the cursor belongs
 to another app process. On a gap, refresh your resource lists; the returned page
@@ -321,7 +331,7 @@ These are invalidation signals: use `notification.list` or
 notifications that have since closed or been removed. Titles, bodies and terminal
 output are not copied into the journal.
 
-This is an on-demand replay API. Push subscriptions, long polling, resource
+This is a replay API with bounded long polling. Push subscriptions, resource
 workspace/pane lifecycle and movement events and the full cmux event contract are not implemented.
 Readers use the existing bounded RPC queue; publishing never waits for clients.
 

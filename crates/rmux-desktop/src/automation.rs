@@ -429,6 +429,43 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
     }
     cx.spawn(async move |cx| {
         while let Ok(request) = receiver.recv().await {
+            if let Some(read) = request.events_read.as_ref() {
+                let setup = cx.update(|cx| {
+                    if !request.pending.start() { return Err(Failure { code: -32001, message: "Request expired before execution" }); }
+                    let journal = cx.global::<super::events::Journal>().clone();
+                    let batch = journal.read(read).map_err(|message| Failure { code: -32602, message })?;
+                    let waiter = if read.wait_ms > 0 && batch.events.is_empty() && batch.gap.is_none() {
+                        Some(journal.subscribe().map_err(|message| Failure { code: -32000, message })?)
+                    } else { None };
+                    // Reading and registering occur in one UI update: a publish
+                    // cannot slip between the empty read and wake registration.
+                    Ok((journal, batch, waiter))
+                }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }));
+                match setup {
+                    Err(error) => { let _ = request.reply.try_send(Err(error)); }
+                    Ok((_, batch, None)) => { let _ = request.reply.try_send(Ok(serde_json::to_value(batch).expect("event batch"))); }
+                    Ok((journal, batch, Some(waiter))) => {
+                        let mut read = read.clone();
+                        // An initial empty read establishes a cursor for this
+                        // wait instead of replaying older records on wake.
+                        read.after = Some(batch.cursor);
+                        let duration = Duration::from_millis(u64::from(read.wait_ms))
+                            .min(request.pending.deadline.saturating_duration_since(Instant::now()).saturating_sub(Duration::from_millis(100)));
+                        cx.spawn(async move |cx| {
+                            let timer = cx.background_executor().timer(duration);
+                            futures_lite::future::race(async { let _ = waiter.receiver.recv().await; }, async { timer.await; }).await;
+                            let result = journal.read(&read)
+                                .map(|batch| serde_json::to_value(batch).expect("event batch"))
+                                .map_err(|message| Failure { code: -32602, message });
+                            drop(waiter);
+                            let _ = request.reply.try_send(result);
+                        }).detach();
+                    }
+                }
+                // Waiting is a separate foreground task, never an await in the
+                // shared dispatcher. Other clients can mutate/read immediately.
+                continue;
+            }
             if let Some(create) = request.workspace_create.as_ref() {
                 let prepared = cx.update(|cx| {
                     if !request.pending.start() { return Err(Failure { code: -32001, message: "Request expired before execution" }); }
@@ -578,11 +615,6 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                         code: -32001,
                         message: "Request expired before execution",
                     });
-                }
-                if let Some(read) = &request.events_read {
-                    return cx.global::<super::events::Journal>().read(read)
-                        .map(|batch| serde_json::to_value(batch).expect("event batch"))
-                        .map_err(|message| Failure { code: -32602, message });
                 }
                 if let Some(command) = &request.buffer_command {
                     if let Some(input) = cx.global::<super::copy_buffers::Store>().paste_input(command)
@@ -1043,7 +1075,7 @@ fn dispatch_inner(
     let events_read = if method == "events.read" {
         match serde_json::from_value::<super::events::Read>(request.get("params").cloned().unwrap_or_else(|| json!({}))) {
             Ok(read) if read.valid() => Some(read),
-            _ => return respond(error(id, -32602, "Expected after cursor and limit between 1 and 128")),
+            _ => return respond(error(id, -32602, "Expected after cursor, limit 1–128 and wait_ms 0–3000")),
         }
     } else { None };
     let buffer_command = match super::copy_buffers::parse(method, request.get("params")) {

@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+`events.read` now supports bounded `wait_ms` long polling (0–3000 ms). An empty
+read registers its wake-up in the same UI update, then waits in a separate task
+so the shared RPC dispatcher can handle other requests. Up to 16 waiters each
+hold one coalesced wake-up; timeout/completion drops the registration, and
+disconnected clients retain it for at most the bounded wait. No idle polling is
+introduced. Focused coverage checks the cap, coalescing and drop cleanup; the
+native smoke exercises timeout and a second connection waking on a notification
+without delaying the sending client. Push streams and full event parity remain
+open.
+
 Event replay now includes `surface.created` and `surface.closed`. A small
 ownership token publishes closure once on explicit close, with a drop fallback;
 it moves with the terminal, so tab transfers do not invent new lifetimes. Native

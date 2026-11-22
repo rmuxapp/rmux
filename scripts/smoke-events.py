@@ -4,15 +4,19 @@ import json
 import os
 from pathlib import Path
 import selectors
+import socket
 import subprocess
 import tempfile
+import concurrent.futures
+import threading
 import time
 
 with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
     config = Path(directory) / "config.json"
     config.write_text('{"confirm_close":"never"}')
     env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}
-    env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true")
+    endpoint = Path(directory) / "rpc"
+    env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true", RMUX_SOCKET_DIR=str(endpoint))
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen([str(Path("target/debug/rmux").resolve()), "--rpc-stdio-live"],
                                    env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -59,6 +63,28 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             page = call("events.read", {"after": received["cursor"]})
             assert any(e["kind"] == "notification.dismissed" and e["notification_id"] == event["notification_id"] for e in page["events"])
             assert call("events.read", {"after": page["cursor"]})["events"] == []
+            start = time.monotonic()
+            timed = call("events.read", {"after": page["cursor"], "wait_ms": 100})
+            assert timed["events"] == [] and time.monotonic() - start >= 0.05
+            ready = threading.Event()
+            def wait_for_event():
+                with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
+                    client.settimeout(5)
+                    client.connect(str(endpoint / "rpc.sock"))
+                    request = {"jsonrpc": "2.0", "id": 1, "method": "events.read", "params": {"after": timed["cursor"], "wait_ms": 2000}}
+                    client.sendall((json.dumps(request) + "\n").encode())
+                    ready.set()
+                    with client.makefile("rb") as reader:
+                        return json.loads(reader.readline(65536))["result"]
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(wait_for_event)
+                assert ready.wait(2)
+                time.sleep(0.05)
+                assert not future.done(), "empty event wait returned before an event"
+                start = time.monotonic()
+                call("notification.send", {"surface_id": surface, "title": "Wake waiting client"})
+                assert time.monotonic() - start < 1, "event wait blocked the shared dispatcher"
+                assert any(e["kind"] == "notification.received" for e in future.result(timeout=3)["events"])
             assert call("events.read", {"after": "0-0:0"})["gap"] == "restart"
             window = call("window.list")["windows"][0]["id"]
             original_workspace = call("workspace.list")["workspaces"][0]["id"]
@@ -81,7 +107,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                 assert sum(e["kind"] == "surface.closed" and e["surface_id"] == target for e in closed["events"]) == 1, closed
             call("system.quit")
             assert process.wait(timeout=5) == 0
-            print("PASS notification replay and surface create/move/close lifetimes")
+            print("PASS replay, bounded waiting, concurrent mutation and surface lifetimes")
         finally:
             if process.poll() is None:
                 process.terminate()
