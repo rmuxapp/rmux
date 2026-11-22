@@ -17,6 +17,7 @@ struct Saved {
 
 /// The caller owns a private application-state directory. IDs are opaque hex,
 /// never caller-selected paths or names derived from a working directory.
+#[derive(Clone)]
 pub(crate) struct Store { directory: PathBuf }
 impl Store {
     pub fn new(directory: PathBuf) -> Self { Self { directory } }
@@ -80,11 +81,170 @@ impl Store {
     }
 }
 
+/// An exclusive writer follows the terminal, including transfers between panes.
+/// Keep its sidecar inode in place: atomic JSON replacement must not release it.
+pub(crate) struct Lease {
+    store: Store,
+    id: String,
+    _lock: std::fs::File,
+    saved_revision: std::sync::atomic::AtomicU64,
+}
+impl Lease {
+    pub fn id(&self) -> &str { &self.id }
+    fn acquire(store: Store, id: String) -> Result<Self> {
+        store.prepare_directory()?;
+        let path = store.path(&id)?.with_extension("lock");
+        let mut options = std::fs::OpenOptions::new();
+        options.read(true).write(true).create(true).truncate(false);
+        #[cfg(unix)] {
+            use std::os::unix::fs::OpenOptionsExt;
+            options.mode(0o600);
+        }
+        let lock = options.open(path)?;
+        lock.try_lock().map_err(|error| anyhow::anyhow!("terminal history is already in use or cannot be locked: {error}"))?;
+        Ok(Self { store, id, _lock: lock, saved_revision: std::sync::atomic::AtomicU64::new(0) })
+    }
+    pub fn save(&self, history: &History) -> Result<()> { self.store.save(&self.id, history) }
+}
+impl Store {
+    /// A restore always gets a fresh writer identity. Reading the old atomic
+    /// snapshot is safe while its original terminal is still active, and two
+    /// restores never overwrite each other's subsequent commands. The source
+    /// identity remains untouched for other saved sessions that reference it.
+    pub fn fork(&self, source: Option<&str>) -> Result<(std::sync::Arc<Lease>, History)> {
+        let history = source.map(|id| self.load(id)).transpose()?.unwrap_or_default();
+        let id = self.allocate()?;
+        let lease = std::sync::Arc::new(Lease::acquire(self.clone(), id)?);
+        lease.save(&history)?;
+        Ok((lease, history))
+    }
+}
+
+struct Pending {
+    lease: std::sync::Arc<Lease>,
+    revision: u64,
+    history: History,
+}
+/// One latest snapshot per terminal, with a finite queue during disk failures.
+/// Enqueue is memory-only; the executor calls flush outside the UI/PTY locks.
+/// Errors retain snapshots for an explicit retry. Successful writes release
+/// leases only after the atomic replacement finishes.
+#[derive(Default)]
+pub(crate) struct Writes {
+    pending: std::sync::Mutex<std::collections::HashMap<String, Pending>>,
+    flush_lock: std::sync::Mutex<()>,
+}
+impl Writes {
+    pub fn enqueue(&self, lease: std::sync::Arc<Lease>, revision: u64, history: &History) -> Result<()> {
+        let mut pending = self.pending.lock().unwrap_or_else(|error| error.into_inner());
+        if revision <= lease.saved_revision.load(std::sync::atomic::Ordering::Acquire) { return Ok(()); }
+        if let Some(previous) = pending.get(lease.id()) {
+            if revision <= previous.revision { return Ok(()); }
+        } else {
+            ensure!(pending.len() < 64, "terminal history save queue is full; retry after flushing");
+        }
+        pending.insert(lease.id().to_owned(), Pending { lease, revision, history: history.clone() });
+        Ok(())
+    }
+    pub fn flush(&self) -> Result<()> {
+        let _serial = self.flush_lock.lock().unwrap_or_else(|error| error.into_inner());
+        let ids: Vec<_> = self.pending.lock().unwrap_or_else(|error| error.into_inner()).keys().cloned().collect();
+        let mut failures = Vec::new();
+        for id in ids {
+            let (lease, revision, history) = {
+                let pending = self.pending.lock().unwrap_or_else(|error| error.into_inner());
+                let Some(entry) = pending.get(&id) else { continue; };
+                (entry.lease.clone(), entry.revision, entry.history.clone())
+            };
+            // No queue lock during filesystem I/O; newer commands can coalesce.
+            if let Err(error) = lease.save(&history) {
+                failures.push(format!("{id}: {error:#}"));
+                continue;
+            }
+            let mut pending = self.pending.lock().unwrap_or_else(|error| error.into_inner());
+            lease.saved_revision.store(revision, std::sync::atomic::Ordering::Release);
+            if pending.get(&id).is_some_and(|entry| entry.revision == revision) {
+                pending.remove(&id);
+            }
+        }
+        ensure!(failures.is_empty(), "could not save terminal history: {}", failures.join("; "));
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     const FIRST: &str = "0123456789abcdef0123456789abcdef";
     const SECOND: &str = "fedcba9876543210fedcba9876543210";
+
+    #[test]
+    fn restored_writers_are_independent_and_leased_until_pending_save_finishes() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let store = Store::new(temporary.path().join("history"));
+        let mut original = History::default();
+        original.record("echo original");
+        store.save(FIRST, &original)?;
+        let (first, restored) = store.fork(Some(FIRST))?;
+        let (second, _) = store.fork(Some(FIRST))?;
+        assert_eq!(restored, original);
+        assert_ne!(first.id(), second.id());
+        let id = first.id().to_owned();
+        assert!(Lease::acquire(store.clone(), id.clone()).is_err());
+        let writes = Writes::default();
+        let mut changed = restored;
+        changed.record("echo first-only");
+        writes.enqueue(first.clone(), 1, &changed)?;
+        drop(first);
+        assert!(Lease::acquire(store.clone(), id.clone()).is_err());
+        writes.flush()?;
+        let _reopened = Lease::acquire(store.clone(), id.clone())?;
+        assert_eq!(store.load(&id)?, changed);
+        assert_eq!(store.load(second.id())?, original);
+        assert_eq!(store.load(FIRST)?, original);
+        Ok(())
+    }
+    #[test]
+    fn saves_coalesce_reject_old_revisions_and_retry_after_io_failure() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let directory = temporary.path().join("history");
+        let store = Store::new(directory.clone());
+        let (lease, _) = store.fork(None)?;
+        let writes = Writes::default();
+        let mut old = History::default();
+        old.record("echo old");
+        let mut recent = History::default();
+        recent.record("echo recent");
+        writes.enqueue(lease.clone(), 1, &old)?;
+        writes.enqueue(lease.clone(), 3, &recent)?;
+        writes.enqueue(lease.clone(), 2, &old)?;
+        let backup = temporary.path().join("backup");
+        std::fs::rename(&directory, &backup)?;
+        std::fs::write(&directory, "block directory creation")?;
+        assert!(writes.flush().is_err());
+        assert_eq!(writes.pending.lock().unwrap().len(), 1);
+        std::fs::remove_file(&directory)?;
+        std::fs::rename(backup, directory)?;
+        writes.flush()?;
+        assert_eq!(store.load(lease.id())?, recent);
+        // A delayed producer after flush must not resurrect older commands.
+        writes.enqueue(lease.clone(), 2, &old)?;
+        assert!(writes.pending.lock().unwrap().is_empty());
+        writes.enqueue(lease.clone(), 4, &History::default())?;
+        writes.flush()?;
+        assert_eq!(store.load(lease.id())?, History::default());
+        Ok(())
+    }
+    #[test]
+    fn corrupt_source_is_not_replaced_or_forked() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let store = Store::new(temporary.path().to_owned());
+        std::fs::write(store.path(FIRST)?, "{broken")?;
+        assert!(store.fork(Some(FIRST)).is_err());
+        assert_eq!(std::fs::read_dir(temporary.path())?.count(), 1);
+        assert_eq!(std::fs::read_to_string(store.path(FIRST)?)?, "{broken");
+        Ok(())
+    }
     #[test]
     fn allocated_histories_are_distinct_and_start_empty() -> Result<()> {
         let temporary = tempfile::tempdir()?;

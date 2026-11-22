@@ -10205,3 +10205,29 @@ and continued saving of new commands. Capture/reset checks and desktop
 compilation passed. This API is not yet activated by the desktop: private-store
 ownership, active-ID leases, asynchronous saves, cleanup, and end-to-end restore
 remain pending. No app bundle build or release was needed.
+
+
+### History writer ownership and coalescing — 2026-11-22
+
+Added exclusive sidecar file leases for terminal-history writers. Restoring a
+source history forks its bounded records into a fresh opaque identity, keeping
+the original file intact and preventing two restored terminals from sharing a
+writer. Leases survive atomic file replacement and stay held by pending saves
+after the terminal owner is dropped. Corrupt sources fail before allocating a
+replacement.
+
+The memory-only save queue keeps one latest revision per identity, rejects stale
+revisions both before and after a flush, and caps pending identities at 64 (at
+most 8 MiB of command text, plus metadata). Its serialized flush runs without
+the queue lock during filesystem I/O; newer enqueues are retained. Failed saves
+remain queued for retry, successful empty snapshots persist history clearing,
+and errors are returned to the caller. Queue-full callers must retry rather
+than acknowledge the rejected revision. This is the queue backend, not yet an
+automatically scheduled writer.
+
+All seven focused storage tests passed, including independent restored histories,
+lock lifetime through pending writes, fault-injected I/O failure/retry, stale
+revision rejection, and explicit clearing. Desktop test compilation was the
+only build. Live startup/restore wiring, asynchronous scheduling and shutdown
+flush, visible error reporting, retention cleanup, and native acceptance remain
+pending; capture is still disabled by default.
