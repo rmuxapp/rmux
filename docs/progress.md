@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Markdown preview destinations now use immutable shared storage across table cells
+and render elements. Click handlers, tooltips and the keyboard destination bar
+clone shared string handles instead of copying URL contents on redraw. Desktop
+test compilation and the focused typography test pass. This removes known copies;
+no new latency or memory benchmark claim is made. Native visual acceptance remains
+pending.
+
 Markdown links now have a keyboard destination bar: Tab/Shift+Tab cycle the selected
 block's links and Alt+Enter opens the displayed URL, while Enter retains copy
 behavior. Hints follow remapped bindings. Selection is keyed to result identity,
