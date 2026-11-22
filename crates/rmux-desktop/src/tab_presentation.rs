@@ -34,9 +34,29 @@ pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stat
 }
 
 pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>) -> Div {
-    div().flex().flex_col().gap_1().px_3().py_2().bg(rgb(0x292929))
-        .child(div().text_xs().text_color(rgb(0xaaaaaa)).child("Tab name · empty restores automatic title · Enter to save · Esc to cancel"))
-        .child(input)
+    let save = input.clone();
+    let cancel = input.clone();
+    div().flex().flex_col().gap_2().px_3().py_2().bg(rgb(0x292929)).min_w_0()
+        .border_b_1().border_color(rgb(0x383838))
+        .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+        .child(div().text_xs().text_color(rgb(0xbcbcc4)).child("Rename tab"))
+        .child(div().flex().flex_wrap().items_center().gap_2().min_w_0()
+            .child(div().flex_1().min_w(px(80.)).max_w_full().px_2().py_1().rounded_sm()
+                .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
+            .child(div().id("cancel-tab-rename").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
+                .hover(|style| style.bg(rgb(0x383838)))
+                .on_click(move |event, _, cx| {
+                    cx.stop_propagation();
+                    if event.standard_click() { cancel.update(cx, |input, cx| input.cancel(cx)); }
+                }).child("Cancel"))
+            .child(div().id("save-tab-rename").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
+                .bg(rgb(crate::chrome_style::SELECTED)).border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER))
+                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                .on_click(move |event, _, cx| {
+                    cx.stop_propagation();
+                    if event.standard_click() { save.update(cx, |input, cx| input.submit(false, cx)); }
+                }).child("Save")))
+        .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Leave empty for automatic title · Enter saves · Esc cancels"))
 }
 
 pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {

@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Shared tab rename polish: a bordered input, clear title/hint and visible Save /
+Cancel buttons replace the keyboard-only editor strip in native and WASM.
+Buttons use the same TextField submit/cancel methods as Enter/Escape and do not
+commit unfinished IME composition. Native compile and WASM build pass. Browser
+pointer acceptance renamed Terminal 1 to Build logs, then cancelled a second
+rename; the title stayed Build logs and focus returned to the unchanged sample
+terminal. Screenshot: `target/tab-rename-polish.png`. Native pointer and narrow
+pane wrapping acceptance remain open. Existing exited-terminal output retention
+and fresh-shell/SSH recovery were inspected, with no change needed in this pass.
+
+
 Shortcut label correction from the browser review: shifted bracket and numeric
 aliases now display the base key once when Shift is already present (for example
 ⇧⌘] rather than ⇧⌘}, and Ctrl+Shift+2 rather than Ctrl+Shift+@). Literal symbols

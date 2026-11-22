@@ -89,6 +89,14 @@ impl TextField {
         // Committing preedit must still publish its value to subscribers.
         if changed || composing { self.changed(cx); } else { cx.notify(); }
     }
+    pub fn submit(&self, reverse: bool, cx: &mut Context<Self>) {
+        if !self.is_composing() {
+            cx.emit(EditEvent::Submitted { text: self.text.text.clone(), reverse });
+        }
+    }
+    pub fn cancel(&self, cx: &mut Context<Self>) {
+        if !self.is_composing() { cx.emit(EditEvent::Cancelled); }
+    }
     fn key(&mut self, event: &KeyDownEvent, _: &mut Window, cx: &mut Context<Self>) {
         self.pointer_anchor = None;
         if self.text.marked.is_some() {
@@ -115,11 +123,8 @@ impl TextField {
             }
         } else { key.key.as_str() };
         match name {
-            "escape" => cx.emit(EditEvent::Cancelled),
-            "enter" => cx.emit(EditEvent::Submitted {
-                text: self.text.text.clone(),
-                reverse: key.modifiers.shift,
-            }),
+            "escape" => self.cancel(cx),
+            "enter" => self.submit(key.modifiers.shift, cx),
             "backspace" | "delete" => {
                 let range = if (mac && key.modifiers.platform) || (control_edit && key.key == "k") {
                     self.text.edge_deletion_range(name == "backspace")
