@@ -10588,3 +10588,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Text, hex and Markdown preview searches now use literal case-insensitive word matching and preserve source order. Filtering no longer ranks later lines above earlier ones or admits unhighlighted fuzzy subsequences. Commands and directory browsing retain fuzzy ranking.
 - Search mode lives with the immutable search snapshot, so input changes and restored preview history use identical matching. Existing full captured text and row metadata remain searchable.
 - Validation: 13 focused core palette-match tests passed, including query extension/deletion, empty results, clearing, Unicode and source ordering; desktop cargo check passed. Native visual/runtime acceptance remains pending. No release build or deployment for this batch.
+
+### Shared text-field shortcut ownership
+
+- Search and rename fields now handle only their editing key combinations. Modified Enter/Escape no longer accidentally submit or dismiss, and Control+Option arrows are left for preview actions/system handling instead of moving the text caret.
+- Preserved Shift+Enter, Shift selection, macOS Option word and Command edge editing, Cocoa Control letter editing, and non-macOS Control word movement/deletion. The shared field implementation applies to native and WASM hosts.
+- Validation: focused desktop key-ownership test passed across macOS/non-macOS modifier matrices; WASM cargo check passed. End-to-end native dispatch and platform shortcuts remain runtime acceptance work. No release build/deploy.

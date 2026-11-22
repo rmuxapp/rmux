@@ -1,5 +1,47 @@
 use super::*;
 
+// Accept only editing combinations owned by the field. Other combinations
+// must reach parent actions (preview links/scrolling) or the platform.
+fn owns_edit_key(key: &Keystroke, mac: bool) -> bool {
+    let m = key.modifiers;
+    match key.key.as_str() {
+        "enter" => !m.control && !m.alt && !m.platform && !m.function,
+        "escape" => !m.control && !m.alt && !m.platform && !m.shift && !m.function,
+        "a" | "e" | "b" | "f" | "h" | "d" | "k" =>
+            mac && m.control && !m.alt && !m.platform && !m.function,
+        "left" | "right" | "home" | "end" | "backspace" | "delete" => {
+            if mac { !m.control && !(m.alt && m.platform) }
+            else { !m.alt && !m.platform }
+        }
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod edit_key_tests {
+    use super::owns_edit_key;
+    use gpui::Keystroke;
+
+    #[test]
+    fn fields_preserve_editing_and_leave_modified_actions_to_parents() {
+        for mac in [true, false] {
+            for key in ["enter", "shift-enter", "escape", "left", "shift-right", "home", "end", "backspace", "delete"] {
+                assert!(owns_edit_key(&Keystroke::parse(key).unwrap(), mac), "{key}, mac={mac}");
+            }
+            for key in ["alt-enter", "ctrl-enter", "cmd-enter", "shift-escape", "ctrl-escape", "alt-escape", "cmd-escape", "ctrl-alt-left", "ctrl-alt-backspace"] {
+                assert!(!owns_edit_key(&Keystroke::parse(key).unwrap(), mac), "{key}, mac={mac}");
+            }
+        }
+        for key in ["alt-left", "alt-shift-right", "cmd-left", "cmd-shift-right", "alt-backspace", "cmd-backspace", "ctrl-a", "ctrl-e", "ctrl-b", "ctrl-f", "ctrl-h", "ctrl-d", "ctrl-k"] {
+            assert!(owns_edit_key(&Keystroke::parse(key).unwrap(), true), "{key}");
+        }
+        for key in ["ctrl-left", "ctrl-shift-right", "ctrl-backspace", "ctrl-delete"] {
+            assert!(owns_edit_key(&Keystroke::parse(key).unwrap(), false), "{key}");
+            assert!(!owns_edit_key(&Keystroke::parse(key).unwrap(), true), "{key}");
+        }
+    }
+}
+
 pub(super) enum EditEvent {
     Changed(String),
     Submitted { text: String, reverse: bool },
@@ -108,6 +150,7 @@ impl TextField {
         let mac = crate::terminal_engine::is_mac();
         #[cfg(not(target_arch = "wasm32"))]
         let mac = cfg!(target_os = "macos");
+        if !owns_edit_key(key, mac) { return; }
         let word = if mac {
             key.modifiers.alt
         } else {
