@@ -131,6 +131,13 @@ links ending in `/` open the file browser. Local `file://` links work the same
 way. Missing files show the preview loader's error; they do not launch another
 application. Links containing local anchors or query strings remain plain text.
 
+Use **Back / Forward** in the preview toolbar to revisit documents, including
+returning from a missing-file error. **Cmd+[ / Cmd+]** on macOS (**Alt+Left /
+Alt+Right** elsewhere) performs the same navigation. History retains up to 32
+preview locations per window, with each document's search, selected result,
+wrap setting and text/hex/Markdown mode. Opening another document after going
+back replaces the forward history. Files are reread when revisited.
+
 Web links open in the default browser when clicked. For keyboard use, select a
 reading block, use Tab/Shift+Tab to cycle its destinations, then Alt+Enter
 (Option+Return on macOS) to open the displayed URL. The link bar shows the current

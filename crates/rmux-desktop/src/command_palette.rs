@@ -293,6 +293,7 @@ fn folder_target(command: &Command) -> Option<(&std::path::Path, u8)> {
     else { action.as_any().downcast_ref::<CopyLocalPath>().map(|action| (action.path.as_path(), 2)) }
 }
 
+#[derive(Clone)]
 pub struct PreviewState {
     path: std::path::PathBuf,
     hex: bool,
@@ -302,7 +303,67 @@ pub struct PreviewState {
     command: Option<usize>,
 }
 impl PreviewState {
+    pub fn new(path: std::path::PathBuf, hex: bool, markdown: bool) -> Self {
+        Self { path, hex, markdown, query: String::new(), wrapped: false, command: None }
+    }
+    pub fn target(&self) -> (std::path::PathBuf, bool, bool) { (self.path.clone(), self.hex, self.markdown) }
     pub fn matches(&self, path: &std::path::Path, hex: bool, markdown: bool) -> bool { self.path == path && self.hex == hex && self.markdown == markdown }
+}
+
+#[derive(Default)]
+pub struct PreviewHistory { entries: Vec<PreviewState>, cursor: usize }
+impl PreviewHistory {
+    pub fn update(&mut self, state: PreviewState) {
+        if let Some(current) = self.entries.get_mut(self.cursor)
+            && current.matches(&state.path, state.hex, state.markdown) { *current = state; }
+    }
+    pub fn adjacent(&self, forward: bool) -> Option<(usize, PreviewState)> {
+        let index = if forward { self.cursor.checked_add(1)? } else { self.cursor.checked_sub(1)? };
+        Some((index, self.entries.get(index)?.clone()))
+    }
+    pub fn commit(&mut self, state: PreviewState, navigation: Option<usize>) {
+        if let Some(index) = navigation.filter(|index| self.entries.get(*index).is_some_and(|entry| entry.matches(&state.path, state.hex, state.markdown))) {
+            self.cursor = index;
+            return;
+        }
+        if self.entries.get(self.cursor).is_some_and(|entry| entry.matches(&state.path, state.hex, state.markdown)) { return; }
+        self.entries.truncate(self.cursor + 1);
+        self.entries.push(state);
+        if self.entries.len() > 32 { self.entries.remove(0); }
+        self.cursor = self.entries.len() - 1;
+    }
+}
+
+#[cfg(test)]
+mod preview_history_tests {
+    use super::{PreviewHistory, PreviewState};
+    fn state(name: &str) -> PreviewState { PreviewState::new(name.into(), false, true) }
+    #[test]
+    fn navigation_retains_reading_state_and_replaces_forward_branch() {
+        let mut history = PreviewHistory::default();
+        assert!(history.adjacent(false).is_none());
+        history.commit(state("a.md"), None);
+        let mut a = state("a.md");
+        a.query = "needle".into(); a.wrapped = true; a.command = Some(9);
+        history.update(a);
+        history.commit(state("missing.md"), None);
+        let (index, a) = history.adjacent(false).unwrap();
+        assert_eq!(a.query, "needle"); assert!(a.wrapped); assert_eq!(a.command, Some(9));
+        history.commit(a, Some(index));
+        assert!(history.adjacent(false).is_none());
+        assert_eq!(history.adjacent(true).unwrap().1.path.to_str(), Some("missing.md"));
+        history.commit(state("a.md"), None); // refresh must retain the forward branch
+        assert!(history.adjacent(true).is_some());
+        history.commit(state("b.md"), None);
+        assert!(history.adjacent(true).is_none());
+        assert_eq!(history.entries.len(), 2);
+        let mut mode = state("b.md"); mode.markdown = false;
+        history.commit(mode, None);
+        assert!(history.adjacent(false).unwrap().1.markdown);
+        for n in 0..40 { history.commit(state(&format!("{n}.md")), None); }
+        assert_eq!(history.entries.len(), 32);
+        assert_eq!(history.cursor, 31);
+    }
 }
 
 struct CodeViewport {
@@ -340,6 +401,7 @@ pub struct CommandPalette {
     wrap_preview: bool,
     folder_navigation: Option<(bool, bool, std::path::PathBuf)>,
     preview_navigation: Option<(std::path::PathBuf, bool)>,
+    preview_history: Option<(bool, bool)>,
     input: Entity<text_field::TextField>,
     heading: &'static str,
     empty_message: &'static str,
@@ -956,7 +1018,7 @@ impl CommandPalette {
         )
         .detach();
         Self {
-            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
+            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, preview_history: None, location: None,
             search: palette_match::RankedSearch::with_shortcuts(commands.iter().map(Command::search_text).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
             commands,
@@ -979,6 +1041,16 @@ impl CommandPalette {
             crate::list_navigation::reveal(&this.scroll, this.selected);
             cx.notify();
         }));
+    }
+    pub fn set_preview_history(&mut self, history: &PreviewHistory) {
+        self.preview_history = Some((history.adjacent(false).is_some(), history.adjacent(true).is_some()));
+    }
+    fn navigate_document(&self, forward: bool, cx: &mut Context<Self>) {
+        if self.input.read(cx).is_composing() { return; }
+        let Some((back, next)) = self.preview_history else { return; };
+        if if forward { next } else { back } {
+            cx.emit(PaletteEvent::Run(if forward { Box::new(PreviewForward) } else { Box::new(PreviewBack) }));
+        }
     }
     pub fn preview_state(&self, cx: &App) -> Option<PreviewState> {
         let (path, hex) = self.preview_navigation.as_ref()?;
@@ -1383,7 +1455,9 @@ impl Render for CommandPalette {
         let copy_hint = has_search_excerpt
             .then(|| shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window)).flatten();
         palette_view::panel(height)
-            .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
+            .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.preview_history.is_some() { "CommandPalette FilePreview" } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
+            .on_action(cx.listener(|this, _: &PreviewBack, _, cx| this.navigate_document(false, cx)))
+            .on_action(cx.listener(|this, _: &PreviewForward, _, cx| this.navigate_document(true, cx)))
             .on_action(cx.listener(|this, _: &OpenPreviewLink, _, cx| this.open_preview_link(cx)))
             .on_action(cx.listener(|this, _: &NextPreviewLink, _, cx| this.cycle_preview_link(1, cx)))
             .on_action(cx.listener(|this, _: &PreviousPreviewLink, _, cx| this.cycle_preview_link(-1, cx)))
@@ -1442,6 +1516,11 @@ impl Render for CommandPalette {
                     .child(self.file_navigation_button("folder-forward", "Forward →", forward.then(|| Box::new(FileBrowserForward) as Box<dyn Action>), cx))
                     .child(self.file_navigation_button("folder-parent", "↑ Parent", path.parent().map(|parent| Box::new(BrowseDirectory { path: parent.to_owned() }) as Box<dyn Action>), cx))
                     .child(self.file_navigation_button("folder-refresh", "Refresh", Some(Box::new(BrowseDirectory { path: path.clone() })), cx))
+            ))
+            .when_some(self.preview_history, |palette, (back, forward)| palette.child(
+                div().flex_shrink_0().px_3().pt_2().flex().gap_2()
+                    .child(self.file_navigation_button("preview-back", "← Back", back.then(|| Box::new(PreviewBack) as Box<dyn Action>), cx))
+                    .child(self.file_navigation_button("preview-forward", "Forward →", forward.then(|| Box::new(PreviewForward) as Box<dyn Action>), cx))
             ))
             .when_some(self.preview_navigation.as_ref(), |palette, (path, hex)| palette.child(
                 div().flex_shrink_0().px_3().pt_2().flex().flex_wrap().gap_2()

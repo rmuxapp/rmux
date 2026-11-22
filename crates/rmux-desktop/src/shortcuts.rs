@@ -128,6 +128,7 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "connect_ssh" => Box::new(ShowSshConnection),
         "ssh_hosts" => Box::new(ShowSshHosts),
         "open_folder" => Box::new(OpenFolderBrowser),
+        "preview_back" => Box::new(PreviewBack), "preview_forward" => Box::new(PreviewForward),
         "file_back" => Box::new(FileBrowserBack), "file_forward" => Box::new(FileBrowserForward),
         "choose_font" => Box::new(ShowFontPicker),
         "choose_default_font" => Box::new(ShowDefaultFontPicker),

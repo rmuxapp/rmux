@@ -119,6 +119,7 @@ pub(super) struct WorkspaceWindow {
     preview_restore: Option<command_palette::PreviewState>,
     folder_restore: Option<command_palette::FolderState>,
     file_history: file_browser::History,
+    preview_history: command_palette::PreviewHistory,
     file_browser_cancel: Option<file_browser::Cancellation>,
     terminal_search_job: Option<Task<()>>,
     terminal_search_query: String,
@@ -2945,9 +2946,22 @@ impl WorkspaceWindow {
     fn preview_file_mode(&mut self, path: std::path::PathBuf, hex: bool, window: &mut Window, cx: &mut Context<Self>) {
         self.preview_file_kind(path, hex, false, window, cx);
     }
+    fn preview_history(&mut self, forward: bool, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some((index, state)) = self.preview_history.adjacent(forward) {
+            let (path, hex, markdown) = state.target();
+            self.preview_file_at(path, hex, markdown, Some((index, state)), window, cx);
+        }
+    }
     fn preview_file_kind(&mut self, path: std::path::PathBuf, hex: bool, markdown: bool, window: &mut Window, cx: &mut Context<Self>) {
-        let restore = self.preview_restore.take().filter(|state| state.matches(&path, hex, markdown));
+        self.preview_file_at(path, hex, markdown, None, window, cx);
+    }
+    fn preview_file_at(&mut self, path: std::path::PathBuf, hex: bool, markdown: bool,
+        navigation: Option<(usize, command_palette::PreviewState)>, window: &mut Window, cx: &mut Context<Self>) {
         if self.file_browser_job.is_some() || self.automation_available(cx).is_err() { return; }
+        let source = self.preview_restore.take().or_else(|| self.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx)));
+        if let Some(state) = &source { self.preview_history.update(state.clone()); }
+        let restore = navigation.as_ref().map(|(_, state)| state.clone()).or_else(|| source.filter(|state| state.matches(&path, hex, markdown)));
+        let navigation = navigation.map(|(index, _)| index);
         let Some(focus) = window.focused(cx) else { return; };
         let permit = match file_browser::Permit::acquire() {
             Ok(permit) => permit,
@@ -2971,19 +2985,25 @@ impl WorkspaceWindow {
                 this.file_browser_cancel = None;
                 if this.notice.as_deref() == Some("Loading file preview…") { this.notice = None; }
                 if focus.is_focused(window) && this.automation_available(cx).is_ok() {
+                    this.preview_history.commit(command_palette::PreviewState::new(target.clone(), hex, markdown), navigation);
                     match result {
                         Ok((preview, blocks)) => {
                             let palette = cx.new(|cx| {
                                 let mut palette = if let Some((blocks, limited)) = blocks {
                                     command_palette::CommandPalette::markdown_file(preview, blocks, limited, window, cx)
                                 } else { command_palette::CommandPalette::file_preview(preview, window, cx) };
+                                palette.set_preview_history(&this.preview_history);
                                 if let Some(state) = restore { palette.restore_preview(state, cx); }
                                 palette
                             });
                             this.install_palette(palette, Some(focus), window, cx);
                         }
                         Err(error) => {
-                            let palette = cx.new(|cx| command_palette::CommandPalette::file_error(target, format!("{error:#}"), false, window, cx));
+                            let palette = cx.new(|cx| {
+                                let mut palette = command_palette::CommandPalette::file_error(target, format!("{error:#}"), false, window, cx);
+                                palette.set_preview_history(&this.preview_history);
+                                palette
+                            });
                             this.install_palette(palette, Some(focus), window, cx);
                         }
                     }
@@ -3014,6 +3034,10 @@ impl WorkspaceWindow {
         cx.notify();
     }
     fn install_palette(&mut self, palette: Entity<command_palette::CommandPalette>, focus: Option<FocusHandle>, window: &mut Window, cx: &mut Context<Self>) {
+        // A clicked document link can replace a palette without closing it
+        // first. Escape must return to the original terminal, not the search
+        // field of the palette that is about to be dropped.
+        let focus = self.palette.as_ref().map(|(_, origin)| origin.clone()).unwrap_or(focus);
         cx.subscribe_in(
             &palette,
             window,
@@ -3032,7 +3056,7 @@ impl WorkspaceWindow {
                     _ => None,
                 };
                 this.preview_restore = match event {
-                    command_palette::PaletteEvent::Run(action) if action.as_any().is::<PreviewLocalFile>() || action.as_any().is::<PreviewHexFile>() || action.as_any().is::<PreviewMarkdownFile>() =>
+                    command_palette::PaletteEvent::Run(action) if action.as_any().is::<PreviewLocalFile>() || action.as_any().is::<PreviewHexFile>() || action.as_any().is::<PreviewMarkdownFile>() || action.as_any().is::<PreviewBack>() || action.as_any().is::<PreviewForward>() =>
                         this.palette.as_ref().and_then(|(palette, _)| palette.read(cx).preview_state(cx)),
                     _ => None,
                 };
@@ -3309,6 +3333,7 @@ impl WorkspaceWindow {
             preview_restore: None,
             folder_restore: None,
             file_history: Default::default(),
+            preview_history: Default::default(),
             file_browser_cancel: None,
             terminal_search_job: None,
             terminal_search_query: String::new(),
@@ -3519,6 +3544,7 @@ impl WorkspaceWindow {
             preview_restore: None,
             folder_restore: None,
             file_history: Default::default(),
+            preview_history: Default::default(),
             file_browser_cancel: None,
             terminal_search_job: None,
             terminal_search_query: String::new(),
@@ -4233,6 +4259,8 @@ impl Render for WorkspaceWindow {
                 this.start_workspace(Some(action.path.clone()), window, cx);
             }))
             .on_action(cx.listener(|this, action: &EditLocalFile, _, cx| this.edit_local_file(action.clone(), cx)))
+            .on_action(cx.listener(|this, _: &PreviewBack, window, cx| this.preview_history(false, window, cx)))
+            .on_action(cx.listener(|this, _: &PreviewForward, window, cx| this.preview_history(true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewMarkdownFile, window, cx| this.preview_file_kind(action.path.clone(), false, true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewHexFile, window, cx| this.preview_file_mode(action.path.clone(), true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewLocalFile, window, cx| this.preview_local_file(action.path.clone(), window, cx)))

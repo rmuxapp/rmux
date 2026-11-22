@@ -244,6 +244,10 @@ For example, `{"key":"ctrl-alt-r","action":"refresh_preview","context":"file_pre
 adds a refresh shortcut without consuming terminal keys. Disable a default with
 `action: "disabled"` in the same context. IME composition suspends these actions.
 
+Preview navigation can be rebound with `preview_back` and `preview_forward`
+under `context: "file_preview"`. Defaults are Cmd+[ / Cmd+] on macOS and
+Alt+Left / Alt+Right elsewhere.
+
 Use `files` for the directory browser: `file_back` (Alt+Left), `file_forward`
 (Alt+Right), `file_parent` (Alt+Up), `refresh_files` (F5), and `file_location`
 (Cmd+L on macOS, Ctrl+L elsewhere). These bindings work while filtering; unavailable

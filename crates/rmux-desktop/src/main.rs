@@ -532,6 +532,8 @@ actions!(
         OpenFolderBrowser,
         NewBrowserWindow,
         FileBrowserBack,
+        PreviewBack,
+        PreviewForward,
         FileBrowserForward,
         ShowTerminalMenu,
         CopySelectionWithLineBreaks,
@@ -3708,6 +3710,8 @@ fn main() {
             KeyBinding::new("ctrl-alt-v", ToggleMarkdownPreview, Some("FilePreview")),
         ]);
         cx.bind_keys([
+            KeyBinding::new(if cfg!(target_os = "macos") { "cmd-[" } else { "alt-left" }, PreviewBack, Some("FilePreview")),
+            KeyBinding::new(if cfg!(target_os = "macos") { "cmd-]" } else { "alt-right" }, PreviewForward, Some("FilePreview")),
             KeyBinding::new("alt-left", FileBrowserBack, Some("FileBrowser")),
             KeyBinding::new("alt-right", FileBrowserForward, Some("FileBrowser")),
             KeyBinding::new("alt-up", FileBrowserParent, Some("FileBrowser")),
