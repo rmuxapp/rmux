@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Selection opacity is configurable in Settings and JSON (`selection_opacity`,
+0–100 or null for theme default). The control uses 5% steps and an explicit reset;
+Save Settings persists it without replacing existing selection colors. The
+preview and terminal share the same fill function. Existing opaque custom colors
+and translucent default blue remain unchanged until an override is selected.
+Focused tests cover color preservation, bounds, reset and save/read round-trip.
+Native visual acceptance remains pending.
+
 PowerShell command completion now reports normalized success/failure from `$?`
 without changing the status seen by the original prompt. The paired expression
 is evaluated before assignment can reset status. Focused PowerShell 7.5.4 checks

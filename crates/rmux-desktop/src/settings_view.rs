@@ -9,7 +9,7 @@ pub struct State {
 }
 pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
-    "import_theme", "file_editor",
+    "selection_opacity", "import_theme", "file_editor",
 ];
 // Each control owns its explanatory content. Only the heading and footer hint
 // are separate non-control children of the scroll container.
@@ -32,6 +32,12 @@ pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
 pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
     match key {
         "opacity" => settings.background_opacity = (settings.background_opacity as i32 + 5 * delta.signum()).clamp(0, 100) as u8,
+        "selection_opacity" => {
+            settings.selection_opacity = if delta == 0 { None } else {
+                let current = settings.selection_opacity.unwrap_or(if settings.selection_background().is_some() { 100 } else { 50 });
+                Some((i32::from(current) + 5 * delta.signum()).clamp(0, 100) as u8)
+            };
+        }
         "cursor_opacity" => settings.cursor_opacity = (settings.cursor_opacity as i32 + 5 * delta.signum()).clamp(0, 100) as u8,
         "blur" => settings.background_blur = !settings.background_blur,
         "option_as_alt" => settings.macos_option_as_alt = !settings.macos_option_as_alt,
@@ -203,6 +209,8 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
             .when(cfg!(target_os = "macos"), |panel| panel.child(div()
                 .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
                 .child(div().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
+            .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, state.selected == KEYS.len() - 3, false))
+                .child(button("selection-opacity-reset".into(), "Use theme default".into(), "selection_opacity", 0)))
             .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, state.selected == KEYS.len() - 2, false))
             .child(div()
                 .child(row("External editor", "file_editor", "Configure…".into(), false, state.selected == KEYS.len() - 1, false))

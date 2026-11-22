@@ -207,6 +207,7 @@ pub struct Preferences {
     pub cursor_color: Option<CellColor>,
     pub cursor_text: Option<CellColor>,
     pub selection_background: Option<CellColor>,
+    pub selection_opacity: Option<u8>,
     pub selection_foreground: Option<CellColor>,
     pub ansi_palette: Option<[HexColor; 16]>,
     pub terminal_theme: TerminalTheme,
@@ -249,6 +250,7 @@ impl Default for Preferences {
             cursor_color: None,
             cursor_text: None,
             selection_background: None,
+            selection_opacity: None,
             selection_foreground: None,
             ansi_palette: None,
             terminal_theme: TerminalTheme::default(),
@@ -367,7 +369,9 @@ impl Preferences {
         self.selection_foreground.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_foreground))
     }
     pub fn selection_background_fill(&self, foreground: rmux_terminal::Color, background: rmux_terminal::Color) -> gpui::Hsla {
-        self.selection_background().map(|setting| crate::color(setting.resolve(foreground, background))).unwrap_or_else(|| gpui::rgba(0x668fca80).into())
+        let mut fill: gpui::Hsla = self.selection_background().map(|setting| crate::color(setting.resolve(foreground, background))).unwrap_or_else(|| gpui::rgba(0x668fca80).into());
+        if let Some(opacity) = self.selection_opacity { fill.a = f32::from(opacity.min(100)) / 100.; }
+        fill
     }
     pub fn selection_background(&self) -> Option<CellColor> {
         self.selection_background.or_else(|| self.imported_theme.as_ref().and_then(|theme| theme.selection_background))
@@ -437,6 +441,7 @@ impl Preferences {
             && self.unfocused_cursor == other.unfocused_cursor
             && self.focused_cursor == other.focused_cursor
             && self.cursor_opacity == other.cursor_opacity
+            && self.selection_opacity == other.selection_opacity
             && self.macos_option_as_alt == other.macos_option_as_alt
             && self.copy_on_select == other.copy_on_select
             && self.native_notifications == other.native_notifications
@@ -468,6 +473,7 @@ impl Preferences {
         latest.unfocused_cursor = self.unfocused_cursor;
         latest.focused_cursor = self.focused_cursor;
         latest.cursor_opacity = self.cursor_opacity;
+        latest.selection_opacity = self.selection_opacity;
         latest.macos_option_as_alt = self.macos_option_as_alt;
         latest.copy_on_select = self.copy_on_select;
         latest.native_notifications = self.native_notifications;
@@ -551,6 +557,7 @@ impl Preferences {
             "font_size must be between 8 and 40"
         );
         ensure!(value.background_opacity <= 100, "background_opacity must be between 0 and 100");
+        ensure!(value.selection_opacity.is_none_or(|opacity| opacity <= 100), "selection_opacity must be null or between 0 and 100");
         ensure!(value.cursor_opacity <= 100, "cursor_opacity must be between 0 and 100");
         crate::shortcuts::compile(&value)?;
         Ok(value)
@@ -917,6 +924,35 @@ mod tests {
             } else {
                 assert!(decoded.is_err());
             }
+        }
+        Ok(())
+    }
+    #[test]
+    fn selection_opacity_keeps_theme_defaults_and_round_trips() -> Result<()> {
+        use rmux_terminal::Color;
+        let (fg, bg) = (Color(200, 100, 20), Color(20, 40, 60));
+        let mut settings = Preferences::decode(b"{}")?;
+        assert!((settings.selection_background_fill(fg, bg).a - 128. / 255.).abs() < 0.001);
+        settings.selection_background = Some(CellColor::parse_theme("cell-foreground")?);
+        let original = settings.selection_background_fill(fg, bg);
+        assert_eq!(original.a, 1.);
+        crate::settings_view::adjust(&mut settings, "selection_opacity", -1);
+        assert_eq!(settings.selection_opacity, Some(95));
+        let fill = settings.selection_background_fill(fg, bg);
+        assert_eq!((fill.h, fill.s, fill.l), (original.h, original.s, original.l));
+        assert_eq!(fill.a, 0.95);
+        let directory = tempfile::tempdir()?;
+        let path = directory.path().join("config.json");
+        settings.source = Some(path.clone());
+        settings.save_appearance()?;
+        assert_eq!(Preferences::read(&path, false)?.selection_opacity, Some(95));
+        for _ in 0..30 { crate::settings_view::adjust(&mut settings, "selection_opacity", -1); }
+        assert_eq!(settings.selection_background_fill(fg, bg).a, 0.);
+        crate::settings_view::adjust(&mut settings, "selection_opacity", 0);
+        assert_eq!(settings.selection_background_fill(fg, bg).a, 1.);
+        assert_eq!(settings.selection_opacity, None);
+        for value in ["-1", "101", "256", "0.5"] {
+            assert!(Preferences::decode(format!("{{\"selection_opacity\":{value}}}").as_bytes()).is_err());
         }
         Ok(())
     }

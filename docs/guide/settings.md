@@ -419,8 +419,11 @@ can invert selection colors with `selection-background = cell-foreground` and
 `selection-foreground = cell-background`.
 
 `selection_background` in rmux JSON also accepts `"#RRGGBB"` and overrides the
-imported selection background. Configured selection backgrounds are opaque; with
-neither setting, the existing translucent blue highlight is retained. Text keeps
+imported selection background. `selection_opacity` accepts an integer percentage
+from 0 to 100, or `null` for the theme default. Settings offers 5% steps and a
+**Use theme default** reset; Save Settings persists the choice. The default keeps
+configured selection backgrounds opaque and the built-in blue highlight
+translucent. Opacity changes affect the highlight only, not the selected text. Text keeps
 its terminal foreground colors unless `selection_foreground` (JSON) or
 `selection-foreground` (theme file) is set. Explicit JSON values win. Foreground
 overrides lazily cache one alternate text rendering per selected visible row;
