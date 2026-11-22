@@ -95,7 +95,7 @@ packages are unsigned. On macOS, use **rmux → Check for Updates…** for Spark
 updates. Linux and Windows currently require manual updates.
 
 Building from source? Use [Building rmux](building.md).
-Using mise? See [Install with mise](install-with-mise.md), including the prerelease setting.
+Using mise? See [Install with mise](install-with-mise.md), including archive selection and the minimum release age.
 
 ## Your first workspace
 
