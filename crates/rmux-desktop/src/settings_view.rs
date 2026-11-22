@@ -157,6 +157,7 @@ fn theme_preview(settings: &Preferences) -> impl IntoElement {
 pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::WorkspaceWindow>) -> AnyElement {
     let settings = cx.global::<Preferences>();
     let busy = cx.global::<preferences::ReloadState>().0;
+    let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(settings);
     let save_label = if busy { "Working with settings…".to_owned() } else {
         shortcuts::hint(&SaveAppearanceSettings, &state.focus, window)
             .map(|key| format!("Save these settings · {key}"))
@@ -235,6 +236,8 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                     .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
             .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
         .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838)).flex().flex_col().gap_2()
+            .child(div().text_xs().text_color(rgb(if unsaved { 0xe3bc78 } else { 0xa0a0a0 }))
+                .child(if unsaved { "Unsaved session changes" } else { "No unsaved session changes" }))
             .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ / Tab select · ←→ change · Enter activate · Esc close"))
             .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(chrome_style::SELECTED_BORDER) }).px_3().py_2().rounded_sm().text_sm()
                 .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))

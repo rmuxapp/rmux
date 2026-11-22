@@ -293,6 +293,16 @@ impl gpui::Global for Preferences {}
 #[derive(Default)]
 pub struct ReloadState(pub bool);
 impl gpui::Global for ReloadState {}
+
+/// Last loaded or successfully saved appearance, shared by every window.
+/// This is a session baseline, not a claim that the file has not changed externally.
+pub struct AppearanceBaseline(pub Preferences);
+impl gpui::Global for AppearanceBaseline {}
+impl AppearanceBaseline {
+    pub fn has_changes(&self, current: &Preferences) -> bool {
+        !self.0.same_saved_appearance(current)
+    }
+}
 impl Preferences {
     pub fn cursor_shape(&self, focused: bool, composing: bool, application: rmux_terminal::CursorShape) -> Option<rmux_terminal::CursorShape> {
         self.unfocused_cursor.shape(focused, composing, self.focused_cursor.shape(application))

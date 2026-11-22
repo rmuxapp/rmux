@@ -1,3 +1,12 @@
+Settings save-state polish: the fixed footer now reports unsaved session
+appearance changes against a shared last-loaded/successfully-saved baseline.
+Successful saves record the submitted snapshot, so edits made during a save
+remain dirty. Failed saves preserve the baseline, and applied reloads replace
+it. All Settings windows observe baseline updates. This is session state, not
+external-file monitoring. The existing persisted-appearance comparison test
+passed with the desktop test binary compiled; native visual acceptance remains
+pending after the prior UI capture limitation. No release or deployment.
+
 Editor handoff release follow-up: workspace.open now preserves the original
 window search scope and rechecks it after asynchronous terminal preparation,
 in the same foreground update as publication. A workspace added manually in

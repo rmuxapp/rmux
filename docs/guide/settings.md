@@ -54,6 +54,10 @@ Open Settings with Cmd+, on macOS (Ctrl+, elsewhere), the app menu or palette.
 The fixed footer keeps **Save**, **Open settings file**, **Reload from file** and
 **Keyboard Shortcuts…** available while scrolling. Reload replaces session
 settings with the saved file; an invalid file leaves the current settings intact.
+The footer also shows **Unsaved session changes** when appearance controls differ
+from the last loaded or successfully saved values. This status is shared across
+windows. Edits made while a save is running stay marked as unsaved; a failed save
+does not clear the status. It does not monitor external edits to the JSON file.
 Use Tab or the arrow keys to select controls, then Enter to activate them.
 The side panel adjusts text-size defaults, terminal padding/theme, unfocused
 cursor, copy-on-select and close confirmation. Choose Active tasks, Always or Never

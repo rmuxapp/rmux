@@ -3557,6 +3557,7 @@ fn main() {
         cx.set_global(copy_buffers::Store::default());
         cx.set_global(preferences.confirm_close);
         cx.set_global(preferences.clone());
+        cx.set_global(preferences::AppearanceBaseline(preferences.clone()));
         recovery::install(recovery_lease.clone(), cx);
         cx.set_global(preferences::ReloadState::default());
         cx.set_global(diagnostics::ExportState::default());

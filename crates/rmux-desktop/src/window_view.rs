@@ -152,6 +152,9 @@ pub(super) struct WorkspaceWindow {
 impl WorkspaceWindow {
     fn observe_settings(cx: &mut Context<Self>) {
         cx.observe_global::<Preferences>(|_, cx| cx.notify()).detach();
+        cx.observe_global::<preferences::AppearanceBaseline>(|this, cx| {
+            if this.settings_state.is_some() { cx.notify(); }
+        }).detach();
         cx.observe_global::<preferences::ReloadState>(|this, cx| {
             if this.settings_state.is_some() { cx.notify(); }
         }).detach();
@@ -1315,6 +1318,9 @@ impl WorkspaceWindow {
             let result = executor.spawn(async move { snapshot.save_appearance() }).await;
             let _ = cx.update(|cx| {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
+                if result.is_ok() {
+                    cx.set_global(preferences::AppearanceBaseline(settings.clone()));
+                }
                 let _ = entity.update(cx, |this, cx| {
                     this.notice = Some(match result {
                         Ok(path) if settings.same_saved_appearance(cx.global::<Preferences>()) => format!("Settings saved to {}", path.display()),
@@ -1392,6 +1398,7 @@ impl WorkspaceWindow {
                         "Settings changed while reloading. Your newer edits were kept; reload again to replace them with the file settings.".into()
                     }
                     Ok(next) => {
+                        cx.set_global(preferences::AppearanceBaseline(next.clone()));
                         cx.set_global(next.confirm_close);
                         cx.set_global(next);
                         shortcuts::install(cx);
