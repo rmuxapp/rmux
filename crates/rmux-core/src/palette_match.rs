@@ -78,6 +78,16 @@ impl RankedSearch {
         let normalized = query.to_lowercase();
         let words: Vec<_> = normalized.split_whitespace().collect();
         self.ranked.clear();
+        if words.is_empty() {
+            // Every empty-query score ties; retain source order directly.
+            // Reapply the filter even for repeated empty queries: availability
+            // can change independently of the text (e.g. workspace selection).
+            self.matches.clear();
+            self.matches.extend((0..self.titles.len()).filter(|index| include(*index)));
+            self.query = normalized;
+            self.complete_candidates = false;
+            return;
+        }
         self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)| {
             if !include(index) { return None; }
             command_score(title, self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))
@@ -136,6 +146,18 @@ fn command_score(title: &str, shortcuts: Option<&str>, words: &[&str]) -> Option
 mod tests {
     use super::{score, tab_score, RankedSearch};
 
+    #[test]
+    fn clearing_filtered_search_preserves_order_and_refreshes_availability() {
+        let mut search = RankedSearch::new(vec!["zebra".into(), "alpha".into(), "beta".into()]);
+        search.update("beta");
+        assert_eq!(search.matches, vec![2]);
+        search.update_filtered(" ", |index| index != 1);
+        assert_eq!(search.matches, vec![0, 2]);
+        search.update_filtered(" ", |index| index == 1);
+        assert_eq!(search.matches, vec![1]);
+        search.update("");
+        assert_eq!(search.matches, vec![0, 1, 2]);
+    }
     #[test]
     fn shortcut_tokens_do_not_create_fuzzy_command_names() {
         let mut search = RankedSearch::with_shortcuts(
