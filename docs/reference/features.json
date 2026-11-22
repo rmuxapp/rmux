@@ -816,7 +816,11 @@
         "EVENT"
       ],
       "acceptance": "Reconnect with explicit gaps when retention expires; slow subscribers cannot stall terminal input.",
-      "rmux_status": "not_started"
+      "rmux_status": "in_progress",
+      "implementation": "Live events.read provides bounded metadata replay for notification receipt/read/dismissal/clear and process exit. Retains 512 records, returns up to 128 per request, uses process-scoped opaque cursors, and reports retention/restart gaps. No notification bodies or terminal output retained, subscriber wait or idle timer. Journal and RPC validation tests pass; isolated native smoke verifies receipt/dismissal replay, no duplicate empty replay and restart gaps.",
+      "remaining": "Push subscriptions/long polling, broader lifecycle/layout events, filtering, cross-platform runtime and slow-client latency acceptance, and complete upstream event semantics.",
+      "implementation_sources": ["crates/rmux-desktop/src/events.rs", "crates/rmux-desktop/src/automation.rs", "scripts/smoke-events.py"],
+      "progress_record": "docs/progress.md"
     },
     {
       "id": "A05",

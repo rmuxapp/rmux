@@ -11,6 +11,10 @@ _.path = ["{{config_root}}/.deps/ghostty-vt/bin"]
 [tasks.check]
 run = "cargo check --workspace"
 
+[tasks.smoke-events]
+description = "Build and check bounded native event replay in an isolated app"
+run = "cargo build -p rmux-desktop && python scripts/smoke-events.py"
+
 [tasks.check-linux-terminal]
 description = "Cross-check Linux terminal code after building its Ghostty dependency"
 env.GHOSTTY_VT_DIR = "{{config_root}}/.deps/ghostty-vt-x86_64-linux-gnu"

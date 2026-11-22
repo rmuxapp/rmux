@@ -1887,6 +1887,9 @@ impl WorkspaceWindow {
         }
         for terminal in pending {
             terminal.update(cx, |terminal, cx| {
+                if terminal.notifications.iter().next().is_some() {
+                    events::publish("notification.cleared", cx.entity_id(), None, cx);
+                }
                 terminal.notifications.clear();
                 terminal.attention.dismiss_notification();
                 cx.emit(TabMetadataChanged);

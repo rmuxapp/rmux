@@ -69,6 +69,8 @@ jobs:
           mise exec -- cargo test --locked -p rmux-terminal input_defers_follow_while_parser_busy_and_navigation_supersedes_it
       - name: Test browser policy and state transitions
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser browser_
+      - name: Test bounded event replay
+        run: mise exec -- cargo test --locked -p rmux-desktop --features browser events
       - name: Test renderer reclamation and diagnostics
         run: |
           mise exec -- cargo test --locked -p rmux-desktop --features browser row_cache::tests

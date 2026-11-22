@@ -24,6 +24,7 @@ mod file_clipboard;
 mod notifications;
 mod native_notifications;
 mod automation;
+mod events;
 #[cfg(unix)]
 mod socket_transport;
 mod close_policy;
@@ -687,6 +688,7 @@ impl TerminalView {
     }
     fn store_notification(&mut self, title: String, body: String, cx: &mut Context<Self>) -> u64 {
         let revision = self.notifications.push(title, body, !self.input_focused);
+        events::publish("notification.received", cx.entity_id(), Some(revision), cx);
         if !self.input_focused {
             self.attention.notify();
             native_notifications::enqueue(revision, cx);
@@ -695,6 +697,7 @@ impl TerminalView {
     }
     fn dismiss_notification(&mut self, revision: u64, cx: &mut Context<Self>) {
         if self.notifications.dismiss(revision) {
+            events::publish("notification.dismissed", cx.entity_id(), Some(revision), cx);
             if !self.notifications.unread() { self.attention.dismiss_notification(); }
             cx.emit(TabMetadataChanged);
             cx.notify();
@@ -702,6 +705,7 @@ impl TerminalView {
     }
     fn mark_notification_read(&mut self, revision: u64, cx: &mut Context<Self>) {
         if self.notifications.mark_one_read(revision) {
+            events::publish("notification.read", cx.entity_id(), Some(revision), cx);
             if !self.notifications.unread() { self.attention.dismiss_notification(); }
             cx.emit(TabMetadataChanged);
             cx.notify();
@@ -834,6 +838,7 @@ impl TerminalView {
                         if view.process_exit.is_none() {
                             if let Some(status) = view.session.exit_status() {
                                 view.process_exit = Some(status);
+                                events::publish("surface.exited", cx.entity_id(), None, cx);
                                 cx.emit(TabMetadataChanged);
                                 cx.notify();
                             }
@@ -1112,6 +1117,7 @@ impl TerminalView {
     fn acknowledge_attention(&mut self, cx: &mut Context<Self>) {
         if self.attention.any() {
             self.attention.acknowledge();
+            if self.notifications.unread() { events::publish("notification.all_read", cx.entity_id(), None, cx); }
             self.notifications.mark_read();
             cx.emit(TabMetadataChanged);
             cx.notify();
@@ -3501,6 +3507,7 @@ fn main() {
     };
     Application::new().with_assets(icons::Assets).run(move |cx: &mut App| {
         cx.set_global(Shutdowns::default());
+        cx.set_global(events::Journal::default());
         cx.set_global(native_notifications::Dispatcher::default());
         cx.set_global(copy_buffers::Store::default());
         cx.set_global(preferences.confirm_close);

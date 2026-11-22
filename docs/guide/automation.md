@@ -16,6 +16,7 @@
 - [Move and join panes](#move-and-join-panes)
 - [Send keys and pasted text](#send-keys-and-pasted-text)
 - [Send and list notifications](#send-and-list-notifications)
+- [Replay events](#replay-events)
 - [Create and close workspaces](#create-and-close-workspaces)
 - [List windows, workspaces and groups](#list-windows-workspaces-and-groups)
 - [Select workspaces and focus terminals](#select-workspaces-and-focus-terminals)
@@ -285,6 +286,40 @@ share UI revisions while tracking shell updates independently. Titles/bodies are
 bounded and control characters removed. The full cmux notify/reply/clear contract
 is still pending. `surface.list` also includes its latest non-dismissed message
 as `notification` (or null).
+
+## Replay events
+
+Live stdio and Unix socket clients can call `events.read`:
+
+```json
+{"jsonrpc":"2.0","id":1,"method":"events.read","params":{"limit":128}}
+```
+
+The result contains `events`, `cursor`, `has_more` and `gap`. Pass the returned
+cursor as `params.after` on your next request, including after reconnecting to
+the same running app. Treat cursors as opaque strings. A request without `after`
+starts at the oldest retained record. Limits are 1–128 (default 128); when
+`has_more` is true, read the next page before waiting for new events.
+
+The app retains the latest 512 metadata events. `gap` is `null` normally,
+`"retention"` if older events were evicted, or `"restart"` when the cursor belongs
+to another app process. On a gap, refresh your resource lists; the returned page
+starts at the oldest available event. Cursors ahead of the current process's
+sequence are rejected. Events are not persisted across app launches.
+
+Each event has a string `cursor`, `kind` and `surface_id`. Notification receive,
+individual read and dismissal events also include `notification_id` as a decimal
+string corresponding to the notification API's numeric `revision`.
+Supported kinds are `notification.received`, `notification.read`,
+`notification.all_read`, `notification.dismissed`, `notification.cleared` and
+`surface.exited`. These are invalidation signals: use `notification.list` or
+`surface.list` to fetch current state. Retained events can refer to surfaces or
+notifications that have since closed or been removed. Titles, bodies and terminal
+output are not copied into the journal.
+
+This is an on-demand replay API. Push subscriptions, long polling, resource
+creation/movement events and the full cmux event contract are not implemented.
+Readers use the existing bounded RPC queue; publishing never waits for clients.
 
 ## Create and close workspaces
 

@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 const MAX_REQUEST_BYTES: usize = 64 * 1024;
 const METHODS: &[&str] = &["system.ping", "system.capabilities"];
 const LIVE_METHODS: &[&str] = &[
+    "events.read",
     "buffer.list", "buffer.get", "buffer.set", "buffer.delete", "buffer.paste", "buffer.rename",
     "system.quit",
     "system.ping",
@@ -362,6 +363,7 @@ pub(super) struct SurfaceKey {
 struct WorkspaceTarget { workspace_id: String }
 
 struct LiveRequest {
+    events_read: Option<super::events::Read>,
     buffer_command: Option<super::copy_buffers::Command>,
     list_filter: ListFilter,
     notification_change: Option<NotificationChange>,
@@ -576,6 +578,11 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                         code: -32001,
                         message: "Request expired before execution",
                     });
+                }
+                if let Some(read) = &request.events_read {
+                    return cx.global::<super::events::Journal>().read(read)
+                        .map(|batch| serde_json::to_value(batch).expect("event batch"))
+                        .map_err(|message| Failure { code: -32602, message });
                 }
                 if let Some(command) = &request.buffer_command {
                     if let Some(input) = cx.global::<super::copy_buffers::Store>().paste_input(command)
@@ -1033,6 +1040,12 @@ fn dispatch_inner(
     if !methods.contains(&method) {
         return respond(error(id, -32601, "Method not found"));
     }
+    let events_read = if method == "events.read" {
+        match serde_json::from_value::<super::events::Read>(request.get("params").cloned().unwrap_or_else(|| json!({}))) {
+            Ok(read) if read.valid() => Some(read),
+            _ => return respond(error(id, -32602, "Expected after cursor and limit between 1 and 128")),
+        }
+    } else { None };
     let buffer_command = match super::copy_buffers::parse(method, request.get("params")) {
         Ok(command) => command,
         Err(message) => return respond(error(id, -32602, message)),
@@ -1384,6 +1397,7 @@ fn dispatch_inner(
         && pane_swap.is_none()
         && focus_history.is_none()
         && surface_focus.is_none()
+        && events_read.is_none()
         && !is_filtered_list
         && request.get("params").is_some_and(|params| {
             !(params.as_object().is_some_and(|params| params.is_empty())
@@ -1407,6 +1421,7 @@ fn dispatch_inner(
                 .unwrap()
                 .try_send(LiveRequest {
                     method: method.into(),
+                    events_read,
                     buffer_command,
                     list_filter,
                     notification_change,
@@ -1499,6 +1514,26 @@ fn serve_inner(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn events_read_validates_before_queueing_and_preserves_cursor() {
+        let (sender, receiver) = async_channel::bounded::<LiveRequest>(1);
+        for params in [json!({"limit":0}), json!({"limit":129}), json!({"after":"bad"}), json!({"unknown":true})] {
+            let request = json!({"jsonrpc":"2.0","id":1,"method":"events.read","params":params});
+            assert_eq!(dispatch_inner(&serde_json::to_vec(&request).unwrap(), Some(&sender)).unwrap()["error"]["code"], -32602);
+            assert!(receiver.try_recv().is_err());
+        }
+        let worker = std::thread::spawn(move || {
+            let request = receiver.recv_blocking().unwrap();
+            let read = request.events_read.unwrap();
+            assert_eq!(read.after.as_deref(), Some("123-456:7"));
+            assert_eq!(read.limit, 16);
+            request.reply.send(Ok(json!({"events":[],"cursor":"123-456:7","has_more":false,"gap":null}))).unwrap();
+        });
+        let request = br#"{"jsonrpc":"2.0","id":1,"method":"events.read","params":{"after":"123-456:7","limit":16}}"#;
+        assert_eq!(dispatch_inner(request, Some(&sender)).unwrap()["result"]["cursor"], "123-456:7");
+        worker.join().unwrap();
+        assert_eq!(dispatch_inner(request, None).unwrap()["error"]["code"], -32601);
+    }
     #[test]
     fn workspace_merge_validates_before_queueing_and_routes_once() {
         let (sender, receiver) = async_channel::bounded::<LiveRequest>(1);
@@ -1871,6 +1906,7 @@ mod tests {
         sender
             .try_send(LiveRequest {
                 method: "window.list".into(),
+                events_read: None,
                 buffer_command: None,
                 list_filter: ListFilter::default(),
                 notification_change: None,

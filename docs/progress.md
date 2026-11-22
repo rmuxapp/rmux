@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Added live `events.read` metadata replay with a 512-record journal, 128-record
+page cap and process-scoped cursors. Notification receive/read/dismiss/clear and
+process exits publish small records without client IO or terminal-output copies.
+Retention and restart gaps are explicit, and future cursors are rejected. Focused
+journal/RPC tests pass. `mise exec -- python scripts/smoke-events.py` passed on
+macOS against a fresh debug app, covering notification receipt/dismissal replay,
+an empty subsequent read, absence of message bodies and restart gaps. This starts
+A04; push subscriptions, broader event coverage and slow-client latency/platform
+acceptance remain open. No public desktop release was made.
+
 Native settings now expose cursor opacity (0–100%, default 100%) beside cursor
 shape, with live application, keyboard adjustment, theme preview and persistence.
 Partial opacity blends block cursor text toward the original foreground; zero
