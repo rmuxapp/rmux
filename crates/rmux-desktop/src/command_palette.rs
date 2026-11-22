@@ -703,6 +703,20 @@ impl CommandPalette {
         palette
     }
     pub fn show_shortcuts(&mut self, focus: Option<&FocusHandle>, window: &Window, cx: &mut Context<Self>) {
+        // Literal terminal-input bindings have no ordinary command-palette
+        // entry, but must still be discoverable in the shortcut reference.
+        let mut texts = std::collections::HashSet::new();
+        for binding in &cx.global::<Preferences>().keybindings {
+            let Some(text) = &binding.text else { continue; };
+            if !texts.insert(text.as_str()) { continue; }
+            let escaped = text.escape_debug().take(80).collect::<String>();
+            self.commands.push(Command {
+                title: format!("Send terminal text: {escaped}{}", if text.escape_debug().nth(80).is_some() { "…" } else { "" }),
+                subtitle: Some(format!("Configured terminal input · {} bytes", text.len())),
+                target: PaletteEvent::Run(Box::new(SendShortcutText { text: text.clone() })),
+                shortcut: None,
+            });
+        }
         if let Some(focus) = focus {
             for command in &mut self.commands {
                 if let PaletteEvent::Run(action) = &command.target {

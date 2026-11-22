@@ -198,7 +198,9 @@ their terminal behavior.
 ## Custom keyboard shortcuts
 
 **View → Keyboard Shortcuts…** lists effective command bindings for the current
-focus context, including custom commands and overrides. Search by action name
+focus context, including custom commands, literal terminal-text bindings and overrides.
+Text bindings show an escaped excerpt and byte count; control characters do not
+render as invisible commands. Search by action name
 or key names. Modifier/key queries such as `ctrl tab` match actual bindings,
 including aliases; command names remain fuzzy-searchable. To bind this view
 itself, use the action `keyboard_shortcuts`.
@@ -263,9 +265,11 @@ pending keys while rmux waits for the next stroke; it does not take keyboard
 focus or resize the terminal. The limit is 128 bindings. Duplicate normalized keys in the same
 context, unknown key names/actions/commands and definitions with more than one
 target fail config validation. A single stroke and a two-stroke chord cannot
-share a prefix in the same custom context (for example `ctrl-k` and
-`ctrl-k ctrl-t`); two different chords may share their first stroke. Error messages
-identify the conflicting sequences. Function keys use F1–F24, without zero padding. Reload Settings replaces prior overrides and restores
+share a prefix in overlapping custom contexts (for example a window-wide
+`ctrl-k` and terminal `ctrl-k ctrl-t`). Terminal/Find and text/file-preview
+contexts also overlap. Independent panels can reuse prefixes; two different
+chords may share their first stroke. Error messages identify both entries and
+their contexts. Function keys use F1–F24, without zero padding. Reload Settings replaces prior overrides and restores
 removed bindings to defaults. Later overrides win within the same context;
 a more specific terminal context takes precedence over a global binding.
 

@@ -37,10 +37,20 @@ pub struct Binding {
     #[serde(default)]
     pub context: Scope,
 }
-#[derive(Clone, Copy, Default, serde::Deserialize, serde::Serialize)]
+#[derive(Clone, Copy, Default, PartialEq, Eq, serde::Deserialize, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Scope { #[default] Terminal, Window, Settings, Find, Preview, FilePreview, Files }
 impl Scope { fn context(self) -> Option<&'static str> { match self { Self::Terminal => Some("Terminal"), Self::Window => None, Self::Settings => Some("Settings"), Self::Find => Some("FindInput"), Self::Preview => Some("TextPreview"), Self::FilePreview => Some("FilePreview"), Self::Files => Some("FileBrowser") } } }
+impl Scope {
+    // Find is a child of Terminal; TextPreview is a subset of FilePreview.
+    // Other panels are sibling focus paths. Window bindings apply to all.
+    fn overlaps(self, other: Self) -> bool {
+        self == other || matches!((self, other),
+            (Self::Window, _) | (_, Self::Window) |
+            (Self::Terminal, Self::Find) | (Self::Find, Self::Terminal) |
+            (Self::Preview, Self::FilePreview) | (Self::FilePreview, Self::Preview))
+    }
+}
 struct Defaults(Vec<KeyBinding>);
 impl Global for Defaults {}
 fn action(name: &str) -> Option<Box<dyn Action>> {
@@ -198,7 +208,7 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
 pub fn compile(settings: &Preferences) -> Result<Vec<KeyBinding>> {
     ensure!(settings.keybindings.len() <= 128, "at most 128 custom keybindings are allowed");
     let mut used = std::collections::HashMap::new();
-    let mut sequences: Vec<(Option<&str>, Vec<String>, usize)> = Vec::new();
+    let mut sequences: Vec<(Scope, Vec<String>, usize)> = Vec::new();
     settings.keybindings.iter().enumerate().map(|(binding_index, binding)| {
         let result = (|| -> Result<KeyBinding> {
         ensure!(binding.key.len() <= 128, "keybinding exceeds 128 bytes");
@@ -218,12 +228,12 @@ pub fn compile(settings: &Preferences) -> Result<Vec<KeyBinding>> {
             anyhow::bail!("duplicate shortcut {canonical}; also assigned by keybindings[{}]", previous);
         }
         for (scope, previous, previous_index) in &sequences {
-            if *scope == binding.context.context() && previous.len() != sequence.len()
+            if scope.overlaps(binding.context) && previous.len() != sequence.len()
                 && (previous.starts_with(&sequence) || sequence.starts_with(previous)) {
-                anyhow::bail!("shortcut prefix conflict with keybindings[{previous_index}]: {} and {canonical}; use distinct strokes or two chords sharing the prefix", previous.join(" "));
+                anyhow::bail!("shortcut prefix conflict with keybindings[{previous_index}] ({} context): {} and {canonical}; use distinct strokes or two chords sharing the prefix", scope.context().unwrap_or("Window"), previous.join(" "));
             }
         }
-        sequences.push((binding.context.context(), sequence, binding_index));
+        sequences.push((binding.context, sequence, binding_index));
         let target = match (&binding.action, &binding.command, &binding.text, &binding.preset) {
             (Some(name), None, None, None) => action(name).ok_or_else(|| anyhow::anyhow!("unknown shortcut action: {name}"))?,
             (None, Some(name), None, None) => {
@@ -580,6 +590,36 @@ mod tests {
             {"key":"ctrl-k","action":"palette","context":"terminal"}
         ]}));
         assert_eq!(compile(&prefs).unwrap().len(), 2);
+    }
+
+    #[test]
+    fn prefix_conflicts_follow_overlapping_focus_scopes() {
+        for (outer, inner) in [("window", "terminal"), ("window", "settings"),
+            ("window", "files"), ("terminal", "find"), ("file_preview", "preview")] {
+            for reverse in [false, true] {
+                let mut bindings = vec![
+                    serde_json::json!({"key":"ctrl-k","action":"settings","context":outer}),
+                    serde_json::json!({"key":"ctrl-k t","action":"palette","context":inner})];
+                if reverse { bindings.reverse(); }
+                let error = format!("{:#}", compile(&settings(serde_json::json!({"keybindings":bindings}))).err().expect("overlapping prefix"));
+                assert!(error.contains("prefix conflict") && error.contains("keybindings[0]") && error.contains("keybindings[1]"), "{error}");
+            }
+        }
+        // The same prefix is usable independently in sibling panels.
+        let prefs = settings(serde_json::json!({"keybindings":[
+            {"key":"ctrl-k","action":"settings","context":"terminal"},
+            {"key":"ctrl-k t","action":"palette","context":"settings"}
+        ]}));
+        let mut map = Keymap::default(); map.add_bindings(compile(&prefs).unwrap());
+        let prefix = [Keystroke::parse("ctrl-k").unwrap()];
+        let terminal = [KeyContext::parse("Terminal").unwrap()];
+        let settings = [KeyContext::parse("Settings").unwrap()];
+        let (actions, pending) = map.bindings_for_input(&prefix, &terminal);
+        assert!(!pending && actions[0].action().as_any().is::<ToggleSettings>());
+        let (actions, pending) = map.bindings_for_input(&prefix, &settings);
+        assert!(pending && actions.is_empty());
+        let (actions, pending) = map.bindings_for_input(&[prefix[0].clone(), Keystroke::parse("t").unwrap()], &settings);
+        assert!(!pending && actions[0].action().as_any().is::<ShowCommandPalette>());
     }
 
     #[test]
