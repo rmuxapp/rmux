@@ -151,13 +151,33 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             created_surface = next(s["id"] for s in call("surface.list")["surfaces"] if s["id"] != surface)
             created = call("events.read", {"after": boundary})
             assert sum(e["kind"] == "surface.created" and e["surface_id"] == created_surface for e in created["events"]) == 1
-            call("surface.move_to_workspace", {"surface_id": created_surface, "workspace_id": original_workspace})
-            moved = call("events.read", {"after": created["cursor"]})
-            assert not any(e["kind"] in ("surface.created", "surface.closed") and e["surface_id"] == created_surface for e in moved["events"])
-            locations = call("events.read", {"after": created["cursor"], "surface_id": created_surface, "kinds": ["surface.location_invalidated"]})
-            assert locations["events"], moved
-            moved_surface = next(s for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
-            assert moved_surface["workspace_id"] == original_workspace, moved_surface
+            original_pid = next(s["process_id"] for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
+            call("window.create")
+            other = next(w for w in call("workspace.list")["workspaces"] if w["window_id"] != window)
+            for target_workspace, target_window in [(other["id"], other["window_id"]), (original_workspace, window)]:
+                boundary = call("events.read")["cursor"]
+                call("surface.move_to_workspace", {"surface_id": created_surface, "workspace_id": target_workspace})
+                moved = call("events.read", {"after": boundary})
+                assert not any(e["kind"] in ("surface.created", "surface.closed") and e["surface_id"] == created_surface for e in moved["events"])
+                locations = call("events.read", {"after": boundary, "surface_id": created_surface, "kinds": ["surface.location_invalidated"]})
+                assert locations["events"], moved
+                moved_surface = next(s for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
+                assert moved_surface["workspace_id"] == target_workspace, moved_surface
+                assert moved_surface["window_id"] == target_window, moved_surface
+                assert moved_surface["process_id"] == original_pid, moved_surface
+                os.kill(original_pid, 0)
+                # A real output change proves the transferred entity still
+                # owns working input/output, beyond a retained PID snapshot.
+                bell_boundary = int(moved_surface["bell_revision"])
+                call("surface.send_text", {"surface_id": created_surface, "text": "bell\n"})
+                deadline = time.monotonic() + 3
+                while True:
+                    current = next(s for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
+                    if int(current["bell_revision"]) == bell_boundary + 3:
+                        break
+                    assert time.monotonic() < deadline, "transferred terminal did not respond"
+                    time.sleep(.01)
+            assert destination not in [w["id"] for w in call("workspace.list")["workspaces"]], "empty source workspace survived transfer"
             # Keep another workspace alive so the application can answer after
             # closing both original terminal entities.
             call("workspace.create", {"window_id": window, "name": "Survivor"})
@@ -170,7 +190,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert process.wait(timeout=5) == 0
             errors.seek(0)
             assert b"native quit confirmation unavailable" not in errors.read(), "native quit hook did not install"
-            print("PASS replay, bounded waiting, concurrent mutation and surface lifetimes")
+            print("PASS replay, bounded waiting, concurrent mutation, cross-window transfer and surface lifetimes")
         finally:
             if process.poll() is None:
                 process.terminate()

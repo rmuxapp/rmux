@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Native replay smoke now moves a terminal to another window and back. Both moves
+preserve surface ID and process PID, emit filtered location invalidations and
+report the destination window/workspace. Sending a command after each move
+produces three new terminal bells, checking live PTY input/output beyond retained
+snapshot data. Moving the last tab removes its empty source workspace without
+false close/create events. The complete smoke passes on macOS. Pointer-drag,
+visual focus and other-platform acceptance remain pending.
+
 Shared palette ranking now counts Unicode scalar positions consistently for
 contiguous and fuzzy matches, so a multibyte workspace-name prefix does not
 artificially lower its rank. Identical case-normalized queries reuse their prior
