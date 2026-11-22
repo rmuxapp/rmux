@@ -3,43 +3,45 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.11</title>
-            <pubDate>Sun, 22 Nov 2026 08:10:34 +0000</pubDate>
+            <title>0.1.12</title>
+            <pubDate>Sun, 22 Nov 2026 08:44:50 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.11</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.11</sparkle:version>
-            <sparkle:shortVersionString>0.1.11</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.12</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.12</sparkle:version>
+            <sparkle:shortVersionString>0.1.12</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.11 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.12 — preview
 
-This release improves file previews, context menus, and terminal tab search.
+This release polishes search, tab renaming, and project context.
 
-## File previews
+## Everyday navigation
 
-- Wide Markdown tables scroll horizontally with their headings aligned. Preview shortcuts also scroll selected tables and code blocks.
-- Markdown heading links work within a document and between local Markdown files. Back and Forward restore your reading position.
-- Switching between Markdown and source view keeps your source position. Opening a selected preview row in an editor passes its source line when the editor configuration supports it.
-- File links and preview history now route through the active palette correctly.
+- File-preview search finds literal text in reading order.
+- Tab renaming shows the name limit and keeps overlong drafts available for correction. Closing another tab preserves the draft and focus.
+- Text fields preserve modified shortcuts and reset horizontal scrolling correctly when text becomes shorter.
 
-## Menus and navigation
+## Project context
 
-- Workspace, tab, and link menus identify their target. Close confirmations name the affected workspace or terminal and explain their scope.
-- Context-menu navigation respects modifiers, avoiding accidental activation from modified keys.
-- The terminal tab chooser shows filtered counts, highlighted matches, and your position in the results. The browser demo also supports paging through tab results.
+- Local terminals can explicitly look up pull requests using an existing authenticated GitHub CLI. The sidebar shows the result and opens its link; pending lookups can be canceled from the command palette.
+- Port summaries retain the last explicit scan and identify partial snapshots.
+- New terminal histories use one atomic initial write, reducing startup disk work.
+- The browser demo shares the desktop branch/directory row and keeps sample directories consistent across tabs, splits, and sample `pwd` output.
 
 ## Downloads and validation
 
 GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux
 x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
-The [browser demo](https://rmux.app) uses bundled sample sessions.
+The [browser demo](https://rmux.app) runs bundled sample sessions, without shell or server access.
 
-Focused tests cover Markdown links and parsing, preview history and source
-positions, and menu navigation. Desktop compilation and browser interaction
-checks passed during development. Native visual review and Windows runtime
-validation remain pending.
+Focused tests and desktop compilation passed during development. Browser checks
+covered tab-renaming focus and close behavior. Native visual review and Windows
+runtime validation remain pending.
+
+Use rmux alongside VS Code with its built-in external-terminal shortcut:
+[setup guide](https://rmux.app/vscode/).
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.11/rmux-0.1.11-macos-arm64.zip" length="7331909" type="application/octet-stream" sparkle:edSignature="h0H1TOAyU2DDOtQEGKRwG4dkfcrQBT3BZJAmUhqNiAU2j1EV2k3FhdyRDcvYlhyOkPy5F96aweajWswkdYR7Aw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.12/rmux-0.1.12-macos-arm64.zip" length="7369335" type="application/octet-stream" sparkle:edSignature="f9zsQxsXLcF5DzaaWE7Gq10yALhyftGHbsGqrXVtdau45WUJHz3pOwqQSAq0KNZjrdu7k8pHFl3qLbVaqKDUAw=="/>
         </item>
     </channel>
 </rss>
