@@ -1,3 +1,14 @@
+Palette search quality: native and WASM palettes now keep command text separate
+from shortcut aliases. Titles retain fuzzy matching, while binding aliases match
+whole tokens; fuzzy words cannot span or form inside repeated shortcut synonyms.
+This fixes the observed `group` query incorrectly returning Move Tab Left.
+Exact-token queries rescan candidates so typing `c` then `ctrl` can introduce a
+binding result; title-only palettes retain incremental filtering. Eleven focused
+core search tests, native compile checking and one WASM build passed. Browser
+review verified `group` now returns only group commands and Keyboard Shortcuts
+still resolves `ctrl tab` to Next/Previous Pane. Screenshot:
+`target/palette-search-matching.png`. No release or deployment.
+
 Contextual palette commands: both native and WASM hosts share group-action
 availability rules. Group-only actions require a grouped origin workspace;
 Group Selected Workspaces requires multiple sidebar selections, and move-to-group

@@ -52,10 +52,11 @@ pub fn tab_score(number: usize, title: &str, directory: &str, words: &[&str]) ->
     Some(total)
 }
 
-/// Search over an immutable palette snapshot. Appended normalized queries can
-/// only remove matches; arbitrary edits must consider every title again.
+/// Search over an immutable palette snapshot. Title-only appended queries can
+/// narrow previous matches; exact shortcut tokens must reconsider candidates.
 pub struct RankedSearch {
     titles: Vec<String>,
+    shortcuts: Vec<String>,
     query: String,
     complete_candidates: bool,
     ranked: Vec<((usize, usize, usize), usize)>,
@@ -63,7 +64,13 @@ pub struct RankedSearch {
 }
 impl RankedSearch {
     pub fn new(titles: Vec<String>) -> Self {
-        Self { matches: (0..titles.len()).collect(), titles, query: String::new(), complete_candidates: true, ranked: Vec::new() }
+        Self { matches: (0..titles.len()).collect(), titles, shortcuts: Vec::new(), query: String::new(), complete_candidates: true, ranked: Vec::new() }
+    }
+    /// Shortcut aliases are exact tokens, never fuzzy continuations of a title.
+    pub fn with_shortcuts(titles: Vec<String>, shortcuts: Vec<String>) -> Self {
+        assert_eq!(titles.len(), shortcuts.len());
+        if shortcuts.iter().all(String::is_empty) { return Self::new(titles); }
+        Self { shortcuts, ..Self::new(titles) }
     }
     /// Query-dependent filters may reintroduce candidates even when text is
     /// appended (e.g. a shortcut query becomes a command-name query).
@@ -73,7 +80,7 @@ impl RankedSearch {
         self.ranked.clear();
         self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)| {
             if !include(index) { return None; }
-            score(title, &words).map(|score| (score, index))
+            command_score(title, self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))
         }));
         self.ranked.sort_unstable();
         self.matches.clear();
@@ -91,12 +98,12 @@ impl RankedSearch {
             self.matches.extend(0..self.titles.len());
         } else {
             self.ranked.clear();
-            if self.complete_candidates && !self.query.is_empty() && normalized.starts_with(&self.query) {
+            if self.shortcuts.is_empty() && self.complete_candidates && !self.query.is_empty() && normalized.starts_with(&self.query) {
                 self.ranked.extend(self.matches.iter().filter_map(|index|
                     score(&self.titles[*index], &words).map(|score| (score, *index))));
             } else {
                 self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)|
-                    score(title, &words).map(|score| (score, index))));
+                    command_score(title, self.shortcuts.get(index).map(String::as_str), &words).map(|score| (score, index))));
             }
             self.ranked.sort_unstable();
             self.matches.clear();
@@ -107,9 +114,51 @@ impl RankedSearch {
     }
 }
 
+fn command_score(title: &str, shortcuts: Option<&str>, words: &[&str]) -> Option<(usize, usize, usize)> {
+    let Some(shortcuts) = shortcuts.filter(|text| !text.is_empty()) else { return score(title, words); };
+    let mut total = (0, 0, 0);
+    for word in words {
+        let name = score(title, &[*word]);
+        let binding = shortcuts.split_whitespace().position(|token| token == *word).map(|position| (0, 0, position));
+        let best = match (name, binding) {
+            (Some(a), Some(b)) => a.min(b),
+            (Some(a), None) | (None, Some(a)) => a,
+            (None, None) => return None,
+        };
+        total.0 += best.0;
+        total.1 += best.1;
+        total.2 += best.2;
+    }
+    Some(total)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{score, tab_score, RankedSearch};
+
+    #[test]
+    fn shortcut_tokens_do_not_create_fuzzy_command_names() {
+        let mut search = RankedSearch::with_shortcuts(
+            vec!["move tab left".into(), "new workspace group".into()],
+            vec!["⌃⇧pgup ctrl control shift pgup page up".into(), String::new()]);
+        search.update("group");
+        assert_eq!(search.matches, [1]);
+        search.update("mv tb");
+        assert_eq!(search.matches, [0]);
+        // Exact shortcut tokens can introduce results as typing continues.
+        search.update("c");
+        assert_eq!(search.matches, [1]);
+        search.update("ctrl");
+        assert_eq!(search.matches, [0]);
+        search.update("ctrl move");
+        assert_eq!(search.matches, [0]);
+        search.update_filtered("group", |_| true);
+        assert_eq!(search.matches, [1]);
+        search.update("⌃⇧pgup");
+        assert_eq!(search.matches, [0]);
+        search.update("");
+        assert_eq!(search.matches, [0, 1]);
+    }
 
     #[test]
     fn query_dependent_filters_can_reintroduce_results_and_return_to_normal_search() {

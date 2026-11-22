@@ -202,9 +202,9 @@ impl Command {
             _ => None,
         }
     }
+    fn shortcut_text(&self) -> String { self.shortcut.as_deref().map(shortcuts::search_terms).unwrap_or_default() }
     fn search_text(&self) -> String {
-        format!("{} {} {}", self.preview_line().filter(|text| !text.is_empty()).unwrap_or(&self.title), self.subtitle.as_deref().unwrap_or_default(),
-            self.shortcut.as_deref().map(shortcuts::search_terms).unwrap_or_default()).to_lowercase()
+        format!("{} {}", self.preview_line().filter(|text| !text.is_empty()).unwrap_or(&self.title), self.subtitle.as_deref().unwrap_or_default()).to_lowercase()
     }
 }
 pub enum PaletteEvent {
@@ -604,7 +604,7 @@ impl CommandPalette {
         self.shortcuts_only = true;
         self.commands.retain(|command| command.shortcut.is_some());
         self.commands.sort_by_cached_key(|command| command.title.to_lowercase());
-        self.search = palette_match::RankedSearch::new(self.commands.iter().map(Command::search_text).collect());
+        self.search = palette_match::RankedSearch::with_shortcuts(self.commands.iter().map(Command::search_text).collect(), self.commands.iter().map(Command::shortcut_text).collect());
         self.selected = 0;
         self.scroll.reset(self.commands.len());
         self.heading = "Keyboard shortcuts · Current context";
@@ -757,7 +757,7 @@ impl CommandPalette {
                 }
             }
         }
-        palette.search = palette_match::RankedSearch::new(palette.commands.iter().map(Command::search_text).collect());
+        palette.search = palette_match::RankedSearch::with_shortcuts(palette.commands.iter().map(Command::search_text).collect(), palette.commands.iter().map(Command::shortcut_text).collect());
         palette.markdown_preview = true;
         palette.wrap_preview = true;
         palette.heading = if truncated { "Markdown reading view · Partial document · Bounded source/blocks" } else { "Markdown reading view · Images and links are inert" };
@@ -910,10 +910,7 @@ impl CommandPalette {
         .detach();
         Self {
             input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
-            search: palette_match::RankedSearch::new(commands
-                .iter()
-                .map(Command::search_text)
-                .collect()),
+            search: palette_match::RankedSearch::with_shortcuts(commands.iter().map(Command::search_text).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
             commands,
             selected: 0,

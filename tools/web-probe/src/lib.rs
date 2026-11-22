@@ -322,9 +322,12 @@ impl InputProbe {
         // focus path, before later frames replace it with the palette input.
         self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
             .map(|index| self.result_hint(index, window, cx)).collect();
-        self.search = palette_match::RankedSearch::new((0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-            .map(|index| format!("{} {}", self.result_title(index), self.result_hints.get(index)
-                .and_then(|hint| hint.as_deref()).map(shortcut_label::search_terms).unwrap_or_default()).to_lowercase()).collect());
+        self.search = palette_match::RankedSearch::with_shortcuts(
+                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+                    .map(|index| self.result_title(index).to_lowercase()).collect(),
+                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+                    .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
+                        .map(shortcut_label::search_terms).unwrap_or_default()).collect());
         self.filter_shortcuts("");
         self.selected = 0;
         self.scroll.reset(self.search.matches.len());
@@ -412,9 +415,12 @@ impl InputProbe {
             self.shortcuts_only = true;
             self.result_hints = (0..COMMANDS.len() + self.workspace_results.len())
                 .map(|index| self.result_hint(index, window, cx)).collect();
-            self.search = palette_match::RankedSearch::new((0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
-                .map(|index| format!("{} {}", self.result_title(index), self.result_hints.get(index)
-                    .and_then(|hint| hint.as_deref()).map(shortcut_label::search_terms).unwrap_or_default()).to_lowercase()).collect());
+            self.search = palette_match::RankedSearch::with_shortcuts(
+                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+                    .map(|index| self.result_title(index).to_lowercase()).collect(),
+                (0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
+                    .map(|index| self.result_hints.get(index).and_then(|hint| hint.as_deref())
+                        .map(shortcut_label::search_terms).unwrap_or_default()).collect());
             self.input.update(cx, |input, cx| {
                 input.placeholder = Some("Search commands or keys, e.g. cmd shift…");
                 input.replace_draft("", cx);
