@@ -3,45 +3,50 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.12</title>
-            <pubDate>Sun, 22 Nov 2026 08:44:50 +0000</pubDate>
+            <title>0.1.13</title>
+            <pubDate>Sun, 22 Nov 2026 13:43:21 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.12</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.12</sparkle:version>
-            <sparkle:shortVersionString>0.1.12</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.13</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.13</sparkle:version>
+            <sparkle:shortVersionString>0.1.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.12 — preview
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.13 — preview
 
-This release polishes search, tab renaming, and project context.
+This release improves project commands, Settings, and keyboard focus.
 
-## Everyday navigation
+## Project and editor workflows
 
-- File-preview search finds literal text in reading order.
-- Tab renaming shows the name limit and keeps overlong drafts available for correction. Closing another tab preserves the draft and focus.
-- Text fields preserve modified shortcuts and reset horizontal scrolling correctly when text becomes shorter.
+- Configured commands accept `{project_dir}` as a complete argument. Your VS Code return shortcut can target the original project even after changing terminal directories or renaming the workspace.
+- Local commands that open a dedicated build or test workspace retain that project identity. Both command pickers preview the resolved target and explain missing project context.
+- Settings includes a VS Code editor configuration example and an option to open the settings file without the configured editor, useful when repairing its path.
 
-## Project context
+## Interface and navigation
 
-- Local terminals can explicitly look up pull requests using an existing authenticated GitHub CLI. The sidebar shows the result and opens its link; pending lookups can be canceled from the command palette.
-- Port summaries retain the last explicit scan and identify partial snapshots.
-- New terminal histories use one atomic initial write, reducing startup disk work.
-- The browser demo shares the desktop branch/directory row and keeps sample directories consistent across tabs, splits, and sample `pwd` output.
+- Sidebar directory labels show the folder name, with the full path in the tooltip.
+- Settings has a compact footer with two aligned rows of actions.
+- Opening the command palette from an inspector restores terminal context. Shortcuts, configured commands and layout pickers use that same context.
+- Palette search keeps command abbreviations while avoiding unrelated matches from scattered letters in long paths.
+- Pull-request lookup prefers open PRs and reports ambiguous matches instead of choosing an arbitrary result.
+
+## Performance
+
+- Bash and zsh reuse encoded working-directory text between prompts when the directory has not changed. Prompt and directory reporting still runs on every prompt.
 
 ## Downloads and validation
 
 GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux
 x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
-The [browser demo](https://rmux.app) runs bundled sample sessions, without shell or server access.
 
-Focused tests and desktop compilation passed during development. Browser checks
-covered tab-renaming focus and close behavior. Native visual review and Windows
-runtime validation remain pending.
+Focused matcher, configured-command, Settings, PR lookup and shell-integration
+checks passed during development. Native review covered the compact Settings
+layout and Settings → command palette → next terminal focus. Broader native
+interaction, multi-window VS Code focus, and Windows runtime validation remain
+pending. Automatic Bash login integration remains unsupported.
 
-Use rmux alongside VS Code with its built-in external-terminal shortcut:
-[setup guide](https://rmux.app/vscode/).
+[VS Code setup](https://rmux.app/vscode/) · [Browser demo](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.12/rmux-0.1.12-macos-arm64.zip" length="7369335" type="application/octet-stream" sparkle:edSignature="f9zsQxsXLcF5DzaaWE7Gq10yALhyftGHbsGqrXVtdau45WUJHz3pOwqQSAq0KNZjrdu7k8pHFl3qLbVaqKDUAw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.13/rmux-0.1.13-macos-arm64.zip" length="7377865" type="application/octet-stream" sparkle:edSignature="y/bLaxPtmDWV0gMsj5nSQICutHA/xdEZSZ/mWkkKmmeShbaYF67mZaSJzdazLkEQQlGahzTqPf2C6g1eOY4kDw=="/>
         </item>
     </channel>
 </rss>
