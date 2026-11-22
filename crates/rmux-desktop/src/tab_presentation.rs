@@ -12,7 +12,8 @@ pub(crate) fn menu_row(index: usize, section: bool) -> Stateful<Div> {
         .when(section, |row| row.mt_1().border_t_1().border_color(rgb(0x414141)))
 }
 pub(crate) fn strip() -> Div {
-    div().flex().h(px(30.)).flex_shrink_0().items_center()
+    div().flex().w_full().min_w_0().max_w_full().overflow_hidden()
+        .h(px(30.)).flex_shrink_0().items_center()
         .border_b_1().border_color(rgb(0x383838)).bg(rgb(0x242424))
 }
 pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {

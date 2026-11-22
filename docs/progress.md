@@ -1,3 +1,13 @@
+Tab overflow layout: a live shared-demo review with twelve tabs exposed pane
+controls pushed outside the viewport by the tab strip's intrinsic width. The
+shared strip now has explicit full-width/min-width/max-width bounds and clips
+overflow, leaving its flexing scroll region beside fixed controls. A fresh-origin
+WASM build review confirmed all four controls remain visible, Cmd+Shift+1 reveals
+the first tab, and pointer Split Right creates two panes with controls still
+visible in both. Local browser evidence: target/tab-overflow-demo.png. This is
+browser sample-session evidence, not a native main-app parity screenshot. Native
+visual review remains pending; no desktop rebuild or deployment for this change.
+
 Quoted terminal paths: matching single/double quotes now preserve spaces,
 punctuation and Unicode in path targets across fully visible soft wraps.
 Unclosed quoted spans do not fall back to misleading partial paths; prose
