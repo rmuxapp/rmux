@@ -10089,3 +10089,24 @@ resolution, native display/IME behavior and runtime xattr behavior remain open.
 Upstream xattr tests were not run: Cargo rejects dependency tests with development
 dependencies outside the workspace; the crate was not added to product workspace
 members solely to bypass that restriction.
+
+
+### Per-terminal shell history groundwork — 2026-11-22
+
+T19 now has a bounded, private storage layer, not an activated history feature.
+The target behavior follows cmux PR #13851: restored terminals prioritize their
+own history while fresh terminals keep global history. Reference:
+https://github.com/manaflow-ai/cmux/pull/13851
+
+The implementation retains up to 512 commands / 128 KiB of command text, with
+an 8 KiB per-command limit. It preserves multiline and Unicode content, deduplicates
+adjacent identical records, uses opaque 32-hex identities, bounds file reads,
+rejects unknown versions, and reuses atomic private-file saving. Loading corrupt
+files does not mutate them. No shell hook or existing history file is changed.
+Three focused tests passed: separate-history roundtrip and Unix permissions,
+count/byte retention and rejected entries, and corrupt/future/oversize input.
+
+Next: collect only commands accepted by shell history policy; persist identity
+through session restoration; import history without executing it or duplicating
+entries in global history; define cleanup for closed sessions. Shell integration
+and restored-shell acceptance are required before describing T19 as implemented.

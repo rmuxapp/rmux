@@ -16,6 +16,9 @@ mod markdown_preview;
 mod external_editor;
 mod terminal_link;
 mod open_project;
+// Session-history persistence is prepared independently of shell hook activation.
+#[allow(dead_code)]
+mod shell_history;
 mod background_command;
 mod terminal_search;
 #[cfg(unix)]
