@@ -14,6 +14,7 @@ on:
       - '!crates/rmux-desktop/src/clipboard.rs'
       - '!crates/rmux-desktop/src/automation.rs'
       - '!crates/rmux-desktop/src/events.rs'
+      - '!crates/rmux-desktop/src/native_quit.rs'
       - '!crates/rmux-desktop/src/recovery.rs'
       - '!crates/rmux-desktop/src/preferences.rs'
       - '!crates/rmux-desktop/src/settings_view.rs'

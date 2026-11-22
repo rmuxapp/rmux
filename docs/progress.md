@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+The macOS CI job now runs the production AppKit quit bridge in an isolated probe,
+checking cancellation, retry and final approval under a ten-second process timeout.
+It shares the existing browser-feature build cache. The native-only quit module
+is excluded from shared WASM triggers; the compiler-dependency guard continues to
+check that exclusion. Theme commit 38431ed passed both native/browser and Shared
+WASM CI. The new CI probe's hosted-run result is pending.
+
 macOS AppKit termination requests now route through the existing quit confirmation
 and bounded session/process cleanup. Repeated requests coalesce. The original
 request is canceled and reissued after approval; deferred AppKit termination was

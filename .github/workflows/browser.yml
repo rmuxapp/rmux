@@ -11,6 +11,7 @@ on:
       - Cargo.lock
       - mise.toml
       - scripts/bootstrap-ghostty.sh
+      - scripts/smoke-native-quit.py
       - .github/workflows/browser.yml
   pull_request:
     paths:
@@ -21,6 +22,7 @@ on:
       - Cargo.lock
       - mise.toml
       - scripts/bootstrap-ghostty.sh
+      - scripts/smoke-native-quit.py
       - .github/workflows/browser.yml
 permissions:
   contents: read
@@ -69,6 +71,11 @@ jobs:
           mise exec -- cargo test --locked -p rmux-terminal input_defers_follow_while_parser_busy_and_navigation_supersedes_it
       - name: Test browser policy and state transitions
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser browser_
+      - name: Test native quit routing
+        run: |
+          mise exec -- cargo test --locked -p rmux-desktop --features browser native_quit
+          mise exec -- cargo build --locked -p rmux-desktop --features browser --example native-quit-probe
+          mise exec -- python scripts/smoke-native-quit.py
       - name: Test bounded event replay
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser events
       - name: Test renderer reclamation and diagnostics
