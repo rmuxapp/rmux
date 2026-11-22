@@ -10635,3 +10635,10 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - PR summary rows now expose their displayed HTTPS destination in the tooltip and open it on a standard click, with hover feedback. The click captures the URL belonging to the rendered terminal metadata, rather than dispatching through whichever terminal has focus later. Mouse-down/click propagation is contained so opening a PR does not also select or drag its workspace. Modified clicks do not launch a URL.
 - Pending/unavailable/no-result and port snapshot rows remain non-links. PR state labels use Open, Closed, Merged and Draft; the existing palette action remains the keyboard route.
 - Desktop cargo check passed. Native pointer/tooltip appearance and browser launch acceptance remain pending; no remote request or browser launch performed during this batch.
+
+### Combined tab rename lifecycle browser acceptance
+
+- Built the current WASM demo once at 6140c38 and reviewed its actual 1280×720 UI with three tabs. Double-click opened Rename Tab; clicking the same selected tab preserved the draft and typing continued in the editor.
+- Closing Terminal 1 while editing Terminal 3 preserved both its draft and input focus; further typing appended to the existing draft. Screenshot: target/tab-rename-survives-close.jpg.
+- Closing the edited Terminal 3 removed the rename form and returned focus to surviving Terminal 2. Typing `echo surviving terminal` immediately executed in that sample terminal and displayed its output. No additional fix was required from these checks. The temporary browser tab/server were closed.
+- This accepts the tested WASM interactions only. Native close confirmation, cross-window transfers and PR/port sidebar rendering remain separate acceptance work; installed native sessions were untouched.
