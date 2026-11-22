@@ -4,6 +4,8 @@ use super::*;
 // size/weight and only inline-code runs switch to the terminal's monospace font.
 #[derive(IntoElement)]
 struct PreviewStyledText {
+    id: SharedString,
+    links: Vec<String>,
     text: String,
     styles: Vec<(std::ops::Range<usize>, markdown_preview::InlineStyle, bool)>,
 }
@@ -16,7 +18,8 @@ impl PreviewStyledText {
             let mut styled = base.clone().highlight(HighlightStyle {
                 font_weight: style.bold.then_some(FontWeight::BOLD),
                 font_style: style.italic.then_some(FontStyle::Italic),
-                color: matched.then(|| rgb(0xffffff).into()),
+                color: if *matched { Some(rgb(0xffffff).into()) } else { style.link.map(|_| rgb(0x8ebfff).into()) },
+                underline: style.link.map(|_| UnderlineStyle { thickness: px(1.), color: None, wavy: false }),
                 background_color: if *matched { Some(rgb(0x41638c).into()) } else { style.code.then(|| rgb(0x363b46).into()) },
                 strikethrough: style.strike.then_some(StrikethroughStyle { thickness: px(1.), color: None }),
                 ..Default::default()
@@ -32,7 +35,21 @@ impl PreviewStyledText {
 impl RenderOnce for PreviewStyledText {
     fn render(self, window: &mut Window, _: &mut App) -> impl IntoElement {
         let runs = self.runs(&window.text_style());
-        StyledText::new(self.text).with_runs(runs)
+        let targets: Vec<_> = self.styles.iter().filter_map(|(range, style, _)|
+            style.link.and_then(|index| self.links.get(index)).map(|url| (range.clone(), url.clone()))).collect();
+        let styled = StyledText::new(self.text).with_runs(runs);
+        if targets.is_empty() { return styled.into_any_element(); }
+        let hints = targets.clone();
+        InteractiveText::new(self.id, styled)
+            .on_click(targets.iter().map(|(range, _)| range.clone()).collect(), move |index, _, cx| {
+                if let Some((_, url)) = targets.get(index) && openable_uri(url) {
+                    cx.stop_propagation();
+                    cx.open_url(url);
+                }
+            })
+            .tooltip(move |index, _, cx| hints.iter().find(|(range, _)| range.contains(&index))
+                .map(|(_, url)| cx.new(|_| pane_view::ControlHint(url.clone().into())).into()))
+            .into_any_element()
     }
 }
 #[cfg(test)]
@@ -43,6 +60,7 @@ mod preview_typography_tests {
         let text = "before 界 after";
         let start = text.find('界').unwrap();
         let element = PreviewStyledText {
+            id: "test".into(), links: Vec::new(),
             text: text.into(),
             styles: vec![(start..start + '界'.len_utf8(), markdown_preview::InlineStyle { code: true, strike: true, ..Default::default() }, true)],
         };
@@ -115,7 +133,7 @@ mod navigation_tests {
         let title = crate::file_browser::preview_line_title(&text, "");
         assert!(!title.contains("Needle"));
         let command = super::Command { title, subtitle: Some("Line 1".into()), shortcut: None,
-            target: super::PaletteEvent::Run(Box::new(crate::CopyPreviewLine { text: text.clone(), markdown: None, spans: Vec::new() })) };
+            target: super::PaletteEvent::Run(Box::new(crate::CopyPreviewLine { text: text.clone(), markdown: None, spans: Vec::new(), links: Vec::new() })) };
         let mut search = crate::palette_match::RankedSearch::new(vec![command.search_text()]);
         search.update("NEEDLE 世界");
         assert_eq!(search.matches, [0]);
@@ -631,7 +649,7 @@ impl CommandPalette {
             let title = file_browser::preview_line_title(&text, "");
             let copy_hint = if preview.partial_line == Some(index) { "Partial line · Enter copies only the captured text" } else { "Enter copies this preview line" };
             Command { title, subtitle: Some(format!("Line {} · {copy_hint}", index + 1)), shortcut: None,
-                target: PaletteEvent::Run(Box::new(CopyPreviewLine { text, markdown: None, spans: Vec::new() })) }
+                target: PaletteEvent::Run(Box::new(CopyPreviewLine { text, markdown: None, spans: Vec::new(), links: Vec::new() })) }
         }));
         let mut palette = Self::with_commands(commands, if preview.hex && preview.truncated { "Hex preview · First 8 KiB / 1,024 rows" } else if preview.hex { "Hex preview · Search bytes or ASCII · Read only" } else if preview.truncated { "Text preview · Limited to 64 KiB / 512 lines" } else if empty { "Text preview · Empty file" } else { "Text preview · Search lines · Read only" }, "No matching preview lines", window, cx);
         palette.hex_preview = preview.hex;
@@ -652,7 +670,7 @@ impl CommandPalette {
                 if let Some(line) = action.as_any().downcast_ref::<CopyPreviewLine>() {
                     block_number += 1;
                     let block = blocks.next().expect("one reading block per line");
-                    command.target = PaletteEvent::Run(Box::new(CopyPreviewLine { text: line.text.clone(), markdown: Some(block.kind), spans: block.spans }));
+                    command.target = PaletteEvent::Run(Box::new(CopyPreviewLine { text: line.text.clone(), markdown: Some(block.kind), spans: block.spans, links: block.links }));
                     let label = match command.markdown_kind() {
                         Some(markdown_preview::Kind::Heading(level)) => format!("Heading H{level}"),
                         Some(markdown_preview::Kind::Table { header, columns, .. }) => format!("Table {} · {columns} columns{}", if header { "header" } else { "row" }, if columns > 8 { " · first 8 shown; copy for all" } else { "" }),
@@ -962,7 +980,7 @@ impl CommandPalette {
                                 })
                                 .when(wrapped, |cell| cell.whitespace_normal().line_clamp(4).text_ellipsis())
                                 .when(!wrapped, |cell| cell.truncate())
-                                .child(PreviewStyledText { styles: markdown_preview::merge_highlights(&spans, &search), text })
+                                .child(PreviewStyledText { id: format!("preview-cell-{command}-{column}").into(), links: line.links.clone(), styles: markdown_preview::merge_highlights(&spans, &search), text })
                         })).into_any_element()
                 }),
                 _ => None,
@@ -979,7 +997,11 @@ impl CommandPalette {
                 range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
             )))
         }).collect::<Vec<_>>());
-        let title = PreviewStyledText { text: title, styles: markdown_preview::merge_highlights(&inline, &title_ranges) };
+        let links = match &self.commands[command].target {
+            PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().map(|line| line.links.clone()).unwrap_or_default(),
+            _ => Vec::new(),
+        };
+        let title = PreviewStyledText { id: format!("preview-text-{command}").into(), links, text: title, styles: markdown_preview::merge_highlights(&inline, &title_ranges) };
         let subtitle = self.commands[command].subtitle.as_ref().map(|text| {
             let ranges = match &self.commands[command].target {
                 PaletteEvent::SearchTerminal { query, preview: true, .. } => literal_highlights(text, query),

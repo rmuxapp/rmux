@@ -108,8 +108,9 @@ on the background file worker. It reads the existing 64 KiB / 512-source-line
 prefix and retains at most 512 reading blocks; partial documents are labeled
 when source content or an additional reading block is omitted. Exactly 512 blocks
 with no omitted content remain complete.
-Displayed excerpts remain bounded and default to four visual lines. Links display
-their label, images display alt text, and raw HTML displays as literal text: no
+Displayed excerpts remain bounded and default to four visual lines. HTTP(S) links
+are underlined and clickable, with their destination shown on hover.
+Other links display their label, images display alt text, and raw HTML displays as literal text: no
 assets load and no HTML or scripts execute. Bold and italic emphasis, including nesting, render within reading blocks and
 remain visible under search highlights. Inline code uses a monospace font and shaded background, and `~~strikethrough~~` draws a strike through its text.
 
@@ -120,8 +121,12 @@ that only the first eight are shown. Row copying retains all tab-separated cells
 and Copy Markdown Source retains the original document. Empty cells remain blank.
 Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
 alignment markers; unspecified columns align left. Table horizontal scrolling,
-clickable links, images, full code-block scrolling and document appearance controls
+keyboard link navigation, relative/file links, images, full code-block scrolling and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
+
+Web links open in the default browser only when clicked; Enter on a reading block
+still copies its text. Link destinations are limited to 8 KiB each, 64 distinct
+links per block and 64 KiB across the document. Additional links remain plain text.
 
 ## Open an external editor
 

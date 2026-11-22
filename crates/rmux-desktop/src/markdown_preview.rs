@@ -5,15 +5,18 @@ pub const TABLE_VISIBLE_COLUMNS: usize = 8;
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
 pub enum Kind { #[default] Paragraph, Heading(u8), Code, Quote, Table { header: bool, columns: usize, alignment: [Alignment; TABLE_VISIBLE_COLUMNS] }, List { depth: usize, number: Option<u64>, marker: bool, checked: Option<bool> } }
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
-pub struct InlineStyle { pub bold: bool, pub italic: bool, pub code: bool, pub strike: bool }
+pub struct InlineStyle { pub bold: bool, pub italic: bool, pub code: bool, pub strike: bool, pub link: Option<usize> }
 #[derive(Clone, Debug, PartialEq)]
 pub struct Span { pub range: std::ops::Range<usize>, pub style: InlineStyle }
-pub struct Block { pub text: String, pub kind: Kind, pub spans: Vec<Span> }
+pub struct Block { pub text: String, pub kind: Kind, pub spans: Vec<Span>, pub links: Vec<String> }
 pub fn blocks(source: &str) -> (Vec<Block>, bool) {
     let mut output = Vec::new();
     let mut text = String::new();
     let mut kind = Kind::Paragraph;
     let mut spans: Vec<Span> = Vec::new();
+    let mut links: Vec<String> = Vec::new();
+    let mut link = None;
+    let mut link_bytes = 0usize;
     let (mut bold, mut italic) = (0usize, 0usize);
     let mut strike = 0usize;
     let mut table_columns = 0usize;
@@ -22,16 +25,16 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
     let mut quote = 0usize;
     let mut lists: Vec<Option<u64>> = Vec::new();
     let mut items: Vec<Kind> = Vec::new();
-    let flush = |output: &mut Vec<Block>, text: &mut String, spans: &mut Vec<Span>, kind| {
-        if text.trim().is_empty() && !matches!(kind, Kind::Table { .. }) { text.clear(); spans.clear(); return false; }
+    let flush = |output: &mut Vec<Block>, text: &mut String, spans: &mut Vec<Span>, links: &mut Vec<String>, kind| {
+        if text.trim().is_empty() && !matches!(kind, Kind::Table { .. }) { text.clear(); spans.clear(); links.clear(); return false; }
         if output.len() >= 512 { return true; }
-        output.push(Block { text: std::mem::take(text), kind, spans: std::mem::take(spans) });
+        output.push(Block { text: std::mem::take(text), kind, spans: std::mem::take(spans), links: std::mem::take(links) });
         false
     };
     for event in Parser::new_ext(source, Options::ENABLE_TASKLISTS | Options::ENABLE_STRIKETHROUGH | Options::ENABLE_TABLES) {
         match event {
             Event::Start(Tag::Table(columns)) => {
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
                 table_columns = columns.len();
                 table_alignment = [Alignment::None; TABLE_VISIBLE_COLUMNS];
                 for (target, value) in table_alignment.iter_mut().zip(columns) { *target = value; }
@@ -46,7 +49,7 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
                 table_cell += 1;
             }
             Event::End(TagEnd::TableHead | TagEnd::TableRow) => {
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
             }
             Event::End(TagEnd::Table) => {
                 table_columns = 0;
@@ -56,29 +59,43 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
             Event::End(TagEnd::BlockQuote(_)) => quote = quote.saturating_sub(1),
             Event::Start(Tag::List(start)) => {
                 if !text.trim().is_empty() && let Some(Kind::List { marker, .. }) = items.last_mut() { *marker = false; }
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
                 lists.push(start);
             }
             Event::End(TagEnd::List(_)) => { lists.pop(); }
             Event::Start(Tag::Item) => {
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
                 let number = lists.last().copied().flatten();
                 kind = Kind::List { depth: lists.len(), number, marker: true, checked: None };
                 items.push(kind);
                 if let Some(Some(next)) = lists.last_mut() { *next = next.saturating_add(1); }
             }
             Event::End(TagEnd::Item) => {
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
                 items.pop();
                 kind = items.last().copied().unwrap_or(if quote > 0 { Kind::Quote } else { Kind::Paragraph });
             }
             Event::Start(tag @ (Tag::HtmlBlock | Tag::Paragraph | Tag::Heading { .. } | Tag::CodeBlock(_))) => {
-                if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); }
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); }
                 kind = match tag { Tag::Heading { level, .. } => Kind::Heading(level as u8), Tag::CodeBlock(_) => Kind::Code,
                     _ if !items.is_empty() => *items.last().unwrap(), _ if quote > 0 => Kind::Quote, _ => Kind::Paragraph };
                 if let Some(Kind::List { marker, .. }) = items.last_mut() { *marker = false; }
             }
-            Event::End(TagEnd::HtmlBlock | TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock) => { if flush(&mut output, &mut text, &mut spans, kind) { return (output, true); } },
+            Event::End(TagEnd::HtmlBlock | TagEnd::Paragraph | TagEnd::Heading(_) | TagEnd::CodeBlock) => { if flush(&mut output, &mut text, &mut spans, &mut links, kind) { return (output, true); } },
+            Event::Start(Tag::Link { dest_url, .. }) => {
+                link = None;
+                if dest_url.len() <= 8192 && super::openable_uri(&dest_url) {
+                    link = links.iter().position(|url| url == dest_url.as_ref());
+                    // Reference links can repeat a long destination many times.
+                    // Bound retained URLs across the whole document, not only each row.
+                    if link.is_none() && links.len() < 64 && link_bytes + dest_url.len() <= 65536 {
+                        link_bytes += dest_url.len();
+                        link = Some(links.len());
+                        links.push(dest_url.into_string());
+                    }
+                }
+            }
+            Event::End(TagEnd::Link) => link = None,
             Event::Start(Tag::Strong) => bold += 1,
             Event::End(TagEnd::Strong) => bold = bold.saturating_sub(1),
             Event::Start(Tag::Emphasis) => italic += 1,
@@ -91,8 +108,8 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
                 let start = text.len();
                 if matches!(kind, Kind::Table { .. }) { text.extend(value.chars().map(|ch| if ch == '\t' { ' ' } else { ch })); }
                 else { text.push_str(&value); }
-                if start < text.len() && (bold > 0 || italic > 0 || strike > 0 || code) {
-                    let style = InlineStyle { bold: bold > 0, italic: italic > 0, code, strike: strike > 0 };
+                if start < text.len() && (bold > 0 || italic > 0 || strike > 0 || code || link.is_some()) {
+                    let style = InlineStyle { bold: bold > 0, italic: italic > 0, code, strike: strike > 0, link };
                     if let Some(previous) = spans.last_mut() && previous.range.end == start && previous.style == style { previous.range.end = text.len(); }
                     else { spans.push(Span { range: start..text.len(), style }); }
                 }
@@ -103,13 +120,13 @@ pub fn blocks(source: &str) -> (Vec<Block>, bool) {
             }
             Event::SoftBreak | Event::HardBreak => text.push('\n'),
             Event::Rule => {
-                if flush(&mut output, &mut text, &mut spans, kind) || output.len() >= 512 { return (output, true); }
-                output.push(Block { text: "────────".into(), kind: Kind::Paragraph, spans: Vec::new() });
+                if flush(&mut output, &mut text, &mut spans, &mut links, kind) || output.len() >= 512 { return (output, true); }
+                output.push(Block { text: "────────".into(), kind: Kind::Paragraph, spans: Vec::new(), links: Vec::new() });
             },
             _ => {},
         }
     }
-    let limited = flush(&mut output, &mut text, &mut spans, kind);
+    let limited = flush(&mut output, &mut text, &mut spans, &mut links, kind);
     (output, limited)
 }
 /// Project original block styles through the same bounded/sanitized excerpt as
@@ -198,6 +215,27 @@ pub fn code_excerpt(source: &str, query: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn web_links_preserve_unicode_styles_and_reject_nonweb_targets() {
+        let (rows, _) = blocks("[**界** code](https://example.com/a) [again](https://example.com/a) [file](file:///tmp/a) ![image](https://example.com/image.png)\n\n[next](https://example.org)");
+        assert_eq!(rows[0].links, ["https://example.com/a"]);
+        assert_eq!(rows[1].links, ["https://example.org"]);
+        let first = rows[0].spans.first().unwrap();
+        assert_eq!(&rows[0].text[first.range.clone()], "界");
+        assert!(first.style.bold && first.style.link == Some(0));
+        let projected = excerpt_spans(&rows[0].text, "code", &rows[0].spans, "• ".len());
+        assert!(projected.iter().all(|span| span.style.link == Some(0)));
+        let (table, _) = blocks("| Link | Other |\n|---|---|\n| [界](https://example.com) | plain |");
+        let cells = table_cells(&table[1].text, &table[1].spans, "");
+        assert_eq!(cells[0].1[0].range, 0.."界".len());
+        assert_eq!(cells[0].1[0].style.link, Some(0));
+        assert!(cells[1].1.is_empty());
+        let source = (0..200).map(|index| format!("[label](https://example.com/{}?{index})\n\n", "x".repeat(1000))).collect::<String>();
+        let (rows, _) = blocks(&source);
+        assert!(rows.iter().map(|row| row.links.iter().map(String::len).sum::<usize>()).sum::<usize>() <= 65536);
+        assert_eq!(rows.len(), 200);
+        assert!(rows.last().unwrap().links.is_empty());
+    }
     #[test]
     fn table_alignment_is_shared_by_rows_and_reset_between_tables() {
         let (rows, _) = blocks("| left | center | right | default |\n| :--- | :---: | ---: | --- |\n| a | b | 42 | d |\n\nafter\n\n| next |\n| --- |\n| plain |\n");

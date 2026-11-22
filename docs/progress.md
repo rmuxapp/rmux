@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Markdown reading blocks now render clickable HTTP(S) links with underlines and
+destination tooltips, including inline emphasis and table cells. Opening a link
+uses the default browser and preserves the preview; non-web/relative links remain
+plain text. Link spans use the same Unicode excerpt projection and search styling
+as other text. Stored destinations are capped per URL, block and document to
+prevent repeated reference links from amplifying memory use. Thirteen Markdown
+checks and the inherited typography check pass. Native visual/click acceptance and
+keyboard link navigation remain pending while the Mac is locked.
+
 Event replay now emits `surface.bell` independently of terminal focus; surface
 snapshots expose `bell_revision` as a decimal string. Burst delivery may coalesce
 several bells into one event, while the counter retains their count. Native smoke
