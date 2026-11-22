@@ -70,7 +70,8 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert any(e["kind"] == "notification.dismissed" and e["notification_id"] == event["notification_id"] for e in page["events"])
             assert call("events.read", {"after": page["cursor"]})["events"] == []
             cli = subprocess.run([str(Path("target/debug/rmuxctl").resolve()), "read-events",
-                                  "--after", page["cursor"], "--limit", "16", "--wait-ms", "0"],
+                                  "--after", page["cursor"], "--limit", "16", "--wait-ms", "0",
+                                  "--surface", surface, "--kind", "notification.received"],
                                  env=env, capture_output=True, timeout=8)
             assert cli.returncode == 0, cli.stderr.decode()
             cli_page = json.loads(cli.stdout)["result"]
@@ -83,7 +84,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                 with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as client:
                     client.settimeout(5)
                     client.connect(str(endpoint / "rpc.sock"))
-                    request = {"jsonrpc": "2.0", "id": 1, "method": "events.read", "params": {"after": timed["cursor"], "wait_ms": 2000}}
+                    request = {"jsonrpc": "2.0", "id": 1, "method": "events.read", "params": {"after": timed["cursor"], "wait_ms": 2000, "surface_id": surface, "kinds": ["notification.received"]}}
                     client.sendall((json.dumps(request) + "\n").encode())
                     ready.set()
                     with client.makefile("rb") as reader:

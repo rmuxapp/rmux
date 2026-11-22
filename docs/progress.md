@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Event reads now accept a surface ID and a bounded list of event kinds, exposed
+as `rmuxctl read-events --surface ID --kind KIND` (repeatable kinds). Replay
+cursors advance over skipped records; waiting subscribers wake only on matching
+events. Filtering keeps existing retention-gap semantics and scan bounds.
+Focused tests cover skipped-page advancement, page limits, unknown/duplicate
+kinds and unrelated wake suppression. The native smoke exercises filtered CLI
+replay and a filtered socket waiter awakened by another connection.
+
 Reduced unnecessary Shared WASM CI builds by excluding eight additional native
 modules: RPC/events, recovery/restore/snapshots, preferences/settings and native
 pane ownership. The browser supplies its own hosts for these responsibilities.

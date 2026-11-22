@@ -435,7 +435,7 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                     let journal = cx.global::<super::events::Journal>().clone();
                     let batch = journal.read(read).map_err(|message| Failure { code: -32602, message })?;
                     let waiter = if read.wait_ms > 0 && batch.events.is_empty() && batch.gap.is_none() {
-                        Some(journal.subscribe().map_err(|message| Failure { code: -32000, message })?)
+                        Some(journal.subscribe(read).map_err(|message| Failure { code: -32000, message })?)
                     } else { None };
                     // Reading and registering occur in one UI update: a publish
                     // cannot slip between the empty read and wake registration.
@@ -1075,7 +1075,7 @@ fn dispatch_inner(
     let events_read = if method == "events.read" {
         match serde_json::from_value::<super::events::Read>(request.get("params").cloned().unwrap_or_else(|| json!({}))) {
             Ok(read) if read.valid() => Some(read),
-            _ => return respond(error(id, -32602, "Expected after cursor, limit 1–128 and wait_ms 0–3000")),
+            _ => return respond(error(id, -32602, "Expected valid cursor/surface/kinds, limit 1–128 and wait_ms 0–3000")),
         }
     } else { None };
     let buffer_command = match super::copy_buffers::parse(method, request.get("params")) {

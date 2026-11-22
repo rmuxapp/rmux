@@ -294,6 +294,7 @@ Read one page with the CLI:
 ```sh
 rmuxctl read-events --limit 128
 rmuxctl read-events --after 'CURSOR_FROM_PREVIOUS_RESULT' --wait-ms 3000
+rmuxctl read-events --surface SURFACE_ID --kind surface.exited --wait-ms 3000
 ```
 
 Commands print the JSON-RPC response, with the page under `result`. Keep the
@@ -312,6 +313,16 @@ cursor as `params.after` on your next request, including after reconnecting to
 the same running app. Treat cursors as opaque strings. A request without `after`
 starts at the oldest retained record. Limits are 1–128 (default 128); when
 `has_more` is true, read the next page before waiting for new events.
+
+Filter with optional `surface_id` and `kinds` (an array of up to 16 distinct
+supported event names). Both filters must match; an empty kinds array accepts
+all kinds. The CLI uses `--surface ID` and repeatable `--kind KIND`.
+Unknown kinds and malformed IDs are rejected. IDs may refer to closed surfaces,
+since their retained events remain readable. Cursors advance past skipped
+records, so keep filters consistent while following a stream; changing filters
+does not replay previously skipped events. `has_more` means more retained records
+remain to scan, which may not match the filter. Waiting readers wake only for
+matching events; a timeout can advance the cursor past unrelated activity.
 
 Set `wait_ms` to an integer from 0 to 3000 (default 0) to wait for a change when
 caught up. Available records and gap responses return immediately. A timeout

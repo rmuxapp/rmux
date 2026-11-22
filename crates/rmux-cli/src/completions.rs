@@ -2,7 +2,7 @@
 use std::ffi::OsString;
 
 const COMMANDS: &[(&str, &[&str])] = &[
-    ("read-events", &["--after", "--limit", "--wait-ms"]),
+    ("read-events", &["--surface", "--kind", "--after", "--limit", "--wait-ms"]),
     ("set-buffer", &["--name"]),
     ("rename-buffer", &["--name"]),
     ("list-buffers", &[]),

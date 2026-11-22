@@ -9,7 +9,7 @@ pub const HELP: &str = "Commands (JSON output except pipe-pane; explicit opaque 
   paste-buffer --surface ID [--name NAME] [--bracketed]
   notify --surface ID [--title TITLE] [--body BODY]
   list-notifications [--window ID] [--workspace ID]
-  read-events [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]
+  read-events [--surface ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]
   dismiss-notification --surface ID --revision NUMBER
   read-notification --surface ID --revision NUMBER
   close-workspace --workspace ID
@@ -42,7 +42,7 @@ whole process unless narrowed with --window (workspaces/panes/panels) or
 
 pub fn help(command: &str) -> Result<String, String> {
     let (arguments, description) = match command {
-        "read-events" => ("[--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. Does not automatically retry or stream forever."),
+        "read-events" => ("[--surface ID] [--kind KIND] [--after CURSOR] [--limit 1-128] [--wait-ms 0-3000]", "Read one bounded page of metadata events. Resume with the returned result.cursor; inspect result.gap for retention loss or an app restart. --wait-ms waits only when caught up. Returns JSON including events, cursor, has_more and gap. Does not automatically retry or stream forever."),
         "pipe-pane" => ("--surface ID [--lines N | --selection [--preserve-wraps]] [--command SHELL_COMMAND | SHELL_COMMAND]", "Capture retained history (up to 1 MiB), optionally its last 1–65536 logical lines with --lines N or selected text with --selection, and feed it once to a local /bin/sh command via stdin. Truncated captures are rejected. Runs in the CLI working directory, forwards command stdout/stderr and returns its exit status. The CLI waits for the command; use normal shell interruption for long-running commands. Does not stream future output."),
         "paste-buffer" => ("--surface ID [--name NAME] [--bracketed]", "Queue a retained buffer to an explicit terminal without changing focus or scroll position. --bracketed uses terminal paste encoding. The buffer is retained; requests are never retried."),
         "rename-buffer" => ("[--name NAME] NEW_NAME", "Rename a retained buffer without copying its contents. Source defaults to default; an existing destination is never overwritten."),
@@ -174,6 +174,18 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             continue;
         }
         if !literal && arg.starts_with('-') && !(command == "set-buffer" && arg == "-") {
+            if command == "read-events" && matches!(arg.as_str(), "--surface" | "--kind") {
+                let value = args.next().ok_or_else(|| format!("{arg} requires a value"))?.into_string().map_err(|_| "event filter must be UTF-8")?;
+                if value.is_empty() || value.len() > 96 || value.starts_with('-') { return Err("invalid event filter".into()); }
+                if arg == "--surface" {
+                    if params.insert("surface_id".into(), Value::String(value)).is_some() { return Err("duplicate --surface".into()); }
+                } else {
+                    let kinds = params.entry("kinds").or_insert_with(|| Value::Array(Vec::new())).as_array_mut().unwrap();
+                    if kinds.len() >= 16 || kinds.contains(&Value::String(value.clone())) { return Err("duplicate kind or more than 16 kinds".into()); }
+                    kinds.push(Value::String(value));
+                }
+                continue;
+            }
             if command == "read-events" && matches!(arg.as_str(), "--after" | "--limit" | "--wait-ms") {
                 let raw = args.next().ok_or_else(|| format!("{arg} requires a value"))?.into_string().map_err(|_| "event option must be UTF-8")?;
                 let (key, value) = if arg == "--after" {
@@ -425,6 +437,10 @@ mod tests {
     fn event_read_preserves_cursor_and_rejects_ambiguous_bounds() {
         assert_eq!(expand("read-events", args(&[])).unwrap(), ("events.read".into(), serde_json::json!({})));
         let cursor = "123-1795305738132856000:18446744073709551615";
+        assert_eq!(expand("read-events", args(&["--surface", "4294967297", "--kind", "surface.closed", "--kind", "surface.exited"])).unwrap().1,
+            serde_json::json!({"surface_id":"4294967297","kinds":["surface.closed","surface.exited"]}));
+        assert!(expand("read-events", args(&["--kind", "surface.closed", "--kind", "surface.closed"])).is_err());
+        assert!(expand("read-events", args(&["--surface", "1", "--surface", "2"])).is_err());
         assert_eq!(expand("read-events", args(&["--after", cursor, "--limit", "128", "--wait-ms", "3000"])).unwrap(),
             ("events.read".into(), serde_json::json!({"after":cursor,"limit":128,"wait_ms":3000})));
         for options in [vec!["--limit", "0"], vec!["--limit", "129"], vec!["--limit", "1.5"],
