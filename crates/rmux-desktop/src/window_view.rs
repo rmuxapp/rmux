@@ -1432,12 +1432,12 @@ impl WorkspaceWindow {
                         } else {
                             match loaded {
                                 Ok(next) => {
-                                    let socket_changed = next.socket_directory != current.socket_directory;
+                                    let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory);
                                     cx.set_global(preferences::AppearanceBaseline(next.clone()));
                                     cx.set_global(next.confirm_close);
                                     cx.set_global(next);
                                     shortcuts::install(cx);
-                                    if socket_changed { format!("{summary} Restart rmux to apply the socket directory change.") }
+                                    if let Some(notice) = socket_notice { format!("{summary} {notice}") }
                                     else { summary }
                                 },
                                 Err(error) => format!("{summary} The file was restored, but session settings could not reload: {error:#}"),
@@ -1468,13 +1468,13 @@ impl WorkspaceWindow {
                         "Settings changed while reloading. Your newer edits were kept; reload again to replace them with the file settings.".into()
                     }
                     Ok(next) => {
-                        let socket_changed = next.socket_directory != current.socket_directory;
+                        let socket_notice = cx.global::<preferences::StartupSocket>().reload_notice(&next.socket_directory);
                         cx.set_global(preferences::AppearanceBaseline(next.clone()));
                         cx.set_global(next.confirm_close);
                         cx.set_global(next);
                         shortcuts::install(cx);
-                        if socket_changed {
-                            "Settings reloaded. Restart rmux to apply the socket directory change; the current automation endpoint is unchanged.".into()
+                        if let Some(notice) = socket_notice {
+                            format!("Settings reloaded. {notice}")
                         } else {
                             "Settings reloaded. Fonts using previous defaults updated; per-terminal overrides retained.".into()
                         }

@@ -1,3 +1,10 @@
+Settings restart feedback: reload and conditional undo now compare socket_directory
+with the startup snapshot instead of the previously loaded settings. Repeated
+reloads retain the restart notice; restoring the startup value clears it. When
+RMUX_SOCKET_DIR overrides the file, the notice explains that the override must
+be removed before restarting. The targeted regression test passes with desktop
+test compilation. No endpoint is replaced and no user session is restarted.
+
 Everyday macOS input/editor batch: Open Settings File now honors file_editor,
 falling back to TextEdit on macOS instead of the JSON file association (which
 opened Xcode). It shares the existing asynchronous launch/reaping/error path.

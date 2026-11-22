@@ -4,6 +4,24 @@ use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::{Path, PathBuf}};
 
+/// Unlike reloaded preferences, this snapshot describes the startup-only socket
+/// choice. Keep restart feedback until the user restores it or restarts.
+pub struct StartupSocket {
+    pub configured: Option<PathBuf>,
+    pub environment_override: bool,
+}
+impl gpui::Global for StartupSocket {}
+impl StartupSocket {
+    pub fn reload_notice(&self, configured: &Option<PathBuf>) -> Option<&'static str> {
+        if *configured == self.configured { return None; }
+        Some(if self.environment_override {
+            "The automation socket is controlled by RMUX_SOCKET_DIR. Remove that override and restart rmux to use socket_directory."
+        } else {
+            "Restart rmux to apply the socket directory change; the current automation endpoint is unchanged."
+        })
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(try_from = "String", into = "String")]
 pub struct HexColor(u32);
@@ -718,6 +736,23 @@ impl Preferences {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn socket_restart_notice_survives_reloads_and_clears_on_revert() {
+        let original = Some(std::env::temp_dir().join("rmux-original-socket"));
+        let changed = Some(std::env::temp_dir().join("rmux-new-socket"));
+        let startup = super::StartupSocket { configured: original.clone(), environment_override: false };
+        assert_eq!(startup.reload_notice(&original), None);
+        for _ in 0..3 {
+            assert!(startup.reload_notice(&changed).unwrap().starts_with("Restart rmux"));
+        }
+        assert!(startup.reload_notice(&None).is_some());
+        assert_eq!(startup.reload_notice(&original), None);
+        let overridden = super::StartupSocket { configured: original, environment_override: true };
+        assert!(overridden.reload_notice(&changed).unwrap().contains("RMUX_SOCKET_DIR"));
+        let disabled = super::StartupSocket { configured: None, environment_override: false };
+        assert!(disabled.reload_notice(&changed).is_some());
+        assert_eq!(disabled.reload_notice(&None), None);
+    }
     #[test]
     fn settings_write_limit_includes_the_trailing_newline() -> anyhow::Result<()> {
         let directory = tempfile::tempdir()?;

@@ -3572,6 +3572,10 @@ fn main() {
         cx.set_global(preferences.confirm_close);
         cx.set_global(preferences.clone());
         cx.set_global(preferences::AppearanceBaseline(preferences.clone()));
+        cx.set_global(preferences::StartupSocket {
+            configured: preferences.socket_directory.clone(),
+            environment_override: std::env::var_os("RMUX_SOCKET_DIR").is_some(),
+        });
         recovery::install(recovery_lease.clone(), cx);
         cx.set_global(preferences::ReloadState::default());
         cx.set_global(preferences::LastSettingsSave::default());
