@@ -13,7 +13,21 @@ concurrency:
   group: release
   cancel-in-progress: false
 jobs:
+  preflight:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - uses: jdx/mise-action@5228313ee0372e111a38da051671ca30fc5a96db
+        with:
+          version: 2026.11.8
+          mise_toml: |
+            [tools]
+            python = "3.13.15"
+      - name: Check release version, notes and lockfiles
+        run: mise exec -- python scripts/check-release.py
   macos:
+    needs: preflight
     if: inputs.reuse_run == ''
     runs-on: macos-15
     timeout-minutes: 90
@@ -75,6 +89,7 @@ jobs:
           if-no-files-found: error
 
   portable:
+    needs: preflight
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(inputs.reuse_run != '' && '{"include":[{"os":"windows-2025","platform":"windows","target":"x86_64-pc-windows-msvc"}]}' || '{"include":[{"os":"ubuntu-24.04","platform":"linux","target":"x86_64-unknown-linux-gnu"},{"os":"windows-2025","platform":"windows","target":"x86_64-pc-windows-msvc"}]}') }}
@@ -143,6 +158,7 @@ jobs:
           if-no-files-found: error
 
   reuse:
+    needs: preflight
     if: inputs.reuse_run != ''
     runs-on: ubuntu-24.04
     steps:

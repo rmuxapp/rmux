@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Prepared the 0.1.5 preview release as one batch: workspace/lockfile version bump,
+user-facing notes, and an inexpensive release-workflow preflight before all
+platform builds. Preflight checks note/version agreement, local rmux package
+versions in both lockfiles, and absence of the release tag on origin. The actual
+0.1.5 preflight passes; injected existing-tag and remote-failure responses reject
+as expected. No local production build was run. All platform release builds,
+signing/notarization and publication run on GitHub. Release completion and the
+Sparkle feed remain pending until that workflow succeeds.
+
 Current priority is polish and release quality. Related changes are batched before
 focused checks/builds and pushes, per the user's instruction; full parity remains
 the longer-term scope. The shared palette presentation batch aligns header and
