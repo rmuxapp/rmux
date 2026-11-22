@@ -205,6 +205,27 @@ pub struct CustomCommand {
     pub cwd: Option<std::path::PathBuf>,
 }
 
+impl CustomCommand {
+    /// Resolve only complete argument tokens; path contents are never reparsed.
+    /// A shell's mutable cwd is deliberately not a substitute for project identity.
+    pub fn resolve_project(mut self, project: Option<&std::path::Path>) -> Result<Self> {
+        for argument in self.argv.iter_mut().skip(1) {
+            if argument == "{project_dir}" {
+                let path = project.context("This command needs a project workspace. Open the project folder in rmux first; standalone --command has no project identity")?;
+                anyhow::ensure!(path.is_absolute(), "Project directory must be absolute");
+                let path = path.to_str().context("Project directory is not valid UTF-8")?;
+                anyhow::ensure!(!path.contains('\0'), "Project directory contains a NUL");
+                *argument = path.to_owned();
+            } else if argument == "{{project_dir}}" {
+                *argument = "{project_dir}".into();
+            }
+        }
+        anyhow::ensure!(self.argv.iter().map(String::len).sum::<usize>() <= 16 * 1024,
+            "Resolved command arguments exceed 16 KiB");
+        Ok(self)
+    }
+}
+
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct LayoutPreset {

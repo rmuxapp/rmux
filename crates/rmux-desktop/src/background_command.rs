@@ -49,6 +49,26 @@ impl Running {
 mod tests {
     use super::*;
     #[test]
+    fn project_argument_is_literal_and_independent_of_command_cwd() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let project = root.path().join("project 'quoted' $(exit 99) 世界 {project_dir}");
+        std::fs::create_dir(&project)?;
+        let output = root.path().join("project-argument");
+        let definition: CustomCommand = serde_json::from_value(serde_json::json!({
+            "name":"Focus project", "mode":"background", "cwd":root.path(),
+            "argv":["/bin/sh", "-c", "printf '%s' \"$1\" > project-argument", "fixture", "{project_dir}"]
+        }))?;
+        assert!(definition.clone().resolve_project(None).is_err());
+        let resolved = definition.resolve_project(Some(&project))?;
+        launch(&resolved, Some(Path::new("/unrelated/terminal/subfolder")))?.wait()?;
+        assert_eq!(std::fs::read_to_string(output)?, project.to_str().unwrap());
+        let literal: CustomCommand = serde_json::from_value(serde_json::json!({
+            "name":"literal", "argv":["echo", "{{project_dir}}", "prefix-{project_dir}"]
+        }))?;
+        assert_eq!(literal.resolve_project(None)?.argv[1..], ["{project_dir}", "prefix-{project_dir}"]);
+        Ok(())
+    }
+    #[test]
     fn literal_arguments_environment_directory_and_exit_status() -> Result<()> {
         let root = tempfile::tempdir()?;
         let output = root.path().join("result");

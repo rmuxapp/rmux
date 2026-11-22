@@ -100,6 +100,25 @@ Use an explicit project path for a fixed command. Multi-root `.code-workspace`
 windows need their workspace file; a member folder does not identify the whole
 workspace. Remote SSH and containers need separate routing.
 
+### Keep targeting the original project after changing directories
+
+Available on development main after v0.1.12 (not yet in a published release):
+use the workspace's stored project directory as a complete argument:
+
+```json
+"argv": [
+  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+  "{project_dir}"
+]
+```
+
+Keep `mode: "background"` and your Cmd+Shift+C binding. This remains tied to the
+original project when you rename its rmux workspace or `cd` into another folder.
+Open the workspace through VS Code's external-terminal command to establish the
+project identity. A manually created workspace without one reports an error;
+rmux does not substitute an unrelated current directory. This targets local
+folder workspaces; a multi-root `.code-workspace` window needs its workspace file.
+
 ## If you tried the task-based setup
 
 Remove the custom Cmd+Shift+C task binding from VS Code's Keyboard Shortcuts

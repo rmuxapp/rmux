@@ -143,6 +143,15 @@ directory/argument preview; environment values are omitted. By default (`"mode":
 starts a dedicated workspace with its own terminal; it does not inject text into
 an existing shell. Arguments are literal, including spaces and empty arguments;
 use an explicit shell executable only when shell interpretation is intended.
+On development main (after v0.1.12), a complete argument `{project_dir}` expands
+to the active workspace's stored project directory. This is the project opened
+from VS Code or a native folder open, independent of terminal `cd`, workspace
+renaming, and command `cwd`. It works for terminal and background commands
+invoked inside rmux. Workspaces without a stored project identity, and standalone
+`rmux --command`, report an error instead of guessing. Use `{{project_dir}}` for
+a literal argument of that spelling. Embedded tokens, executable paths, `cwd`,
+and environment values are not expanded. Paths are passed as a single argument,
+never interpreted as shell source.
 Without `cwd`, the selected workspace's remembered terminal directory is used
 when available. Limits are 32 unique command names, 64 argv entries and 16 KiB
 of argument text per command, within the config's overall 64 KiB limit. Optional

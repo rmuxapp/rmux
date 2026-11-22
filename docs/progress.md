@@ -10680,3 +10680,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Added an explicit settings-file opener that bypasses the configured editor, allowing repair when its executable path is broken. Uses TextEdit on macOS and the system association elsewhere; ordinary settings opens still honor the configured editor. Mouse and keyboard share the action handler.
 - Two focused Settings navigation/activation tests passed and compiled the native changes. Native app inventory is accessible again, but the installed user app was not manipulated; visual acceptance of these new controls remains pending. No release or deployment.
 - Bash login startup investigation remains incomplete: isolated installed Bash 3.2 experiments did not execute the proposed ENV/POSIX bootstrap. No shell launch behavior or user startup files were changed.
+
+### Project-aware configured commands
+
+- Configured terminal/background commands invoked inside rmux now resolve a complete `{project_dir}` argv argument from the active workspace's persistent project identity before launch. Renaming or shell cwd changes do not retarget it. Expansion is single-pass and literal, with existing argument-size bounds; `{{project_dir}}` escapes the token. Executable/env/cwd and embedded strings are unchanged.
+- Missing identity and standalone --command produce explicit errors instead of using process cwd. Documented the VS Code CLI setup as development-main only after v0.1.12; multi-root workspace routing remains outside this folder-based workflow.
+- Two focused background-command tests passed, including actual child argv delivery with quotes, Unicode, shell metacharacters and placeholder-looking path content, independent command cwd, missing identity and escaped tokens. Native test compilation passed. Multi-window VS Code focus acceptance remains pending; no user editor windows or sessions were changed.

@@ -3525,12 +3525,16 @@ fn main() {
                 eprintln!("rmux: command is not configured: {name}");
                 std::process::exit(2);
             };
+            let configured = match configured.clone().resolve_project(None) {
+                Ok(command) => command,
+                Err(error) => { eprintln!("rmux: {name}: {error:#}"); std::process::exit(2); }
+            };
             if configured.mode == preferences::CommandMode::Background {
                 if live_rpc_stdio {
                     eprintln!("rmux: background --command does not open a GUI or RPC session");
                     std::process::exit(2);
                 }
-                if let Err(error) = background_command::launch(configured, std::env::current_dir().ok().as_deref()).and_then(|child| child.wait()) {
+                if let Err(error) = background_command::launch(&configured, std::env::current_dir().ok().as_deref()).and_then(|child| child.wait()) {
                     eprintln!("rmux: {name}: {error:#}");
                     std::process::exit(1);
                 }

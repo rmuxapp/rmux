@@ -1196,6 +1196,12 @@ impl WorkspaceWindow {
         let Some(command) = cx.global::<Preferences>().commands.iter().find(|command| command.name == name).cloned() else {
             self.notice = Some("Custom command is no longer configured".into()); cx.notify(); return;
         };
+        let project = self.workspace_state.entries.get(self.workspace_state.active)
+            .and_then(|entry| entry.project_directory.as_deref());
+        let command = match command.resolve_project(project) {
+            Ok(command) => command,
+            Err(error) => { self.notice = Some(format!("{name}: {error:#}")); cx.notify(); return; }
+        };
         if command.mode == preferences::CommandMode::Background {
             let directory = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
                 let workspace = entry.workspace.read(cx);
