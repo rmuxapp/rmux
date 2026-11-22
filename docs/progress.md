@@ -10704,3 +10704,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Terminal focus recording now updates the workspace's remembered pane immediately, not only on workspace switches/snapshots. Opening Settings also captures the current pane before its focus moves. Sidebar context and background command fallback therefore retain the recently used pane.
 - Browse Terminal Files and Use Current Terminal Directory for Group now use the shared focused/remembered/first-pane selection, preserving their local-directory target when window-level UI owns focus. Terminal-scoped operations retain their existing focus guards; merely adding them to an overlay palette would not make their action dispatch work.
 - Desktop compilation passed; final diff restores the unchanged terminal-scoped palette availability path. Native multi-pane/overlay acceptance remains pending. No release, deployment, or user-session changes.
+
+### Inspector-to-command-palette focus transition
+
+- Opening the main command palette now closes focused Memory first, then Settings/Notifications, using their existing origin-focus restoration before capturing command context. This avoids dispatching terminal actions back into an inspector and keeps Escape's return target usable. Memory closes first because its origin may itself be Settings.
+- Existing palette toggle behavior is retained. The keyboard-handler review found existing Ctrl/Cmd/Alt/Shift guards in Settings, Memory and Ports; no speculative modifier rewrite was added.
+- Desktop compilation passed; final diff reordered the same close calls to respect nested focus ownership. Native Settings → Cmd+P → terminal action / Escape, Notifications and Memory transitions remain runtime acceptance items. No build/deployment or changes to user sessions.

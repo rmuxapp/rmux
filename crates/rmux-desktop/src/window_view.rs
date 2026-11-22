@@ -2578,6 +2578,13 @@ impl WorkspaceWindow {
             self.close_palette(window, cx);
             return;
         }
+        // Replace window inspectors before capturing the palette's dispatch
+        // origin. Otherwise terminal actions are sent back to an inspector.
+        if self.memory_focus.as_ref().is_some_and(|focus| focus.is_focused(window)) {
+            self.close_memory(window, cx);
+        }
+        if self.settings_state.is_some() { self.toggle_settings(window, cx); }
+        if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
         let focus = window.focused(cx);
         let workspaces = self.workspace_order(true)
             .into_iter()
