@@ -90,10 +90,11 @@ checkboxes and searchable Pending task / Completed task labels. Clicking copies
 the block text; it does not toggle completion or write the file.
 
 Block copying returns its text without added list/checkbox markers;
-source copying preserves the original Markdown. In wrapped mode, code excerpts
-show four separate source lines near the first matching query word, preserve
-indentation, and expand tabs at four-column stops. Long lines and omitted code
-receive clipping markers; copying retains the entire captured block.
+source copying preserves the original Markdown. In wrapped mode, code blocks
+have a four-line-high scrollable viewport containing all captured source lines.
+Scroll within a block to read more; long lines can scroll horizontally.
+Indentation is preserved and tabs expand at four-column stops. Changing the search
+brings the first matching source line into view. Copying retains the original block.
 Search and highlight operate on reading text; Enter copies a block, while
 **Copy Markdown Source** keeps the captured original Markdown. **View Source**
 returns to the ordinary text preview. Ctrl+Alt+V toggles reading/source mode and
@@ -121,7 +122,7 @@ that only the first eight are shown. Row copying retains all tab-separated cells
 and Copy Markdown Source retains the original document. Empty cells remain blank.
 Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
 alignment markers; unspecified columns align left. Table horizontal scrolling,
-relative/file links, images, full code-block scrolling and document appearance controls
+relative/file links, images and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
 
 Web links open in the default browser when clicked. For keyboard use, select a

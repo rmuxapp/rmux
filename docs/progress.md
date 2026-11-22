@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+Markdown code blocks now keep all captured source lines in a compact scroll
+viewport instead of clipping to a four-line excerpt. Per-block scroll handles
+retain position across redraws; a changed search reveals the first matching line.
+Tabs retain Unicode-aware four-column stops and controls remain inert; copying
+keeps original source. The existing file byte/line limits still apply. Fourteen
+Markdown tests pass, including long Unicode lines, all 512 source lines and search
+position. Native scrolling, horizontal layout and interaction acceptance remain
+pending while the Mac is locked.
+
 Markdown preview destinations now use immutable shared storage across table cells
 and render elements. Click handlers, tooltips and the keyboard destination bar
 clone shared string handles instead of copying URL contents on redraw. Desktop

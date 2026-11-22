@@ -257,6 +257,7 @@ pub struct CommandPalette {
     location: Option<SharedString>,
     feedback: Option<&'static str>,
     preview_link: Option<(usize, usize)>,
+    code_scroll: std::collections::HashMap<usize, (String, ScrollHandle)>,
     buffer_rename: Option<(String, u64)>,
     directory_input: bool,
     terminal_search_input: bool,
@@ -674,6 +675,7 @@ impl CommandPalette {
                     command.target = PaletteEvent::Run(Box::new(CopyPreviewLine { text: line.text.clone(), markdown: Some(block.kind), spans: block.spans, links: block.links.into_iter().map(SharedString::from).collect() }));
                     let label = match command.markdown_kind() {
                         Some(markdown_preview::Kind::Heading(level)) => format!("Heading H{level}"),
+                        Some(markdown_preview::Kind::Code) => "Code · Scroll to read".into(),
                         Some(markdown_preview::Kind::Table { header, columns, .. }) => format!("Table {} · {columns} columns{}", if header { "header" } else { "row" }, if columns > 8 { " · first 8 shown; copy for all" } else { "" }),
                         Some(markdown_preview::Kind::List { checked: Some(true), .. }) => "Completed task".into(),
                         Some(markdown_preview::Kind::List { checked: Some(false), .. }) => "Pending task".into(),
@@ -840,7 +842,7 @@ impl CommandPalette {
         )
         .detach();
         Self {
-            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, directory_input: false, terminal_search_input: false, ssh_input: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
+            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
             search: palette_match::RankedSearch::new(commands
                 .iter()
                 .map(Command::search_text)
@@ -969,9 +971,7 @@ impl CommandPalette {
         let markdown = self.commands[command].markdown_kind();
         let heading = match markdown { Some(markdown_preview::Kind::Heading(level)) => Some(level), _ => None };
         let title = self.commands[command].preview_line()
-            .map(|text| if wrapped && markdown == Some(markdown_preview::Kind::Code) {
-                markdown_preview::code_excerpt(text, self.input.read(cx).value())
-            } else { file_browser::preview_line_title(text, self.input.read(cx).value()) })
+            .map(|text| file_browser::preview_line_title(text, self.input.read(cx).value()))
             .unwrap_or_else(|| self.commands[command].title.clone());
         let excerpt_len = title.len();
         let title = match markdown {
@@ -1014,12 +1014,28 @@ impl CommandPalette {
             None => title.clone().into(),
         };
         let title_ranges = file_browser::preview_highlights(&title, self.input.read(cx).value());
-        let code_lines = (wrapped && markdown == Some(markdown_preview::Kind::Code)).then(|| title.split('\n').map(|line| {
-            let ranges = file_browser::preview_highlights(line, self.input.read(cx).value());
-            StyledText::new(line.to_owned()).with_highlights(ranges.into_iter().map(|range| (
-                range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
-            )))
-        }).collect::<Vec<_>>());
+        let code_view = if wrapped && markdown == Some(markdown_preview::Kind::Code) {
+            let source = self.commands[command].preview_line().unwrap_or("");
+            let query = self.input.read(cx).value();
+            let state = self.code_scroll.entry(command).or_insert_with(|| {
+                let scroll = ScrollHandle::new();
+                scroll.scroll_to_top_of_item(markdown_preview::code_match_line(source, query));
+                (query.to_owned(), scroll)
+            });
+            if state.0 != query {
+                state.0 = query.to_owned();
+                state.1.scroll_to_top_of_item(markdown_preview::code_match_line(source, query));
+            }
+            Some(div().id(("code-scroll", command)).h(px(80.)).w_full()
+                .overflow_scroll().track_scroll(&state.1).flex().flex_col().items_start()
+                .children(markdown_preview::code_lines(source).into_iter().map(|line| {
+                    let ranges = file_browser::preview_highlights(&line, query);
+                    div().h(px(20.)).flex_shrink_0().whitespace_nowrap().child(
+                        StyledText::new(line).with_highlights(ranges.into_iter().map(|range| (
+                            range, HighlightStyle { color: Some(rgb(0xffffff).into()), background_color: Some(rgb(0x41638c).into()), ..Default::default() }
+                        ))))
+                })).into_any_element())
+        } else { None };
         let links = match &self.commands[command].target {
             PaletteEvent::Run(action) => action.as_any().downcast_ref::<CopyPreviewLine>().map(|line| line.links.clone()).unwrap_or_default(),
             _ => Default::default(),
@@ -1054,8 +1070,8 @@ impl CommandPalette {
                     .when(!wrapped, |title| title.truncate())
                     .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(title_hint.clone())).into())
                     .child(div().flex().flex_col().gap_1()
-                        .child(if let Some(table) = table { table } else if let Some(lines) = code_lines {
-                            div().flex().flex_col().overflow_hidden().children(lines.into_iter().map(|line| div().h(px(20.)).flex_shrink_0().whitespace_nowrap().overflow_hidden().child(line))).into_any_element()
+                        .child(if let Some(table) = table { table } else if let Some(code) = code_view {
+                            code
                         } else { div().when(wrapped, |title| title.whitespace_normal().line_clamp(if heading.is_some() { 2 } else { 4 }).text_ellipsis()).when(!wrapped, |title| title.truncate()).child(title).into_any_element() })
                         .when_some(subtitle, |column, subtitle| column.child(div().truncate().text_xs().line_height(px(16.)).text_color(rgb(0xa0a0a0)).child(subtitle)))),
             )
