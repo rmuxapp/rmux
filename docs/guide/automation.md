@@ -327,7 +327,7 @@ starts at the oldest retained record. Limits are 1–128 (default 128); when
 Filter with optional `surface_id`, `workspace_id` and `kinds` (an array of up to
 16 distinct supported event names). All supplied filters must match; an empty
 kinds array accepts all kinds. The CLI uses `--surface ID`, `--workspace ID` and
-repeatable `--kind KIND`. Workspace filters select workspace lifecycle records,
+repeatable `--kind KIND`. Workspace filters select workspace lifecycle/location records,
 not events from terminals inside that workspace. Supplying both resource IDs
 therefore matches no current event kinds.
 Unknown kinds and malformed IDs are rejected. IDs may refer to closed resources,
@@ -375,6 +375,12 @@ windows preserves its identity and does not close/recreate it. Close is emitted
 once even if rendering retains the old entity. Creation can precede publication
 into the window list; a failed setup can produce a short-lived create/close pair.
 Use `workspace.list` for current state; these records contain no names or paths.
+`workspace.location_invalidated` is emitted when a workspace's window bindings
+are rebuilt during a move or detach. Refresh `workspace.list` for its current
+`window_id`. The stable workspace ID and existing terminals are preserved.
+Rollback can invalidate an unchanged final location; requesting a move to the
+window that already owns it emits no event. Per-surface location invalidations
+also cover its terminals.
 
 Terminal metadata also emits `surface.title_changed`, `surface.directory_changed`,
 `surface.status_changed` and `surface.progress_changed`. Shell title and directory

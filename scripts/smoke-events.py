@@ -160,6 +160,19 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             original_pid = next(s["process_id"] for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
             call("window.create")
             other = next(w for w in call("workspace.list")["workspaces"] if w["window_id"] != window)
+            for target_window in (other["window_id"], window):
+                boundary = call("events.read")["cursor"]
+                call("workspace.move_to_window", {"workspace_id": destination, "window_id": target_window})
+                lifecycle = call("events.read", {"after": boundary, "workspace_id": destination})
+                assert [e["kind"] for e in lifecycle["events"]] == ["workspace.location_invalidated"], lifecycle
+                moved_workspace = next(w for w in call("workspace.list")["workspaces"] if w["id"] == destination)
+                assert moved_workspace["window_id"] == target_window, moved_workspace
+                moved_terminal = next(s for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
+                assert moved_terminal["window_id"] == target_window and moved_terminal["process_id"] == original_pid, moved_terminal
+            boundary = call("events.read")["cursor"]
+            call("workspace.move_to_window", {"workspace_id": destination, "window_id": window})
+            assert call("events.read", {"after": boundary, "workspace_id": destination})["events"] == [], "same-window move emitted lifecycle event"
+
             for target_workspace, target_window in [(other["id"], other["window_id"]), (original_workspace, window)]:
                 boundary = call("events.read")["cursor"]
                 call("surface.move_to_workspace", {"surface_id": created_surface, "workspace_id": target_workspace})
@@ -184,7 +197,7 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                     assert time.monotonic() < deadline, "transferred terminal did not respond"
                     time.sleep(.01)
             assert destination not in [w["id"] for w in call("workspace.list")["workspaces"]], "empty source workspace survived transfer"
-            workspace_events = call("events.read", {"after": created["cursor"], "workspace_id": destination})
+            workspace_events = call("events.read", {"after": created["cursor"], "workspace_id": destination, "kinds": ["workspace.closed"]})
             assert [e["kind"] for e in workspace_events["events"]] == ["workspace.closed"], workspace_events
             # Keep another workspace alive so the application can answer after
             # closing both original terminal entities.

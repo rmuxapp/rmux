@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Whole-workspace moves now publish workspace.location_invalidated with the stable
+workspace ID. Native replay smoke moves a populated workspace between two windows
+and back, checks destination window IDs and retained terminal PID, and rejects
+false creation/closure events. A same-window move is a no-op with no invalidation.
+The smoke passes; rollback semantics remain invalidation-only, and detached-window
+UI acceptance remains pending.
+
 Replay now includes workspace.created/workspace.closed with workspace_id instead
 of surface_id. Workspace ownership tokens avoid duplicate close records and move
 with their entity; explicit close, empty-source removal and merge close promptly.

@@ -2639,6 +2639,7 @@ impl Workspace {
     }
     fn rebind_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.split_drag = None;
+        self.event_lifetime.location_invalidated();
         if let Some(canceled) = self.split_launch_canceled.take() { canceled.store(true, Ordering::Relaxed); }
         self.spawning_split = None;
         self.pane_subscriptions.clear();

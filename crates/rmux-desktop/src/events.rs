@@ -15,7 +15,7 @@ impl Default for Read {
     fn default() -> Self { Self { after: None, limit: default_limit(), wait_ms: 0, surface_id: None, workspace_id: None, kinds: Vec::new() } }
 }
 const KINDS: &[&str] = &["notification.received", "notification.read", "notification.all_read", "notification.dismissed", "notification.cleared",
-    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed", "surface.bell", "surface.location_invalidated", "workspace.created", "workspace.closed"];
+    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed", "surface.bell", "surface.location_invalidated", "workspace.created", "workspace.closed", "workspace.location_invalidated"];
 pub fn capabilities() -> serde_json::Value {
     serde_json::json!({
         "version":1, "method":"events.read", "kinds":KINDS,
@@ -135,6 +135,11 @@ impl Journal {
 /// Moves with workspace ownership; retained render entities do not delay close.
 pub struct WorkspaceLifetime { journal: Journal, workspace: gpui::EntityId, closed: std::cell::Cell<bool> }
 impl WorkspaceLifetime {
+    pub fn location_invalidated(&self) {
+        if !self.closed.get() {
+            self.journal.0.borrow_mut().push_resource("workspace.location_invalidated", None, Some(self.workspace), None);
+        }
+    }
     pub fn close(&self) {
         if !self.closed.replace(true) {
             self.journal.0.borrow_mut().push_resource("workspace.closed", None, Some(self.workspace), None);
@@ -173,6 +178,7 @@ mod tests {
         assert!(waiter.receiver.is_empty());
         workspace.close();
         workspace.close();
+        workspace.location_invalidated();
         drop(workspace);
         let batch = journal.read(&filter).unwrap();
         assert_eq!(batch.events.iter().map(|event| event.kind).collect::<Vec<_>>(), ["workspace.created", "workspace.closed"]);
