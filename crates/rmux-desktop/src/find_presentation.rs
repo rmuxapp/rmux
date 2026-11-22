@@ -98,13 +98,13 @@ pub(crate) fn bar<V: FindHost>(input: Entity<TextField>, status: String, status_
                     .child(if has_query || status_error { status.clone() } else { String::new() }))
                 .child(control("find-older", "Older match · Enter")
                     .when(!can_navigate, |control| control.opacity(0.35).cursor_default())
-                    .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                        if event.standard_click() { this.navigate_find(true, cx); }
+                    .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
+                        if can_navigate && event.standard_click() { this.navigate_find(true, cx); }
                     })).child(crate::icons::icon("chevron-up")))
                 .child(control("find-newer", "Newer match · Shift+Enter")
                     .when(!can_navigate, |control| control.opacity(0.35).cursor_default())
-                    .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                        if event.standard_click() { this.navigate_find(false, cx); }
+                    .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
+                        if can_navigate && event.standard_click() { this.navigate_find(false, cx); }
                     })).child(crate::icons::icon("chevron-down")))
                 .child(control("find-close", "Close Find · Escape")
                     .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {

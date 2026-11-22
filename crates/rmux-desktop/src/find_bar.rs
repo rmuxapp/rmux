@@ -11,6 +11,7 @@ pub(super) struct FindBar {
     input: Entity<TextField>,
     status: String,
     status_error: bool,
+    no_matches: bool,
     history: QueryHistory,
     _updates: Task<()>,
 }
@@ -18,7 +19,7 @@ impl EventEmitter<Closed> for FindBar {}
 impl FindBar {
     pub fn navigate(&mut self, direction: Direction, cx: &App) {
         let query = self.input.read(cx).value();
-        if query.is_empty() || self.status_error || self.input.read(cx).is_composing() { return; }
+        if query.is_empty() || self.status_error || self.no_matches || self.input.read(cx).is_composing() { return; }
         self.history.remember(query);
         // The worker retains navigation while the initial scan runs.
         self.worker.navigate(direction);
@@ -58,6 +59,7 @@ impl FindBar {
             EditEvent::Changed(text) => {
                 view.history.edited(text);
                 view.status_error = false;
+                view.no_matches = false;
                 view.status = if text.is_empty() { "Find in terminal" } else { "Searching…" }.into();
                 if let Err(error) = view.worker.set_query(text.clone()) {
                     view.status_error = true;
@@ -80,8 +82,11 @@ impl FindBar {
                             if view.input.read(cx).value().len() > 4096 { return; }
                             view.status_error = update.result.is_err();
                             view.status = match update.result {
-                                Ok(p) => rmux_core::search_state::status(view.input.read(cx).value().is_empty(), p.matches, p.selected, p.pending),
-                                Err(error) => error,
+                                Ok(p) => {
+                                    view.no_matches = !view.input.read(cx).value().is_empty() && !p.pending && p.matches == 0;
+                                    rmux_core::search_state::status(view.input.read(cx).value().is_empty(), p.matches, p.selected, p.pending)
+                                },
+                                Err(error) => { view.no_matches = false; error },
                             };
                             cx.notify();
                             let _ = parent.update(cx, |_, cx| cx.notify());
@@ -99,6 +104,7 @@ impl FindBar {
             input,
             status,
             status_error,
+            no_matches: false,
             history,
             _updates: task,
         }
@@ -115,6 +121,6 @@ impl crate::find_presentation::FindHost for FindBar {
 }
 impl Render for FindBar {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.status_error, cx)
+        crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.status_error || self.no_matches, cx)
     }
 }

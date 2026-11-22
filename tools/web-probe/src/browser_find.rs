@@ -9,6 +9,7 @@ pub(crate) struct FindBar {
     parent: WeakEntity<TerminalSample>,
     status: String,
     error: bool,
+    no_matches: bool,
     pending: bool,
     navigation: std::collections::VecDeque<bool>,
     task: Option<Task<()>>,
@@ -24,6 +25,7 @@ impl FindBar {
                 this.task = None;
                 this.navigation.clear();
                 this.error = false;
+                this.no_matches = false;
                 let result = this.parent.read_with(cx, |terminal, _| terminal.engine.search_query(query));
                 this.accept(result.unwrap_or_else(|_| Err("Terminal closed".into())), cx);
             }
@@ -35,7 +37,7 @@ impl FindBar {
             let result = this.parent.read_with(cx, |terminal, _| terminal.engine.search_refresh());
             this.accept(result.unwrap_or_else(|_| Err("Terminal closed".into())), cx);
         }).detach();
-        let mut view = Self { input, history, parent: parent.downgrade(), status: "Find in terminal".into(), error: false,
+        let mut view = Self { input, history, parent: parent.downgrade(), status: "Find in terminal".into(), error: false, no_matches: false,
             pending: false, navigation: Default::default(), task: None };
         view.accept(progress, cx);
         view
@@ -56,6 +58,7 @@ impl FindBar {
             Ok(progress) => {
                 self.pending = progress.pending;
                 self.error = false;
+                self.no_matches = !self.input.read(cx).value().is_empty() && !progress.pending && progress.matches == 0;
                 self.status = rmux_core::search_state::status(self.input.read(cx).value().is_empty(), progress.matches, progress.selected, progress.pending);
                 if self.pending { self.schedule(cx); }
                 else {
@@ -88,7 +91,7 @@ impl FindHost for FindBar {
     fn focus_find(&mut self, window: &mut Window, cx: &mut Context<Self>) { self.input.read(cx).focus.clone().focus(window, cx); }
     fn close_find(&mut self, cx: &mut Context<Self>) { cx.emit(Closed); }
     fn navigate_find(&mut self, older: bool, cx: &mut Context<Self>) {
-        if self.error || self.input.read(cx).value().is_empty() || self.input.read(cx).is_composing() { return; }
+        if self.error || self.no_matches || self.input.read(cx).value().is_empty() || self.input.read(cx).is_composing() { return; }
         self.history.remember(self.input.read(cx).value());
         if self.pending {
             if self.navigation.len() < 64 { self.navigation.push_back(older); }
@@ -104,7 +107,7 @@ impl FindHost for FindBar {
 }
 impl Render for FindBar {
     fn render(&mut self, _: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.error, cx)
+        crate::find_presentation::bar(self.input.clone(), self.status.clone(), self.error || self.no_matches, cx)
             .on_action(cx.listener(|this, _: &crate::Find, window, cx| this.focus_query(window, cx)))
             .on_action(cx.listener(|this, _: &crate::FindOlder, _, cx| this.navigate_find(true, cx)))
             .on_action(cx.listener(|this, _: &crate::FindNewer, _, cx| this.navigate_find(false, cx)))

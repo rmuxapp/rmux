@@ -1,3 +1,13 @@
+Find feedback polish: completed searches with zero matches now use the shared
+error-colored query border/status and disable match navigation in both hosts.
+Native and WASM navigation handlers reject completed no-match requests; shared
+pointer controls now honor their disabled state. Editing a query clears the
+no-match state immediately, preserving queued navigation during pending scans.
+Native compile checking and the WASM build passed. Browser review verified the
+no-match state, recovery to a matching query, and Escape returning terminal input
+where `echo find-focus-restored` ran immediately. Screenshot:
+`target/find-no-matches.png`. Native pointer acceptance remains pending.
+
 Palette search quality: native and WASM palettes now keep command text separate
 from shortcut aliases. Titles retain fuzzy matching, while binding aliases match
 whole tokens; fuzzy words cannot span or form inside repeated shortcut synonyms.
