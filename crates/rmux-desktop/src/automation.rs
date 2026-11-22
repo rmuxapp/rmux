@@ -20,6 +20,7 @@ const LIVE_METHODS: &[&str] = &[
     "window.create",
     "workspace.list",
     "workspace.create",
+    "workspace.open",
     "workspace.close",
     "pane.list",
     "pane.zoom.set",
@@ -159,6 +160,38 @@ pub(super) struct SurfaceText {
     pub paste: bool,
 }
 
+/// Resolve exact names across normal windows; cwd and startup parameters are
+/// creation-only. Never guess among duplicate names.
+fn resolve_open_workspace(create: &mut WorkspaceCreate, cx: &mut gpui::App) -> Result<Option<Value>, Failure> {
+    let target = if create.window_id.is_empty() { None } else { Some(target_id(&create.window_id)?) };
+    let name = create.name.as_deref().expect("validated workspace.open name");
+    let mut windows = Vec::new();
+    let mut matches = Vec::new();
+    for handle in cx.windows() {
+        let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
+        let any: gpui::AnyWindowHandle = handle.into();
+        let Ok(Some((id, workspaces))) = any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, cx| {
+            entity.read(cx).automation_named_workspaces(name).map(|workspaces| (entity.entity_id(), workspaces))
+        }) else { continue; };
+        if target.is_some_and(|target| target != id) { continue; }
+        for workspace in workspaces { matches.push((id, handle, workspace)); }
+        windows.push((id, handle));
+    }
+    if matches.len() > 1 { return Err(Failure { code: -32006, message: "Workspace name is ambiguous; use --window or rename duplicates" }); }
+    if let Some((id, handle, workspace)) = matches.pop() {
+        create.window_id = id.to_string();
+        return handle.update(cx, |view, window, cx| view.automation_reuse_workspace(create, workspace, window, cx))
+            .map_err(|_| Failure { code: -32004, message: "Window closed" })?.map(Some);
+    }
+    windows.sort_by_key(|(id, _)| id.as_u64());
+    let preferred = cx.active_window().and_then(|active| windows.iter().find(|(_, handle)| gpui::AnyWindowHandle::from(*handle) == active));
+    let Some((id, _)) = preferred.or_else(|| windows.first()) else {
+        return Err(Failure { code: -32004, message: "No matching rmux window; open an rmux window first" });
+    };
+    create.window_id = id.to_string();
+    Ok(None)
+}
+
 fn default_read_limit() -> usize {
     64 * 1024
 }
@@ -226,10 +259,13 @@ struct WindowCreate {
     activate: bool,
 }
 
-#[derive(serde::Deserialize, Debug)]
+#[derive(Clone, serde::Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 pub(super) struct WorkspaceCreate {
+    #[serde(default)]
     pub window_id: String,
+    #[serde(skip)]
+    pub reuse: bool,
     pub ssh_destination: Option<String>,
     pub name: Option<String>,
     pub description: Option<String>,
@@ -467,22 +503,27 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                 continue;
             }
             if let Some(create) = request.workspace_create.as_ref() {
+                let mut create = create.clone();
                 let prepared = cx.update(|cx| {
                     if !request.pending.start() { return Err(Failure { code: -32001, message: "Request expired before execution" }); }
+                    if create.reuse {
+                        if let Some(workspace) = resolve_open_workspace(&mut create, cx)? { return Ok(Err(workspace)); }
+                    }
                     let target = target_id(&create.window_id)?;
                     for handle in cx.windows() {
                         let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
                         let any: gpui::AnyWindowHandle = handle.into();
                         if any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, _| entity.entity_id() == target).unwrap_or(false) {
-                            let job = handle.update(cx, |view, _, cx| view.automation_prepare_workspace(create, cx))
+                            let job = handle.update(cx, |view, _, cx| view.automation_prepare_workspace(&create, cx))
                                 .map_err(|_| Failure { code: -32004, message: "Window closed" })??;
-                            return Ok((handle, job));
+                            return Ok(Ok((handle, job)));
                         }
                     }
                     Err(Failure { code: -32004, message: "Window not found" })
                 }).unwrap_or(Err(Failure { code: -32004, message: "Application closed" }));
                 let result = match prepared {
-                    Ok((handle, job)) => {
+                    Ok(Err(workspace)) => Ok(workspace),
+                    Ok(Ok((handle, job))) => {
                         let mut prepared = cx.background_executor().spawn(async move { job() }).await;
                         loop {
                             let refresh = cx.update(|cx| {
@@ -497,7 +538,7 @@ pub fn attach_live(cx: &mut gpui::App, stdio: bool, socket_directory: Option<std
                                 super::TerminalView::prepare(session, colors, palette)
                             }).await;
                         }
-                        handle.update(cx, |view, window, cx| view.automation_finish_workspace(create, prepared, window, cx))
+                        handle.update(cx, |view, window, cx| view.automation_finish_workspace(&create, prepared, window, cx))
                             .map_err(|_| Failure { code: -32004, message: "Window closed during terminal startup" })
                             .and_then(|result| result)
                     }
@@ -1045,6 +1086,7 @@ fn dispatch_inner(
                 | "pane.split"
                 | "window.create"
                 | "workspace.create"
+                | "workspace.open"
                 | "workspace.close"
                 | "workspace.rename"
                 | "workspace.group.create"
@@ -1227,9 +1269,10 @@ fn dispatch_inner(
             _ => return respond(error(id, -32602, "Expected notification surface_id and content or revision")),
         }
     } else { None };
-    let workspace_create = if method == "workspace.create" {
+    let workspace_create = if matches!(method, "workspace.create" | "workspace.open") {
         match serde_json::from_value::<WorkspaceCreate>(request.get("params").cloned().unwrap_or_else(|| json!({}))) {
-            Ok(mut create) if target_id(&create.window_id).is_ok()
+            Ok(mut create) if (target_id(&create.window_id).is_ok() || (method == "workspace.open" && create.window_id.is_empty()))
+                && (method != "workspace.open" || create.name.is_some())
                 && create.ssh_destination.as_ref().is_none_or(|destination| super::ssh::command(destination).is_ok())
                 && create.cwd.as_ref().is_none_or(|path| path.is_absolute())
                 && create.description.as_ref().is_none_or(|text| text.len() <= 4096 && !text.contains('\0')) => {
@@ -1237,9 +1280,11 @@ fn dispatch_inner(
                     let Some(name) = super::window_view::normalized_workspace_name(name) else { return respond(error(id, -32602, "Workspace name must not be empty")); };
                     create.name = Some(name);
                 }
+                create.reuse = method == "workspace.open";
+                if create.reuse && request.get("params").and_then(|params| params.get("focus")).is_none() { create.focus = true; }
                 Some(create)
             }
-            _ => return respond(error(id, -32602, "Expected window_id, optional valid ssh_destination, name, description, absolute cwd, focus and activate booleans")),
+            _ => return respond(error(id, -32602, "Expected window_id (optional for workspace.open), name (required for workspace.open), optional valid ssh_destination, name, description, absolute cwd, focus and activate booleans")),
         }
     } else { None };
     let surface_memory = if method == "surface.memory_usage" {
@@ -1695,6 +1740,28 @@ mod tests {
             assert_eq!(dispatch_inner(&serde_json::to_vec(&request).unwrap(), Some(&sender)).unwrap()["error"]["code"], -32602);
             assert!(receiver.is_empty());
         }
+    }
+
+    #[test]
+    fn open_workspace_requires_name_and_defaults_to_reuse_and_selection() {
+        let (sender, receiver) = async_channel::bounded::<LiveRequest>(1);
+        for params in [json!({}), json!({"name":" "}), json!({"name":"a","cwd":"relative"}), json!({"name":"a","window_id":"invalid"})] {
+            let request = json!({"jsonrpc":"2.0","id":1,"method":"workspace.open","params":params});
+            assert_eq!(dispatch_inner(&serde_json::to_vec(&request).unwrap(), Some(&sender)).unwrap()["error"]["code"], -32602);
+            assert!(receiver.is_empty());
+        }
+        let worker = std::thread::spawn(move || {
+            let request = receiver.recv_blocking().unwrap();
+            assert!(request.pending.start());
+            let create = request.workspace_create.unwrap();
+            assert!(create.reuse && create.focus && !create.activate);
+            assert!(create.window_id.is_empty());
+            assert_eq!(create.name.as_deref(), Some("Editor 世界"));
+            request.reply.send(Ok(json!({"reused":true}))).unwrap();
+        });
+        let request = json!({"jsonrpc":"2.0","id":2,"method":"workspace.open","params":{"name":" Editor 世界 "}});
+        assert_eq!(dispatch_inner(&serde_json::to_vec(&request).unwrap(), Some(&sender)).unwrap()["result"]["reused"], true);
+        worker.join().unwrap();
     }
 
     #[test]

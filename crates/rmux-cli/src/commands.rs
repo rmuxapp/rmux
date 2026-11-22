@@ -14,6 +14,7 @@ pub const HELP: &str = "Commands (JSON output except default pipe-pane; explicit
   read-notification --surface ID --revision NUMBER
   close-workspace --workspace ID
   new-window [--activate]
+  open-workspace --name NAME [--window ID] [--cwd PATH] [--activate]
   new-workspace --window ID [--name NAME] [--description TEXT] [--cwd PATH] [--ssh DESTINATION]
                 [--focus true|false] [--activate]
   list-windows | list-workspaces | list-panes | list-panels
@@ -54,6 +55,7 @@ pub fn help(command: &str) -> Result<String, String> {
         "list-notifications" => ("[--window ID] [--workspace ID]", "List retained notifications, newest first within each terminal."),
         "close-workspace" => ("--workspace ID", "Close a workspace through the app's close policy. No force option is supported."),
         "new-window" => ("[--activate]", "Create a window. Activating it requires --activate."),
+        "open-workspace" => ("--name NAME [--window ID] [--cwd PATH] [--activate]", "Reuse an exact named workspace or create it. Selects it; --activate brings rmux forward. cwd applies only to creation. Duplicate names fail; --window scopes lookup and creation."),
         "new-workspace" => ("--window ID [--name NAME] [--description TEXT] [--cwd PATH] [--ssh DESTINATION] [--focus true|false] [--activate]", "Create a workspace in an existing window. Selection and activation are opt-in."),
         "list-windows" => ("", "List windows in the connected app process."),
         "list-workspaces" => ("[--window ID]", "List workspaces, optionally limited to one window."),
@@ -119,6 +121,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             None,
         ),
         "new-window" => ("window.create", None, None),
+        "open-workspace" => ("workspace.open", None, None),
         "new-workspace" => ("workspace.create", Some(("--window", "window_id")), None),
         "list-windows" => ("window.list", None, None),
         "list-workspaces" => ("workspace.list", None, None),
@@ -278,7 +281,8 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
                 }
                 continue;
             }
-            if (command == "new-workspace" && matches!(arg.as_str(), "--name" | "--description" | "--cwd" | "--focus" | "--ssh"))
+            if (command == "open-workspace" && matches!(arg.as_str(), "--name" | "--cwd"))
+                || (command == "new-workspace" && matches!(arg.as_str(), "--name" | "--description" | "--cwd" | "--focus" | "--ssh"))
                 || (command == "split-pane" && matches!(arg.as_str(), "--cwd" | "--focus" | "--ssh"))
             {
                 let value = args
@@ -303,8 +307,8 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
             }
             if matches!(
                 command,
-                "list-workspaces" | "list-panes" | "list-panels" | "list-notifications"
-            ) && (arg == "--window" || (arg == "--workspace" && command != "list-workspaces"))
+                "open-workspace" | "list-workspaces" | "list-panes" | "list-panels" | "list-notifications"
+            ) && (arg == "--window" || (arg == "--workspace" && !matches!(command, "list-workspaces" | "open-workspace")))
             {
                 let key = if arg == "--window" {
                     "window_id"
@@ -345,7 +349,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
                 ("paste-buffer", "--bracketed") => ("bracketed", Value::Bool(true)),
                 ("send", "--paste") => ("paste", Value::Bool(true)),
                 (
-                    "select-workspace" | "focus-panel" | "focus-back" | "focus-forward" | "new-window" | "new-workspace" | "move-panel" | "move-workspace" | "merge-workspace" | "split-pane",
+                    "select-workspace" | "focus-panel" | "focus-back" | "focus-forward" | "new-window" | "new-workspace" | "open-workspace" | "move-panel" | "move-workspace" | "merge-workspace" | "split-pane",
                     "--activate",
                 ) => ("activate", Value::Bool(true)),
                 ("read-screen" | "capture-pane", "--scrollback") => ("scope", Value::String("history".into())),
@@ -380,6 +384,7 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
         return Err("--preserve-wraps requires --selection".into());
     }
     let required = match command {
+        "open-workspace" => Some(("name", "--name")),
         "dismiss-notification" | "read-notification" => Some(("revision", "--revision")),
         "split-pane" | "resize-pane" => Some(("direction", "--direction")),
         "swap-panes" => Some(("other_pane_id", "--other-pane")),
@@ -439,6 +444,16 @@ pub fn expand(command: &str, args: Vec<OsString>) -> Result<(String, Value), Str
 }
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn open_workspace_requires_a_name_and_preserves_creation_and_activation_options() {
+        let (method, params) = expand("open-workspace", args(&["--name", "Editor 世界", "--cwd", "/tmp/project", "--activate"])).unwrap();
+        assert_eq!(method, "workspace.open");
+        assert_eq!(params, serde_json::json!({"name":"Editor 世界","cwd":"/tmp/project","activate":true}));
+        assert!(expand("open-workspace", args(&[])).is_err());
+        assert!(expand("open-workspace", args(&["--name","a","--name","b"])).is_err());
+        assert!(expand("open-workspace", args(&["--name","a","--workspace","123"])).is_err());
+        assert_eq!(expand("open-workspace", args(&["--name","a","--window","4294967297"])).unwrap().1["window_id"], "4294967297");
+    }
     #[test]
     fn event_read_preserves_cursor_and_rejects_ambiguous_bounds() {
         assert_eq!(expand("read-events", args(&[])).unwrap(), ("events.read".into(), serde_json::json!({})));

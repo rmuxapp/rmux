@@ -1,3 +1,19 @@
+Named workspace handoff: `rmuxctl open-workspace --name NAME [--window ID]
+[--cwd PATH] [--activate]` and `workspace.open` reuse exact normalized names
+across normal windows or create in the requested/active/fallback window. Selection
+defaults on; OS activation stays explicit. Reuse leaves metadata, layout, cwd and
+PTYs unchanged; replies include `reused`. Duplicate names fail without mutation,
+including duplicates inside an explicitly scoped window. Existing serialized
+workspace preparation prevents concurrent open requests from independently
+creating duplicates; publish rechecks same-window names after async startup.
+CLI help/completions and editor handoff docs updated. CLI and RPC parser tests
+passed, then one desktop/CLI build. `smoke-open-workspace.py` passed against an
+isolated native app with real /bin/sh: creation, stable IDs/PIDs, retained Unicode
+shell variable/cwd, ignored creation cwd on reuse, ambiguity and scoped lookup.
+A broader smoke attempt failed in its pre-existing transfer shell-state check
+before reaching this feature; no broad-suite success is claimed. OS activation
+and Windows runtime validation remain pending. No installed app was modified.
+
 Configured background commands: custom commands accept `mode: "background"`
 (default remains terminal), reuse existing named command shortcuts/palette, and
 spawn literal argv with child env/cwd without creating a workspace or PTY.

@@ -529,6 +529,22 @@ impl WorkspaceWindow {
         Ok(serde_json::json!({"workspace_id":target.to_string(),"closed":true,"window_closed":closes_window}))
     }
 
+    pub(super) fn automation_named_workspaces(&self, name: &str) -> Option<Vec<EntityId>> {
+        (!self.benchmark).then(|| self.workspace_state.entries.iter().filter(|entry| entry.name == name)
+            .map(|entry| entry.workspace.entity_id()).collect())
+    }
+    pub(super) fn automation_reuse_workspace(&mut self, create: &automation::WorkspaceCreate, id: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
+        self.automation_available(cx)?;
+        let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)
+            .ok_or(automation::Failure { code: -32004, message: "Workspace no longer exists" })?;
+        if create.focus || create.activate { self.select(index, window, cx); }
+        if create.activate { window.activate_window(); }
+        let mut result = self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap()
+            .iter().find(|row| row["id"] == id.to_string()).unwrap().clone();
+        result["reused"] = true.into();
+        cx.notify();
+        Ok(result)
+    }
     pub(super) fn automation_prepare_workspace(&mut self, create: &automation::WorkspaceCreate, cx: &mut Context<Self>) -> Result<Box<dyn FnOnce() -> Result<PreparedTerminal> + Send>, automation::Failure> {
         self.automation_available(cx)?;
         if self.command_launching || self.workspace_state.entries.len() >= 64 { return Err(automation::Failure { code: -32005, message: "Command startup busy or workspace limit reached" }); }
@@ -555,6 +571,11 @@ impl WorkspaceWindow {
     }
     pub(super) fn automation_finish_workspace(&mut self, create: &automation::WorkspaceCreate, prepared: Result<PreparedTerminal>, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.command_launching = false;
+        if create.reuse {
+            let matches = self.automation_named_workspaces(create.name.as_deref().unwrap()).unwrap_or_default();
+            if matches.len() > 1 { return Err(automation::Failure { code: -32006, message: "Workspace name became ambiguous during startup" }); }
+            if let Some(id) = matches.first() { return self.automation_reuse_workspace(create, *id, window, cx); }
+        }
         let prepared = prepared.map_err(|_| automation::Failure { code: -32005, message: "Could not prepare workspace terminal; check the executable and launch directory" })?;
         let settings = cx.global::<Preferences>();
         let seed = TerminalSeed::Ready(prepared, CellMetrics::new(settings.font_size), settings.font_family.clone().into());
@@ -580,7 +601,9 @@ impl WorkspaceWindow {
         if create.focus || create.activate { self.select(index, window, cx); }
         if create.activate { window.activate_window(); }
         cx.notify();
-        Ok(self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap().iter().find(|row| row["id"] == id).unwrap().clone())
+        let mut result = self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap().iter().find(|row| row["id"] == id).unwrap().clone();
+        if create.reuse { result["reused"] = false.into(); }
+        Ok(result)
     }
 
     pub(super) fn automation_group_mutation(&mut self, change: &automation::GroupMutation, method: &str, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {

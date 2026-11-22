@@ -4,6 +4,7 @@
 
 ## On this page
 
+- [Open or reuse a named workspace](#open-or-reuse-a-named-workspace)
 - [Merge workspaces from scripts](#merge-workspaces-from-scripts)
 - [Capture terminal output](#capture-terminal-output)
 - [Pipe captured output](#pipe-captured-output)
@@ -29,6 +30,42 @@
 - [Resize panes through RPC](#resize-panes-through-rpc)
 - [Equalize panes from scripts](#equalize-panes-from-scripts)
 - [Swap panes through RPC](#swap-panes-through-rpc)
+
+## Open or reuse a named workspace
+
+From an editor terminal or command launcher, use:
+
+```sh
+rmuxctl --socket /absolute/path/to/rpc.sock open-workspace \
+  --name "my-project" --cwd /absolute/path/to/my-project --activate
+```
+
+rmux must already be running with [socket automation](#unix-socket-automation)
+enabled. You can omit `--socket` when the caller has `RMUX_SOCKET_DIR` set.
+
+The command selects an existing workspace with the same name, preserving its
+terminals, running processes, layout and directory. If none exists, it creates
+one with the supplied `--cwd`. Creation options never modify a reused workspace.
+Names use the same normalization as workspace creation and are case-sensitive.
+The response includes the workspace/window IDs and `reused: true` or `false`.
+
+Lookup covers all normal windows. Duplicate names return an ambiguity error;
+add `--window ID` to restrict both lookup and creation to one window, or rename
+duplicates. With no match and no explicit window, creation uses the active rmux
+window when available, otherwise an existing normal window. Busy destinations
+return an error. `--activate` brings the destination window forward; without it,
+the workspace is selected without requesting OS activation. This command does
+not launch rmux when it is closed.
+
+The corresponding RPC is `workspace.open`, with required `name`, optional
+`window_id`, absolute `cwd`, and `activate`. Selection defaults to true; raw RPC
+can use `focus: false`. Optional `description` and `ssh_destination` also apply
+only to newly created workspaces. Requests use the existing serialized workspace
+startup path, so repeated open calls do not independently create duplicates.
+
+For the return shortcut, configure a [background command](settings.md#background-commands-and-app-shortcuts)
+that focuses your editor. This keeps editor launching separate from workspace
+identity and works with any configured executable.
 
 ## Merge workspaces from scripts
 

@@ -13,6 +13,7 @@ const COMMANDS: &[(&str, &[&str])] = &[
     ("list-notifications", &["--window", "--workspace"]),
     ("close-workspace", &["--workspace"]),
     ("new-window", &["--activate"]),
+    ("open-workspace", &["--name", "--window", "--cwd", "--activate"]),
     ("new-workspace", &["--window", "--name", "--description", "--cwd", "--focus", "--activate"]),
     ("list-windows", &[]),
     ("list-workspaces", &["--window"]),
