@@ -147,6 +147,8 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                 assert sum(e["kind"] == "surface.closed" and e["surface_id"] == target for e in closed["events"]) == 1, closed
             call("system.quit")
             assert process.wait(timeout=5) == 0
+            errors.seek(0)
+            assert b"native quit confirmation unavailable" not in errors.read(), "native quit hook did not install"
             print("PASS replay, bounded waiting, concurrent mutation and surface lifetimes")
         finally:
             if process.poll() is None:

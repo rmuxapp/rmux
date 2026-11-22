@@ -330,10 +330,13 @@ Linux/Windows use Ctrl+Alt+N and Ctrl+Alt+W. Each window owns its workspace list
 Closing a window drops its terminal sessions; quitting the app cleans up sessions
 across all windows. Native menus expose the main window, workspace, tab, edit and
 split commands where the platform provides an application menu.
-System-originated quits that bypass rmux's Quit action request process cleanup
-through GPUI's shutdown hook. That hook cannot show a cancellable confirmation
-and allows only 100 ms to await completion; the normal Quit action retains its
-confirmation policy and three-second cleanup deadline.
+On macOS, normal system-originated app quits now route through rmux's confirmation
+and three-second cleanup path. The initial AppKit request is canceled, then
+reissued after approval and cleanup. This does not preserve a pending macOS
+logout/shutdown request; retry that system operation after rmux exits. Native
+confirmation interaction still needs manual acceptance. Other platform-originated
+quits retain GPUI's best-effort shutdown hook, which cannot veto termination and
+allows only 100 ms for cleanup. Force Quit cannot be intercepted.
 
 ## Tabs and tab switching
 

@@ -249,7 +249,7 @@
       "acceptance": "Respect configured warnings and distinguish closing a view from terminating owned work.",
       "rmux_status": "in_progress",
       "implementation": "Tab, workspace and window close requests prompt when any reported task is working or blocked. Window actions and native close callbacks share the warning path; the Quit rmux action scans all windows and confirms once before process cleanup. Confirmation resolves original entity IDs, with tab focus-handle validation; transfers do not ask to terminate processes. Unix foreground process groups and directly launched commands also trigger active-work warnings. The on-demand check uses nonblocking parser/exit-state locks and conservatively requests confirmation under contention; focused real-PTY contention and job-control tests pass.",
-      "remaining": "OS-originated quit routing outside the rmux action, non-reporting Windows process detection and native confirmation/cancellation acceptance. Settings now offers persistent Active tasks/Always/Never close confirmation; RMUX_CONFIRM_CLOSE=active|always|never overrides it without changing the saved policy.",
+      "remaining": "macOS normal AppKit quit requests now route through confirmation/cleanup; an isolated native probe verifies cancellation/retry/approval. Native confirmation UI acceptance, preserving macOS logout/shutdown requests, other platform-originated quit routing and non-reporting Windows process detection remain pending. Settings now offers persistent Active tasks/Always/Never close confirmation; RMUX_CONFIRM_CLOSE=active|always|never overrides it without changing the saved policy.",
       "implementation_sources": [
         "crates/rmux-desktop/src/pane_view.rs"
       ],

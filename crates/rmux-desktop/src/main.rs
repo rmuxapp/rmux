@@ -4,6 +4,7 @@ use std::ops::Range;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 mod app_menu;
+mod native_quit;
 mod updater;
 mod attention;
 mod cell_metrics;
@@ -319,6 +320,8 @@ fn request_quit(cx: &mut App) {
             cx.global_mut::<Shutdowns>().quit_prompt = false;
             if confirmed {
                 quit_after_cleanup(cx);
+            } else {
+                native_quit::cancel();
             }
         });
     })
@@ -366,7 +369,7 @@ fn quit_after_cleanup(cx: &mut App) {
         if !finished {
             eprintln!("session checkpoint or shell shutdown exceeded three-second deadline");
         }
-        let _ = cx.update(|cx| cx.quit());
+        let _ = cx.update(|cx| { native_quit::approve(); cx.quit(); });
     })
     .detach();
 }
@@ -3621,6 +3624,7 @@ fn main() {
         cx.bind_keys(shortcuts::bracket_navigation());
         cx.bind_keys(pane_shortcuts::tab_numbers(cfg!(target_os = "macos")));
         app_menu::initialize(cx);
+        native_quit::initialize(cx);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-shift-c" } else { "ctrl-shift-c" }, CopySearchExcerpt, Some("CommandPalette"))]);
         cx.bind_keys([KeyBinding::new("ctrl-alt-w", TogglePreviewWrap, Some("TextPreview"))]);
         cx.bind_keys([

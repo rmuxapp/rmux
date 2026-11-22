@@ -213,3 +213,7 @@ run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-focus"
 [tasks.bench-queued-keyboard]
 description = "Measure queued key admission and native text routing under 1/4/8/16 busy panes"
 run = "cargo run --release -p rmux-terminal --example pty_bench -- queued-keyboard"
+
+[tasks.smoke-native-quit]
+description = "Check AppKit quit routing, cancellation and approval in an isolated app"
+run = ["cargo build -p rmux-desktop --example native-quit-probe", "python scripts/smoke-native-quit.py"]

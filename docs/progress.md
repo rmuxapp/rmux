@@ -2,6 +2,15 @@
 
 ## Current implementation focus
 
+macOS AppKit termination requests now route through the existing quit confirmation
+and bounded session/process cleanup. Repeated requests coalesce. The original
+request is canceled and reissued after approval; deferred AppKit termination was
+rejected after a real probe demonstrated it stalls GPUI's queued handler. A native
+AppKit probe now passes cancellation, a second request and approved termination;
+the native event smoke confirms hook installation and ordinary app cleanup.
+Manual Dock/menu confirmation acceptance, logout/shutdown continuation and other
+platform-originated quit routing remain pending. This does not intercept Force Quit.
+
 Added Catppuccin Mocha and Latte presets to Settings and palette commands, with
 ANSI, foreground/background, cursor and selection colors from the pinned official
 Ghostty port. Bundled themes parse once into immutable cached data; no filesystem
