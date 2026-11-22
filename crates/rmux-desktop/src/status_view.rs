@@ -13,14 +13,14 @@ fn selected_index(records: &[Record], id: Option<&str>) -> Option<usize> {
     Some(records.iter().position(|record| Some(record.id.as_str()) == id).unwrap_or(0))
 }
 
-fn report(record: &Record) -> String {
+fn report(record: &Record, ended: bool) -> String {
     let id = if record.id.is_empty() { "Root" } else { &record.id };
     let state = match record.kind { Kind::Permission => "Approval".into(), Kind::Question => "Question".into(),
         Kind::Auth => "Login".into(), Kind::None => format!("{:?}", record.state) };
     let progress = record.progress.map_or(String::new(), |value| format!(" · {value}%"));
     let metadata = [&record.app, &record.title].into_iter().filter(|value| !value.is_empty())
         .map(String::as_str).collect::<Vec<_>>().join(" · ");
-    [format!("{id} · {state}{progress}"), metadata, record.message.clone()].into_iter()
+    [if ended { "Terminal finished · Last reported status".into() } else { String::new() }, format!("{id} · {state}{progress}"), metadata, record.message.clone()].into_iter()
         .filter(|line| !line.is_empty()).collect::<Vec<_>>().join("\n")
 }
 
@@ -36,15 +36,20 @@ impl TerminalView {
     fn copy_status_record(&self, cx: &mut Context<Self>) {
         let Some((records, state)) = self.status_details.as_ref().zip(self.status_ui.as_ref()) else { return; };
         if let Some(index) = selected_index(records, state.selected.as_deref()) {
-            clipboard::write(ClipboardItem::new_string(report(&records[index])), cx);
+            clipboard::write(ClipboardItem::new_string(report(&records[index], self.process_exit.is_some())), cx);
         }
     }
     fn status_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
+        if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt
+            || (event.keystroke.modifiers.shift && event.keystroke.key != "tab") { return; }
         if event.keystroke.key == "escape" { self.close_status_details(window, cx); }
         else if event.keystroke.key == "c" { self.copy_status_record(cx); }
         else if let Some((records, state)) = self.status_details.as_ref().zip(self.status_ui.as_mut()) {
             if let Some(current) = selected_index(records, state.selected.as_deref()) {
-                let next = match event.keystroke.key.as_str() {
+                let key = if event.keystroke.key == "tab" {
+                    if event.keystroke.modifiers.shift { "up" } else { "down" }
+                } else { event.keystroke.key.as_str() };
+                let next = match key {
                     "home" => Some(0), "end" => Some(records.len() - 1),
                     key @ ("pageup" | "pagedown") => command_palette::paged_result(
                         current, records.len(), key == "pageup",
@@ -84,11 +89,12 @@ mod tests {
         assert_eq!(selected_index(&[record("b"), record("a")], Some("b")), Some(0));
         assert_eq!(selected_index(&records, Some("removed")), Some(0));
         assert_eq!(selected_index(&[], Some("b")), None);
-        assert_eq!(report(&record("")), "Root · Approval · 42%\nbuilder\nReview 世界\nnext line");
+        assert_eq!(report(&record(""), false), "Root · Approval · 42%\nbuilder\nReview 世界\nnext line");
+        assert_eq!(report(&record(""), true), "Terminal finished · Last reported status\nRoot · Approval · 42%\nbuilder\nReview 世界\nnext line");
     }
 }
 
-pub fn panel(records: &[Record], loading: bool, state: &State, window: &Window, cx: &mut Context<TerminalView>) -> AnyElement {
+pub fn panel(records: &[Record], loading: bool, ended: bool, state: &State, window: &Window, cx: &mut Context<TerminalView>) -> AnyElement {
     let selected = selected_index(records, state.selected.as_deref());
     let focused = state.focus.is_focused(window);
     div().track_focus(&state.focus).key_context("ProgramStatus")
@@ -125,7 +131,7 @@ pub fn panel(records: &[Record], loading: bool, state: &State, window: &Window, 
                 .min_w_0()
                 .gap_2()
                 .text_sm()
-                .child(div().flex_1().min_w_0().truncate().child(if loading { "Program status · Loading…".to_owned() } else { format!("Program status · {} records", records.len()) }))
+                .child(div().flex_1().min_w_0().truncate().child(if loading { "Program status · Loading…".to_owned() } else if ended { format!("Last reported status · {} records", records.len()) } else { format!("Program status · {} records", records.len()) }))
                 .child(
                     pane_view::pane_control("close-program-status", "Close Program Status")
                         .on_click(cx.listener(|view, event: &ClickEvent, window, cx| {
@@ -172,7 +178,7 @@ pub fn panel(records: &[Record], loading: bool, state: &State, window: &Window, 
                     let heading: SharedString = format!("{id} · {state}{progress}").into();
                     let metadata = [&record.app, &record.title].into_iter().filter(|value| !value.is_empty())
                         .map(String::as_str).collect::<Vec<_>>().join(" · ");
-                    let report = report(record);
+                    let report = report(record, ended);
                     let record_id = record.id.clone();
                     div().id(("status-record", index))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |view, _, window, cx| {
@@ -211,6 +217,6 @@ pub fn panel(records: &[Record], loading: bool, state: &State, window: &Window, 
                         })
                 })),
         )
-        .child(div().flex_shrink_0().px_2().py_1().text_xs().text_color(rgb(0xaaaaaa)).child("↑↓ Select · C Copy · Esc Close"))
+        .child(div().flex_shrink_0().px_2().py_1().text_xs().text_color(rgb(0xaaaaaa)).child("↑↓ / Tab Select · C Copy · Esc Close"))
         .into_any_element()
 }

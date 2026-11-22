@@ -395,3 +395,7 @@ messages.
 Finished terminals carry a **Finished** label in the tab strip. Hover the title
 for the exit message, or search terminals in the palette to see and search their
 finished status across windows. Custom tab names remain intact.
+Live task and progress badges disappear when the terminal finishes. Program
+Status retains the last reports for inspection and copying, labeled **Last
+reported status** so they are not mistaken for running tasks. Tab/Shift-Tab or
+the arrow keys navigate those reports; C copies the selected report.

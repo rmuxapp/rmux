@@ -2058,7 +2058,7 @@ impl Render for TerminalView {
             )
             .when_some(self.find.clone(), |root, find| root.child(find))
             .when_some(self.status_details.as_ref().zip(self.status_ui.as_ref()), |root, (records, state)| {
-                root.child(status_view::panel(records, self.status_load.is_some(), state, window, cx))
+                root.child(status_view::panel(records, self.status_load.is_some(), self.process_exit.is_some(), state, window, cx))
             })
             .when(self.ports.visible, |root| root.child(ports_view::panel(&self.ports, window, cx)))
             .child(TerminalElement { view: cx.entity() })

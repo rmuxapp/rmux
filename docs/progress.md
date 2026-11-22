@@ -1,3 +1,11 @@
+Finished-terminal status polish: tab strips now suppress live task/progress
+badges once the terminal exits, avoiding contradictory Working/Finished labels.
+The Program Status panel retains its records under Last reported status, and
+both pointer and keyboard copying include an explicit finished-terminal prefix.
+Task navigation now supports Tab/Shift-Tab and leaves modified keys to shortcut
+routing. The focused status test passed, including selection identity and copied
+historical context. Native visual acceptance of these changes remains pending.
+
 Settings keyboard follow-up: Left/Right now adjust values without launching
 the font picker, theme import dialog or external editor. Enter/Space activate
 those action controls. Keyboard activation of fixed-footer actions also respects

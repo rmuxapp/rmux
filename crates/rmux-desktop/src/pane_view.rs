@@ -1249,7 +1249,7 @@ impl Render for PaneView {
                                             .when(terminal.read(cx).attention.any(), |tab| tab.child(
                                                 div().w(px(6.)).h(px(6.)).flex_shrink_0().rounded_full().bg(rgb(0xf0b85b))
                                             ))
-                                            .when_some(terminal.read(cx).program_status.as_ref(), |tab, status| {
+                                            .when_some(terminal.read(cx).program_status.as_ref().filter(|_| terminal.read(cx).process_exit.is_none()), |tab, status| {
                                                 use rmux_terminal::program_status::{Kind, State};
                                                 let record = &status.record;
                                                 let (label, tint) = match record.state {
@@ -1266,7 +1266,7 @@ impl Render for PaneView {
                                                 tab.child(div().id(("program-status", terminal.entity_id())).text_xs().flex_shrink_0().text_color(rgb(tint))
                                                     .tooltip(move |_, cx| cx.new(|_| ControlHint(detail.clone())).into()).child(text))
                                             })
-                                            .when_some(terminal.read(cx).progress, |tab, progress| {
+                                            .when_some(terminal.read(cx).progress.filter(|_| terminal.read(cx).process_exit.is_none()), |tab, progress| {
                                                 use rmux_terminal::ProgressState;
                                                 let (label, tint) = match progress.state {
                                                     ProgressState::Running => ("", 0x86b8f5),
