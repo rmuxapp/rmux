@@ -171,12 +171,17 @@ mod tests {
 /// bounded UI labels or captured preview lines, never unbounded scrollback.
 pub fn highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
     if query.trim().is_empty() { return Vec::new(); }
-    let mut folded = String::new();
+    // Whole-string lowering preserves contextual final sigma, matching the
+    // ranked search. Lowering each scalar separately always produces σ.
+    let folded = text.to_lowercase();
+    let mut folded_offset = 0;
     let mut boundaries = Vec::new();
     for (start, ch) in text.char_indices() {
-        let folded_start = folded.len();
-        folded.extend(ch.to_lowercase());
-        boundaries.push((folded_start..folded.len(), start..start + ch.len_utf8()));
+        let folded_start = folded_offset;
+        // Contextual σ/ς have equal UTF-8 widths; expanding mappings such as
+        // İ still occupy the sum of their lowercase scalar widths.
+        folded_offset += ch.to_lowercase().map(char::len_utf8).sum::<usize>();
+        boundaries.push((folded_start..folded_offset, start..start + ch.len_utf8()));
     }
     let mut marked = vec![false; boundaries.len()];
     for word in query.split_whitespace() {
@@ -201,6 +206,13 @@ pub fn highlights(text: &str, query: &str) -> Vec<std::ops::Range<usize>> {
 #[cfg(test)]
 mod highlight_tests {
     use super::highlights as preview_highlights;
+    #[test]
+    fn highlights_agree_with_search_for_contextual_greek_lowercase() {
+        let text = "ΟΣ build";
+        assert!(super::score(&text.to_lowercase(), &["ος"]).is_some());
+        assert_eq!(preview_highlights(text, "ΟΣ"), vec![0..4]);
+        assert_eq!(preview_highlights("İ ΟΣ ΣΟ", "ος σο"), vec![3..7, 8..12]);
+    }
     #[test]
     fn preview_highlights_merge_words_and_preserve_expanding_unicode() {
         let text = "…İstanbul ÉCOLE 世界 needle";

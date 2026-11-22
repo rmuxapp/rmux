@@ -2,6 +2,11 @@
 
 ## Current implementation focus
 
+Shared match highlighting now uses whole-string lowercase like search ranking,
+fixing contextual Greek final sigma (ΟΣ). A regression first reproduced the
+missing highlight, then passed with original UTF-8 ranges preserved, including
+an expanding İ prefix. All eight focused shared search tests pass.
+
 The browser command palette now highlights matching query words in result labels,
 using the same Unicode-safe range mapping as native previews. That helper and its
 regression test moved into rmux-core; desktop retains its existing call sites via
