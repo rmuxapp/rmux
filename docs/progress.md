@@ -1,3 +1,14 @@
+Shortcut search polish: modifier/key queries in the dedicated shortcut view
+now require real binding tokens rather than fuzzy letters from command titles.
+An all-key query must fit one alias, preventing cross-alias false combinations;
+modifier-plus-action queries retain fuzzy action matching. Shared filtering is
+used by native/WASM. Query-dependent ranking can reintroduce matches on appended
+text and correctly returns to ordinary search. Five focused shortcut-label tests
+and ten core search tests passed, plus one WASM build. Browser review verified
+`ctrl tab` shows only Previous/Next Pane (not Close Tab or Move Tab), then appending
+` move` reveals the tab-move commands. Screenshot:
+`target/shortcut-search-polish.png`. Native rendering remains unverified.
+
 Release-quality follow-up (93fce70): the existing native live-shell transfer
 smoke passed on one diagnostic rerun, including UTF-8 delivery, seven retained
 shell PIDs/variables across merges and transfers, stale-target rejection and

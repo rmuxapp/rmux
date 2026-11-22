@@ -168,7 +168,9 @@ their terminal behavior.
 
 **View → Keyboard Shortcuts…** lists effective command bindings for the current
 focus context, including custom commands and overrides. Search by action name
-or key names. To bind this view itself, use the action `keyboard_shortcuts`.
+or key names. Modifier/key queries such as `ctrl tab` match actual bindings,
+including aliases; command names remain fuzzy-searchable. To bind this view
+itself, use the action `keyboard_shortcuts`.
 
 
 Shortcut overrides can be added alongside custom commands:

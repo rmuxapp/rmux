@@ -57,23 +57,41 @@ pub fn tab_score(number: usize, title: &str, directory: &str, words: &[&str]) ->
 pub struct RankedSearch {
     titles: Vec<String>,
     query: String,
+    complete_candidates: bool,
     ranked: Vec<((usize, usize, usize), usize)>,
     pub matches: Vec<usize>,
 }
 impl RankedSearch {
     pub fn new(titles: Vec<String>) -> Self {
-        Self { matches: (0..titles.len()).collect(), titles, query: String::new(), ranked: Vec::new() }
+        Self { matches: (0..titles.len()).collect(), titles, query: String::new(), complete_candidates: true, ranked: Vec::new() }
+    }
+    /// Query-dependent filters may reintroduce candidates even when text is
+    /// appended (e.g. a shortcut query becomes a command-name query).
+    pub fn update_filtered(&mut self, query: &str, mut include: impl FnMut(usize) -> bool) {
+        let normalized = query.to_lowercase();
+        let words: Vec<_> = normalized.split_whitespace().collect();
+        self.ranked.clear();
+        self.ranked.extend(self.titles.iter().enumerate().filter_map(|(index, title)| {
+            if !include(index) { return None; }
+            score(title, &words).map(|score| (score, index))
+        }));
+        self.ranked.sort_unstable();
+        self.matches.clear();
+        self.matches.extend(self.ranked.iter().map(|(_, index)| *index));
+        // A subsequent ordinary update must reconsider all candidates.
+        self.query = normalized;
+        self.complete_candidates = false;
     }
     pub fn update(&mut self, query: &str) {
         let normalized = query.to_lowercase();
-        if normalized == self.query { return; }
+        if self.complete_candidates && normalized == self.query { return; }
         let words: Vec<_> = normalized.split_whitespace().collect();
         if words.is_empty() {
             self.matches.clear();
             self.matches.extend(0..self.titles.len());
         } else {
             self.ranked.clear();
-            if !self.query.is_empty() && normalized.starts_with(&self.query) {
+            if self.complete_candidates && !self.query.is_empty() && normalized.starts_with(&self.query) {
                 self.ranked.extend(self.matches.iter().filter_map(|index|
                     score(&self.titles[*index], &words).map(|score| (score, *index))));
             } else {
@@ -85,6 +103,7 @@ impl RankedSearch {
             self.matches.extend(self.ranked.iter().map(|(_, index)| *index));
         }
         self.query = normalized;
+        self.complete_candidates = true;
     }
 }
 
@@ -92,6 +111,18 @@ impl RankedSearch {
 mod tests {
     use super::{score, tab_score, RankedSearch};
 
+    #[test]
+    fn query_dependent_filters_can_reintroduce_results_and_return_to_normal_search() {
+        let mut search = RankedSearch::new(vec!["ctrl tab next pane".into(), "ctrl move tab".into()]);
+        search.update_filtered("ctrl tab", |index| index == 0);
+        assert_eq!(search.matches, [0]);
+        search.update_filtered("ctrl tab move", |_| true);
+        assert_eq!(search.matches, [1]);
+        search.update_filtered("", |index| index == 0);
+        assert_eq!(search.matches, [0]);
+        search.update("");
+        assert_eq!(search.matches, [0, 1]);
+    }
     #[test]
     fn unicode_prefixes_use_character_positions_for_contiguous_and_fuzzy_words() {
         assert_eq!(score("界 build", &["build"]), score("x build", &["build"]));

@@ -287,6 +287,7 @@ pub struct CommandPalette {
     directory_input: bool,
     terminal_search_input: bool,
     ssh_input: bool,
+    shortcuts_only: bool,
     hex_preview: bool,
     markdown_preview: bool,
     wrap_preview: bool,
@@ -593,6 +594,7 @@ impl CommandPalette {
                 }
             }
         }
+        self.shortcuts_only = true;
         self.commands.retain(|command| command.shortcut.is_some());
         self.commands.sort_by_cached_key(|command| command.title.to_lowercase());
         self.search = palette_match::RankedSearch::new(self.commands.iter().map(Command::search_text).collect());
@@ -882,7 +884,10 @@ impl CommandPalette {
                         cx.notify();
                         return;
                     }
-                    this.search.update(query);
+                    if this.shortcuts_only {
+                        let filter = crate::shortcut_label::ShortcutQuery::new(query);
+                        this.search.update_filtered(query, |index| this.commands[index].shortcut.as_deref().is_some_and(|hint| filter.matches(hint)));
+                    } else { this.search.update(query); }
                     this.selected = 0;
                     this.scroll.reset(this.search.matches.len());
                     cx.notify();
@@ -897,7 +902,7 @@ impl CommandPalette {
         )
         .detach();
         Self {
-            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
+            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
             search: palette_match::RankedSearch::new(commands
                 .iter()
                 .map(Command::search_text)

@@ -154,7 +154,7 @@ impl InputProbe {
             });
             cx.subscribe_in(&input, window, |this: &mut InputProbe, _, event: &text_field::EditEvent, window, cx| {
                 match event {
-                    text_field::EditEvent::Changed(query) => { this.search.update(query); this.filter_shortcuts(query.trim().is_empty()); this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
+                    text_field::EditEvent::Changed(query) => { if this.shortcuts_only { this.filter_shortcuts(query); } else { this.search.update(query); } this.scroll.reset(this.search.matches.len()); this.selected = 0; this.feedback = None; },
                     text_field::EditEvent::Submitted { .. } => this.choose(window, cx),
                     text_field::EditEvent::Cancelled => this.dismiss_palette(window, cx),
                 }
@@ -323,7 +323,7 @@ impl InputProbe {
         self.search = palette_match::RankedSearch::new((0..COMMANDS.len() + self.workspace_results.len() + self.group_results.len())
             .map(|index| format!("{} {}", self.result_title(index), self.result_hints.get(index)
                 .and_then(|hint| hint.as_deref()).map(shortcut_label::search_terms).unwrap_or_default()).to_lowercase()).collect());
-        self.filter_shortcuts(true);
+        self.filter_shortcuts("");
         self.selected = 0;
         self.scroll.reset(self.search.matches.len());
         cx.notify();
@@ -370,10 +370,12 @@ impl InputProbe {
         cx.notify();
     }
 
-    fn filter_shortcuts(&mut self, empty_query: bool) {
+    fn filter_shortcuts(&mut self, query: &str) {
         if !self.shortcuts_only { return; }
-        self.search.matches.retain(|index| *index < COMMANDS.len() && self.result_hints.get(*index).is_some_and(Option::is_some));
-        if empty_query { self.search.matches.sort_by_key(|index| COMMANDS[*index].title()); }
+        let filter = shortcut_label::ShortcutQuery::new(query);
+        self.search.update_filtered(query, |index| index < COMMANDS.len() && self.result_hints.get(index)
+            .and_then(|hint| hint.as_deref()).is_some_and(|hint| filter.matches(hint)));
+        if query.trim().is_empty() { self.search.matches.sort_by_key(|index| COMMANDS[*index].title()); }
     }
     fn choose(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         let Some(&index) = self.search.matches.get(self.selected) else { return; };
@@ -409,7 +411,7 @@ impl InputProbe {
                 input.replace_draft("", cx);
             });
             self.search.update("");
-            self.filter_shortcuts(true);
+            self.filter_shortcuts("");
             self.selected = 0;
             self.scroll.reset(self.search.matches.len());
             cx.notify();
