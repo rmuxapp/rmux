@@ -11,6 +11,7 @@ name = "rmux"
 path = "src/main.rs"
 
 [dependencies]
+rmux-protocol = { path = "../rmux-protocol" }
 rmux-core = { path = "../rmux-core" }
 pulldown-cmark = { version = "=0.13.6", default-features = false }
 glob = "=0.3.4"

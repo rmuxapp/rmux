@@ -8,6 +8,7 @@ on:
       - crates/rmux-terminal/**
       - crates/rmux-core/**
       - crates/rmux-cli/**
+      - crates/rmux-protocol/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml
@@ -21,6 +22,7 @@ on:
       - crates/rmux-terminal/**
       - crates/rmux-core/**
       - crates/rmux-cli/**
+      - crates/rmux-protocol/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml

@@ -144,7 +144,10 @@ rmuxctl completions fish | source
 ```
 
 The scripts complete supported friendly command names, command-specific flags,
-and `--focus`/`--zoomed` boolean values. They do not contact rmux, enumerate live IDs, or
+`--focus`/`--zoomed` boolean values, directions and supported `read-events --kind`
+values. Event names come from the same protocol list as server capabilities;
+already-selected kinds are omitted. Completion uses the installed CLI version.
+The scripts do not contact rmux, enumerate live IDs, or
 complete raw RPC JSON. Save the generated script in your shell's startup setup
 if you want it enabled in later sessions. Bash and Zsh wrapper handling has been
 checked locally; Fish runtime verification remains pending.
@@ -309,7 +312,7 @@ rmuxctl read-events --surface SURFACE_ID --kind surface.exited --wait-ms 3000
 
 Commands print the JSON-RPC response, with the page under `result`. Keep the
 returned `result.cursor` as a string; use it for subsequent calls. This command
-does not run a permanent subscription or retry failed requests. Offline help
+reads one page unless `--follow` is supplied, and never retries failed requests. Offline help
 and Bash/Zsh/Fish completions include its options.
 
 Live stdio and Unix socket clients can call `events.read`:

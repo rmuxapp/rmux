@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+Offline --kind completion now offers supported event names by prefix and omits
+already-selected kinds. The CLI and server capabilities/validation share one
+rmux-protocol vocabulary with no dependencies, avoiding separate drifting lists
+or a GUI/terminal dependency in rmuxctl. Both completion tests and all five event
+journal tests pass. CLI-version completion remains offline; live target-ID and
+path completion are still pending.
+
 CLI completion now recognizes --follow, --json, --preserve-wraps and --bracketed
 as switches instead of swallowing the following word as their value. Repeatable
 event --kind remains offered after a prior kind, while single-use options stay

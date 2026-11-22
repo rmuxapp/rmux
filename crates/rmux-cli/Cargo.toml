@@ -11,6 +11,7 @@ name = "rmuxctl"
 path = "src/main.rs"
 
 [dependencies]
+rmux-protocol = { path = "../rmux-protocol" }
 serde_json = "1.0.154"
 
 [dev-dependencies]

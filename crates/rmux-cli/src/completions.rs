@@ -102,10 +102,14 @@ pub fn candidates(args: &[OsString]) -> Vec<&'static str> {
     };
     let initial = previous.len() == 0;
     let mut used = Vec::new();
+    let mut used_kinds = Vec::new();
     let mut value_for = None;
     for word in previous {
-        if value_for.take().is_some() { continue; }
         let Some(word) = word.to_str() else { return Vec::new(); };
+        if let Some(flag) = value_for.take() {
+            if flag == "--kind" { used_kinds.push(word); }
+            continue;
+        }
         if word == "--" { return Vec::new(); }
         if options.contains(&word) {
             used.push(word);
@@ -120,6 +124,9 @@ pub fn candidates(args: &[OsString]) -> Vec<&'static str> {
             ["true", "false"].into_iter().filter(|value| value.starts_with(current)).collect()
         } else if flag == "--direction" {
             ["left", "right", "up", "down"].into_iter().filter(|value| value.starts_with(current)).collect()
+        } else if flag == "--kind" {
+            rmux_protocol::EVENT_KINDS.iter().copied()
+                .filter(|kind| kind.starts_with(current) && !used_kinds.contains(kind)).collect()
         } else { Vec::new() };
     }
     options.iter().copied().chain(["--help"].into_iter().filter(|_| initial)).filter(|flag| flag.starts_with(current) && (*flag == "--kind" || !used.contains(flag))
@@ -148,7 +155,9 @@ mod tests {
         assert!(complete(&["read-events", "--follow", "--workspace", "42", ""]).contains(&"--kind"));
         assert!(!complete(&["read-events", "--follow", "--workspace", "42", ""]).contains(&"--workspace"));
         assert!(complete(&["read-events", "--kind", "workspace.created", "--k"]).contains(&"--kind"));
-        assert!(complete(&["read-events", "--kind", ""]).is_empty());
+        assert_eq!(complete(&["read-events", "--kind", "workspace.c"]), ["workspace.created", "workspace.closed"]);
+        assert_eq!(complete(&["read-events", "--kind", "workspace.created", "--kind", "workspace.c"]), ["workspace.closed"]);
+        assert!(complete(&["read-events", "--kind", "unknown."]).is_empty());
     }
     #[test]
     fn completion_respects_command_values_and_literal_text() {

@@ -14,8 +14,7 @@ pub struct Read { pub after: Option<String>, pub limit: usize, pub wait_ms: u16,
 impl Default for Read {
     fn default() -> Self { Self { after: None, limit: default_limit(), wait_ms: 0, surface_id: None, workspace_id: None, kinds: Vec::new() } }
 }
-const KINDS: &[&str] = &["notification.received", "notification.read", "notification.all_read", "notification.dismissed", "notification.cleared",
-    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed", "surface.bell", "surface.location_invalidated", "workspace.created", "workspace.closed", "workspace.location_invalidated"];
+use rmux_protocol::EVENT_KINDS as KINDS;
 pub fn capabilities() -> serde_json::Value {
     serde_json::json!({
         "version":1, "method":"events.read", "kinds":KINDS,
