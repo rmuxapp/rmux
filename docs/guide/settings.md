@@ -143,7 +143,7 @@ directory/argument preview; environment values are omitted. By default (`"mode":
 starts a dedicated workspace with its own terminal; it does not inject text into
 an existing shell. Arguments are literal, including spaces and empty arguments;
 use an explicit shell executable only when shell interpretation is intended.
-On development main (after v0.1.12), a complete argument `{project_dir}` expands
+Since v0.1.13, a complete argument `{project_dir}` expands
 to the active workspace's stored project directory. This is the project opened
 from VS Code or a native folder open, independent of terminal `cd`, workspace
 renaming, and command `cwd`. It works for terminal and background commands

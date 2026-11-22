@@ -102,7 +102,7 @@ workspace. Remote SSH and containers need separate routing.
 
 ### Keep targeting the original project after changing directories
 
-Available on development main after v0.1.12 (not yet in a published release):
+Available since v0.1.13:
 use the workspace's stored project directory as a complete argument:
 
 ```json
