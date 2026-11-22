@@ -195,8 +195,10 @@ For example, a VS Code CLI configuration can use:
 
 This does not run a shell. File names containing placeholder-looking text are
 kept literal. Plain output detection handles fully visible wrapped lines and
-Unicode cells, but stops at whitespace and enclosing punctuation. Use encoded
-`file://` links for names containing spaces. Bare names are recognized when they
+Unicode cells. Matching single or double quotes preserve spaces and punctuation
+in a path, such as `"/tmp/my project/main.rs"`; unquoted paths stop at whitespace
+and enclosing punctuation. Line/column suffixes must be inside the quotes.
+Encoded `file://` links also support names containing spaces. Bare names are recognized when they
 have an extension and a numeric location, such as `main.rs:12`; otherwise use a
 path containing a directory separator. Home-directory shorthand (`~/`) is not
 expanded. Missing files report an error when opened; hovering never reads disk.

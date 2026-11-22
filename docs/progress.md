@@ -1,3 +1,13 @@
+Quoted terminal paths: matching single/double quotes now preserve spaces,
+punctuation and Unicode in path targets across fully visible soft wraps.
+Unclosed quoted spans do not fall back to misleading partial paths; prose
+apostrophes do not start quoted spans. All seven hyperlink tests pass, including
+real wrapped terminal cells. The combined native debug bundle through b1e6487
+built successfully before this parser follow-up. Its isolated review fixture
+was launched and then cleanly closed when native access reported the Mac locked;
+no screenshot or native interaction acceptance is claimed. Installed sessions
+were untouched. This parser follow-up has focused tests, not another app build.
+
 Terminal-link destination polish: modifier-hover now identifies editor actions,
 shows the resolved absolute path plus line/column, and explains missing editor
 configuration. Context-menu Open Link captures the resolved local destination

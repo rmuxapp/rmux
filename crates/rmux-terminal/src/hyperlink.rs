@@ -151,25 +151,64 @@ fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
 // Recognize path-shaped tokens only; existence and local/remote routing belong
 // to the host. This runs on demand, never in the normal terminal draw path.
 fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
+    // Quotes delimit a single literal path, not shell syntax. Do not fall back
+    // to a misleading partial token inside an unclosed or invalid quoted span.
+    let mut quote = None;
+    for (offset, character) in text.char_indices() {
+        if let Some((start, delimiter)) = quote {
+            if character == delimiter {
+                if clicked >= start && clicked < offset {
+                    let candidate = &text[start..offset];
+                    return path_shaped(candidate).then_some(candidate);
+                }
+                quote = None;
+            }
+        } else if matches!(character, '\'' | '"')
+            && (offset == 0 || text[..offset].chars().next_back().is_some_and(|c| c.is_whitespace() || matches!(c, '=' | ':' | '(' | '['))) {
+            quote = Some((offset + character.len_utf8(), character));
+        }
+    }
+    if quote.is_some_and(|(start, _)| clicked >= start) { return None; }
     let delimiter = |c: char| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}');
     let mut start = 0;
     for token in text.split_inclusive(delimiter) {
         let candidate = token.trim_end_matches(delimiter).trim_end_matches([',', ';', ':']);
         if clicked >= start && clicked < start + candidate.len() {
-            if candidate.contains("://") || candidate.starts_with('-') { return None; }
-            let has_location = candidate.rsplit_once(':').is_some_and(|(name, line)|
-                name.contains('.') && !line.is_empty() && line.bytes().all(|c| c.is_ascii_digit()));
-            return (candidate.contains('/') || candidate.contains('\\') || has_location)
-                .then_some(candidate);
+            return path_shaped(candidate).then_some(candidate);
         }
         start += token.len();
     }
     None
 }
 
+fn path_shaped(candidate: &str) -> bool {
+    if candidate.contains("://") || candidate.starts_with('-') || candidate.chars().any(char::is_control) { return false; }
+    let has_location = candidate.rsplit_once(':').is_some_and(|(name, line)|
+        name.contains('.') && !line.is_empty() && line.bytes().all(|c| c.is_ascii_digit()));
+    candidate.contains('/') || candidate.contains('\\') || has_location
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn quoted_paths_preserve_spaces_punctuation_and_wide_cells() -> Result<()> {
+        for text in ["File \"/tmp/my project/世界 (draft).rs\"", "error 'src/my file.rs:42:7'"] {
+            let clicked = text.find("my").unwrap();
+            let expected = text.trim_start_matches("File ").trim_start_matches("error ").trim_matches(['\'', '"']);
+            assert_eq!(plain_path_at(text, clicked), Some(expected));
+        }
+        assert_eq!(plain_path_at("File \"/tmp/unfinished path", 12), None);
+        assert_eq!(plain_path_at("'ordinary words'", 4), None);
+        assert_eq!(plain_path_at("can't read src/a.rs", 14), Some("src/a.rs"));
+        assert_eq!(plain_path_at("'src/a.rs' src/b.rs:12", 15), Some("src/b.rs:12"));
+        let mut terminal = Terminal::new(20, 4)?;
+        terminal.write("File \"/tmp/my project/世界 (draft).rs\"".as_bytes());
+        terminal.frame()?;
+        assert_eq!(terminal.link_at(12, 0)?.as_deref(), Some("/tmp/my project/世界 (draft).rs"));
+        assert_eq!(terminal.link_at(2, 1)?.as_deref(), Some("/tmp/my project/世界 (draft).rs"));
+        Ok(())
+    }
     #[test]
     fn compiler_paths_follow_wrapped_cells_and_keep_url_priority() -> Result<()> {
         let mut terminal = Terminal::new(20, 5)?;
