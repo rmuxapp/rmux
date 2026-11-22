@@ -53,7 +53,7 @@ to match workspace names, and reports ambiguity if multiple workspaces share one
 Use **Cmd+Shift+C in both apps**: from VS Code it opens or reuses the current
 project in rmux; from rmux it focuses VS Code.
 
-In rmux, open **Settings → Open Settings File**, merge these entries into the
+In rmux, open **Settings → Open JSON**, merge these entries into the
 existing `commands` and `keybindings` arrays, then choose **Reload Settings**.
 No restart is needed. Keep your other commands, bindings, and layout presets:
 

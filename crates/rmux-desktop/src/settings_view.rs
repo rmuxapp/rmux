@@ -182,10 +182,10 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
     let settings = cx.global::<Preferences>();
     let busy = cx.global::<preferences::ReloadState>().0;
     let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(settings);
-    let save_label = if busy { "Working with settings…".to_owned() } else {
+    let save_label = if busy { "Working…".to_owned() } else {
         shortcuts::hint(&SaveAppearanceSettings, &state.focus, window)
-            .map(|key| format!("Save these settings · {key}"))
-            .unwrap_or_else(|| "Save these settings".into())
+            .map(|key| format!("Save settings · {key}"))
+            .unwrap_or_else(|| "Save settings".into())
     };
     chrome_style::inspector(overlay).track_focus(&state.focus).key_context("Settings")
         .on_mouse_down(MouseButton::Left, { let focus = state.focus.clone(); move |_, window, _| { focus.focus(window); } })
@@ -195,7 +195,7 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .child(pane_view::pane_control("close-settings", "Close Settings")
                 .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSettings), cx); } }).child(icons::icon("close"))))
         .child(div().id("settings-scroll").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_3()
-            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Appearance changes apply immediately. Save to keep them for next time. File settings below note when a restart is needed."))
+            .child(div().pt_3().text_xs().text_color(rgb(0xa0a0a0)).child("Changes apply now. Save to keep them. Settings marked below require a restart."))
             .child(row("Default text size", "font", format!("{} pt", settings.font_size), true, state.selected == 0, false))
             .child(row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, state.selected == 1, false))
             .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(rgb(0x383838))
@@ -278,8 +278,8 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .child(div().py_3().text_xs().text_color(rgb(0xa0a0a0)).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
         .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x383838)).flex().flex_col().gap_2()
             .child(div().text_xs().text_color(rgb(if unsaved { 0xe3bc78 } else { 0xa0a0a0 }))
-                .child(if unsaved { "Unsaved session changes" } else { "No unsaved session changes" }))
-            .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ / Tab select · ←→ change · Enter activate · Esc close"))
+                .child(if unsaved { "Unsaved changes" } else { "No unsaved changes" }))
+            .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ select · ←→ change · Enter apply · Esc close"))
             .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(chrome_style::SELECTED_BORDER) }).px_3().py_2().rounded_sm().text_sm()
                 .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))
                 .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(chrome_style::SELECTED_HOVER))))
@@ -288,11 +288,11 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                 })
                 .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(SaveAppearanceSettings), cx); } }).child(save_label))
             .child(div().flex().flex_wrap().gap_2().children([
-                (1, "settings-json", "Open settings file", "Edit all settings in your editor"),
-                (2, "settings-reload", "Reload from file", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
-                (3, "settings-shortcuts", "Keyboard Shortcuts…", "Search command shortcuts available in the current context"),
-                (4, "settings-revert", "Revert unsaved changes", "Restore the last loaded or saved panel values without changing the settings file"),
-                (5, "settings-undo-save", "Undo last save", "Restore saved values only where the file still matches the last save; preserve later edits"),
+                (1, "settings-json", "Open JSON", "Open settings file in your configured editor"),
+                (2, "settings-reload", "Reload", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
+                (3, "settings-shortcuts", "Shortcuts…", "Search command shortcuts available in the current context"),
+                (4, "settings-revert", "Revert", "Restore the last loaded or saved panel values without changing the settings file"),
+                (5, "settings-undo-save", "Undo save", "Restore saved values only where the file still matches the last save; preserve later edits"),
             ].into_iter().map(|(index, id, label, hint)| {
                 let enabled = footer_enabled(index, busy, unsaved,
                     cx.global::<preferences::LastSettingsSave>().0.is_some());
