@@ -158,7 +158,7 @@ struct PreviewLocalFile { path: std::path::PathBuf }
 
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
-struct EditLocalFile { path: std::path::PathBuf }
+struct EditLocalFile { path: std::path::PathBuf, line: Option<u32>, column: Option<u32> }
 
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
@@ -1406,18 +1406,18 @@ impl TerminalView {
         self.link_hover_cell = None;
         if self.link_hover.take().is_some() { cx.notify(); }
     }
-    fn local_link_file(&self, uri: &str) -> Option<std::path::PathBuf> {
-        terminal_link::local_file(uri, self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
+    fn local_link_file(&self, uri: &str) -> Option<terminal_link::Location> {
+        terminal_link::local_target(uri, self.snapshot_directory.as_deref(), self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
     }
     fn can_open_terminal_link(&self, uri: &str) -> bool {
         openable_uri(uri) || self.local_link_file(uri).is_some()
     }
     fn open_terminal_link(&mut self, uri: &str, window: &mut Window, cx: &mut Context<Self>) {
         if openable_uri(uri) { cx.open_url(uri); }
-        else if let Some(path) = self.local_link_file(uri) {
-            window.dispatch_action(Box::new(EditLocalFile { path }), cx);
+        else if let Some(location) = self.local_link_file(uri) {
+            window.dispatch_action(Box::new(EditLocalFile { path: location.path, line: location.line, column: location.column }), cx);
         } else {
-            self.error = Some("Open Link supports HTTP(S) URLs and local file:// links from local terminals. Remote files are not opened locally.".into());
+            self.error = Some("Open Link supports HTTP(S) URLs and local file paths from local terminals. Remote files are not opened locally.".into());
             cx.notify();
         }
     }

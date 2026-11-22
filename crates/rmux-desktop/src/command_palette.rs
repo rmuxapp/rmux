@@ -704,7 +704,7 @@ impl CommandPalette {
         commands.push(Command { title: "Read Markdown".into(), subtitle: Some("Bounded reading view · No active content".into()), shortcut: None,
             target: PaletteEvent::Run(Box::new(PreviewMarkdownFile { path: preview.path.clone() })) });
         commands.push(Command { title: "Open in External Editor".into(), subtitle: Some("Uses file_editor from Settings".into()), shortcut: None,
-            target: PaletteEvent::Run(Box::new(EditLocalFile { path: preview.path.clone() })) });
+            target: PaletteEvent::Run(Box::new(EditLocalFile { path: preview.path.clone(), ..Default::default() })) });
         commands.push(Command { title: if preview.hex { "Copy Hex Dump" } else { "Copy Preview Text" }.into(),
             subtitle: Some(if preview.truncated { "Copies captured text only · Preview is incomplete" } else if preview.hex { "Copies the formatted hex dump, not raw bytes" } else { "Preserves original line endings" }.into()), shortcut: None,
             target: PaletteEvent::Run(Box::new(CopyPreviewText { text: preview.contents })) });
@@ -961,7 +961,7 @@ impl CommandPalette {
         if self.input.read(cx).is_composing() { return; }
         let path = self.preview_navigation.as_ref().map(|(path, _)| path.clone())
             .or_else(|| self.selected_preview_file().map(std::path::Path::to_owned));
-        if let Some(path) = path { cx.emit(PaletteEvent::Run(Box::new(EditLocalFile { path }))); }
+        if let Some(path) = path { cx.emit(PaletteEvent::Run(Box::new(EditLocalFile { path, ..Default::default() }))); }
     }
     fn navigate_folder(&mut self, action: &dyn Action, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
@@ -1402,7 +1402,7 @@ impl Render for CommandPalette {
                         Some(if *hex { Box::new(PreviewLocalFile { path: path.clone() }) } else { Box::new(PreviewHexFile { path: path.clone() }) }), cx))
                     .child(self.file_navigation_button("preview-markdown", if self.markdown_preview { "View Source" } else { "Read Markdown" },
                         Some(if self.markdown_preview { Box::new(PreviewLocalFile { path: path.clone() }) } else { Box::new(PreviewMarkdownFile { path: path.clone() }) }), cx))
-                    .child(self.file_navigation_button("preview-editor", "External Editor", Some(Box::new(EditLocalFile { path: path.clone() })), cx))
+                    .child(self.file_navigation_button("preview-editor", "External Editor", Some(Box::new(EditLocalFile { path: path.clone(), ..Default::default() })), cx))
                     .child(self.file_navigation_button("preview-refresh", "Refresh",
                         Some(if self.markdown_preview { Box::new(PreviewMarkdownFile { path: path.clone() }) } else if *hex { Box::new(PreviewHexFile { path: path.clone() }) } else { Box::new(PreviewLocalFile { path: path.clone() }) }), cx))
             ))

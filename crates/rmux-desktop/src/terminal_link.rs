@@ -16,9 +16,60 @@ pub fn local_file(uri: &str, remote: bool) -> Option<PathBuf> {
         && !path.as_os_str().as_encoded_bytes().iter().any(u8::is_ascii_control)).then_some(path)
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Location {
+    pub path: PathBuf,
+    pub line: Option<u32>,
+    pub column: Option<u32>,
+}
+
+pub fn local_target(text: &str, cwd: Option<&std::path::Path>, remote: bool) -> Option<Location> {
+    if remote || text.len() > 8192 || text.chars().any(char::is_control) { return None; }
+    if text.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("file://")) {
+        return local_file(text, false).map(|path| Location { path, ..Default::default() });
+    }
+    if text.contains("://") || text.starts_with("//") || text.starts_with("\\\\") { return None; }
+    let mut path = text;
+    let mut line = None;
+    let mut column = None;
+    if let Some((prefix, suffix)) = path.rsplit_once(':')
+        && !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()) {
+        line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0)?);
+        path = prefix;
+        if let Some((prefix, suffix)) = path.rsplit_once(':')
+            && !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()) {
+            column = line;
+            line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0)?);
+            path = prefix;
+        }
+    }
+    if path.is_empty() || path.starts_with('~') { return None; }
+    #[cfg(not(windows))]
+    if path.contains('\\') || path.contains(':') { return None; }
+    let path = PathBuf::from(path);
+    let path = if path.is_absolute() { path } else { cwd.filter(|p| p.is_absolute())?.join(path) };
+    (path.as_os_str().len() <= 8192).then_some(Location { path, line, column })
+}
+
 #[cfg(test)]
 mod tests {
-    use super::local_file;
+    use super::*;
+    #[test]
+    fn compiler_locations_resolve_without_io_and_require_local_context() {
+        let cwd = std::env::temp_dir();
+        let location = local_target("src/世界/main.rs:42:7", Some(&cwd), false).unwrap();
+        assert_eq!(location.path, cwd.join("src/世界/main.rs"));
+        assert_eq!((location.line, location.column), (Some(42), Some(7)));
+        let location = local_target("main.rs:12", Some(&cwd), false).unwrap();
+        assert_eq!((location.line, location.column), (Some(12), None));
+        for text in ["src/main.rs:0", "src/main.rs:1:0", "src/main.rs:999999999999", "//server/a", "~/a", "https://example.com/a", "src/a\n"] {
+            assert!(local_target(text, Some(&cwd), false).is_none(), "{text}");
+        }
+        assert!(local_target("src/main.rs:2", None, false).is_none());
+        assert!(local_target("src/main.rs:2", Some(&cwd), true).is_none());
+        let path = cwd.join("absolute.rs");
+        assert_eq!(local_target(path.to_str().unwrap(), None, false).unwrap().path, path);
+    }
     #[test]
     fn local_file_links_decode_literal_paths_without_shell_interpretation() {
         let path = std::env::temp_dir().join("café 世界 'quotes' $(echo).txt");

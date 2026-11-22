@@ -51,7 +51,7 @@ impl Terminal {
             }
         }
         Ok(clicked
-            .and_then(|offset| plain_url_at(&text, offset))
+            .and_then(|offset| plain_url_at(&text, offset).or_else(|| plain_path_at(&text, offset)))
             .map(str::to_owned))
     }
 
@@ -148,9 +148,45 @@ fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
     None
 }
 
+// Recognize path-shaped tokens only; existence and local/remote routing belong
+// to the host. This runs on demand, never in the normal terminal draw path.
+fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
+    let delimiter = |c: char| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"' | '\'' | '(' | ')' | '[' | ']' | '{' | '}');
+    let mut start = 0;
+    for token in text.split_inclusive(delimiter) {
+        let candidate = token.trim_end_matches(delimiter).trim_end_matches([',', ';', ':']);
+        if clicked >= start && clicked < start + candidate.len() {
+            if candidate.contains("://") || candidate.starts_with('-') { return None; }
+            let has_location = candidate.rsplit_once(':').is_some_and(|(name, line)|
+                name.contains('.') && !line.is_empty() && line.bytes().all(|c| c.is_ascii_digit()));
+            return (candidate.contains('/') || candidate.contains('\\') || has_location)
+                .then_some(candidate);
+        }
+        start += token.len();
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn compiler_paths_follow_wrapped_cells_and_keep_url_priority() -> Result<()> {
+        let mut terminal = Terminal::new(20, 5)?;
+        terminal.write("  --> src/世界/main.rs:42:7\r\n".as_bytes());
+        terminal.frame()?;
+        assert_eq!(terminal.link_at(9, 0)?.as_deref(), Some("src/世界/main.rs:42:7"));
+        assert_eq!(terminal.link_at(1, 1)?.as_deref(), Some("src/世界/main.rs:42:7"));
+        for text in ["src/main.rs:42:7:", "(src/main.rs:42:7)", "[src/main.rs:42:7]"] {
+            let offset = text.find("main").unwrap();
+            assert_eq!(plain_path_at(text, offset), Some("src/main.rs:42:7"));
+        }
+        assert_eq!(plain_path_at("main.rs:42", 2), Some("main.rs:42"));
+        assert_eq!(plain_path_at("some words", 2), None);
+        assert_eq!(plain_path_at("12:30", 2), None);
+        assert_eq!(plain_path_at("https://example.com/x.rs:42", 10), None);
+        Ok(())
+    }
     #[test]
     fn file_urls_follow_visible_cells_and_leave_routing_to_the_host() -> Result<()> {
         let mut terminal = Terminal::new(24, 4)?;

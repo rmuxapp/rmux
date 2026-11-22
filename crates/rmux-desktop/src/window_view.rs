@@ -2906,13 +2906,13 @@ impl WorkspaceWindow {
             }));
         }).detach();
     }
-    fn edit_local_file(&mut self, path: std::path::PathBuf, cx: &mut Context<Self>) {
+    fn edit_local_file(&mut self, action: EditLocalFile, cx: &mut Context<Self>) {
         let Some(editor) = cx.global::<Preferences>().file_editor.clone() else {
             self.notice = Some("Configure file_editor.program and file_editor.args in Settings first".into()); cx.notify(); return;
         };
         let executor = cx.background_executor().clone();
         cx.spawn(async move |entity, cx| {
-            let result = match executor.spawn(async move { editor.launch(&path) }).await {
+            let result = match executor.spawn(async move { editor.launch_at(&action.path, action.line, action.column) }).await {
                 Ok(child) => executor.spawn(child.reap()).await,
                 Err(error) => Err(error),
             };
@@ -3005,7 +3005,7 @@ impl WorkspaceWindow {
                 // so returning from the editor can refresh the same document.
                 if let command_palette::PaletteEvent::Run(action) = event
                     && let Some(action) = action.as_any().downcast_ref::<EditLocalFile>() {
-                    this.edit_local_file(action.path.clone(), cx);
+                    this.edit_local_file(action.clone(), cx);
                     return;
                 }
                 this.folder_restore = match event {
@@ -4214,7 +4214,7 @@ impl Render for WorkspaceWindow {
                 }
                 this.start_workspace(Some(action.path.clone()), window, cx);
             }))
-            .on_action(cx.listener(|this, action: &EditLocalFile, _, cx| this.edit_local_file(action.path.clone(), cx)))
+            .on_action(cx.listener(|this, action: &EditLocalFile, _, cx| this.edit_local_file(action.clone(), cx)))
             .on_action(cx.listener(|this, action: &PreviewMarkdownFile, window, cx| this.preview_file_kind(action.path.clone(), false, true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewHexFile, window, cx| this.preview_file_mode(action.path.clone(), true, window, cx)))
             .on_action(cx.listener(|this, action: &PreviewLocalFile, window, cx| this.preview_local_file(action.path.clone(), window, cx)))

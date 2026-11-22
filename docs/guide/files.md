@@ -151,8 +151,9 @@ Set the editor explicitly, then Reload Settings:
 ```
 
 Use arguments supported by your editor (`--` is an example argument, not added
-by rmux). Exactly one argument must be the literal `{file}` placeholder; rmux
-replaces it with the absolute file path as one argument. It does not interpolate
+by rmux). The argument list must contain exactly one `{file}` placeholder; rmux
+replaces it with the absolute file path inside that argument. Optional `{line}`
+and `{column}` placeholders use a terminal link’s location, or 1 when absent. It does not interpolate
 shell expressions, expand environment variables, or choose a file association.
 Paths with spaces, quotes or shell punctuation remain data. Directories and
 symbolic links are rejected. The editor starts in the file's parent directory,
@@ -169,6 +170,38 @@ window notice if that window is still open. A successful launcher exit does not
 prove that a separate GUI application loaded the file. Up to eight launched editor processes
 may remain active; they are reaped asynchronously without blocking a UI or worker
 thread. Editors are independent applications and are not closed with the preview.
+
+## Open paths from terminal output
+
+Command-click on macOS (Ctrl-click elsewhere), or use **Open Link** in the
+terminal context menu, to open `file://` links and path-shaped output such as
+`src/main.rs:42:7`, `./tests/check.rs:12`, or an absolute file path. The first
+number is the line and the second is the column. Relative paths resolve from
+the terminal's last reported working directory, falling back to its launch
+directory; enable shell integration so directory changes stay current.
+
+For editors that accept a combined location, configure their supported syntax.
+For example, a VS Code CLI configuration can use:
+
+```json
+"file_editor": {
+  "program": "/absolute/path/to/code",
+  "args": ["--goto", "{file}:{line}:{column}"]
+}
+```
+
+This does not run a shell. File names containing placeholder-looking text are
+kept literal. Plain output detection handles fully visible wrapped lines and
+Unicode cells, but stops at whitespace and enclosing punctuation. Use encoded
+`file://` links for names containing spaces. Bare names are recognized when they
+have an extension and a numeric location, such as `main.rs:12`; otherwise use a
+path containing a directory separator. Home-directory shorthand (`~/`) is not
+expanded. Missing files report an error when opened; hovering never reads disk.
+Paths in old output use the current reported directory, not a historical one.
+
+Recognized remote sessions and remote file URL hosts do not open local files.
+A manually started SSH session that rmux cannot identify is not covered by that
+remote-context detection. The WASM demo cannot launch a local editor.
 
 ## Preview limits and background loading
 

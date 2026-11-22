@@ -11,17 +11,35 @@ impl Editor {
     pub fn validate(&self) -> Result<()> {
         ensure!(self.program.is_absolute() && self.program.as_os_str().len() <= 8192 && !self.program.as_os_str().as_encoded_bytes().contains(&0), "file_editor.program must be an absolute path up to 8192 bytes without NULs");
         ensure!(self.args.len() <= 64 && self.args.iter().all(|arg| arg.len() <= 8192 && !arg.contains('\0')), "file_editor.args must contain at most 64 arguments, each up to 8192 bytes without NULs");
-        ensure!(self.args.iter().filter(|arg| arg.as_str() == "{file}").count() == 1, "file_editor.args must contain exactly one standalone {{file}} argument");
+        ensure!(self.args.iter().map(|arg| arg.matches("{file}").count()).sum::<usize>() == 1, "file_editor.args must contain exactly one {{file}} placeholder");
         Ok(())
     }
-    fn command(&self, path: &Path) -> Result<Command> {
+    #[cfg(test)]
+    fn command(&self, path: &Path) -> Result<Command> { self.command_at(path, None, None) }
+    fn command_at(&self, path: &Path, line: Option<u32>, column: Option<u32>) -> Result<Command> {
         self.validate()?;
         ensure!(path.is_absolute() && path.as_os_str().len() <= 8192
             && !path.as_os_str().as_encoded_bytes().contains(&0), "Editor file path must be absolute and up to 8192 bytes without NULs");
         let mut command = Command::new(&self.program);
         command.current_dir(path.parent().context("Editor file path has no parent directory")?);
         for arg in &self.args {
-            if arg == "{file}" { command.arg(path); } else { command.arg(arg); }
+            // Substitute each original fragment once: placeholders inside a file
+            // name must remain literal, and non-Unicode paths must stay intact.
+            let mut value = std::ffi::OsString::new();
+            let mut rest = arg.as_str();
+            while let Some((offset, marker)) = ["{file}", "{line}", "{column}"].into_iter()
+                .filter_map(|marker| rest.find(marker).map(|offset| (offset, marker)))
+                .min_by_key(|(offset, _)| *offset) {
+                value.push(&rest[..offset]);
+                match marker {
+                    "{file}" => value.push(path),
+                    "{line}" => value.push(line.unwrap_or(1).to_string()),
+                    _ => value.push(column.unwrap_or(1).to_string()),
+                }
+                rest = &rest[offset + marker.len()..];
+            }
+            value.push(rest);
+            command.arg(value);
         }
         command.stdin(Stdio::null()).stdout(Stdio::null()).stderr(Stdio::null());
         #[cfg(windows)] {
@@ -30,9 +48,11 @@ impl Editor {
         }
         Ok(command)
     }
-    pub fn launch(&self, path: &Path) -> Result<RunningEditor> {
+    #[cfg(test)]
+    pub fn launch(&self, path: &Path) -> Result<RunningEditor> { self.launch_at(path, None, None) }
+    pub fn launch_at(&self, path: &Path, line: Option<u32>, column: Option<u32>) -> Result<RunningEditor> {
         let permit = Permit::acquire()?;
-        let mut command = self.command(path)?;
+        let mut command = self.command_at(path, line, column)?;
         let metadata = std::fs::symlink_metadata(path)
             .with_context(|| format!("Could not access editor file {}", path.display()))?;
         ensure!(metadata.is_file(), "External editing requires a regular file, not a directory or symbolic link: {}", path.display());
@@ -98,6 +118,17 @@ mod tests {
         Ok(())
     }
     #[test]
+    fn editor_locations_are_literal_and_default_to_first_line() -> Result<()> {
+        let editor = Editor { program: std::env::current_exe()?, args: vec!["--goto".into(), "{file}:{line}:{column}".into()] };
+        let path = std::env::temp_dir().join("世界 {line} $(echo).rs");
+        for (line, column, suffix) in [(Some(42), Some(7), ":42:7"), (None, None, ":1:1")] {
+            let command = editor.command_at(&path, line, column)?;
+            let mut expected = path.as_os_str().to_os_string(); expected.push(suffix);
+            assert_eq!(command.get_args().nth(1).unwrap(), expected);
+        }
+        Ok(())
+    }
+    #[test]
     fn editor_paths_remain_single_literal_arguments() -> Result<()> {
         let editor = Editor { program: std::env::current_exe()?, args: vec!["--".into(), "{file}".into()] };
         let path = std::env::temp_dir().join("spaces $(touch nope); 'quoted'.sh");
@@ -105,7 +136,7 @@ mod tests {
         assert_eq!(command.get_current_dir(), path.parent());
         let args: Vec<_> = command.get_args().collect();
         assert_eq!(args, [std::ffi::OsStr::new("--"), path.as_os_str()]);
-        for args in [vec![], vec!["{file}", "{file}"], vec!["prefix{file}"], vec!["{file}", "bad\0arg"]] {
+        for args in [vec![], vec!["{file}", "{file}"], vec!["{file}", "bad\0arg"]] {
             assert!(Editor { program: editor.program.clone(), args: args.into_iter().map(String::from).collect() }.validate().is_err());
         }
         assert!(editor.command(Path::new("relative.txt")).is_err());

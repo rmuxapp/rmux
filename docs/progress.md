@@ -1,3 +1,15 @@
+Terminal compiler-path navigation (T10): on-demand visible-line detection now
+recognizes path-shaped output and filename:line[:column] references, including
+soft wraps and wide Unicode cells. Local targets resolve against the terminal's
+reported/launch directory and pass through the existing editor validation and
+background launch path. Editor argv accepts literal {file}, {line}, {column}
+placeholders, including VS Code --goto combinations, without reinterpreting
+placeholders inside file names. Recognized remote contexts remain blocked.
+Twelve targeted link/routing/editor tests passed with desktop compilation,
+including wrapped cells, invalid coordinates, remote contexts and literal args.
+Native modifier-click acceptance and historical-cwd/quoted-path support remain
+open. No bundle, site deployment or additional release was made for this batch.
+
 Release 0.1.6 delivered from commit 2662511 via GitHub run 44985734410.
 macOS signing/notarization, Linux and Windows packaging, and publication passed.
 The published assets include macOS DMG/ZIP, Linux tarball, Windows ZIP,
