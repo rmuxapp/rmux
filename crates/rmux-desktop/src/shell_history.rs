@@ -172,12 +172,113 @@ impl Writes {
     }
 }
 
+/// A single event-driven writer is shared by every history-enabled terminal.
+/// Clones own only a bounded wake channel and shared state, not another thread.
+#[derive(Clone)]
+pub(crate) struct Worker {
+    writes: std::sync::Arc<Writes>,
+    wake: std::sync::mpsc::SyncSender<()>,
+    error: std::sync::Arc<std::sync::Mutex<Option<String>>>,
+}
+impl Worker {
+    pub fn start() -> Result<Self> {
+        use std::sync::{Arc, Mutex, mpsc};
+        let writes = Arc::new(Writes::default());
+        let error = Arc::new(Mutex::new(None));
+        let (wake, receiver) = mpsc::sync_channel(1);
+        let pending = writes.clone();
+        let failure = error.clone();
+        std::thread::Builder::new().name("rmux-history-save".into()).spawn(move || {
+            loop {
+                let mut disconnected = receiver.recv().is_err();
+                if !disconnected {
+                    // A fixed window coalesces bursts without starving a busy
+                    // shell. No timer exists while there is no pending work.
+                    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(250);
+                    loop {
+                        let remaining = deadline.saturating_duration_since(std::time::Instant::now());
+                        if remaining.is_zero() { break; }
+                        match receiver.recv_timeout(remaining) {
+                            Ok(()) => (),
+                            Err(mpsc::RecvTimeoutError::Timeout) => break,
+                            Err(mpsc::RecvTimeoutError::Disconnected) => { disconnected = true; break; }
+                        }
+                    }
+                }
+                let result = pending.flush().err().map(|error| format!("{error:#}"));
+                let mut previous = failure.lock().unwrap_or_else(|error| error.into_inner());
+                if result != *previous {
+                    if let Some(message) = &result { eprintln!("rmux: {message}"); }
+                    *previous = result;
+                }
+                if disconnected { break; }
+            }
+        })?;
+        Ok(Self { writes, wake, error })
+    }
+    fn queue(&self, lease: std::sync::Arc<Lease>, revision: u64, history: &History) -> Result<()> {
+        let result = self.writes.enqueue(lease, revision, history);
+        // Wake even on overflow so producers can retry after the queue drains.
+        match self.wake.try_send(()) {
+            Ok(()) | Err(std::sync::mpsc::TrySendError::Full(())) => (),
+            Err(std::sync::mpsc::TrySendError::Disconnected(())) => anyhow::bail!("terminal history worker stopped"),
+        }
+        result
+    }
+    /// Explicit save/quit barriers call this on a background executor after
+    /// terminal readers have drained. It serializes with the regular worker.
+    pub fn flush(&self) -> Result<()> { self.writes.flush() }
+    pub fn error(&self) -> Option<String> {
+        self.error.lock().unwrap_or_else(|error| error.into_inner()).clone()
+    }
+    pub fn shell(&self, store: &Store, source: Option<&str>, columns: u16, rows: u16,
+        directory: Option<&std::path::Path>, scrollback_bytes: usize) -> Result<rmux_terminal::session::Session> {
+        let (lease, history) = store.fork(source)?;
+        let id = lease.id().to_owned();
+        let sink = std::sync::Arc::new(Recorder { worker: self.clone(), lease });
+        let mut session = rmux_terminal::session::Session::shell_in_with_history_sink(
+            columns, rows, directory, scrollback_bytes, Some(&history), Some(sink))?;
+        session.set_shell_history_id(Some(id))?;
+        Ok(session)
+    }
+}
+struct Recorder { worker: Worker, lease: std::sync::Arc<Lease> }
+impl rmux_terminal::session::HistorySink for Recorder {
+    fn changed(&self, revision: u64, history: &History) -> Result<()> {
+        self.worker.queue(self.lease.clone(), revision, history)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     const FIRST: &str = "0123456789abcdef0123456789abcdef";
     const SECOND: &str = "fedcba9876543210fedcba9876543210";
 
+
+    #[test]
+    fn shared_worker_flushes_when_last_owner_closes() -> Result<()> {
+        let temporary = tempfile::tempdir()?;
+        let store = Store::new(temporary.path().join("history"));
+        let (lease, _) = store.fork(None)?;
+        let id = lease.id().to_owned();
+        let worker = Worker::start()?;
+        let mut history = History::default();
+        history.record("echo retained-on-close");
+        worker.queue(lease.clone(), 1, &history)?;
+        drop(lease);
+        drop(worker);
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        loop {
+            if let Ok(_lease) = Lease::acquire(store.clone(), id.clone()) {
+                assert_eq!(store.load(&id)?, history);
+                break;
+            }
+            ensure!(std::time::Instant::now() < deadline, "history worker did not finish its final flush");
+            std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+        Ok(())
+    }
     #[test]
     fn restored_writers_are_independent_and_leased_until_pending_save_finishes() -> Result<()> {
         let temporary = tempfile::tempdir()?;

@@ -298,6 +298,12 @@ impl Drop for UnstartedChild {
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LocalInputMode { pub echo: bool, pub canonical: bool }
 
+/// Receives bounded shell-approved snapshots off the terminal lock. Implementors
+/// must enqueue only: filesystem work belongs on a separate background worker.
+pub trait HistorySink: Send + Sync {
+    fn changed(&self, revision: u64, history: &rmux_core::shell_history::History) -> Result<()>;
+}
+
 impl Session {
     /// Event-driven callers can sample local tty flags without locking the parser.
     /// ConPTY and remote tty modes are not inferred from output text.
@@ -332,10 +338,10 @@ impl Session {
         rows: u16,
         scrollback_bytes: usize,
     ) -> Result<Self> {
-        Self::spawn_with_history(command, columns, rows, scrollback_bytes, None)
+        Self::spawn_with_history(command, columns, rows, scrollback_bytes, None, None)
     }
     fn spawn_with_history(command: CommandBuilder, columns: u16, rows: u16, scrollback_bytes: usize,
-        history: Option<&rmux_core::shell_history::History>) -> Result<Self> {
+        history: Option<&rmux_core::shell_history::History>, history_sink: Option<Arc<dyn HistorySink>>) -> Result<Self> {
         // portable-pty falls back to HOME for a missing Unix cwd. Reject an
         // invalid explicit target before allocating an engine or starting work.
         if let Some(directory) = command.get_cwd() {
@@ -474,11 +480,12 @@ impl Session {
             .name("rmux-pty-read".into())
             .spawn(move || {
                 let mut bytes = [0; 16 * 1024];
+                let mut history_revision = 0;
                 loop {
                     match reader.read(&mut bytes) {
                         Ok(0) => break,
                         Ok(count) => {
-                            let replies = {
+                            let (replies, history_update) = {
                                 let mut terminal =
                                     read_terminal.lock().unwrap_or_else(|e| e.into_inner());
                                 terminal.write(&bytes[..count]);
@@ -490,8 +497,18 @@ impl Session {
                                     Ok(enabled) => reader_mouse_tracking.store(enabled, Ordering::Release),
                                     Err(error) => { let _ = mode_error.try_send(format!("Mouse mode query failed: {error}")); }
                                 }
-                                terminal.take_replies()
+                                let history_update = history_sink.as_ref().and_then(|_| {
+                                    terminal.shell_history_since(history_revision)
+                                        .map(|(revision, history)| (revision, history.clone()))
+                                });
+                                (terminal.take_replies(), history_update)
                             };
+                            if let (Some(sink), Some((revision, history))) = (&history_sink, history_update) {
+                                match sink.changed(revision, &history) {
+                                    Ok(()) => history_revision = revision,
+                                    Err(error) => { let _ = mode_error.try_send(format!("Could not queue terminal history: {error:#}")); }
+                                }
+                            }
                             read_bytes.fetch_add(count as u64, Ordering::Relaxed);
                             if !replies.is_empty() {
                                 if reply_writer.send(replies.into()).is_err() {
@@ -529,6 +546,12 @@ impl Session {
     }
     pub fn shell_in_with_history(columns: u16, rows: u16, directory: Option<&std::path::Path>,
         scrollback_bytes: usize, history: Option<&rmux_core::shell_history::History>) -> Result<Self> {
+        Self::shell_in_with_history_sink(columns, rows, directory, scrollback_bytes, history, None)
+    }
+    pub fn shell_in_with_history_sink(columns: u16, rows: u16, directory: Option<&std::path::Path>,
+        scrollback_bytes: usize, history: Option<&rmux_core::shell_history::History>,
+        history_sink: Option<Arc<dyn HistorySink>>) -> Result<Self> {
+        anyhow::ensure!(history_sink.is_none() || history.is_some(), "history sink requires initialized history");
         let shell = select_shell(
             std::env::var_os("RMUX_SHELL"),
             std::env::var_os(if cfg!(windows) { "COMSPEC" } else { "SHELL" }),
@@ -593,7 +616,7 @@ impl Session {
             command.env("RMUX_HISTORY_IMPORT", path);
             command.env("RMUX_SESSION_HISTORY", "1");
         }
-        let mut session = Self::spawn_with_history(command, columns, rows, scrollback_bytes, history)?;
+        let mut session = Self::spawn_with_history(command, columns, rows, scrollback_bytes, history, history_sink)?;
         session._shell_integration = integration;
         Ok(session)
     }
@@ -1324,6 +1347,31 @@ fn select_shell(
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    #[cfg(unix)]
+    fn history_sink_receives_pty_commands_and_clears_without_idle_snapshots() -> Result<()> {
+        struct Sink(std::sync::mpsc::Sender<(u64, rmux_core::shell_history::History)>);
+        impl HistorySink for Sink {
+            fn changed(&self, revision: u64, history: &rmux_core::shell_history::History) -> Result<()> {
+                self.0.send((revision, history.clone()))?;
+                Ok(())
+            }
+        }
+        let (sender, receiver) = std::sync::mpsc::channel();
+        let mut command = CommandBuilder::new("/bin/sh");
+        command.args(["-c", r"printf '\033]9999;rmux-history;6563686f206869\007'; read gate; printf 'ordinary output\n\033]9999;rmux-history;clear\007'; read gate"]);
+        let session = Session::spawn_with_history(command, 80, 24, 1024 * 1024,
+            Some(&rmux_core::shell_history::History::default()), Some(Arc::new(Sink(sender))))?;
+        let (first, history) = receiver.recv_timeout(std::time::Duration::from_secs(5))?;
+        assert_eq!(history.entries().collect::<Vec<_>>(), vec!["echo hi"]);
+        session.input(b"\r")?;
+        let (second, history) = receiver.recv_timeout(std::time::Duration::from_secs(5))?;
+        assert!(second > first);
+        assert_eq!(history.entries().len(), 0);
+        assert!(receiver.try_recv().is_err());
+        session.input(b"\r")?;
+        Ok(())
+    }
     #[test]
     fn powershell_login_flag_precedes_interactive_without_changing_other_shells() {
         use std::ffi::OsStr;

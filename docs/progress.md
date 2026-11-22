@@ -10231,3 +10231,26 @@ revision rejection, and explicit clearing. Desktop test compilation was the
 only build. Live startup/restore wiring, asynchronous scheduling and shutdown
 flush, visible error reporting, retention cleanup, and native acceptance remain
 pending; capture is still disabled by default.
+
+
+### Event-driven history writer and terminal delivery — 2026-11-22
+
+History-enabled Session startup now accepts a memory-only sink. The PTY reader
+checks history revisions only when a sink is present, clones bounded records
+only on change, and delivers them after releasing the engine lock. Failed
+enqueues do not acknowledge the revision and use the existing session error
+channel. Ordinary sessions do not clone or enqueue history.
+
+Added one shared background writer with a one-slot wake channel and a fixed
+250 ms coalescing window. It blocks while idle, cannot be starved indefinitely
+by command bursts, and drains pending saves when its last sender closes.
+Explicit background flushes serialize with scheduled flushes. Changed I/O
+errors are retained for presentation and logged once per change; no idle retry
+loop is introduced. Worker shell creation connects forked identities, imported
+records, the sink, and Session identity in one path.
+
+A real PTY check passed for command and clear delivery, and eight storage/worker
+tests passed, including final-owner shutdown flushing. Normal application shell
+creation does not invoke this opt-in path yet. Startup/restore configuration,
+visible save-error presentation, reader-drain-aware app quit, retention cleanup,
+and full restore acceptance remain pending. No GUI bundle or release was built.
