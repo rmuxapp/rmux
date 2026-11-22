@@ -568,7 +568,7 @@ impl Render for InputProbe {
                                         HighlightStyle { color: Some(rgb_to_hsla(rgb(0xffffff))), background_color: Some(rgb_to_hsla(rgb(0x41638c))), ..Default::default() })))
                                 }))
                                 .when_some(this.result_hints.get(index).cloned().flatten(), |row, hint| row.child(
-                                    div().flex_shrink_0().text_xs().text_color(rgb(0xa0a0a0)).child(hint)))
+                                    palette_view::shortcut(hint)))
                                 .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                     if event.standard_click() { this.selected = row; this.choose(window, cx); }
                                 })).into_any_element()
@@ -576,8 +576,10 @@ impl Render for InputProbe {
                     }).with_sizing_behavior(ListSizingBehavior::Auto).w_full().min_h_0()
                         .h(px((self.search.matches.len() as f32 * 36.).min(320.)))
                 })
-                .when(self.search.matches.is_empty(), |panel| panel.child(div().p_3().text_sm().child("No matching commands")))
-                .child(palette_view::footer().child(self.feedback.clone().unwrap_or_else(|| "↑↓ Navigate     ↵ Run     Esc Close".into()))))))
+                .when(self.search.matches.is_empty(), |panel| panel.child(palette_view::empty_state("No matching commands or workspaces")))
+                .child(palette_view::footer().child(if let Some(feedback) = self.feedback.clone() {
+                    div().child(feedback).into_any_element()
+                } else { palette_view::navigation_hints().into_any_element() })))))
     }
 }
 #[wasm_bindgen::prelude::wasm_bindgen(start)]

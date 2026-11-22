@@ -21,17 +21,15 @@ pub(crate) fn panel(height: f32) -> Stateful<Div> {
         .max_h(px((height - top_inset(height) - 8.).max(0.))).overflow_hidden()
         .flex().flex_col().rounded_lg().border_1().border_color(rgb(0x454545)).bg(rgb(0x252525))
 }
-pub(crate) fn heading(text: impl Into<SharedString>) -> Div {
-    div().flex_shrink_0().px_3().pt_2().text_xs().text_color(rgb(0xa0a0a0)).child(text.into())
-}
 pub(crate) fn header(text: impl Into<SharedString>, close: impl IntoElement) -> Div {
-    div().flex().flex_shrink_0().items_center().justify_between()
-        .child(heading(text).min_w_0().flex_1())
+    div().flex().flex_shrink_0().items_center().justify_between().gap_2().px_3().pt_3()
+        .child(div().min_w_0().flex_1().text_size(px(13.)).text_color(rgb(0xbcbcc4)).child(text.into()))
         .child(close)
 }
 pub(crate) fn close_button() -> Stateful<Div> {
-    div().id("close-command-palette").flex_shrink_0().mt_2().mr_2().px_2().py_1()
-        .rounded_sm().text_sm().cursor_pointer().hover(|style| style.bg(rgb(0x454545)))
+    div().id("close-command-palette").flex_shrink_0().px_2().h(px(28.))
+        .flex().items_center().rounded_sm().text_xs().text_color(rgb(0xbcbcc4))
+        .cursor_pointer().hover(|style| style.bg(rgb(0x454545)).text_color(rgb(0xffffff)))
         .child("Close ×")
 }
 pub(crate) fn search(input: impl IntoElement) -> Div {
@@ -47,6 +45,26 @@ pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {
 pub(crate) fn footer() -> Div {
     div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x363636))
         .flex().flex_wrap().items_center().gap_2().text_xs().text_color(rgb(0xa0a0a0))
+}
+
+pub(crate) fn shortcut(text: impl Into<SharedString>) -> Div {
+    div().flex_shrink_0().max_w(relative(0.4)).truncate().px_2().py_1()
+        .text_xs().line_height(px(16.)).rounded_sm().border_1().border_color(rgb(0x45454b))
+        .bg(rgb(0x2b2b30)).text_color(rgb(0xbcbcc4)).child(text.into())
+}
+
+pub(crate) fn navigation_hints() -> Div {
+    div().flex().flex_wrap().items_center().gap_3()
+        .children([("↑↓", "Navigate"), ("↵", "Run"), ("Esc", "Close")].into_iter().map(|(key, label)|
+            div().flex().items_center().gap_1()
+                .child(div().px_1().rounded_sm().border_1().border_color(rgb(0x45454b))
+                    .text_color(rgb(0xbcbcc4)).child(key))
+                .child(label)))
+}
+
+pub(crate) fn empty_state(message: impl Into<SharedString>) -> Div {
+    div().w_full().px_3().py_6().flex_shrink_0().text_center().text_sm()
+        .text_color(rgb(0xbcbcc4)).child(message.into())
 }
 
 // Keep the destination within one viewport of the starting row. Always advance

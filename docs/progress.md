@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Current priority is polish and release quality. Related changes are batched before
+focused checks/builds and pushes, per the user's instruction; full parity remains
+the longer-term scope. The shared palette presentation batch aligns header and
+Close controls, gives Close a 28 px height, shares bordered shortcut badges
+between desktop and WASM, replaces space-padded footer text with wrapping keyboard
+hints, and improves empty-state spacing. Desktop check and the WASM build pass
+(one WASM delimiter typo was corrected during this batch). Browser inspection
+confirms populated/empty layouts and Close returning focus to the terminal.
+Screenshot: target/palette-polish-batch.jpg. Native graphical acceptance and
+deployment of this batch are still pending.
+
 Fuzzy highlighting now also covers palette result subtitles such as terminal
 directories. Literal terminal-search excerpts and document previews retain their
 existing behavior. Contiguous highlighting marks ranges directly without a new

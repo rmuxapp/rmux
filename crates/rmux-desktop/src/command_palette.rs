@@ -1094,12 +1094,8 @@ impl CommandPalette {
             )
             .when_some(self.commands[command].shortcut.clone(), |row, shortcut| {
                 row.child(
-                    div().id(("command-shortcut", command))
-                        .flex_shrink_0().max_w(relative(0.4)).truncate()
-                        .text_xs().px_2().py_1().rounded_sm().bg(rgb(0x2b2b2b))
-                        .text_color(rgb(0xa0a0a0))
-                        .tooltip({ let hint: SharedString = shortcut.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into() })
-                        .child(shortcut),
+                    palette_view::shortcut(shortcut.clone()).id(("command-shortcut", command))
+                        .tooltip({ let hint: SharedString = shortcut.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into() }),
                 )
             }).into_any_element()
     }
@@ -1386,7 +1382,7 @@ impl Render for CommandPalette {
                         .child(url))))
             .child(palette_view::search(self.input.clone()))
             .child(if self.search.matches.is_empty() {
-                div().p_3().text_sm().child(self.empty_message).into_any_element()
+                palette_view::empty_state(self.empty_message).into_any_element()
             } else {
                 let entity = cx.entity();
                 list(self.scroll.clone(), move |row, _, cx| {
@@ -1414,7 +1410,9 @@ impl Render for CommandPalette {
             ))
             .when((!compact || self.feedback.is_some() || has_search_excerpt || has_ssh_destination || has_preview_file) && self.buffer_rename.is_none() && !self.directory_input && !self.terminal_search_input && !self.ssh_input, |palette| palette.child(
                 palette_view::footer()
-                    .child(div().flex_1().min_w_0().child(self.feedback.unwrap_or("↑↓ Navigate     ↵ Run     Esc Close")))
+                    .child(div().flex_1().min_w_0().child(if let Some(feedback) = self.feedback {
+                        div().child(feedback).into_any_element()
+                    } else { palette_view::navigation_hints().into_any_element() }))
                     .when(has_preview_file, |footer| footer.child(
                         div().id("preview-selected-hex").px_2().py_1().rounded_sm()
                             .cursor_pointer().text_color(rgb(0xffffff)).bg(rgb(0x353535))
