@@ -184,8 +184,8 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
     let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(settings);
     let save_label = if busy { "Working…".to_owned() } else {
         shortcuts::hint(&SaveAppearanceSettings, &state.focus, window)
-            .map(|key| format!("Save settings · {key}"))
-            .unwrap_or_else(|| "Save settings".into())
+            .map(|key| format!("Save · {key}"))
+            .unwrap_or_else(|| "Save".into())
     };
     chrome_style::inspector(overlay).track_focus(&state.focus).key_context("Settings")
         .on_mouse_down(MouseButton::Left, { let focus = state.focus.clone(); move |_, window, _| { focus.focus(window); } })
@@ -280,23 +280,22 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .child(div().text_xs().text_color(rgb(if unsaved { 0xe3bc78 } else { 0xa0a0a0 }))
                 .child(if unsaved { "Unsaved changes" } else { "No unsaved changes" }))
             .child(div().text_xs().text_color(rgb(0xa0a0a0)).child("↑↓ select · ←→ change · Enter apply · Esc close"))
-            .child(div().id("settings-save").border_1().border_color(if state.selected == KEYS.len() { rgb(0xffffff) } else { rgb(chrome_style::SELECTED_BORDER) }).px_3().py_2().rounded_sm().text_sm()
-                .bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED }))
-                .when(!busy, |button| button.cursor_pointer().hover(|s| s.bg(rgb(chrome_style::SELECTED_HOVER))))
-                .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                    if !busy { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[0].into() }), cx); }
-                })
-                .on_click(move |event, window, cx| { if !busy && event.standard_click() { window.dispatch_action(Box::new(SaveAppearanceSettings), cx); } }).child(save_label))
-            .child(div().flex().flex_wrap().gap_2().children([
-                (1, "settings-json", "Open JSON", "Open settings file in your configured editor"),
-                (2, "settings-reload", "Reload", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
-                (3, "settings-shortcuts", "Shortcuts…", "Search command shortcuts available in the current context"),
-                (4, "settings-revert", "Revert", "Restore the last loaded or saved panel values without changing the settings file"),
-                (5, "settings-undo-save", "Undo save", "Restore saved values only where the file still matches the last save; preserve later edits"),
-            ].into_iter().map(|(index, id, label, hint)| {
+            .children([
+                [
+                    (0, "settings-save", save_label.as_str(), "Save current appearance settings to the settings file"),
+                    (1, "settings-json", "Open JSON", "Open settings file in your configured editor"),
+                    (2, "settings-reload", "Reload", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
+                ],
+                [
+                    (3, "settings-shortcuts", "Shortcuts…", "Search command shortcuts available in the current context"),
+                    (4, "settings-revert", "Revert", "Restore the last loaded or saved panel values without changing the settings file"),
+                    (5, "settings-undo-save", "Undo save", "Restore saved values only where the file still matches the last save; preserve later edits"),
+                ],
+            ].into_iter().map(|row| div().flex().gap_2().children(row.into_iter().map(|(index, id, label, hint)| {
                 let enabled = footer_enabled(index, busy, unsaved,
                     cx.global::<preferences::LastSettingsSave>().0.is_some());
-                div().id(id).px_2().py_1().rounded_sm().text_xs().border_1()
+                div().id(id).flex_1().min_w_0().h(px(30.)).flex().items_center().justify_center().px_2().rounded_sm().text_xs().border_1()
+                    .when(index == 0, |button| button.bg(rgb(if busy { 0x353535 } else { chrome_style::SELECTED })))
                     .border_color(rgb(if state.selected == KEYS.len() + index { chrome_style::ACCENT } else { 0x454545 }))
                     .text_color(rgb(if enabled { chrome_style::ACCENT } else { 0x777777 }))
                     .when(enabled, |link| link.cursor_pointer().hover(|style| style.bg(rgb(chrome_style::SELECTED_HOVER))))
@@ -308,8 +307,8 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                         if enabled && event.standard_click() {
                             if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); }
                         }
-                    }).child(label)
-            }))))
+                    }).child(div().min_w_0().truncate().child(label.to_owned()))
+            })))))
         .into_any_element()
 }
 
