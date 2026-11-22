@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Replay now includes workspace.created/workspace.closed with workspace_id instead
+of surface_id. Workspace ownership tokens avoid duplicate close records and move
+with their entity; explicit close, empty-source removal and merge close promptly.
+RPC filtering and rmuxctl --workspace select these lifecycle records independently
+of surface filters. Native smoke passes creation, last-tab departure closure and
+explicit closure alongside cross-window surface transfers. The focused CLI parser
+check passes; workspace journal coverage checks filtered wake-up, wire fields,
+invalid IDs and duplicate-close suppression. Restore/merge and whole-workspace
+window transfer runtime acceptance remain pending.
+
 Native replay smoke now moves a terminal to another window and back. Both moves
 preserve surface ID and process PID, emit filtered location invalidations and
 report the destination window/workspace. Sending a command after each move

@@ -2532,6 +2532,7 @@ enum TerminalSeed {
 }
 
 struct Workspace {
+    event_lifetime: events::WorkspaceLifetime,
     spawning_split: Option<Task<()>>,
     split_launch_canceled: Option<Arc<AtomicBool>>,
     pane_subscriptions: std::collections::HashMap<EntityId, Vec<Subscription>>,
@@ -2552,6 +2553,7 @@ struct WorkspaceMetadataChanged;
 impl EventEmitter<WorkspaceMetadataChanged> for Workspace {}
 impl Workspace {
     fn request_process_close(&self, cx: &App) {
+        self.event_lifetime.close();
         if let Some(cancel) = &self.split_launch_canceled { cancel.store(true, Ordering::Relaxed); }
         for pane in &self.panes { pane.read(cx).request_process_close(cx); }
     }
@@ -2571,6 +2573,7 @@ impl Workspace {
             source.split_drag = None;
             let tree = source.pane_state.layout.take().expect("validated source layout");
             let panes = std::mem::take(&mut source.panes);
+            source.event_lifetime.close();
             cx.notify();
             (tree, panes)
         });
@@ -2956,6 +2959,7 @@ impl Workspace {
         self.pane_subscriptions.remove(&removed.entity_id());
         self.pane_state.remove(&removed);
         if self.panes.is_empty() {
+            self.event_lifetime.close();
             cx.emit(WorkspaceEmpty);
         }
         cx.notify();

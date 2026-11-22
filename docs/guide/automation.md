@@ -324,10 +324,13 @@ the same running app. Treat cursors as opaque strings. A request without `after`
 starts at the oldest retained record. Limits are 1–128 (default 128); when
 `has_more` is true, read the next page before waiting for new events.
 
-Filter with optional `surface_id` and `kinds` (an array of up to 16 distinct
-supported event names). Both filters must match; an empty kinds array accepts
-all kinds. The CLI uses `--surface ID` and repeatable `--kind KIND`.
-Unknown kinds and malformed IDs are rejected. IDs may refer to closed surfaces,
+Filter with optional `surface_id`, `workspace_id` and `kinds` (an array of up to
+16 distinct supported event names). All supplied filters must match; an empty
+kinds array accepts all kinds. The CLI uses `--surface ID`, `--workspace ID` and
+repeatable `--kind KIND`. Workspace filters select workspace lifecycle records,
+not events from terminals inside that workspace. Supplying both resource IDs
+therefore matches no current event kinds.
+Unknown kinds and malformed IDs are rejected. IDs may refer to closed resources,
 since their retained events remain readable. Cursors advance past skipped
 records, so keep filters consistent while following a stream; changing filters
 does not replay previously skipped events. `has_more` means more retained records
@@ -350,7 +353,8 @@ to another app process. On a gap, refresh your resource lists; the returned page
 starts at the oldest available event. Cursors ahead of the current process's
 sequence are rejected. Events are not persisted across app launches.
 
-Each event has a string `cursor`, `kind` and `surface_id`. Notification receive,
+Each event has string `cursor` and `kind` fields. Surface/notification events
+include `surface_id`; workspace events include `workspace_id` instead. Notification receive,
 individual read and dismissal events also include `notification_id` as a decimal
 string corresponding to the notification API's numeric `revision`.
 Supported kinds are `notification.received`, `notification.read`,
@@ -363,6 +367,14 @@ These are invalidation signals: use `notification.list` or
 `surface.list` to fetch current state. Retained events can refer to surfaces or
 notifications that have since closed or been removed. Titles, bodies and terminal
 output are not copied into the journal.
+
+`workspace.created` and `workspace.closed` follow workspace entity lifetimes,
+including restored workspaces, explicit closure, merge-source removal and removal
+of an empty workspace after its last tab leaves. Moving the same workspace between
+windows preserves its identity and does not close/recreate it. Close is emitted
+once even if rendering retains the old entity. Creation can precede publication
+into the window list; a failed setup can produce a short-lived create/close pair.
+Use `workspace.list` for current state; these records contain no names or paths.
 
 Terminal metadata also emits `surface.title_changed`, `surface.directory_changed`,
 `surface.status_changed` and `surface.progress_changed`. Shell title and directory
@@ -404,7 +416,7 @@ full program-status history. These reports come from terminal programs and are
 not authenticated agent identities.
 
 This is a replay API with bounded long polling. Push subscriptions, resource
-workspace/pane lifecycle and historical movement events and the full cmux event contract are not implemented.
+window/pane lifecycle and historical movement events and the full cmux event contract are not implemented.
 Readers use the existing bounded RPC queue; publishing never waits for clients.
 
 ## Create and close workspaces

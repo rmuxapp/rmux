@@ -61,6 +61,8 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             assert "surface.directory_changed" in event_api["kinds"]
             assert "surface.focus_changed" in event_api["kinds"]
             assert "surface.location_invalidated" in event_api["kinds"]
+            assert "workspace.created" in event_api["kinds"]
+            assert "workspace_id" in event_api["filters"]
             surfaces = call("surface.list")["surfaces"]
             assert all(isinstance(item["input_focused"], bool) for item in surfaces)
             surface = surfaces[0]["id"]
@@ -151,6 +153,10 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
             created_surface = next(s["id"] for s in call("surface.list")["surfaces"] if s["id"] != surface)
             created = call("events.read", {"after": boundary})
             assert sum(e["kind"] == "surface.created" and e["surface_id"] == created_surface for e in created["events"]) == 1
+            workspace_events = call("events.read", {"after": boundary, "workspace_id": destination})
+            assert [e["kind"] for e in workspace_events["events"]] == ["workspace.created"], workspace_events
+            assert all("surface_id" not in e for e in workspace_events["events"])
+
             original_pid = next(s["process_id"] for s in call("surface.list")["surfaces"] if s["id"] == created_surface)
             call("window.create")
             other = next(w for w in call("workspace.list")["workspaces"] if w["window_id"] != window)
@@ -178,12 +184,16 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                     assert time.monotonic() < deadline, "transferred terminal did not respond"
                     time.sleep(.01)
             assert destination not in [w["id"] for w in call("workspace.list")["workspaces"]], "empty source workspace survived transfer"
+            workspace_events = call("events.read", {"after": created["cursor"], "workspace_id": destination})
+            assert [e["kind"] for e in workspace_events["events"]] == ["workspace.closed"], workspace_events
             # Keep another workspace alive so the application can answer after
             # closing both original terminal entities.
             call("workspace.create", {"window_id": window, "name": "Survivor"})
             boundary = call("events.read")["cursor"]
             call("workspace.close", {"workspace_id": original_workspace})
             closed = call("events.read", {"after": boundary})
+            workspace_events = call("events.read", {"after": boundary, "workspace_id": original_workspace})
+            assert [e["kind"] for e in workspace_events["events"]] == ["workspace.closed"], workspace_events
             for target in (surface, created_surface):
                 assert sum(e["kind"] == "surface.closed" and e["surface_id"] == target for e in closed["events"]) == 1, closed
             call("system.quit")

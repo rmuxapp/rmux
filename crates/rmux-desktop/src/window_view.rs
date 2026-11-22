@@ -1720,6 +1720,7 @@ impl WorkspaceWindow {
             let id = cx.entity_id();
             let pane = cx.new(|cx| PaneView::from_transfer(tab, id, cx));
             let mut workspace = Workspace {
+                    event_lifetime: cx.global::<events::Journal>().workspace(cx.entity_id()),
                 spawning_split: None,
                 split_launch_canceled: None,
                 pane_subscriptions: Default::default(),
@@ -3177,6 +3178,7 @@ impl WorkspaceWindow {
         for saved in snapshot.workspaces {
             let workspace = cx.new(|cx| {
                 let mut workspace = Workspace {
+                    event_lifetime: cx.global::<events::Journal>().workspace(cx.entity_id()),
                     spawning_split: None,
                     split_launch_canceled: None,
                     pane_subscriptions: Default::default(),
@@ -3661,6 +3663,7 @@ impl WorkspaceWindow {
         self.rename = None;
         let workspace = cx.new(|cx| {
             let mut workspace = Workspace {
+                    event_lifetime: cx.global::<events::Journal>().workspace(cx.entity_id()),
                 spawning_split: None,
                 split_launch_canceled: None,
                 pane_subscriptions: Default::default(),

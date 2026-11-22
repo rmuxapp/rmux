@@ -10,29 +10,31 @@ const MAX_KINDS: usize = 16;
 fn default_limit() -> usize { MAX_PAGE }
 #[derive(Clone, Deserialize)]
 #[serde(default, deny_unknown_fields)]
-pub struct Read { pub after: Option<String>, pub limit: usize, pub wait_ms: u16, pub surface_id: Option<String>, pub kinds: Vec<String> }
+pub struct Read { pub after: Option<String>, pub limit: usize, pub wait_ms: u16, pub surface_id: Option<String>, pub workspace_id: Option<String>, pub kinds: Vec<String> }
 impl Default for Read {
-    fn default() -> Self { Self { after: None, limit: default_limit(), wait_ms: 0, surface_id: None, kinds: Vec::new() } }
+    fn default() -> Self { Self { after: None, limit: default_limit(), wait_ms: 0, surface_id: None, workspace_id: None, kinds: Vec::new() } }
 }
 const KINDS: &[&str] = &["notification.received", "notification.read", "notification.all_read", "notification.dismissed", "notification.cleared",
-    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed", "surface.bell", "surface.location_invalidated"];
+    "surface.created", "surface.closed", "surface.exited", "surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed", "surface.focus_changed", "surface.bell", "surface.location_invalidated", "workspace.created", "workspace.closed"];
 pub fn capabilities() -> serde_json::Value {
     serde_json::json!({
         "version":1, "method":"events.read", "kinds":KINDS,
         "retention_records":CAPACITY, "max_page_records":MAX_PAGE,
         "default_page_records":default_limit(), "max_wait_ms":MAX_WAIT_MS,
         "max_pending_waits":MAX_WAITERS, "max_filter_kinds":MAX_KINDS,
-        "filters":["surface_id", "kinds"], "gap_reasons":["retention", "restart"],
+        "filters":["surface_id", "workspace_id", "kinds"], "gap_reasons":["retention", "restart"],
         "cursor_scope":"process", "push_subscriptions":false,
     })
 }
 impl Read {
     fn matches(&self, event: &Event) -> bool {
-        self.surface_id.as_ref().is_none_or(|id| id == &event.surface_id)
+        self.surface_id.as_ref().is_none_or(|id| Some(id) == event.surface_id.as_ref())
+            && self.workspace_id.as_ref().is_none_or(|id| Some(id) == event.workspace_id.as_ref())
             && (self.kinds.is_empty() || self.kinds.iter().any(|kind| kind == event.kind))
     }
     pub fn valid(&self) -> bool {
         self.surface_id.as_ref().is_none_or(|id| super::automation::target_id(id).is_ok())
+            && self.workspace_id.as_ref().is_none_or(|id| super::automation::target_id(id).is_ok())
             && self.kinds.len() <= MAX_KINDS && self.kinds.iter().enumerate().all(|(index, kind)| KINDS.contains(&kind.as_str()) && !self.kinds[..index].contains(kind))
             && (1..=MAX_PAGE).contains(&self.limit) && self.wait_ms <= MAX_WAIT_MS && self.after.as_ref().is_none_or(|cursor| parse_cursor(cursor).is_some())
     }
@@ -48,7 +50,10 @@ fn parse_cursor(cursor: &str) -> Option<(&str, u64)> {
 pub struct Event {
     pub cursor: String,
     pub kind: &'static str,
-    pub surface_id: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub surface_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub workspace_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub notification_id: Option<String>,
 }
@@ -69,15 +74,18 @@ impl Default for State {
 impl State {
     fn cursor(&self, sequence: u64) -> String { format!("{}:{sequence}", self.epoch) }
     pub fn push(&mut self, kind: &'static str, surface: gpui::EntityId, notification: Option<u64>) {
+        self.push_resource(kind, Some(surface), None, notification);
+    }
+    fn push_resource(&mut self, kind: &'static str, surface: Option<gpui::EntityId>, workspace: Option<gpui::EntityId>, notification: Option<u64>) {
         self.sequence += 1;
         if self.events.len() == CAPACITY { self.events.pop_front(); }
         let event = Event { cursor: self.cursor(self.sequence), kind,
-            surface_id: surface.as_u64().to_string(), notification_id: notification.map(|id| id.to_string()) };
+            surface_id: surface.map(|id| id.as_u64().to_string()), workspace_id: workspace.map(|id| id.as_u64().to_string()), notification_id: notification.map(|id| id.to_string()) };
         for (_, wake, filter) in &self.waiters { if filter.matches(&event) { let _ = wake.try_send(()); } }
         self.events.push_back((self.sequence, event));
     }
     pub fn read(&self, request: &Read) -> Result<Batch, &'static str> {
-        if !request.valid() { return Err("Expected valid cursor/surface/kinds, limit 1–128 and wait_ms 0–3000"); }
+        if !request.valid() { return Err("Expected valid cursor/surface/workspace/kinds, limit 1–128 and wait_ms 0–3000"); }
         let oldest = self.events.front().map_or(self.sequence + 1, |(sequence, _)| *sequence);
         let (after, gap) = match request.after.as_deref().and_then(parse_cursor) {
             None => (oldest - 1, None),
@@ -115,11 +123,25 @@ impl Journal {
         state.waiters.push((id, sender, filter.clone()));
         Ok(Waiter { journal: self.clone(), id, receiver })
     }
+    pub fn workspace(&self, workspace: gpui::EntityId) -> WorkspaceLifetime {
+        self.0.borrow_mut().push_resource("workspace.created", None, Some(workspace), None);
+        WorkspaceLifetime { journal: self.clone(), workspace, closed: std::cell::Cell::new(false) }
+    }
     pub fn surface(&self, surface: gpui::EntityId) -> SurfaceLifetime {
         self.push("surface.created", surface, None);
         SurfaceLifetime { journal: self.clone(), surface, closed: std::cell::Cell::new(false) }
     }
 }
+/// Moves with workspace ownership; retained render entities do not delay close.
+pub struct WorkspaceLifetime { journal: Journal, workspace: gpui::EntityId, closed: std::cell::Cell<bool> }
+impl WorkspaceLifetime {
+    pub fn close(&self) {
+        if !self.closed.replace(true) {
+            self.journal.0.borrow_mut().push_resource("workspace.closed", None, Some(self.workspace), None);
+        }
+    }
+}
+impl Drop for WorkspaceLifetime { fn drop(&mut self) { self.close(); } }
 pub struct Waiter { journal: Journal, id: u64, pub receiver: async_channel::Receiver<()> }
 impl Drop for Waiter {
     fn drop(&mut self) { self.journal.0.borrow_mut().waiters.retain(|(id, _, _)| *id != self.id); }
@@ -140,6 +162,27 @@ pub fn publish(kind: &'static str, surface: gpui::EntityId, notification: Option
 mod tests {
     use super::*;
     #[test]
+    fn workspace_lifetime_filters_wake_and_close_only_once() {
+        let journal = Journal::default();
+        let id = gpui::EntityId::from(4294967297);
+        let filter = Read { workspace_id: Some(id.as_u64().to_string()), ..Read::default() };
+        let waiter = journal.subscribe(&filter).unwrap();
+        let workspace = journal.workspace(id);
+        assert!(waiter.receiver.try_recv().is_ok());
+        journal.push("surface.title_changed", id, None);
+        assert!(waiter.receiver.is_empty());
+        workspace.close();
+        workspace.close();
+        drop(workspace);
+        let batch = journal.read(&filter).unwrap();
+        assert_eq!(batch.events.iter().map(|event| event.kind).collect::<Vec<_>>(), ["workspace.created", "workspace.closed"]);
+        let wire = serde_json::to_value(&batch.events[0]).unwrap();
+        assert!(wire.get("surface_id").is_none());
+        assert_eq!(wire["workspace_id"], id.as_u64().to_string());
+        assert!(journal.read(&Read { surface_id: filter.workspace_id.clone(), ..filter.clone() }).unwrap().events.is_empty());
+        assert!(!Read { workspace_id: Some("invalid".into()), ..Read::default() }.valid());
+    }
+    #[test]
     fn filters_advance_over_skipped_records_and_only_wake_matching_waiters() {
         let journal = Journal::default();
         let first = gpui::EntityId::from(4294967297);
@@ -159,7 +202,7 @@ mod tests {
         assert_eq!(waiter.receiver.len(), 1);
         let matched = journal.read(&read).unwrap();
         assert_eq!(matched.events.len(), 1);
-        assert_eq!(matched.events[0].surface_id, first.as_u64().to_string());
+        assert_eq!(matched.events[0].surface_id, Some(first.as_u64().to_string()));
         assert!(matched.has_more);
         read.after = Some(matched.cursor);
         assert!(journal.read(&read).unwrap().events.is_empty());
