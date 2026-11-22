@@ -60,8 +60,12 @@ recovery, and configuration.
 ## Early, and moving quickly
 
 rmux is an early preview inspired by [cmux](https://cmux.com/). It is usable, but
-full feature and interaction parity is still in progress. Embedded browser
-surfaces, remote workflows, and native OS notifications are not yet included.
+full feature and interaction parity is still in progress. The development branch
+includes opt-in [desktop notifications](docs/guide/notifications.md), with native
+delivery and click behavior still awaiting platform acceptance. The experimental
+browser is separate from workspace panes; complete browser surfaces and remote
+workflows remain in progress. Features on main may be newer than your installed
+release; check its [release notes](https://github.com/rmuxapp/rmux/releases).
 Linux and Windows packages are experimental; cross-platform behavior is still being validated.
 Performance is a design priority, not a promise of zero lag or a fixed memory
 footprint on every workload.

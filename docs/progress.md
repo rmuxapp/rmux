@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Release-documentation review: N03 already correctly records the opt-in native
+notification dispatcher and its pending platform acceptance. README's blanket
+claim that native notifications are absent was stale; it now distinguishes main
+from installed releases, links the notification guide, and describes the
+experimental browser as separate from workspace panes. Source inspection confirms
+bounded delivery, focus suppression, and macOS/Linux click routing; this review
+does not establish native permission, delivery or click runtime acceptance.
+
 The shared WASM demo is now deployed from successful GitHub run 44970793969
 (e3fc657), including the contextual Greek search-highlight correction. Cloudflare
 deployment 77c82b1d completed successfully; fetching rmux.app confirms its demo
