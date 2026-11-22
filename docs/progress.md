@@ -10300,3 +10300,19 @@ lookup so adding this row does not shift their selection styling.
 Desktop test compilation and the focused settings keyboard-action test passed.
 Native screenshot review remains pending: CUA confirmed the Mac is locked. No
 installed app or user session was changed, and no release build was performed.
+
+
+### Missing history references during restore — 2026-11-22
+
+Restore no longer treats a missing referenced command-history file as an empty
+history. It reports the exact file and asks the user to restore it or correct
+shell_history_directory, before allocating a replacement identity. New terminals
+without a source reference still begin with empty history. This prevents opening
+a saved session against an empty or wrong history directory from silently
+replacing its references. Documentation also explains how to disable history
+loading and open the session while retaining its references.
+
+Nine focused storage/lifecycle tests passed, including missing/corrupt sources
+producing no replacement files and the isolated shell restore roundtrip. The
+child fixture is invoked by that parent test rather than run with user settings.
+No installed application or user histories were modified.

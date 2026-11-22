@@ -629,7 +629,12 @@ own history copy. Reusable layouts exclude history references.
 
 Records follow shell history exclusions and are stored as private, unencrypted
 JSON files, bounded to 512 commands / 128 KiB per terminal. Keep this directory
-with your session backups if you want history on another machine. Automatic
+with your session backups if you want history on another machine. A missing or
+unreadable referenced history file stops restore rather than replacing it with
+an empty history. Restore the file or correct the configured directory and retry.
+To open the session without loading command history, disable
+`shell_history_directory` and restart rmux; its references remain in the session.
+Automatic
 cleanup of old history files is not implemented yet. Explicit empty-history
 resets are supported; individual history-entry deletion is not synchronized yet.
 Save failures appear in the app and retry on the next command or at quit.

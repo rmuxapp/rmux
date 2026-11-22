@@ -1,6 +1,6 @@
 //! Bounded per-terminal history storage. Shell hooks, not PTY input, supply entries.
 //! Call from background work; no global shell history file is opened here.
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use serde::{Deserialize, Serialize};
 use std::{io::Read, path::PathBuf};
 
@@ -52,11 +52,8 @@ impl Store {
     }
     pub fn load(&self, id: &str) -> Result<History> {
         let path = self.path(id)?;
-        let file = match std::fs::File::open(path) {
-            Ok(file) => file,
-            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(History::default()),
-            Err(error) => return Err(error.into()),
-        };
+        let file = std::fs::File::open(&path).with_context(|| format!(
+            "cannot read saved command history {}. Restore the history file or check shell_history_directory before restoring this session", path.display()))?;
         let mut bytes = Vec::new();
         file.take(FILE_LIMIT as u64 + 1).read_to_end(&mut bytes)?;
         ensure!(bytes.len() <= FILE_LIMIT, "terminal history exceeds size limit");
@@ -389,9 +386,12 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn corrupt_source_is_not_replaced_or_forked() -> Result<()> {
+    fn missing_or_corrupt_source_is_not_replaced_or_forked() -> Result<()> {
         let temporary = tempfile::tempdir()?;
         let store = Store::new(temporary.path().to_owned());
+        let missing = store.fork(Some(FIRST)).err().expect("missing history must fail");
+        assert!(missing.to_string().contains("Restore the history file"));
+        assert_eq!(std::fs::read_dir(temporary.path())?.count(), 0);
         std::fs::write(store.path(FIRST)?, "{broken")?;
         assert!(store.fork(Some(FIRST)).is_err());
         assert_eq!(std::fs::read_dir(temporary.path())?.count(), 1);
@@ -420,7 +420,7 @@ mod tests {
         history.record(" leading space remains data; shell decides whether to record");
         store.save(FIRST, &history)?;
         assert_eq!(store.load(FIRST)?, history);
-        assert_eq!(store.load(SECOND)?, History::default());
+        assert!(store.load(SECOND).is_err());
         assert!(history.clear());
         store.save(FIRST, &history)?;
         assert_eq!(store.load(FIRST)?, History::default());
