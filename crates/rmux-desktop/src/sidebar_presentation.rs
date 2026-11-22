@@ -2,20 +2,18 @@
 use gpui::{prelude::*, *};
 pub(crate) use crate::chrome_style::{ACCENT, SELECTED_DETAIL};
 
-/// Keep the useful end of a long directory visible in a narrow sidebar.
-/// The caller retains the unabridged value in its tooltip.
+/// Compact project context prioritizes the working folder, not its ancestors.
+/// Full paths remain available in the row tooltip. Remote context includes
+/// connection state and a host, so it must not be treated as a filesystem path.
 pub(crate) fn directory_label(directory: &str) -> String {
-    const LIMIT: usize = 28;
-    if directory.chars().count() > LIMIT {
-        let leaf = directory.rsplit(['/', '\\']).find(|part| !part.is_empty()).unwrap_or(directory);
-        if leaf != directory && leaf.chars().count() <= LIMIT {
-            return format!("…/{leaf}");
-        }
+    if directory.starts_with("SSH · ") || directory.starts_with("SSH ended · ") {
+        return directory.to_owned();
     }
-    match directory.char_indices().rev().nth(LIMIT - 1) {
-        Some((offset, _)) if offset > 0 => format!("…{}", &directory[offset..]),
-        _ => directory.to_owned(),
+    let trimmed = directory.trim_end_matches(['/', '\\']);
+    if trimmed.is_empty() || (trimmed.len() == 2 && trimmed.ends_with(':')) {
+        return directory.to_owned();
     }
+    trimmed.rsplit(['/', '\\']).next().unwrap_or(directory).to_owned()
 }
 pub(crate) fn sidebar(width: f32) -> Div {
     div().w(px(width)).overflow_hidden().flex_shrink_0().h_full().flex().flex_col().bg(rgb(0x242424))
@@ -83,7 +81,7 @@ pub(crate) fn context_row(id: impl Into<ElementId>, branch: Option<String>, dire
     div().id(id).flex().items_center().gap_1().min_w_0().text_size(px(11.))
         .text_color(rgb(if selected { SELECTED_DETAIL } else { 0x969696 }))
         .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())
-        .when_some(branch, |row, branch| row.child(crate::icons::icon("branch"))
+        .when_some(branch, |row, branch| row.child(div().flex_shrink_0().child(crate::icons::icon("branch")))
             .child(div().min_w_0().max_w(relative(0.45)).truncate().child(branch)))
         .when_some(directory, |row, directory| row
             .when(has_branch, |row| row.child(div().flex_shrink_0().px_1().text_color(rgb(0x74717c)).child("·")))

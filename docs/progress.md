@@ -10662,3 +10662,8 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 - Existing repository VS Code guide and private-site /vscode/ landing page already document native external-terminal integration.
 
 - Browser acceptance for the release batch: switched from rmux to website, ran `pwd`, and split the website terminal. Both website panes reported `/home/demo/projects/website`; the shared sidebar context remained visible. Screenshot: target/release-demo-project-context.jpg. Temporary browser/server closed.
+
+### Compact sidebar working-directory labels
+
+- Fixed the release demo review's `/home/demo/proj…` labels hiding the meaningful folder name. Native and WASM context rows now show the final folder component with the full path retained in their tooltip. Root directories remain intact, Windows separators are recognized, and SSH connection/ended summaries retain their host and state instead of being parsed as paths. The branch icon no longer shrinks under width pressure.
+- Desktop compilation and one combined WASM build passed. Browser review at 1280×720 confirms `main · rmux` and `main · website` fit the default sidebar. Screenshot: target/sidebar-project-labels.jpg. Native visual acceptance remains pending; no user sessions changed and no release/deployment performed.
