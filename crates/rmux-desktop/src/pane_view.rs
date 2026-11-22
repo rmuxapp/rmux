@@ -360,7 +360,7 @@ impl PaneView {
                     if let Some((_, selected, _)) = &this.tab_picker {
                         let matches = this.matching_tabs(cx);
                         if let Some(index) = matches.iter().find(|index| Some(this.terminals[**index].entity_id()) == *selected)
-                            .or_else(|| matches.first()).copied() { this.select(index, window, cx); }
+                            .copied() { this.select(index, window, cx); }
                     }
                 }
                 text_field::EditEvent::Cancelled => this.dismiss_tab_picker(window, cx)
@@ -431,13 +431,16 @@ impl PaneView {
             if let Some((_, _, scroll)) = &self.tab_picker { reveal_reordered_tab(scroll, &mut self.tab_picker_selected_row, row); }
             return;
         }
-        let first = matches.first().map(|index| self.terminals[*index].entity_id());
-        if selected == first { return; }
+        // A removed/renamed result should leave the user near the same place,
+        // rather than jumping to the beginning of a potentially long list.
+        let row = self.tab_picker_selected_row.min(matches.len().saturating_sub(1));
+        let replacement = matches.get(row).map(|index| self.terminals[*index].entity_id());
+        if selected == replacement { return; }
         if let Some((_, selected, scroll)) = &mut self.tab_picker {
-            *selected = first;
-            if !matches.is_empty() { crate::list_navigation::reveal(scroll, 0); }
+            *selected = replacement;
+            if !matches.is_empty() { crate::list_navigation::reveal(scroll, row); }
         }
-        self.tab_picker_selected_row = 0;
+        self.tab_picker_selected_row = row;
     }
 
     pub(super) fn set_workspace_owner(&mut self, workspace: EntityId, cx: &mut Context<Self>) {

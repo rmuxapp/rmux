@@ -1,3 +1,11 @@
+Tab-picker live-update polish: when the selected terminal disappears or no
+longer matches after metadata changes, replacement selection stays at the
+nearest surviving result row rather than jumping to the first. Enter no longer
+falls back to an unrelated first result if its selected identity is stale.
+The desktop test binary compiled and six existing tab-order/picker tests passed;
+those cover ordering, scroll preservation and selection reveal, not native
+race reproduction. No app bundle rebuild or release was performed.
+
 Diagnostic panel interaction batch: Listening Ports keeps its previous snapshot
 visible during refresh with an explicit label, preserves selection made during
 the scan by address/PID, and avoids scrolling on copy/unrelated typing or an

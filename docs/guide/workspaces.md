@@ -207,7 +207,9 @@ Keyboard selection follows the terminal identity when live title/directory updat
 change result order. If that terminal no longer matches, the first result becomes
 the stored fallback and is revealed, so an old match cannot silently reclaim
 selection later; changing the query starts at the first result.
-Moving focus elsewhere dismisses the picker.
+Moving focus elsewhere dismisses the picker. If a result disappears while the
+list is open, selection stays near its previous row. Enter only opens the selected
+matching tab; a stale target does not silently open the first result.
 The picker displays original tab numbers, a matching count and navigation hints.
 A displayed tab number matches an exact query word: `3` prioritizes tab 3, and
 `3 server` also requires a title or directory match for “server”. Numbered titles
