@@ -33,6 +33,11 @@
 
 ## Open or reuse a named workspace
 
+For direct VS Code switching without the task runner, the source-only
+[rmux extension](../../extensions/vscode/README.md) binds the standard external
+terminal shortcut to this API. Installation and extension-host acceptance are
+still pending; the task recipe below works without an extension.
+
 From an editor terminal or command launcher, use:
 
 ```sh

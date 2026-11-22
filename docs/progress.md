@@ -1,3 +1,24 @@
+Direct VS Code integration: source-only extension at extensions/vscode binds
+Cmd+Shift+C (Linux Ctrl+Shift+C) to workspace.open over the local socket. It
+chooses the active project or offers a multi-folder picker, coalesces key repeat,
+and rejects remote/virtual/untrusted targets. The socket path is user-level;
+requests have a deadline, cancellation and a response-size bound. No runtime
+dependencies, subprocesses or idle polling. Four focused Node tests pass using
+real temporary sockets and a simulated command host. VS Code extension-host
+acceptance, packaging, installation and latency measurement remain pending.
+
+Combined native review through 7f82bd3: one debug bundle built successfully.
+In an isolated real Bash session, Option+Left inserted WORD_ before beta and
+Option+Right inserted _END after beta. Open Settings File invoked the configured
+recorder with the exact temporary config path. CLI workspace.open create/reuse
+with activate=true accepted native input without a terminal click after raising
+Finder; reused=true retained workspace identity and original cwd despite a new
+creation-only cwd argument. One user-interaction interruption required refreshing
+the native state before the reuse typing check. Evidence screenshot:
+target/native-workspace-activation.png. This is not a VS Code task latency test.
+The review process is confirmed exited. Interrupt cleanup found its socket already
+closed; temporary configuration was removed. Installed sessions were untouched.
+
 Automation foregrounding fix: workspace open/reuse and the other explicit
 activate paths now activate both the destination window and the application.
 Previously they only keyed the window, allowing VS Code to remain foreground
