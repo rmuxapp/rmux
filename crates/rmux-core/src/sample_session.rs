@@ -1,13 +1,55 @@
 //! In-memory demo session service. Emits terminal output without owning a view
 //! or terminal parser; deliberately does not execute commands on the host.
 use crate::{sample_input::SampleInput, terminal_text::Grapheme};
+use std::collections::VecDeque;
+const HISTORY_ENTRIES: usize = 32;
+const HISTORY_BYTES: usize = 16 * 1024;
 
 #[derive(Clone, Default)]
 pub struct SampleSession {
     draft: SampleInput,
+    history: VecDeque<String>,
+    history_bytes: usize,
+    history_index: Option<usize>,
+    unfinished: Option<SampleInput>,
 }
 impl SampleSession {
     pub fn display(&self, columns: u16) -> String { self.draft.display(columns) }
+
+    fn remember(&mut self) {
+        let text = self.draft.text();
+        if !text.trim().is_empty() && self.history.back().is_none_or(|last| last != text) {
+            while self.history.len() >= HISTORY_ENTRIES || self.history_bytes + text.len() > HISTORY_BYTES {
+                let Some(oldest) = self.history.pop_front() else { break; };
+                self.history_bytes -= oldest.len();
+            }
+            self.history.push_back(text.to_owned());
+            self.history_bytes += text.len();
+        }
+        self.history_index = None;
+        self.unfinished = None;
+    }
+    fn recall(&mut self, older: bool, measure: impl FnOnce(&str) -> Option<Vec<Grapheme>>) -> Result<bool, &'static str> {
+        let index = if older {
+            self.history_index.unwrap_or(self.history.len()).checked_sub(1)
+        } else {
+            self.history_index.map(|index| index + 1)
+        };
+        let Some(index) = index else { return Ok(false); };
+        if index == self.history.len() {
+            if let Some(draft) = self.unfinished.take() { self.draft = draft; }
+            self.history_index = None;
+            return Ok(true);
+        }
+        let mut recalled = SampleInput::default();
+        // Measure before changing navigation state so a failure preserves both
+        // the visible draft and the original unfinished line/cursor.
+        recalled.append(&self.history[index], measure)?;
+        let previous = std::mem::replace(&mut self.draft, recalled);
+        if self.history_index.is_none() { self.unfinished = Some(previous); }
+        self.history_index = Some(index);
+        Ok(true)
+    }
 
     /// Consume unbracketed terminal paste bytes transactionally. The sample
     /// service has no bracketed-paste negotiation; real shell backends own that.
@@ -53,8 +95,11 @@ impl SampleSession {
                     _ if self.draft.text().starts_with("echo ") => "",
                     _ => "Unknown sample command. Try help.\r\n",
                 });
+                self.remember();
                 self.draft.clear();
             }
+            "\x1b[A" | "\x1bOA" | "\x10" => { if !self.recall(true, measure)? { return Ok(None); } }
+            "\x1b[B" | "\x1bOB" | "\x0e" => { if !self.recall(false, measure)? { return Ok(None); } }
             "\x7f" | "\x08" => self.draft.delete(true, measure)?,
             "\x1b[3~" | "\x04" => self.draft.delete(false, measure)?,
             "\x1b[D" | "\x1bOD" | "\x02" => self.draft.move_cursor(true, false),
@@ -66,6 +111,8 @@ impl SampleSession {
             "\x03" => {
                 output.push_str(&format!("\r\x1b[2K$ {}^C\r\n", self.draft.text()));
                 self.draft.clear();
+                self.history_index = None;
+                self.unfinished = None;
             }
             "\x15" => self.draft.erase_to_edge(false, measure)?,
             "\x0b" => self.draft.erase_to_edge(true, measure)?,
@@ -84,6 +131,51 @@ mod tests {
     use super::*;
     fn send(session: &mut SampleSession, input: &str) -> String {
         session.input(input, 80, |_| panic!("ASCII requires no measurement")).unwrap().unwrap()
+    }
+    #[test]
+    fn history_restores_unfinished_cursor_and_keeps_sessions_independent() {
+        let mut session = SampleSession::default();
+        for command in ["echo first", "echo second", "echo second"] {
+            send(&mut session, command); send(&mut session, "\r");
+        }
+        assert_eq!(session.history.len(), 2);
+        send(&mut session, "echo draft"); send(&mut session, "\x01");
+        let draft = session.display(80);
+        assert!(send(&mut session, "\x1b[A").contains("echo second"));
+        assert!(send(&mut session, "\x10").contains("echo first"));
+        assert!(session.input("\x1b[A", 80, |_| None).unwrap().is_none());
+        send(&mut session, " edited");
+        assert!(send(&mut session, "\x1bOB").contains("echo second"));
+        assert_eq!(send(&mut session, "\x0e"), draft);
+        send(&mut session, "X");
+        assert_eq!(session.draft.text(), "Xecho draft");
+        send(&mut session, "\x1bOA"); send(&mut session, "\x03");
+        assert!(session.unfinished.is_none() && session.history_index.is_none());
+        assert!(send(&mut session, "\x1b[A").contains("echo second"));
+        assert!(SampleSession::default().input("\x1b[A", 80, |_| None).unwrap().is_none());
+    }
+    #[test]
+    fn history_is_bounded_and_failed_recall_preserves_the_draft() {
+        let mut session = SampleSession::default();
+        for index in 0..40 {
+            send(&mut session, &format!("echo {index}")); send(&mut session, "\r");
+        }
+        assert_eq!(session.history.len(), HISTORY_ENTRIES);
+        assert_eq!(session.history.front().unwrap(), "echo 8");
+        for index in 0..10 {
+            send(&mut session, &format!("{index}{}", "x".repeat(4095))); send(&mut session, "\r");
+        }
+        assert_eq!(session.history_bytes, HISTORY_BYTES);
+        assert_eq!(session.history.len(), 4);
+        let measure = |text: &str| Some(text.char_indices().map(|(offset, ch)| Grapheme { end: offset + ch.len_utf8(), width: 1 }).collect());
+        session.input("echo é", 80, measure).unwrap(); send(&mut session, "\r");
+        send(&mut session, "unfinished");
+        let before = session.display(80);
+        assert!(session.input("\x1b[A", 80, |_| None).is_err());
+        assert_eq!(session.display(80), before);
+        assert!(session.unfinished.is_none() && session.history_index.is_none());
+        assert!(session.input("\x1b[A", 80, measure).unwrap().unwrap().contains("echo é"));
+        assert_eq!(send(&mut session, "\x1b[B"), before);
     }
     #[test]
     fn cursor_editing_and_word_navigation_preserve_the_command() {

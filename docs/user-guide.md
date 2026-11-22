@@ -54,6 +54,11 @@ on macOS (Alt or Ctrl+Left/Right elsewhere) moves by word. On macOS,
 **Cmd+Left/Right** moves to the start/end and **Cmd+Backspace** deletes back to
 the start. **Ctrl+A/E** also moves to the start/end; **Ctrl+U/K** deletes from
 the cursor to the start/end. Long drafts scroll within the pane as you move.
+**Up/Down** (or **Ctrl+P/N**) recalls commands from that terminal's sample history.
+Moving past the newest command restores your unfinished draft and cursor. History
+stays in memory, is limited to 32 entries / 16 KiB per terminal, and is cleared
+when that sample session closes or the page refreshes. Consecutive duplicates
+and empty commands are not added.
 
 Rename a workspace with **Cmd+Shift+R** (Ctrl+Shift+R elsewhere) or double-click
 its sidebar name. Use the palette to pin workspaces or create, rename, and close
