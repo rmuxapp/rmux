@@ -1,3 +1,18 @@
+Configured background commands: custom commands accept `mode: "background"`
+(default remains terminal), reuse existing named command shortcuts/palette, and
+spawn literal argv with child env/cwd without creating a workspace or PTY.
+Launch and exit failures surface as notices; output/input are disconnected and
+eight concurrent children are allowed. Spawning/reaping stay off the UI thread;
+idle apps have no polling cost. Palette previews identify execution mode. SSH
+continues to use terminal mode. Standalone `--command` supports background mode
+without GUI, waits for completion, reports failure, and rejects live RPC mode.
+The user guide includes a macOS VS Code focus example and process lifetime rules.
+A real-process unit test passed for literal Unicode/metacharacter arguments,
+env/cwd, exit failure and failed-launch slot release. One desktop build and an
+isolated CLI smoke passed for output, nonzero exit and RPC incompatibility.
+Actual shortcut-to-app activation remains unverified; no user config was edited.
+Open-or-reuse named workspace remains separate pending work.
+
 Shortcut discovery batch: native and WASM shortcut views now collect every
 effective alias for each listed command from GPUI, highest precedence first,
 and deduplicate equivalent display spellings. All aliases are searchable;

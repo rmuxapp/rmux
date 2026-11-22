@@ -267,6 +267,7 @@ pub fn command(destination: &str) -> Result<crate::preferences::CustomCommand, &
         argv
     } else { vec!["ssh".into(), "--".into(), destination.into()] };
     Ok(crate::preferences::CustomCommand {
+        mode: crate::preferences::CommandMode::Terminal,
         name: format!("SSH · {destination}"),
         argv,
         env: Default::default(), cwd: None,

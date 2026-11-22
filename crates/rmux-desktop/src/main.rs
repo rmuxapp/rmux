@@ -14,6 +14,7 @@ mod file_drop;
 mod file_browser;
 mod markdown_preview;
 mod external_editor;
+mod background_command;
 mod terminal_search;
 #[cfg(unix)]
 mod image_paste;
@@ -3408,6 +3409,17 @@ fn main() {
                 eprintln!("rmux: command is not configured: {name}");
                 std::process::exit(2);
             };
+            if configured.mode == preferences::CommandMode::Background {
+                if live_rpc_stdio {
+                    eprintln!("rmux: background --command does not open a GUI or RPC session");
+                    std::process::exit(2);
+                }
+                if let Err(error) = background_command::launch(configured, std::env::current_dir().ok().as_deref()).and_then(|child| child.wait()) {
+                    eprintln!("rmux: {name}: {error:#}");
+                    std::process::exit(1);
+                }
+                return;
+            }
             initial_command = configured.argv.iter().map(std::ffi::OsString::from).collect();
             initial_environment = configured.env.iter().map(|(key, value)| (key.into(), value.into())).collect();
             initial_directory = configured.cwd.clone().or_else(|| std::env::current_dir().ok());

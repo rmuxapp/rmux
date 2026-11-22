@@ -171,9 +171,15 @@ impl NotificationFocus {
     }
 }
 
+#[derive(Clone, Copy, Default, PartialEq, Eq, Deserialize, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CommandMode { #[default] Terminal, Background }
+
 #[derive(Clone, Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
 pub struct CustomCommand {
+    #[serde(default)]
+    pub mode: CommandMode,
     #[serde(default)]
     pub env: std::collections::BTreeMap<String, String>,
     pub name: String,

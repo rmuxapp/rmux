@@ -1124,7 +1124,25 @@ impl WorkspaceWindow {
         let Some(command) = cx.global::<Preferences>().commands.iter().find(|command| command.name == name).cloned() else {
             self.notice = Some("Custom command is no longer configured".into()); cx.notify(); return;
         };
-        self.launch_command(command, None, window, cx);
+        if command.mode == preferences::CommandMode::Background {
+            let directory = self.workspace_state.entries.get(self.workspace_state.active).and_then(|entry| {
+                let workspace = entry.workspace.read(cx);
+                workspace.focused_index(window, cx).and_then(|index| workspace.panes[index].read(cx).cached_directory(cx))
+            });
+            let name = command.name.clone();
+            let executor = cx.background_executor().clone();
+            cx.spawn(async move |entity, cx| {
+                let result = match executor.spawn(async move { crate::background_command::launch(&command, directory.as_deref()) }).await {
+                    Ok(child) => executor.spawn(child.reap()).await,
+                    Err(error) => Err(error),
+                };
+                if let Err(error) = result {
+                    let _ = entity.update(cx, |this, cx| { this.notice = Some(format!("{name}: {error:#}")); cx.notify(); });
+                }
+            }).detach();
+        } else {
+            self.launch_command(command, None, window, cx);
+        }
     }
     fn launch_command(&mut self, command: preferences::CustomCommand, remote: Option<String>, window: &mut Window, cx: &mut Context<Self>) {
         if self.command_launching { self.notice = Some("A command is already starting in this window".into()); cx.notify(); return; }

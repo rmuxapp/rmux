@@ -1513,7 +1513,8 @@ fn custom_command(command: &preferences::CustomCommand) -> Command {
     }).collect::<Vec<_>>().join(" ");
     let directory = command.cwd.as_ref().map(|cwd| cwd.display().to_string())
         .unwrap_or_else(|| "Current terminal directory".into());
-    let detail = format!("{directory} · {argv}");
+    let mode = if command.mode == preferences::CommandMode::Background { "Background · No terminal" } else { "New terminal workspace" };
+    let detail = format!("{mode} · {directory} · {argv}");
     let mut chars = detail.chars().map(|ch| if ch.is_control() { ' ' } else { ch });
     let mut subtitle: String = chars.by_ref().take(768).collect();
     if chars.next().is_some() { subtitle.push('…'); }

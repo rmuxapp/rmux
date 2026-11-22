@@ -108,7 +108,7 @@ set the directory and arguments in the command definition instead.
 After Reload Settings, choose **Run Tests** in the palette. For a list limited to
 your saved commands, use **File → Run Configured Command…**, or assign the
 `custom_command_picker` shortcut action. Search matches names and the displayed
-directory/argument preview; environment values are omitted. Each invocation
+directory/argument preview; environment values are omitted. By default (`"mode": "terminal"`), each invocation
 starts a dedicated workspace with its own terminal; it does not inject text into
 an existing shell. Arguments are literal, including spaces and empty arguments;
 use an explicit shell executable only when shell interpretation is intended.
@@ -123,6 +123,46 @@ is pending is rejected with a notice. Startup
 runs off the UI thread; failures appear in the notice area. These definitions
 are retained when saving appearance settings. Environment packs and the complete upstream command configuration contract
 remain pending; shortcut overrides are described below.
+
+## Background commands and app shortcuts
+
+Set `"mode": "background"` to run a command without opening a terminal or
+workspace. Use the same named `command` binding as other configured commands.
+For example, on macOS this shortcut opens or focuses VS Code:
+
+```json
+{
+  "commands": [
+    {
+      "name": "Focus VS Code",
+      "mode": "background",
+      "argv": ["/usr/bin/open", "-a", "Visual Studio Code"]
+    }
+  ],
+  "keybindings": [
+    {"key": "cmd-alt-v", "command": "Focus VS Code", "context": "window"}
+  ]
+}
+```
+
+Merge these entries into your existing arrays, then **Reload Settings**.
+The palette also offers **Run Focus VS Code**. This is a general command launcher;
+other apps and platforms can use their own executable and arguments. It focuses
+VS Code as an application, not a particular project window.
+
+Background commands use literal `argv`, optional absolute `cwd`, and child-only
+`env` overrides. Without `cwd`, a shortcut uses the focused terminal's reported
+local directory when available, otherwise rmux's launch directory. Input and
+output are disconnected; use terminal mode for interactive commands or output
+you need to read. Launch errors and unsuccessful exits appear in rmux's notice
+area. At most eight background commands run concurrently. Long-running commands
+retain a slot until they exit; closing a workspace does not terminate them.
+They are independent processes and are not restored with sessions.
+
+`rmux --command "Focus VS Code"` also supports background mode: it starts no GUI,
+waits for the launcher command to exit, and returns success or failure. It cannot
+be combined with `--rpc-stdio-live`. Existing definitions without `mode` retain
+their terminal behavior.
 
 ## Custom keyboard shortcuts
 
