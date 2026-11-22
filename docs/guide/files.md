@@ -121,11 +121,15 @@ that only the first eight are shown. Row copying retains all tab-separated cells
 and Copy Markdown Source retains the original document. Empty cells remain blank.
 Header and body cells honor left (`:---`), center (`:---:`), and right (`---:`)
 alignment markers; unspecified columns align left. Table horizontal scrolling,
-keyboard link navigation, relative/file links, images, full code-block scrolling and document appearance controls
+relative/file links, images, full code-block scrolling and document appearance controls
 remain unimplemented. This is a reading preview, not a complete Markdown renderer.
 
-Web links open in the default browser only when clicked; Enter on a reading block
-still copies its text. Link destinations are limited to 8 KiB each, 64 distinct
+Web links open in the default browser when clicked. For keyboard use, select a
+reading block, use Tab/Shift+Tab to cycle its web destinations, then Alt+Enter
+(Option+Return on macOS) to open the displayed URL. The link bar shows the current
+destination and active shortcut hints. Enter alone still copies the block text.
+Search changes and row movement keep link selection tied to the block identity;
+a different block starts at its first link. IME composition suspends link actions. Link destinations are limited to 8 KiB each, 64 distinct
 links per block and 64 KiB across the document. Additional links remain plain text.
 
 ## Open an external editor

@@ -129,6 +129,9 @@ fn action(name: &str) -> Option<Box<dyn Action>> {
         "edit_selected_file" => Box::new(EditSelectedFile),
         "toggle_markdown_preview" => Box::new(ToggleMarkdownPreview),
         "switch_preview_mode" => Box::new(SwitchPreviewMode),
+        "open_preview_link" => Box::new(OpenPreviewLink),
+        "next_preview_link" => Box::new(NextPreviewLink),
+        "previous_preview_link" => Box::new(PreviousPreviewLink),
         "toggle_preview_wrap" => Box::new(TogglePreviewWrap),
         "cancel_file_loading" => Box::new(CancelFileLoading),
         "open_text_preview" => Box::new(OpenTextPreview),
@@ -302,6 +305,22 @@ mod tests {
     use crate::{preferences::Preferences, ShowCommandPalette, ToggleSettings};
     use gpui::{KeyBinding, KeyContext, Keymap, Keystroke};
     fn settings(value: serde_json::Value) -> Preferences { serde_json::from_value(value).unwrap() }
+    #[test]
+    fn preview_link_bindings_are_scoped_and_remappable() {
+        let mut map = Keymap::new(vec![KeyBinding::new("alt-enter", crate::OpenPreviewLink, Some("MarkdownPreview"))]);
+        let key = [Keystroke::parse("alt-enter").unwrap()];
+        let markdown = [KeyContext::parse("CommandPalette FilePreview TextPreview MarkdownPreview").unwrap(), KeyContext::parse("TextInput").unwrap()];
+        assert!(map.bindings_for_input(&key, &markdown).0[0].action().as_any().is::<crate::OpenPreviewLink>());
+        for context in ["Terminal", "CommandPalette", "CommandPalette TextPreview"] {
+            assert!(map.bindings_for_input(&key, &[KeyContext::parse(context).unwrap()]).0.is_empty());
+        }
+        map.add_bindings(compile(&settings(serde_json::json!({"keybindings":[
+            {"key":"alt-enter", "action":"disabled", "context":"preview"},
+            {"key":"ctrl-alt-o", "action":"open_preview_link", "context":"preview"}
+        ]}))).unwrap());
+        assert!(map.bindings_for_input(&key, &markdown).0.is_empty());
+        assert!(map.bindings_for_input(&[Keystroke::parse("ctrl-alt-o").unwrap()], &markdown).0[0].action().as_any().is::<crate::OpenPreviewLink>());
+    }
     #[test]
     fn markdown_toggle_binding_can_be_remapped_in_previews_only() {
         let mut map = Keymap::new(vec![KeyBinding::new("ctrl-alt-v", crate::ToggleMarkdownPreview, Some("FilePreview"))]);

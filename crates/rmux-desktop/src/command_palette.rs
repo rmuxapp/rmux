@@ -256,6 +256,7 @@ impl PreviewState {
 pub struct CommandPalette {
     location: Option<SharedString>,
     feedback: Option<&'static str>,
+    preview_link: Option<(usize, usize)>,
     buffer_rename: Option<(String, u64)>,
     directory_input: bool,
     terminal_search_input: bool,
@@ -839,7 +840,7 @@ impl CommandPalette {
         )
         .detach();
         Self {
-            input, heading, empty_message, buffer_rename: None, feedback: None, directory_input: false, terminal_search_input: false, ssh_input: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
+            input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, directory_input: false, terminal_search_input: false, ssh_input: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, location: None,
             search: palette_match::RankedSearch::new(commands
                 .iter()
                 .map(Command::search_text)
@@ -931,6 +932,28 @@ impl CommandPalette {
             Box::new(PreviewLocalFile { path: path.clone() })
         };
         cx.emit(PaletteEvent::Run(action));
+    }
+    fn selected_preview_links(&self) -> Option<(usize, &[String])> {
+        if !self.markdown_preview { return None; }
+        let command = *self.search.matches.get(self.selected)?;
+        let PaletteEvent::Run(action) = &self.commands[command].target else { return None; };
+        let line = action.as_any().downcast_ref::<CopyPreviewLine>()?;
+        (!line.links.is_empty()).then_some((command, line.links.as_slice()))
+    }
+    fn preview_link_target(&self) -> Option<(usize, usize, String)> {
+        let (command, links) = self.selected_preview_links()?;
+        let index = markdown_preview::link_index(self.preview_link, command, links.len(), 0)?;
+        Some((index, links.len(), links[index].clone()))
+    }
+    fn cycle_preview_link(&mut self, delta: i32, cx: &mut Context<Self>) {
+        if self.input.read(cx).is_composing() { return; }
+        let Some((command, links)) = self.selected_preview_links() else { return; };
+        self.preview_link = markdown_preview::link_index(self.preview_link, command, links.len(), delta).map(|index| (command, index));
+        cx.notify();
+    }
+    fn open_preview_link(&self, cx: &mut Context<Self>) {
+        if self.input.read(cx).is_composing() { return; }
+        if let Some((_, _, url)) = self.preview_link_target() && openable_uri(&url) { cx.open_url(&url); }
     }
     fn toggle_preview_wrap(&mut self, cx: &mut Context<Self>) {
         if self.preview_navigation.is_none() || self.hex_preview || self.input.read(cx).is_composing() { return; }
@@ -1230,10 +1253,15 @@ impl Render for CommandPalette {
                 .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!("{key} {label}")))
                 .collect::<Vec<_>>().join(" · ")
         } else { String::new() };
+        let link_hints = [(&NextPreviewLink as &dyn Action, "next"), (&PreviousPreviewLink as &dyn Action, "previous"), (&OpenPreviewLink as &dyn Action, "open")]
+            .into_iter().filter_map(|(action, label)| shortcuts::hint(action, &self.input.read(cx).focus, window).map(|key| format!(" · {key} {label}"))).collect::<String>();
         let wrap_hint = shortcuts::hint(&TogglePreviewWrap, &self.input.read(cx).focus, window);
         let copy_hint = shortcuts::hint(&CopySearchExcerpt, &self.input.read(cx).focus, window);
         palette_view::panel(height)
-            .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
+            .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
+            .on_action(cx.listener(|this, _: &OpenPreviewLink, _, cx| this.open_preview_link(cx)))
+            .on_action(cx.listener(|this, _: &NextPreviewLink, _, cx| this.cycle_preview_link(1, cx)))
+            .on_action(cx.listener(|this, _: &PreviousPreviewLink, _, cx| this.cycle_preview_link(-1, cx)))
             .on_action(cx.listener(|this, _: &TogglePreviewWrap, _, cx| this.toggle_preview_wrap(cx)))
             .on_action(cx.listener(|this, action: &FileBrowserBack, _, cx| this.navigate_folder(action, cx)))
             .on_action(cx.listener(|this, action: &FileBrowserForward, _, cx| this.navigate_folder(action, cx)))
@@ -1316,6 +1344,13 @@ impl Render for CommandPalette {
                         .child(if self.wrap_preview { "Single-line excerpts" } else { "Wrap excerpts" }))
                     .when(self.wrap_preview, |bar| bar.child(div().text_xs().text_color(rgb(0xa0a0a0)).child("Up to 4 visual lines")))
             ))
+            .when_some(self.preview_link_target(), |palette, (index, count, url)| palette.child(
+                div().px_3().py_2().flex_shrink_0().flex().flex_col().gap_1()
+                    .child(div().text_xs().text_color(rgb(0xa0a0a0)).child(format!("Link {}/{count}{link_hints}", index + 1)))
+                    .child(div().id("preview-link-target").truncate().text_sm().text_color(rgb(0x8ebfff)).cursor_pointer()
+                        .tooltip({ let url = url.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(url.clone().into())).into() })
+                        .on_click(cx.listener(|this, event: &ClickEvent, _, cx| { if event.standard_click() { cx.stop_propagation(); this.open_preview_link(cx); } }))
+                        .child(url))))
             .child(palette_view::search(self.input.clone()))
             .child(if self.search.matches.is_empty() {
                 div().p_3().text_sm().child(self.empty_message).into_any_element()

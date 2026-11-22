@@ -508,6 +508,9 @@ actions!(
         ShowSshHosts,
         CopySearchExcerpt,
         TogglePreviewWrap,
+        OpenPreviewLink,
+        NextPreviewLink,
+        PreviousPreviewLink,
         RefreshFilePreview,
         RefreshFileBrowser,
         FileBrowserParent,
@@ -3627,7 +3630,11 @@ fn main() {
         app_menu::initialize(cx);
         native_quit::initialize(cx);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-shift-c" } else { "ctrl-shift-c" }, CopySearchExcerpt, Some("CommandPalette"))]);
-        cx.bind_keys([KeyBinding::new("ctrl-alt-w", TogglePreviewWrap, Some("TextPreview"))]);
+        cx.bind_keys([KeyBinding::new("ctrl-alt-w", TogglePreviewWrap, Some("TextPreview")),
+            KeyBinding::new("alt-enter", OpenPreviewLink, Some("MarkdownPreview")),
+            KeyBinding::new("tab", NextPreviewLink, Some("MarkdownPreview")),
+            KeyBinding::new("shift-tab", PreviousPreviewLink, Some("MarkdownPreview")),
+        ]);
         cx.bind_keys([
             KeyBinding::new("f5", RefreshFilePreview, Some("FilePreview")),
             KeyBinding::new("alt-up", PreviewDirectory, Some("FilePreview")),

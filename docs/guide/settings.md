@@ -145,7 +145,10 @@ Cmd+S on macOS or Ctrl+S elsewhere saves the settings through the same action as
 it with `{"key":"ctrl-alt-s","action":"save_appearance","context":"settings"}`;
 use `action: "disabled"` in the same context to disable the default key.
 
-Use `preview` for text-file preview shortcuts. Wrap excerpts defaults to
+Use `preview` for text-file preview shortcuts. Markdown links expose
+`next_preview_link`, `previous_preview_link` and `open_preview_link`. Defaults
+are Tab, Shift+Tab and Alt+Enter only in the Markdown reading view.
+ Wrap excerpts defaults to
 Ctrl+Alt+W and can be remapped with
 `{"key":"ctrl-alt-r","action":"toggle_preview_wrap","context":"preview"}`.
 Disable the original key separately with `action: "disabled"` in that context.

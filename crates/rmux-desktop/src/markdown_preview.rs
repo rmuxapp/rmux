@@ -216,6 +216,15 @@ pub fn code_excerpt(source: &str, query: &str) -> String {
 mod tests {
     use super::*;
     #[test]
+    fn preview_link_navigation_tracks_identity_and_wraps() {
+        assert_eq!(link_index(None, 7, 0, 1), None);
+        assert_eq!(link_index(None, 7, 3, 0), Some(0));
+        assert_eq!(link_index(Some((7, 2)), 7, 3, 1), Some(0));
+        assert_eq!(link_index(Some((7, 0)), 7, 3, -1), Some(2));
+        assert_eq!(link_index(Some((7, 2)), 8, 3, 0), Some(0));
+        assert_eq!(link_index(Some((7, 9)), 7, 1, 0), Some(0));
+    }
+    #[test]
     fn web_links_preserve_unicode_styles_and_reject_nonweb_targets() {
         let (rows, _) = blocks("[**界** code](https://example.com/a) [again](https://example.com/a) [file](file:///tmp/a) ![image](https://example.com/image.png)\n\n[next](https://example.org)");
         assert_eq!(rows[0].links, ["https://example.com/a"]);
@@ -392,4 +401,11 @@ mod tests {
         assert!(blocks.iter().any(|b| b.text == "alt"));
         assert!(blocks.iter().any(|b| b.text.contains("<script>")));
     }
+}
+
+/// Link focus belongs to a result identity, never to its changing search-row index.
+pub fn link_index(previous: Option<(usize, usize)>, command: usize, count: usize, delta: i32) -> Option<usize> {
+    if count == 0 { return None; }
+    let index = previous.filter(|(key, _)| *key == command).map_or(0, |(_, index)| index.min(count - 1));
+    Some((index as i64 + i64::from(delta.signum())).rem_euclid(count as i64) as usize)
 }

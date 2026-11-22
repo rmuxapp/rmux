@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Markdown links now have a keyboard destination bar: Tab/Shift+Tab cycle the selected
+block's links and Alt+Enter opens the displayed URL, while Enter retains copy
+behavior. Hints follow remapped bindings. Selection is keyed to result identity,
+not the changing filtered row index; stale indices clamp and empty blocks do not
+open anything. IME composition suspends link actions. Native compilation plus
+focused navigation/scoping/remapping tests pass. Native visual and interaction
+acceptance remain pending.
+
 Markdown reading blocks now render clickable HTTP(S) links with underlines and
 destination tooltips, including inline emphasis and table cells. Opening a link
 uses the default browser and preserves the preview; non-web/relative links remain
