@@ -7,22 +7,26 @@ on:
       - crates/rmux-desktop/**
       - crates/rmux-terminal/**
       - crates/rmux-core/**
+      - crates/rmux-cli/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml
       - scripts/bootstrap-ghostty.sh
       - scripts/smoke-native-quit.py
+      - scripts/smoke-events.py
       - .github/workflows/browser.yml
   pull_request:
     paths:
       - crates/rmux-desktop/**
       - crates/rmux-terminal/**
       - crates/rmux-core/**
+      - crates/rmux-cli/**
       - Cargo.toml
       - Cargo.lock
       - mise.toml
       - scripts/bootstrap-ghostty.sh
       - scripts/smoke-native-quit.py
+      - scripts/smoke-events.py
       - .github/workflows/browser.yml
 permissions:
   contents: read
@@ -78,6 +82,11 @@ jobs:
           mise exec -- python scripts/smoke-native-quit.py
       - name: Test bounded event replay
         run: mise exec -- cargo test --locked -p rmux-desktop --features browser events
+      - name: Test live replay and cross-window terminal ownership
+        run: |
+          mise exec -- cargo build --locked -p rmux-desktop -p rmux-cli --features browser
+          mise exec -- cargo test --locked -p rmux-cli event_read
+          mise exec -- python scripts/smoke-events.py
       - name: Test renderer reclamation and diagnostics
         run: |
           mise exec -- cargo test --locked -p rmux-desktop --features browser row_cache::tests

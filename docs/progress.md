@@ -2,6 +2,13 @@
 
 ## Current implementation focus
 
+The existing macOS GitHub job now builds the app/CLI with its already-used browser
+feature set and runs the live event smoke plus the focused CLI event parser test.
+CLI and smoke-script changes trigger this job. The smoke covers filtered replay,
+concurrent clients, real shell metadata/bells, surface and workspace transfers,
+PID continuity and lifecycle cleanup. The exact browser-enabled build/smoke command
+passes locally; the new hosted step is not yet verified on a GitHub runner.
+
 Whole-workspace moves now publish workspace.location_invalidated with the stable
 workspace ID. Native replay smoke moves a populated workspace between two windows
 and back, checks destination window IDs and retained terminal PID, and rejects
