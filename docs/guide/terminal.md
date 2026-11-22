@@ -186,16 +186,25 @@ menus scroll and keyboard navigation brings the selected action into view.
 
 ## Links and clipboard input
 
-Command-click (Control-click on Linux/Windows) opens terminal HTTP(S) links.
+Command-click (Control-click on Linux/Windows) opens terminal HTTP(S) links in
+your browser and local `file://` links in your configured external editor.
 Hold that modifier while hovering to see the link target in a tooltip and a pointer
-cursor for supported HTTP(S) links. Unsupported OSC 8 targets are labeled and do
+cursor for supported links. Unsupported OSC 8 targets are labeled and do
 not gain the pointer cursor. Hover lookup is cached per cell/revision and skips a
 busy parser; move the pointer again to retry. Output changes clear old targets.
 Link previews fit the window width and truncate long addresses with an ellipsis.
 The terminal context menu also offers Copy Link Address and Open Link for the
 link under the menu's opening position. It captures that target when opened, so
 later terminal output cannot change the chosen address. Open Link is enabled
-only for supported HTTP(S) targets; copying preserves the original address.
+only for supported targets; copying preserves the original address.
+
+Local file links work as explicit OSC 8 targets or plain-text `file:///…` URLs.
+Configure `file_editor` as described in the [file guide](files.md). Paths are
+percent-decoded and passed as a literal editor argument. The editor launcher
+requires an existing regular file; directories and symlinks report an error.
+Remote URL hosts, recognized remote terminals, network-share forms, queries and
+fragments are not opened as local files. Bare paths and `path:line` references
+are not detected yet, and the browser demo cannot launch a local editor.
 
 If a terminal program owns right-click, use Shift-right-click for the local menu.
 If output parsing is busy, rmux reports a retry message instead of waiting; click

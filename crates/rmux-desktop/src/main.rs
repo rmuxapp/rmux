@@ -14,6 +14,7 @@ mod file_drop;
 mod file_browser;
 mod markdown_preview;
 mod external_editor;
+mod terminal_link;
 mod background_command;
 mod terminal_search;
 #[cfg(unix)]
@@ -1318,12 +1319,7 @@ impl TerminalView {
             let row = (f32::from(position.y) / self.cells.height) as u32;
             match self.session.hyperlink_at(column, row, self.frame.revision) {
                 Ok(Some(uri)) => {
-                    if openable_uri(&uri) {
-                        cx.open_url(&uri);
-                    } else {
-                        self.error = Some("Only HTTP(S) hyperlinks can be opened here.".into());
-                        cx.notify();
-                    }
+                    self.open_terminal_link(&uri, window, cx);
                     self.mouse_button = None;
                     cx.stop_propagation();
                     return;
@@ -1409,6 +1405,21 @@ impl TerminalView {
     fn clear_link_hover(&mut self, cx: &mut Context<Self>) {
         self.link_hover_cell = None;
         if self.link_hover.take().is_some() { cx.notify(); }
+    }
+    fn local_link_file(&self, uri: &str) -> Option<std::path::PathBuf> {
+        terminal_link::local_file(uri, self.session.remote_destination().is_some() || self.remote_directory_label.is_some())
+    }
+    fn can_open_terminal_link(&self, uri: &str) -> bool {
+        openable_uri(uri) || self.local_link_file(uri).is_some()
+    }
+    fn open_terminal_link(&mut self, uri: &str, window: &mut Window, cx: &mut Context<Self>) {
+        if openable_uri(uri) { cx.open_url(uri); }
+        else if let Some(path) = self.local_link_file(uri) {
+            window.dispatch_action(Box::new(EditLocalFile { path }), cx);
+        } else {
+            self.error = Some("Open Link supports HTTP(S) URLs and local file:// links from local terminals. Remote files are not opened locally.".into());
+            cx.notify();
+        }
     }
     fn update_link_hover(&mut self, position: Point<Pixels>, modifiers: Modifiers, cx: &mut Context<Self>) {
         let modifier = if cfg!(target_os = "macos") { modifiers.platform } else { modifiers.control };
@@ -2022,7 +2033,7 @@ impl Render for TerminalView {
                 else { this.clear_link_hover(cx); }
             }))
             .when_some(self.link_hover.as_ref().filter(|(revision, _)| *revision == self.frame.revision).map(|(_, uri)| uri.clone()), |root, uri| {
-                let allowed = openable_uri(&uri);
+                let allowed = self.can_open_terminal_link(&uri);
                 let target: SharedString = uri.into();
                 root.when(allowed, |root| root.cursor_pointer())
                     .tooltip(move |_, cx| cx.new(|_| LinkHint { target: target.clone(), allowed }).into())

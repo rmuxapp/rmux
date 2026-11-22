@@ -121,15 +121,16 @@ impl Terminal {
 fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
     let delimiter =
         |c: char| c.is_whitespace() || c.is_control() || matches!(c, '<' | '>' | '"' | '\'');
-    for (start, _) in text.char_indices().filter(|(_, c)| *c == 'h' || *c == 'H') {
+    for (start, _) in text.char_indices().filter(|(_, c)| matches!(c, 'h' | 'H' | 'f' | 'F')) {
         let rest = &text[start..];
+        let file = rest.get(..7).is_some_and(|s| s.eq_ignore_ascii_case("file://"));
         let prefix = rest
             .get(..8)
             .is_some_and(|s| s.eq_ignore_ascii_case("https://"))
             || rest
                 .get(..7)
                 .is_some_and(|s| s.eq_ignore_ascii_case("http://"));
-        if !prefix {
+        if !prefix && !file {
             continue;
         }
         let end = rest.find(delimiter).unwrap_or(rest.len());
@@ -140,7 +141,7 @@ fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
             }
         }
         let authority = uri.split_once("://")?.1.split(['/', '?', '#']).next()?;
-        if !authority.is_empty() && clicked >= start && clicked < start + uri.len() {
+        if (!authority.is_empty() || file && uri.len() > 8) && clicked >= start && clicked < start + uri.len() {
             return Some(uri);
         }
     }
@@ -150,6 +151,17 @@ fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn file_urls_follow_visible_cells_and_leave_routing_to_the_host() -> Result<()> {
+        let mut terminal = Terminal::new(24, 4)?;
+        terminal.write(b"file:///tmp/a%20b.txt");
+        terminal.frame()?;
+        assert_eq!(terminal.link_at(12, 0)?.as_deref(), Some("file:///tmp/a%20b.txt"));
+        assert_eq!(plain_url_at("file://remote/tmp/a", 10), Some("file://remote/tmp/a"));
+        assert_eq!(plain_url_at("file://", 2), None);
+        assert_eq!(plain_url_at("https:///missing-host", 5), None);
+        Ok(())
+    }
     #[test]
     fn links_wait_for_a_matching_frame_after_output_or_viewport_changes() -> Result<()> {
         let mut terminal = Terminal::new(40, 3)?;

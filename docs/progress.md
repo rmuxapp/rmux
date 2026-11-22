@@ -1,3 +1,14 @@
+Local file links (T10): modifier-click and terminal-menu Open Link now route
+local `file://` URLs through the configured external editor; hover uses the same
+eligibility rules. The terminal's bounded visible-line lookup also detects
+plain-text file URLs, retaining OSC 8 precedence and frame-revision checks.
+URL decoding preserves spaces/Unicode/literal shell metacharacters and rejects
+remote hosts, recognized remote sessions, network-share forms, query/fragment
+targets and controls. The existing editor launcher validates regular files and
+passes paths as argv. Two desktop routing tests and five engine hyperlink tests
+passed. Native click-to-editor acceptance and bare/relative/line-number paths
+remain open; the WASM demo cannot launch editors. No app bundle or release.
+
 Settings edge-case recovery: the first-save undo regression exposed macOS's
 `/var`/`/private/var` alias: a newly created file's receipt retained an unresolved
 path and rejected its own canonical target. Receipts now record the canonical

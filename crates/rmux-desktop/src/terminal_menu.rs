@@ -20,7 +20,7 @@ impl TerminalView {
         let selection = self.frame.selections.iter().any(Option::is_some);
         let link = self.terminal_menu.as_ref().and_then(|menu| menu.link.as_deref());
         let local = self.session.remote_destination().is_none();
-        [selection, selection, !self.session.paste_pending(), true, true, local || self.remote_directory_label.is_some(), local, true, link.is_some(), link.is_some_and(openable_uri),
+        [selection, selection, !self.session.paste_pending(), true, true, local || self.remote_directory_label.is_some(), local, true, link.is_some(), link.is_some_and(|uri| self.can_open_terminal_link(uri)),
             #[cfg(all(target_os = "macos", feature = "browser"))]
             link.is_some_and(browser_window::can_open_link),
         ]
@@ -72,7 +72,7 @@ impl TerminalView {
             6 => self.lookup_working_directory(false, cx),
             7 => self.clear_scrollback(&ClearScrollback, window, cx),
             8 => { if let Some(link) = link { clipboard::write(ClipboardItem::new_string(link), cx); } },
-            9 => { if let Some(link) = link.filter(|uri| openable_uri(uri)) { cx.open_url(&link); } },
+            9 => { if let Some(link) = link { self.open_terminal_link(&link, window, cx); } },
             #[cfg(all(target_os = "macos", feature = "browser"))]
             10 => {
                 if let Some(link) = link {
