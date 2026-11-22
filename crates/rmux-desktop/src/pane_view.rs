@@ -297,7 +297,7 @@ impl PaneView {
                         else { (*label).to_owned() };
                     tab_presentation::menu_row(index, matches!(index, 1 | 4 | 6))
                         .when(enabled[index], |row| row.cursor_pointer()
-                            .when(index == menu.selected, |row| row.bg(rgb(0x354969)))
+                            .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {
                                 if let Some(menu) = &mut this.tab_menu {
                                     if menu.selected != index {
@@ -369,7 +369,7 @@ impl PaneView {
         let hint: SharedString = directory.as_ref().map(|directory| format!("{title}\n{directory}").into()).unwrap_or_else(|| title.clone());
         div().id(("choose-tab", id)).flex().items_center().gap_2().px_3().h(px(52.)).text_sm().line_height(px(20.)).cursor_pointer()
             .tooltip(move |_, cx| cx.new(|_| ControlHint(hint.clone())).into())
-            .when(Some(id) == selected, |row| row.bg(rgb(0x354969)))
+            .when(Some(id) == selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
             .hover(|row| row.bg(rgb(0x40516c)))
             .child(div().w(px(16.)).flex_shrink_0().child(if index == self.terminals.active_index() { "✓" } else { "" }))
             .child(div().w(px(24.)).flex_shrink_0().text_xs().text_color(rgb(0xaaaaaa)).child((index + 1).to_string()))

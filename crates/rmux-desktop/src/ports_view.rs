@@ -177,7 +177,7 @@ pub(super) fn panel(state: &State, window: &Window, cx: &mut Context<TerminalVie
                 .children(report.listeners.iter().enumerate().map(|(index, row)| {
                     let address = row.address.to_string();
                     div().id(("listener-row", index)).py_1().px_1().rounded_sm().flex().items_center().gap_2().cursor_pointer()
-                        .when(index == state.selected, |row| row.bg(rgb(if state.focus.as_ref().is_some_and(|focus| focus.is_focused(window)) { 0x354969 } else { 0x333333 })))
+                        .when(index == state.selected, |row| row.bg(rgb(if state.focus.as_ref().is_some_and(|focus| focus.is_focused(window)) { crate::chrome_style::SELECTED } else { 0x333333 })))
                         .on_mouse_down(MouseButton::Left, cx.listener(move |this, _, window, cx| {
                             this.ports.selected = index;
                             if let Some(focus) = &this.ports.focus { focus.focus(window); }

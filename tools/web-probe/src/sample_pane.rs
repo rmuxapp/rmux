@@ -264,15 +264,19 @@ impl Render for SamplePane {
                                 }
                             }))
                             .on_mouse_down(MouseButton::Right, cx.listener(move |this,event: &MouseDownEvent,window,cx| {
-                                cx.stop_propagation(); this.show_menu(index, event.position, window, cx);
+                                cx.stop_propagation();
+                                if let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) {
+                                    this.show_menu(index, event.position, window, cx);
+                                }
                             }))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
+                                let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; };
                                 this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_tab(window,cx); }
                             }))})))
                 .child(crate::pane_presentation::action_control("add-tab", "New Terminal Tab", Box::new(crate::NewTab), control_focus.clone(), mac).child(crate::icons::icon("plus"))
-                    .on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
+                    .on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.add(window,cx); } })))
                 .children([
                     ("split-right", "Split Right", Box::new(crate::Split) as Box<dyn Action>),
                     ("split-down", "Split Below", Box::new(crate::SplitBelow) as Box<dyn Action>),

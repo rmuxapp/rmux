@@ -2071,12 +2071,10 @@ impl WorkspaceWindow {
                             })).child("Clear all")
                     ))
                     .child(
-                        div()
-                            .id("close-notifications")
-                            .px_2()
-                            .cursor_pointer()
-                            .hover(|style| style.bg(rgb(0x353535)))
-                            .on_click(cx.listener(|this, _, window, cx| this.toggle_notifications(window, cx)))
+                        crate::pane_presentation::action_control("close-notifications", "Close Notifications", Box::new(ToggleNotifications), None, cfg!(target_os = "macos"))
+                            .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
+                                if event.standard_click() { this.toggle_notifications(window, cx); }
+                            }))
                             .child(icons::icon("close")),
                     ),
             )
@@ -2084,7 +2082,7 @@ impl WorkspaceWindow {
                 .children([(false, format!("All {total_count}")), (true, format!("Unread {unread_count}"))].into_iter().map(|(unread_only, label)| {
                     div().id(if unread_only { "notification-filter-unread" } else { "notification-filter-all" })
                         .px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                        .bg(if unread_only == navigation.unread_only { rgb(0x303b4a) } else { rgb(0x242424) })
+                        .bg(if unread_only == navigation.unread_only { rgb(crate::chrome_style::SELECTED) } else { rgb(0x242424) })
                         .text_color(if unread_only == navigation.unread_only { rgb(0xffffff) } else { rgb(0xa0a0a0) })
                         .hover(|style| style.bg(rgb(0x353535)))
                         .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
@@ -2130,9 +2128,10 @@ impl WorkspaceWindow {
                                 .rounded_md()
                                 .text_sm()
                                 .cursor_pointer()
-                                .bg(if selected == Some((terminal, revision)) { rgb(0x303b4a) } else { rgb(0x292929) })
-                                .hover(|style| style.bg(rgb(0x303b50)))
-                                .on_click(cx.listener(move |this, _, window, cx| {
+                                .bg(if selected == Some((terminal, revision)) { rgb(crate::chrome_style::SELECTED) } else { rgb(0x292929) })
+                                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                                    if !event.standard_click() { return; }
                                     this.notification_navigation = None;
                                     this.focus_terminal(workspace, terminal, window, cx)
                                 }))
@@ -2175,7 +2174,7 @@ impl WorkspaceWindow {
                                         .when(unread, |controls| controls.child(
                                             div().id(SharedString::from(format!("read-notification-{terminal}-{revision}")))
                                                 .px_2().py_1().rounded_sm().text_xs()
-                                                .hover(|style| style.bg(rgb(0x43506a)))
+                                                .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                                                 .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                     cx.stop_propagation();
                                                     if event.standard_click() { this.change_notification(terminal, revision, true, cx); }
@@ -2183,7 +2182,7 @@ impl WorkspaceWindow {
                                         ))
                                         .child(div().id(SharedString::from(format!("expand-notification-{terminal}-{revision}")))
                                             .px_2().py_1().rounded_sm().text_xs()
-                                            .hover(|style| style.bg(rgb(0x43506a)))
+                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                                             .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                 cx.stop_propagation();
                                                 if !event.standard_click() { return; }
@@ -2194,7 +2193,7 @@ impl WorkspaceWindow {
                                             })).child(if expanded { "Less" } else { "More" }))
                                         .child(div().id(SharedString::from(format!("copy-notification-{terminal}-{revision}")))
                                             .px_2().py_1().rounded_sm().text_xs()
-                                            .hover(|style| style.bg(rgb(0x43506a)))
+                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                                             .on_click(move |event, _, cx| {
                                                 cx.stop_propagation();
                                                 if event.standard_click() {
@@ -2208,10 +2207,10 @@ impl WorkspaceWindow {
                                             .py_1()
                                             .rounded_sm()
                                             .text_xs()
-                                            .hover(|style| style.bg(rgb(0x43506a)))
-                                            .on_click(cx.listener(move |this, _, _, cx| {
+                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
+                                            .on_click(cx.listener(move |this, event: &ClickEvent, _, cx| {
                                                 cx.stop_propagation();
-                                                this.dismiss_notification(terminal, revision, cx);
+                                                if event.standard_click() { this.dismiss_notification(terminal, revision, cx); }
                                             }))
                                             .child("Dismiss"),
                                     ),
@@ -4372,7 +4371,7 @@ impl Render for WorkspaceWindow {
                                                     .when_some(header, |row, _| row.child(
                                                         gpui::div().id(("group-add", target)).w(px(24.)).h(px(24.)).flex_shrink_0()
                                                             .flex().items_center().justify_center().rounded_sm().child(icons::icon("plus"))
-                                                            .hover(|style| style.bg(rgb(0x43516a)))
+                                                            .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
                                                             .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("New Workspace in Group".into())).into())
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                                                 if !event.standard_click() || this.automation_available(cx).is_err() { return; }

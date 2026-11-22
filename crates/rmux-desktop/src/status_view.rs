@@ -184,7 +184,7 @@ pub fn panel(records: &[Record], loading: bool, state: &State, window: &Window, 
                         .ml(px(record.id.matches('/').count().min(8) as f32 * 8.))
                         .p_2()
                         .rounded_sm()
-                        .bg(rgb(if selected == Some(index) { if focused { 0x354969 } else { 0x333333 } } else { 0x2b2b2b }))
+                        .bg(rgb(if selected == Some(index) { if focused { crate::chrome_style::SELECTED } else { 0x333333 } } else { 0x2b2b2b }))
                         .text_sm()
                         .child(
                             div().flex().items_center().min_w_0().gap_2()

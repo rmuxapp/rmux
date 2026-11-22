@@ -440,7 +440,7 @@ impl CopyMode {
         let anchor = self.anchor.unwrap_or(self.cursor);
         let selected = (self.cursor.min(anchor)..=self.cursor.max(anchor)).contains(&index);
         div().id(("copy-line", index)).w_full().min_h(px(22.)).px_2().py_1().text_size(px(12.)).font_family(FONT_FAMILY)
-            .when(selected && !self.characters, |row| row.bg(rgb(0x354969)))
+            .when(selected && !self.characters, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                 if event.standard_click() {
                     this.copy_message = None;

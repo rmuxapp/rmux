@@ -17,5 +17,5 @@ pub(crate) fn frame(window: &Window) -> Stateful<Div> {
 }
 pub(crate) fn row(index: usize, selected: usize) -> Stateful<Div> {
     div().id(("workspace-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).cursor_pointer().flex().items_center().gap_3()
-        .when(index == selected, |row| row.bg(rgb(0x354969)))
+        .when(index == selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
 }

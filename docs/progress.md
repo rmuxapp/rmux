@@ -2,6 +2,32 @@
 
 ## Current implementation focus
 
+Completed the combined chrome/input polish batch with notification-panel fixes:
+desktop close, open and dismiss handlers now require standard clicks, matching
+the existing read/copy/filter controls. The close control uses the shared 28 px
+hit area and shortcut tooltip; notification selection/hover colors use the shared
+chrome palette. Desktop compilation passes after these additions. Native runtime
+notification acceptance remains pending; the prior browser review covers the
+WASM changes. The complete batch is committed together without a release build.
+
+Combined chrome and browser interaction batch: one WASM debug build passes.
+Browser inspection confirms right clicks on new-workspace, new-tab and Commands
+do not activate them; normal clicks create a workspace/tab and open the palette,
+and Escape dismisses it. The browser workspace add button now shares native
+geometry, vector icon and shortcut tooltip resolution. Tab selection/context menus
+and workspace selection resolve stable IDs at event time rather than captured
+positions. Empty-state creation controls also filter standard clicks. Screenshot:
+target/chrome-polish-batch.jpg. Palette/sidebar colors visually agree; native
+menu/list rendering remains pending. Changes remain local for batch delivery.
+
+Application selection styling now shares one chrome color definition across
+desktop and WASM. Palette results/search borders, terminal and workspace menus,
+settings selection, memory/ports/status lists and copy-mode rows use the same
+muted accent as the sidebar. Selected hover states and group controls also share
+that treatment. Terminal theme colors remain independently configured. Desktop
+and WASM cargo checks pass for the complete batch; no packaged build, deployment
+or release was run. Visual acceptance of this latest color batch is pending.
+
 Combined sidebar/toolbar/tab polish review passes desktop compilation and one
 WASM build. Tab close buttons now share the native 22 px hit area, vector icon,
 tooltip and hover treatment; left mouse-down does not start a parent tab drag.

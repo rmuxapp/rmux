@@ -171,7 +171,7 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                         div().id(("theme-choice", index)).px_2().py_1().rounded_sm().cursor_pointer()
                             .text_size(px(12.)).border_1()
                             .border_color(rgb(if selected { 0x4599ef } else { 0x454545 }))
-                            .bg(rgb(if selected { 0x354969 } else { 0x292929 }))
+                            .bg(rgb(if selected { crate::chrome_style::SELECTED } else { 0x292929 }))
                             .hover(|style| style.bg(rgb(0x40516c)))
                             .on_click(move |event, window, cx| {
                                 if event.standard_click() { window.dispatch_action(Box::new(SetTerminalTheme { theme }), cx); }

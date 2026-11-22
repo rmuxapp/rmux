@@ -500,7 +500,7 @@ impl Render for InputProbe {
         } else {
             div().size_full().flex().items_center().justify_center().track_focus(&self.empty_focus).key_context("Terminal")
                 .child(div().id("restart-terminal").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
-                    .child("New Terminal").on_click(cx.listener(|this,_,window,cx| this.start_terminal(window,cx))))
+                    .child("New Terminal").on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.start_terminal(window,cx); } })))
                 .into_any_element()
         };
         div().font_family(FONT_FAMILY).size_full().bg(rgb(0x151517)).text_color(rgb(0xe2e3e7)).relative().flex().flex_col()
@@ -514,7 +514,8 @@ impl Render for InputProbe {
                 .child(workspace_presentation::title("workspace-title", self.name.clone()))
                 .child(div().text_xs().text_color(rgb(0x9b9ba3)).child("Sample sessions"))
                 .child(div().id("open-commands").px_2().py_1().rounded_sm().text_size(px(13.)).cursor_pointer().hover(|style| style.bg(rgb(0x353535))).child("Commands")
-                    .on_click(cx.listener(|this, _, window, cx| {
+                    .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
+                        if !event.standard_click() { return; }
                         this.open_palette(window, cx);
                     }))))
             .when(self.pane_state.zoomed.is_some(), |root| {
@@ -660,6 +661,8 @@ mod sample_pane;
 
 mod key_adapter;
 
+#[path = "../../../crates/rmux-desktop/src/chrome_style.rs"]
+mod chrome_style;
 #[path = "../../../crates/rmux-desktop/src/sidebar_presentation.rs"]
 mod sidebar_presentation;
 #[path = "../../../crates/rmux-desktop/src/metadata_presets.rs"]

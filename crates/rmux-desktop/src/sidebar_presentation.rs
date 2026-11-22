@@ -1,7 +1,6 @@
 //! Workspace sidebar geometry and selection styling shared by both hosts.
 use gpui::{prelude::*, *};
-pub(crate) const SELECTED_DETAIL: u32 = 0xcac5dd;
-pub(crate) const ACCENT: u32 = 0xa99be8;
+pub(crate) use crate::chrome_style::{ACCENT, SELECTED_DETAIL};
 pub(crate) fn sidebar(width: f32) -> Div {
     div().w(px(width)).overflow_hidden().flex_shrink_0().h_full().flex().flex_col().bg(rgb(0x242424))
 }
@@ -12,13 +11,13 @@ pub(crate) fn header() -> Stateful<Div> {
 pub(crate) fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
     div().id(id).mx_1().mb(px(2.)).px_3().py_2().rounded(px(5.)).text_size(px(13.)).cursor_pointer()
         .border_1().border_color(gpui::transparent_black())
-        .when(selected, |row| row.bg(rgb(0x373441)).border_color(rgb(0x625a77)).text_color(rgb(0xf1eff8)))
-        .hover(move |style| style.bg(rgb(if selected {0x403b4c} else {0x303030})))
+        .when(selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)).border_color(rgb(crate::chrome_style::SELECTED_BORDER)).text_color(rgb(crate::chrome_style::SELECTED_TEXT)))
+        .hover(move |style| style.bg(rgb(if selected {crate::chrome_style::SELECTED_HOVER} else {0x303030})))
 }
 
 pub(crate) fn group_toggle(id: impl Into<ElementId>, collapsed: bool) -> Stateful<Div> {
     div().id(id).w(px(24.)).h(px(24.)).flex_shrink_0().flex().items_center().justify_center().rounded_sm()
-        .hover(|style| style.bg(rgb(0x43516a)))
+        .hover(|style| style.bg(rgb(crate::chrome_style::SELECTED_HOVER)))
         .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Expand / Collapse Group".into())).into())
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(crate::icons::icon(if collapsed { "chevron-right" } else { "chevron-down" }))

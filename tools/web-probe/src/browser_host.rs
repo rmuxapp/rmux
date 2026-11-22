@@ -360,8 +360,8 @@ impl Render for BrowserHost {
             .when(self.sidebar, |root| root.child(sidebar_presentation::sidebar(width)
                 .child(sidebar_presentation::header()
                     .child(div().flex_1().text_xs().text_color(rgb(0xa0a0a0)).child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
-                    .child(div().id("new-workspace").px_2().cursor_pointer().child("+")
-                        .on_click(cx.listener(|this,_,window,cx| this.add(window,cx)))))
+                    .child(crate::pane_presentation::action_control("new-workspace", "New Workspace", Box::new(crate::NewWorkspace), None, crate::terminal_engine::is_mac()).child(crate::icons::icon("plus"))
+                        .on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.add(window,cx); } }))))
                 .child(div().id("workspace-list").flex_1().min_h_0().overflow_y_scroll().track_scroll(&self.workspace_scroll).py_2()
                     .children(self.workspace_order(false).into_iter().map(|index| {
                         let (name, entity, pinned, metadata) = &self.workspace_state.entries[index];
@@ -417,8 +417,7 @@ impl Render for BrowserHost {
                                     .child(div().text_xs().child(self.editor_hint.clone()))))
                             .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                                 if !event.standard_click() { return; }
-                                let Some((_, entity, _, _)) = this.workspace_state.entries.get(index) else { return; };
-                                let target = entity.entity_id();
+                                let Some(index) = this.workspace_state.entries.iter().position(|entry| entry.1.entity_id() == target) else { return; };
                                 if this.rename.as_ref().is_some_and(|(id, _)| *id == target) { return; }
                                 if let ClickEvent::Mouse(mouse) = event {
                                     let modifiers = mouse.down.modifiers;
@@ -444,7 +443,7 @@ impl Render for BrowserHost {
                     div().size_full().bg(rgb(0x151517)).flex().flex_col().items_center().justify_center().gap_3()
                         .child("No workspaces open")
                         .child(div().id("empty-new-workspace").px_4().py_2().rounded_md().bg(rgb(0x303030)).cursor_pointer()
-                            .child("New Workspace").on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
+                            .child("New Workspace").on_click(cx.listener(|this,event: &ClickEvent,window,cx| { if event.standard_click() { this.add(window,cx); } })))
                         .into_any_element()
                 }))
             .when_some(self.menu.clone(), |root, menu| root.child(self.workspace_menu_element(menu, window, cx)))

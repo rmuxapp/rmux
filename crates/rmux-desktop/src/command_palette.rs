@@ -1363,7 +1363,7 @@ impl Render for CommandPalette {
             .when(self.preview_navigation.is_some() && !self.hex_preview, |palette| palette.child(
                 div().px_3().pt_2().flex_shrink_0().flex().items_center().gap_2()
                     .child(div().id("preview-wrap").px_2().py_1().rounded_sm().text_xs().cursor_pointer()
-                        .bg(rgb(if self.wrap_preview { 0x354969 } else { 0x303030 }))
+                        .bg(rgb(if self.wrap_preview { crate::chrome_style::SELECTED } else { 0x303030 }))
                         .hover(|style| style.bg(rgb(0x454545)))
                         .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                             if event.standard_click() { this.toggle_preview_wrap(cx); }

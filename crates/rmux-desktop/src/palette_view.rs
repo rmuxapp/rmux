@@ -34,13 +34,13 @@ pub(crate) fn close_button() -> Stateful<Div> {
 }
 pub(crate) fn search(input: impl IntoElement) -> Div {
     div().flex_shrink_0().p_3().child(div().w_full().px_3().py_2().rounded_md()
-        .border_1().border_color(rgb(0x4b5668)).bg(rgb(0x12141a)).child(input))
+        .border_1().border_color(rgb(crate::chrome_style::SELECTED_BORDER)).bg(rgb(0x12141a)).child(input))
 }
 pub(crate) fn result(id: usize, height: f32, selected: bool) -> Stateful<Div> {
     div().id(("command", id)).w_full().min_w_0().px_3().h(px(height))
         .text_sm().line_height(px(20.)).flex().items_center().gap_3().cursor_pointer()
-        .when(selected, |row| row.bg(rgb(0x354969)))
-        .hover(move |row| row.bg(rgb(if selected { 0x40577b } else { 0x303030 })))
+        .when(selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+        .hover(move |row| row.bg(rgb(if selected { crate::chrome_style::SELECTED_HOVER } else { 0x303030 })))
 }
 pub(crate) fn footer() -> Div {
     div().flex_shrink_0().px_3().py_2().border_t_1().border_color(rgb(0x363636))

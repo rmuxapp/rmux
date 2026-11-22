@@ -147,8 +147,8 @@ pub fn render_row(row: &Row, index: usize, selected: bool, cx: &mut Context<wind
         mib(usage.compressed_bytes), mib(usage.image_bytes), mib(usage.virtual_bytes)))
         .unwrap_or_else(|| row.status.into());
     div().id(("terminal-memory-row", index)).px_3().py_2().border_b_1().border_color(rgb(0x383838))
-        .when(selected, |row| row.bg(rgb(0x354969)))
-        .cursor_pointer().hover(move |style| style.bg(rgb(if selected { 0x40577b } else { 0x303030 })))
+        .when(selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
+        .cursor_pointer().hover(move |style| style.bg(rgb(if selected { crate::chrome_style::SELECTED_HOVER } else { 0x303030 })))
         .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
         .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
             if event.standard_click() { this.focus_memory_terminal(workspace, surface, window, cx); }

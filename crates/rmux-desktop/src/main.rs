@@ -72,6 +72,7 @@ mod tab_actions;
 mod terminal_actions;
 mod workspace_shortcuts;
 mod tab_presentation;
+mod chrome_style;
 mod sidebar_presentation;
 mod metadata_presets;
 mod workspace_menu_view;

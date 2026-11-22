@@ -16,6 +16,19 @@ The latest GitHub release endpoint returned **v0.65.2.2**, published October 27,
 
 ## Phase sequence
 
+### Current delivery priority
+
+Focus on polish and release quality of the existing terminal workspace: coherent
+native and WASM interactions, keyboard and focus behavior, clear menus and
+controls, dependable session handling, and reliable downloads and updates.
+Resolve reported regressions before adding new feature families. The phases
+below retain the longer-term parity scope; they are not the immediate work queue.
+
+Implement related improvements in substantial batches, then run targeted checks
+and a combined build. Avoid rebuilding or deploying each small change. Native
+release builds remain on GitHub; native Windows runtime validation stays deferred
+at the user's request.
+
 | Phase | Outcome | Main dependencies | Exit gate |
 | --- | --- | --- | --- |
 | P0 | Prove the portable terminal and renderer | Ghostty API, GUI integration, PTY adapters | One terminal and eight splits on all three OS families; IME, DPI, Unicode, output stress and teardown verified |

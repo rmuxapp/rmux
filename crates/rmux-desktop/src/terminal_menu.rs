@@ -126,7 +126,7 @@ impl TerminalView {
                     .children(LABELS.iter().enumerate().map(|(index, label)| {
                     div().id(("terminal-menu-item", index)).mx_1().px_3().py_2().rounded_sm().text_size(px(13.)).flex().items_center().gap_3()
                         .when(enabled[index], |row| row.cursor_pointer()
-                            .when(index == menu.selected, |row| row.bg(rgb(0x354969)))
+                            .when(index == menu.selected, |row| row.bg(rgb(crate::chrome_style::SELECTED)))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {
                                 if let Some(menu) = &mut this.terminal_menu {
                                     if menu.selected != index { menu.selected = index; cx.notify(); }
