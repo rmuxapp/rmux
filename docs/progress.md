@@ -2,6 +2,17 @@
 
 ## Current implementation focus
 
+Combined browser input review (ee65dca): rebuilt the WASM demo once and checked
+it at localhost:4319. Cmd+P opened the palette; Down selected New Terminal Tab;
+Shift+Down followed by Backspace on the empty query preserved that selection.
+Escape dismissed it. Cmd+F opened Find; after typing `rmux`, opening/dismissing
+the palette and typing ` find` produced `rmux find` in Find while the sample
+shell prompt stayed unchanged. Clear followed by Cmd+Z restored that query.
+Screenshot: `target/input-review.png`. Live IME composition, native modified-key
+behavior and multi-message notification interactions remain unverified. No
+production demo deployment or release was performed.
+
+
 Find/input polish: identical replacements and boundary deletions now update
 caret/selection without publishing a false text-change event, avoiding needless
 search restarts and palette-selection resets. IME commits still publish the
