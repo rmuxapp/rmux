@@ -148,6 +148,16 @@ fn plain_url_at(text: &str, clicked: usize) -> Option<&str> {
     None
 }
 
+// Compiler coordinates are numeric data, not a general parenthesized token.
+fn parenthesized_location_len(text: &str) -> Option<usize> {
+    let rest = text.strip_prefix('(')?;
+    let end = rest.find(')')?;
+    let parts = rest[..end].split(',');
+    ((1..=2).contains(&parts.clone().count()) && parts.clone().all(|part|
+        !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())))
+        .then_some(end + 2)
+}
+
 // Recognize path-shaped tokens only; existence and local/remote routing belong
 // to the host. This runs on demand, never in the normal terminal draw path.
 fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
@@ -158,6 +168,13 @@ fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
         if let Some((start, delimiter)) = quote {
             if character == delimiter {
                 let after_quote = offset + character.len_utf8();
+                let quoted_path = &text[start..offset];
+                if quoted_path.rsplit(['/', '\\']).next().is_some_and(|name| name.contains('.'))
+                    && let Some(length) = parenthesized_location_len(&text[after_quote..]) {
+                    let begin = start - delimiter.len_utf8();
+                    let end = after_quote + length;
+                    if clicked >= begin && clicked < end { return Some(&text[begin..end]); }
+                }
                 let suffix = &text[after_quote..];
                 let suffix = &suffix[..suffix.find(|c: char| c.is_whitespace() || matches!(c, ',' | ';' | ')' | ']' | '}')).unwrap_or(suffix.len())];
                 let suffix = suffix.trim_end_matches(':');
@@ -186,6 +203,12 @@ fn plain_path_at(text: &str, clicked: usize) -> Option<&str> {
     let mut start = 0;
     for token in text.split_inclusive(delimiter) {
         let candidate = token.trim_end_matches(delimiter).trim_end_matches([',', ';', ':']);
+        if candidate.rsplit(['/', '\\']).next().is_some_and(|name| name.contains('.'))
+            && !candidate.contains("://")
+            && let Some(length) = parenthesized_location_len(&text[start + candidate.len()..]) {
+            let end = start + candidate.len() + length;
+            if clicked >= start && clicked < end { return Some(&text[start..end]); }
+        }
         if clicked >= start && clicked < start + candidate.len() {
             return path_shaped(candidate).then_some(candidate);
         }
@@ -204,6 +227,16 @@ fn path_shaped(candidate: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn compiler_parenthesized_coordinates_are_part_of_the_link() {
+        for target in ["src/main.ts(12,3)", "main.cs(42)", "\"src/my file.ts\"(12,3)"] {
+            assert_eq!(plain_path_at(target, 2), Some(target));
+            assert_eq!(plain_path_at(target, target.len() - 2), Some(target));
+        }
+        assert_eq!(plain_path_at("function(12,3)", 10), None);
+        assert_eq!(plain_path_at("src/file.rs(draft)", 13), None);
+        assert_eq!(plain_path_at("src/file.rs(12,3,4)", 14), None);
+    }
     #[test]
     fn quoted_diagnostic_locations_include_external_coordinates() {
         for text in [r#""src/my file.rs":12:3"#, "'main.rs':27", r#""~/my file.rs":8"#] {

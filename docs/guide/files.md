@@ -213,7 +213,9 @@ kept literal. Plain output detection handles fully visible wrapped lines and
 Unicode cells. Matching single or double quotes preserve spaces and punctuation
 in a path, such as `"/tmp/my project/main.rs"`; unquoted paths stop at whitespace
 and enclosing punctuation. Line/column suffixes can be inside or after the quotes, for example
-`"src/my file.rs:12:3"` or `"src/my file.rs":12:3`.
+`"src/my file.rs:12:3"` or `"src/my file.rs":12:3`. Compiler forms such as
+`main.cs(42)` and `"src/my file.ts"(12,3)` also pass their line and column to
+the editor.
 Encoded `file://` links also support names containing spaces. Bare names are recognized when they
 have an extension and a numeric location, such as `main.rs:12`; otherwise use a
 path containing a directory separator. Home-directory shorthand such as `~/projects/app/main.rs:12:3` expands to

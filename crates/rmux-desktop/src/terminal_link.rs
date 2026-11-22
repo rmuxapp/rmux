@@ -73,7 +73,17 @@ fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
     let mut path = text;
     let mut line = None;
     let mut column = None;
-    if let Some((prefix, suffix)) = path.rsplit_once(':')
+    if let Some((prefix, coordinates)) = path.strip_suffix(')').and_then(|path| path.rsplit_once('(')) {
+        let parts: Vec<_> = coordinates.split(',').collect();
+        if (1..=2).contains(&parts.len()) && parts.iter().all(|part|
+            !part.is_empty() && part.bytes().all(|byte| byte.is_ascii_digit())) {
+            let number = |part: &str| part.parse::<u32>().ok().filter(|number| *number > 0).ok_or(Unsupported);
+            line = Some(number(parts[0])?);
+            column = parts.get(1).map(|part| number(part)).transpose()?;
+            path = prefix;
+        }
+    }
+    if line.is_none() && let Some((prefix, suffix)) = path.rsplit_once(':')
         && !suffix.is_empty() && suffix.bytes().all(|c| c.is_ascii_digit()) {
         line = Some(suffix.parse::<u32>().ok().filter(|n| *n > 0).ok_or(Unsupported)?);
         path = prefix;
@@ -110,6 +120,19 @@ fn resolve_with_home(text: &str, cwd: Option<&std::path::Path>, remote: bool,
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn compiler_parenthesized_locations_resolve_to_editor_coordinates() {
+        let cwd = std::env::temp_dir();
+        for text in ["src/my file.ts(12,3)", "\"src/my file.ts\"(12,3)"] {
+            let target = resolve_with_home(text, Some(&cwd), false, None).unwrap();
+            assert_eq!(target.path, cwd.join("src/my file.ts"));
+            assert_eq!((target.line, target.column), (Some(12), Some(3)));
+        }
+        assert_eq!(resolve_with_home("main.cs(42)", Some(&cwd), false, None).unwrap().line, Some(42));
+        for text in ["main.cs(0)", "main.cs(12,0)", "main.cs(999999999999)"] {
+            assert_eq!(resolve_with_home(text, Some(&cwd), false, None), Err(LinkError::Unsupported));
+        }
+    }
     #[test]
     fn quoted_paths_with_external_locations_keep_literal_names() {
         let cwd = std::env::temp_dir();

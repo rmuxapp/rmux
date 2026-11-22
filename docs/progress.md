@@ -10342,3 +10342,15 @@ rechecks network-path rejection after unquoting. Existing inside-quote locations
 remain supported. Eight terminal hyperlink checks and six desktop resolver
 checks passed; native editor-launch acceptance remains pending. Updated the file
 guide; no release or installed-app changes were made.
+
+
+### Parenthesized compiler locations — 2026-11-22
+
+Terminal links now recognize extension-bearing diagnostic paths with `(line)`
+or `(line,column)` suffixes, including quoted names with spaces. Clicking the
+path or coordinates retains the whole target, and desktop resolution maps it
+to existing literal editor arguments. Function-like tokens without a filename
+extension and nonnumeric/extra coordinate fields are not treated as locations;
+zero/overflow coordinates are rejected by the resolver. Nine hyperlink and
+seven desktop resolver tests passed. Native editor launch remains unreviewed;
+no release build or user-session changes were made.
