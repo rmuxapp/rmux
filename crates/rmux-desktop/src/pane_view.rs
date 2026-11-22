@@ -445,6 +445,21 @@ impl PaneView {
                 "directory_label":terminal.directory_label,
                 "remote_directory":terminal.remote_directory_label,
                 "git_branch":terminal.git_branch,
+                "program_status":terminal.program_status.as_ref().map(|summary| {
+                    use rmux_terminal::program_status::{State, Kind};
+                    let record = &summary.record;
+                    serde_json::json!({"id":record.id, "count":summary.count,
+                        "state":match record.state { State::Idle => "idle", State::Working => "working", State::Done => "done", State::Blocked => "blocked", State::Error => "error" },
+                        "kind":match record.kind { Kind::None => "none", Kind::Permission => "permission", Kind::Question => "question", Kind::Auth => "auth" },
+                        "progress":record.progress, "app":record.app, "title":record.title, "message":record.message})
+                }),
+                "progress":terminal.progress.map(|progress| {
+                    use rmux_terminal::ProgressState;
+                    serde_json::json!({"state":match progress.state {
+                        ProgressState::Running => "running", ProgressState::Error => "error",
+                        ProgressState::Indeterminate => "indeterminate", ProgressState::Paused => "paused",
+                    }, "percent":progress.percent})
+                }),
                 "notification":terminal.notifications.latest()
                     .map(|message| serde_json::json!({"revision":message.revision,"title":message.title,"body":message.body})),
                 "notifications":terminal.notifications.iter().rev().take(if history { usize::MAX } else { 0 }).map(|record| serde_json::json!({
@@ -525,7 +540,9 @@ impl PaneView {
                         {
                             let title = rmux_core::tabs::custom_title(text);
                             terminal.update(cx, |terminal, cx| {
+                                if terminal.custom_title == title { return; }
                                 terminal.custom_title = title;
+                                events::publish("surface.title_changed", cx.entity_id(), None, cx);
                                 cx.emit(TabMetadataChanged);
                                 cx.notify();
                             });

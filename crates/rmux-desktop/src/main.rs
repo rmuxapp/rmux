@@ -863,6 +863,7 @@ impl TerminalView {
                             return false;
                         };
                         let mut metadata_changed = false;
+                        let mut directory_changed = false;
                         if let Some((revision, status)) = metadata.program_status {
                             use rmux_terminal::program_status::State;
                             if !view.input_focused
@@ -877,11 +878,13 @@ impl TerminalView {
                             }
                             view.program_status = status;
                             view.program_status_revision = revision;
+                            events::publish("surface.status_changed", cx.entity_id(), None, cx);
                             if let Some(records) = metadata.program_status_records { view.status_details = Some(records); view.status_load = None; }
                             metadata_changed = true;
                         }
                         if view.progress != metadata.progress {
                             view.progress = metadata.progress;
+                            events::publish("surface.progress_changed", cx.entity_id(), None, cx);
                             metadata_changed = true;
                         }
                         for notification in metadata.notifications {
@@ -904,6 +907,7 @@ impl TerminalView {
                             view.title_revision = revision;
                             if title != view.title {
                                 view.title = title;
+                                events::publish("surface.title_changed", cx.entity_id(), None, cx);
                                 metadata_changed = true;
                             }
                         }
@@ -914,6 +918,7 @@ impl TerminalView {
                             // later remote/cleared reports must clear that fallback.
                             if (revision != 0 || directory.is_some()) && view.snapshot_directory != directory {
                                 view.snapshot_directory = directory.clone();
+                                directory_changed = true;
                                 view.git_branch = None;
                                 metadata_changed = true;
                             }
@@ -925,6 +930,7 @@ impl TerminalView {
                             });
                             if view.directory_label != label {
                                 view.directory_label = label;
+                                directory_changed = true;
                                 metadata_changed = true;
                             }
                             view.refresh_git_context(cx);
@@ -933,8 +939,12 @@ impl TerminalView {
                             view.directory_revision = revision;
                             if view.remote_directory_label != directory {
                                 view.remote_directory_label = directory;
+                                directory_changed = true;
                                 metadata_changed = true;
                             }
+                        }
+                        if directory_changed {
+                            events::publish("surface.directory_changed", cx.entity_id(), None, cx);
                         }
                         if metadata_changed {
                             cx.emit(TabMetadataChanged);

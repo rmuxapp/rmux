@@ -343,6 +343,23 @@ These are invalidation signals: use `notification.list` or
 notifications that have since closed or been removed. Titles, bodies and terminal
 output are not copied into the journal.
 
+Terminal metadata also emits `surface.title_changed`, `surface.directory_changed`,
+`surface.status_changed` and `surface.progress_changed`. Shell title and directory
+reports only emit when their values change; manual title edits use the same title
+event. Local/remote directory changes in one delivered update produce one event.
+Program status reports signal a new status revision; progress signals a changed
+value. These events describe metadata delivered to the UI, not every intermediate
+escape sequence in a burst of terminal output.
+
+`surface.list` includes `program_status` (null or the current summary with `id`,
+`count`, `state`, `kind`, `progress`, `app`, `title`, and `message`) and `progress`
+(null or `state` and nullable `percent`). Program status states are `idle`,
+`working`, `done`, `blocked`, and `error`; kinds are `none`, `permission`,
+`question`, and `auth`. Progress states are `running`, `error`, `indeterminate`,
+and `paused`. The status summary covers the currently selected record, not the
+full program-status history. These reports come from terminal programs and are
+not authenticated agent identities.
+
 This is a replay API with bounded long polling. Push subscriptions, resource
 workspace/pane lifecycle and movement events and the full cmux event contract are not implemented.
 Readers use the existing bounded RPC queue; publishing never waits for clients.

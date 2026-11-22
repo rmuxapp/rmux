@@ -2,6 +2,16 @@
 
 ## Current implementation focus
 
+Event replay now reports terminal title, directory, program-status revision and
+progress changes. Repeated shell title/directory values do not generate duplicate
+events; local/remote directory updates coalesce within one delivered batch.
+Manual tab title changes use the same event. `surface.list` now exposes current
+program-status summary and progress so clients can resolve those invalidations.
+The isolated native smoke uses a live shell reporting Unicode title/cwd, OSC 7501
+status and OSC 9 progress; it checks events against the resulting surface state
+and verifies unchanged title/directory reports do not emit again. Native manual
+title interaction and cross-platform runtime acceptance remain pending.
+
 Added `rmuxctl read-events --after CURSOR --limit N --wait-ms N`, preserving
 opaque cursors exactly and validating page/wait bounds and duplicate flags.
 Offline help and Bash/Zsh/Fish option completion expose the command. The native

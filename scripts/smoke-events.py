@@ -10,13 +10,19 @@ import tempfile
 import concurrent.futures
 import threading
 import time
+from urllib.parse import quote
 
 with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
     config = Path(directory) / "config.json"
     config.write_text('{"confirm_close":"never"}')
     env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}
     endpoint = Path(directory) / "rpc"
-    env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true", RMUX_SOCKET_DIR=str(endpoint))
+    reported_directory = Path(directory) / "reported 世界"
+    reported_directory.mkdir()
+    shell = Path(directory) / "fixture-shell"
+    shell.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nwhile IFS= read -r line; do\n  case "$line" in\n    metadata) printf "\\033]7501;state=working:id=build\\007\\033]9;4;1;42\\007\\033]2;Replay title 世界\\007\\033]7;file://localhost%s\\007" "$RMUX_TEST_URL" ;;\n  esac\ndone\n')
+    shell.chmod(0o700)
+    env.update(RMUX_CONFIG=str(config), RMUX_SHELL=str(shell), RMUX_SOCKET_DIR=str(endpoint), RMUX_TEST_URL=quote(str(reported_directory)))
     with tempfile.TemporaryFile() as errors:
         process = subprocess.Popen([str(Path("target/debug/rmux").resolve()), "--rpc-stdio-live"],
                                    env=env, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
@@ -92,6 +98,25 @@ with tempfile.TemporaryDirectory(prefix="rmux-events-") as directory:
                 assert time.monotonic() - start < 1, "event wait blocked the shared dispatcher"
                 assert any(e["kind"] == "notification.received" for e in future.result(timeout=3)["events"])
             assert call("events.read", {"after": "0-0:0"})["gap"] == "restart"
+            boundary = call("events.read")["cursor"]
+            call("surface.send_text", {"surface_id": surface, "text": "metadata\n"})
+            metadata_events = []
+            deadline = time.monotonic() + 3
+            while time.monotonic() < deadline:
+                page = call("events.read", {"after": boundary, "wait_ms": 100})
+                metadata_events.extend(page["events"])
+                boundary = page["cursor"]
+                if {"surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed"} <= {e["kind"] for e in metadata_events}:
+                    break
+            for kind in ("surface.title_changed", "surface.directory_changed", "surface.status_changed", "surface.progress_changed"):
+                assert sum(e["kind"] == kind and e["surface_id"] == surface for e in metadata_events) == 1, metadata_events
+            current = next(s for s in call("surface.list")["surfaces"] if s["id"] == surface)
+            assert current["title"] == "Replay title 世界" and current["directory_label"] == str(reported_directory), current
+            assert current["program_status"]["state"] == "working" and current["program_status"]["id"] == "build"
+            assert current["progress"] == {"state": "running", "percent": 42}
+            call("surface.send_text", {"surface_id": surface, "text": "metadata\n"})
+            duplicate = call("events.read", {"after": boundary, "wait_ms": 100})
+            assert not any(e["kind"] in ("surface.title_changed", "surface.directory_changed") for e in duplicate["events"])
             window = call("window.list")["windows"][0]["id"]
             original_workspace = call("workspace.list")["workspaces"][0]["id"]
             boundary = call("events.read")["cursor"]
