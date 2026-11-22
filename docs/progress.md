@@ -10732,3 +10732,9 @@ native runtime acceptance remain pending. Review tab/server closed; no deploymen
 
 - The native review's Next Pane search included unrelated workspaces via scattered letters in temporary paths. Palette search now treats titles and subtitles as separate fields: titles retain fuzzy abbreviations, descriptive paths/metadata require contiguous word matches, and words cannot cross between fields. Mixed searches such as a command abbreviation plus a project directory remain supported. Subtitle highlights follow the same literal matching rule.
 - Fourteen focused shared matcher tests passed, including the path-noise regression, Unicode, incremental versus fresh searches, shortcut aliases and query-dependent filters. Desktop compilation and diff checks passed. Native visual review of this ranking change remains pending; no rebuild, release or deployment.
+
+### Consistent command-picker dispatch context
+
+- Fixed the shortcut reference capturing the Settings focus handle before the main palette closed that inspector. Shortcut enumeration now uses the palette's restored dispatch origin, retaining terminal-scoped bindings instead of querying a closed inspector's context.
+- Shared the inspector-closing/origin-restoration path with configured-command and layout-preset pickers, preserving nested Memory → Settings closure order. Their Escape target now follows the same restored terminal context as the main command palette.
+- Desktop compilation and diff checks passed. These additional picker transitions still need native interaction acceptance; the earlier verified Settings → main palette → Next Pane flow remains the reference behavior. No rebuild, release or deployment.

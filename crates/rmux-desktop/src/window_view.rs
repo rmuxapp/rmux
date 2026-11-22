@@ -2579,11 +2579,7 @@ impl WorkspaceWindow {
         (!context.is_empty()).then(|| context.join(" · "))
     }
 
-    fn show_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if self.palette.is_some() {
-            self.close_palette(window, cx);
-            return;
-        }
+    fn command_palette_origin(&mut self, window: &mut Window, cx: &mut Context<Self>) -> Option<FocusHandle> {
         // Replace window inspectors before capturing the palette's dispatch
         // origin. Otherwise terminal actions are sent back to an inspector.
         if self.memory_focus.as_ref().is_some_and(|focus| focus.is_focused(window)) {
@@ -2591,7 +2587,14 @@ impl WorkspaceWindow {
         }
         if self.settings_state.is_some() { self.toggle_settings(window, cx); }
         if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
-        let focus = window.focused(cx);
+        window.focused(cx)
+    }
+    fn show_palette(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette.is_some() {
+            self.close_palette(window, cx);
+            return;
+        }
+        let focus = self.command_palette_origin(window, cx);
         let workspaces = self.workspace_order(true)
             .into_iter()
             .map(|index| { let entry = &self.workspace_state.entries[index]; (entry.workspace.entity_id(), entry.name.clone(), self.workspace_palette_context(entry)) })
@@ -2669,9 +2672,10 @@ impl WorkspaceWindow {
     }
     fn show_keyboard_shortcuts(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.palette.is_some() { self.close_palette(window, cx); }
-        let origin = window.focused(cx);
         self.show_palette(window, cx);
-        if let Some((palette, _)) = &self.palette {
+        // Use the restored dispatch origin, not the inspector that show_palette
+        // just closed. Otherwise terminal-only bindings disappear from the list.
+        if let Some((palette, origin)) = &self.palette {
             palette.update(cx, |palette, cx| palette.show_shortcuts(origin.as_ref(), window, cx));
         }
     }
@@ -3556,7 +3560,7 @@ impl WorkspaceWindow {
     fn show_custom_command_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.automation_available(cx).is_err() { return; }
         self.close_palette(window, cx);
-        let focus = window.focused(cx);
+        let focus = self.command_palette_origin(window, cx);
         let project = self.workspace_state.entries.get(self.workspace_state.active)
             .and_then(|entry| entry.project_directory.clone());
         let palette = cx.new(|cx| command_palette::CommandPalette::custom_commands(project.as_deref(), window, cx));
@@ -3565,7 +3569,7 @@ impl WorkspaceWindow {
     fn show_layout_preset_picker(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if self.restore_job.is_some() || cx.global::<Shutdowns>().quitting { return; }
         self.close_palette(window, cx);
-        let focus = window.focused(cx);
+        let focus = self.command_palette_origin(window, cx);
         let palette = cx.new(|cx| command_palette::CommandPalette::layout_presets(window, cx));
         self.install_palette(palette, focus, window, cx);
     }
