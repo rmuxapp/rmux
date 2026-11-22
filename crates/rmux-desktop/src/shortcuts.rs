@@ -13,9 +13,7 @@ pub(super) fn bracket_navigation() -> Vec<KeyBinding> {
 /// Resolve the current binding at the terminal that will receive the action.
 /// This respects custom overrides, disabled bindings and multi-stroke chords.
 pub(super) fn hint(action: &dyn Action, focus: &FocusHandle, window: &Window) -> Option<String> {
-    window.highest_precedence_binding_for_action_in(action, focus).map(|binding| {
-        binding.keystrokes().iter().map(|key| format_key_parts(key.key(), *key.modifiers(), cfg!(target_os = "macos"))).collect::<Vec<_>>().join(" ")
-    })
+    crate::shortcut_label::binding_hint(action, focus, window, cfg!(target_os = "macos"))
 }
 
 /// Presentation only: parsing and keymap identity continue using GPUI's syntax.

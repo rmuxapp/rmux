@@ -130,12 +130,7 @@ pub(super) fn action_control(
     action: impl Action,
     focus: Option<FocusHandle>,
 ) -> Stateful<Div> {
-    control_button(id).tooltip(move |window, cx| {
-        let focus = focus.clone().or_else(|| window.focused(cx));
-        let hint = focus.as_ref().and_then(|focus| shortcuts::hint(&action, focus, window));
-        let text = hint.map_or_else(|| label.to_owned(), |hint| format!("{label}  {hint}"));
-        cx.new(|_| ControlHint(text.into())).into()
-    })
+    crate::pane_presentation::action_control(id, label, Box::new(action), focus, cfg!(target_os = "macos"))
 }
 
 #[derive(Clone)]

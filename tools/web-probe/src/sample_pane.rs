@@ -225,6 +225,8 @@ impl crate::tab_actions::TabCommandHost for SamplePane {
 impl Render for SamplePane {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let focused = self.terminals.active().is_some_and(|terminal| terminal.read(cx).is_focused(window));
+        let control_focus = self.terminals.active().map(|terminal| terminal.read(cx).focus_handle().clone());
+        let mac = crate::terminal_engine::is_mac();
         let container = cx.entity_id();
         let scope = self.scope.unwrap_or(container);
         let accepts_incoming = self.terminals.len() < 16 && self.rename.is_none();
@@ -247,6 +249,7 @@ impl Render for SamplePane {
                                 .on_drop(cx.listener(move |this, item, window, cx| this.drop_tab(item, Some(target), window, cx))))
                             .child(tab_presentation::title(("tab-title", target), title.clone(), title))
                             .child(div().id(("close-sample-tab",terminal.entity_id())).px_1().child("×")
+                                .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Close Terminal Tab".into())).into())
                                 .on_mouse_down(MouseButton::Left, |_,_,cx| cx.stop_propagation())
                                 .on_click(cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); })))
                             .on_mouse_down(MouseButton::Middle, cx.listener(move |this,_,window,cx| { cx.stop_propagation(); this.close(index,window,cx); }))
@@ -258,15 +261,14 @@ impl Render for SamplePane {
                                 this.select(index,window,cx);
                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) { this.rename_tab(window,cx); }
                             }))})))
-                .child(crate::pane_presentation::control_button("add-tab").child(crate::icons::icon("plus"))
+                .child(crate::pane_presentation::action_control("add-tab", "New Terminal Tab", Box::new(crate::NewTab), control_focus.clone(), mac).child(crate::icons::icon("plus"))
                     .on_click(cx.listener(|this,_,window,cx| this.add(window,cx))))
                 .children([
                     ("split-right", "Split Right", Box::new(crate::Split) as Box<dyn Action>),
                     ("split-down", "Split Below", Box::new(crate::SplitBelow) as Box<dyn Action>),
                     ("expand", "Toggle Pane Zoom", Box::new(crate::TogglePaneZoom) as Box<dyn Action>),
                 ].into_iter().map(|(icon,label,action)| {
-                    crate::pane_presentation::control_button(icon).child(crate::icons::icon(icon))
-                        .tooltip(move |_,cx| cx.new(|_| crate::control_hint::ControlHint(label.into())).into())
+                    crate::pane_presentation::action_control(icon, label, action.boxed_clone(), control_focus.clone(), mac).child(crate::icons::icon(icon))
                         .on_click(cx.listener(move |this,event: &ClickEvent,window,cx| {
                             if !event.standard_click() { return; }
                             this.focus(window,cx);

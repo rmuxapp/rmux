@@ -1,6 +1,12 @@
 //! Shared display labels for resolved key bindings.
 use gpui::Modifiers;
 
+pub(crate) fn binding_hint(action: &dyn gpui::Action, focus: &gpui::FocusHandle, window: &gpui::Window, mac: bool) -> Option<String> {
+    window.highest_precedence_binding_for_action_in(action, focus).map(|binding|
+        binding.keystrokes().iter().map(|key| format_key_parts(key.key(), *key.modifiers(), mac))
+            .collect::<Vec<_>>().join(" "))
+}
+
 pub(crate) fn format_key_parts(key: &str, modifiers: Modifiers, mac: bool) -> String {
     let mut parts = Vec::with_capacity(6);
     if modifiers.function { parts.push("Fn".to_owned()); }

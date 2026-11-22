@@ -4405,7 +4405,7 @@ impl Render for WorkspaceWindow {
                         div.child(
                             crate::workspace_presentation::toolbar()
                                 .when(cfg!(target_os = "macos") && !self.sidebar, |header| header.pl(px(80.)))
-                                .child(crate::workspace_presentation::sidebar_toggle())
+                                .child(crate::workspace_presentation::sidebar_toggle(cfg!(target_os = "macos")))
                                 .child(crate::workspace_presentation::title("workspace-title-drag", entry.name.clone())
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } }))
                                 .child(pane_view::pane_control("toolbar-notifications", "Toggle Notifications")

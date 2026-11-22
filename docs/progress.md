@@ -2,6 +2,14 @@
 
 ## Current implementation focus
 
+Continuing the held polish batch: toolbar action tooltips now share the same
+binding resolver between native and WASM hosts. Sidebar toggle, pane split/zoom
+and browser new-tab controls resolve current shortcuts at hover time; pane
+controls use their own active terminal's focus context. Browser close-tab controls
+also gain the native description. Changes are held locally with the sidebar/tab
+styling for a combined compile and visual review; only diff checks have run on
+this continuation, avoiding a build for each individual polish edit.
+
 Local sidebar/tab polish batch: selected workspaces now use a subdued lavender-gray
 fill with a visible outline instead of saturated blue. Shared accent/detail
 colors coordinate native/browser icons, metadata, shortcuts and native unread

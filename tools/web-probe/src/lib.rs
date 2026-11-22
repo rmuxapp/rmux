@@ -510,7 +510,7 @@ impl Render for InputProbe {
             .map(|root| pane_actions::bind(root, cx))
             .on_action(cx.listener(|this, _: &CommandPalette, window, cx| this.open_palette(window, cx)))
             .child(workspace_presentation::toolbar()
-                .child(workspace_presentation::sidebar_toggle())
+                .child(workspace_presentation::sidebar_toggle(terminal_engine::is_mac()))
                 .child(workspace_presentation::title("workspace-title", self.name.clone()))
                 .child(div().text_xs().text_color(rgb(0x9b9ba3)).child("Sample sessions"))
                 .child(div().id("open-commands").px_2().py_1().rounded_sm().text_size(px(13.)).cursor_pointer().hover(|style| style.bg(rgb(0x353535))).child("Commands")

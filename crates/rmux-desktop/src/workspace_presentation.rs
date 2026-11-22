@@ -9,9 +9,8 @@ pub(crate) fn title(id: impl Into<ElementId>, name: impl Into<SharedString>) -> 
         .font_weight(FontWeight::SEMIBOLD).child(name.into())
 }
 
-pub(crate) fn sidebar_toggle() -> Stateful<Div> {
-    crate::pane_presentation::control_button("toolbar-sidebar")
-        .tooltip(|_, cx| cx.new(|_| crate::control_hint::ControlHint("Toggle Sidebar".into())).into())
+pub(crate) fn sidebar_toggle(mac: bool) -> Stateful<Div> {
+    crate::pane_presentation::action_control("toolbar-sidebar", "Toggle Sidebar", Box::new(crate::ToggleSidebar), None, mac)
         .on_click(|event, window, cx| {
             if event.standard_click() { window.dispatch_action(Box::new(crate::ToggleSidebar), cx); }
         })
