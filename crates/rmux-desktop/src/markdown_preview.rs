@@ -13,7 +13,41 @@ pub fn link_destination(uri: &str, source: &std::path::Path) -> Option<String> {
     super::terminal_link::local_file(target.as_str(), false)?;
     Some(target.into())
 }
+/// A fragment stays inside the current preview; it is never an OS URL.
+pub fn fragment(uri: &str) -> Option<String> {
+    if uri.len() > 8192 { return None; }
+    let raw = uri.strip_prefix('#')?;
+    let mut bytes = Vec::with_capacity(raw.len());
+    let mut input = raw.bytes();
+    while let Some(byte) = input.next() {
+        bytes.push(if byte == b'%' {
+            let high = (input.next()? as char).to_digit(16)?;
+            let low = (input.next()? as char).to_digit(16)?;
+            (high * 16 + low) as u8
+        } else { byte });
+    }
+    let value = String::from_utf8(bytes).ok()?;
+    (!value.chars().any(char::is_control)).then_some(value)
+}
+
+pub fn heading_targets<'a>(headings: impl Iterator<Item = (usize, &'a str)>) -> std::collections::HashMap<String, usize> {
+    let mut targets = std::collections::HashMap::new();
+    for (index, text) in headings {
+        let base: String = text.to_lowercase().chars().filter_map(|ch| {
+            if ch.is_whitespace() { Some('-') }
+            else if ch.is_alphanumeric() || ch == '_' || ch == '-' { Some(ch) }
+            else { None }
+        }).collect();
+        let mut id = base.clone();
+        let mut suffix = 0;
+        while targets.contains_key(&id) { suffix += 1; id = format!("{base}-{suffix}"); }
+        targets.insert(id, index);
+    }
+    targets
+}
+
 fn supported_link(uri: &str) -> bool {
+    if fragment(uri).is_some() { return true; }
     // The source path is supplied when the preview is assembled. Use a local
     // absolute base here only to classify and reject unsupported destinations.
     let base = if cfg!(windows) { "C:/rmux/document.md" } else { "/rmux/document.md" };
@@ -242,7 +276,18 @@ mod tests {
             assert!(link_destination(uri, &source).is_none(), "{uri}");
         }
         let (rows, _) = blocks("[local](../guide.md) [script](javascript:alert) [anchor](#part)");
-        assert_eq!(rows[0].links, ["../guide.md"]);
+        assert_eq!(rows[0].links, ["../guide.md", "#part"]);
+    }
+    #[test]
+    fn heading_fragments_decode_and_resolve_duplicate_unicode_titles() {
+        let (rows, _) = blocks("# Hello, **World**!\n\n## Hello, World!\n\n## Hello World-1\n\n## Café 日本語\n");
+        let targets = heading_targets(rows.iter().enumerate().filter_map(|(i, row)| matches!(row.kind, Kind::Heading(_)).then_some((i, row.text.as_str()))));
+        assert_eq!(targets.get("hello-world"), Some(&0));
+        assert_eq!(targets.get("hello-world-1"), Some(&1));
+        assert_eq!(targets.get("hello-world-1-1"), Some(&2));
+        assert_eq!(targets.get(&fragment("#caf%C3%A9-%E6%97%A5%E6%9C%AC%E8%AA%9E").unwrap()), Some(&3));
+        assert_eq!(fragment("#"), Some(String::new()));
+        for invalid in ["#%", "#%GG", "#%FF", "#%00", "#%0a", "file.md#part"] { assert!(fragment(invalid).is_none()); }
     }
     #[test]
     fn preview_link_navigation_tracks_identity_and_wraps() {

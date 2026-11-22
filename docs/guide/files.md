@@ -129,14 +129,24 @@ scrolls by one column width. The same keys pan a selected code block, and
 Ctrl+Alt+Up/Down scroll its lines while wrapped reading mode is enabled.
 These shortcuts keep the search field focused and do not change the selected
 result. Visible hints follow custom bindings in Settings.
-Same-document anchors, images and document appearance controls
-remain unimplemented. This is a reading preview, not a complete Markdown renderer.
+Images and document appearance controls remain unimplemented. This is a reading preview, not a complete Markdown renderer.
+
+Same-document links such as `[Install](#installation)` jump to the matching
+heading. Click the link or select its block and use Tab/Shift+Tab and Alt+Enter.
+The jump clears the search filter so the target is visible and keeps the preview
+open. A missing heading reports “Heading not found in this preview”; it may be
+outside a truncated document. A bare `#` returns to the first reading block.
+
+Heading IDs use lowercase text, whitespace replaced with hyphens, and punctuation
+removed except underscores and hyphens. Unicode letters and digits are retained;
+repeated IDs receive `-1`, `-2`, and so on. Percent-encoded UTF-8 fragments work.
+Explicit HTML IDs and cross-file heading jumps are not supported yet.
 
 Relative links resolve from the current document's folder. Links to Markdown
 files open in reading view; other local files open in text preview. Directory
 links ending in `/` open the file browser. Local `file://` links work the same
 way. Missing files show the preview loader's error; they do not launch another
-application. Links containing local anchors or query strings remain plain text.
+application. Links to other local files with anchors or query strings remain plain text.
 
 Use **Back / Forward** in the preview toolbar to revisit documents, including
 returning from a missing-file error. **Cmd+[ / Cmd+]** on macOS (**Alt+Left /

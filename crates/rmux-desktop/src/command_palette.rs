@@ -1,6 +1,12 @@
 use super::*;
 
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct JumpPreviewHeading { fragment: String }
+
+
 fn local_preview_link(uri: &str, source: Option<&std::path::Path>) -> Option<Box<dyn Action>> {
+    if let Some(fragment) = markdown_preview::fragment(uri) { return Some(Box::new(JumpPreviewHeading { fragment })); }
     let resolved = markdown_preview::link_destination(uri, source?)?;
     let uri = resolved.as_str();
     let path = terminal_link::local_file(uri, false)?;
@@ -418,6 +424,7 @@ fn table_rows_share_horizontal_position_without_linking_separate_tables() {
 }
 
 pub struct CommandPalette {
+    headings: std::collections::HashMap<String, usize>,
     location: Option<SharedString>,
     feedback: Option<&'static str>,
     preview_link: Option<(usize, usize)>,
@@ -921,6 +928,8 @@ impl CommandPalette {
             }
         }
         palette.search = palette_match::RankedSearch::with_shortcuts(palette.commands.iter().map(Command::search_text).collect(), palette.commands.iter().map(Command::shortcut_text).collect());
+        palette.headings = markdown_preview::heading_targets(palette.commands.iter().enumerate().filter_map(|(index, command)|
+            matches!(command.markdown_kind(), Some(markdown_preview::Kind::Heading(_))).then(|| (index, command.preview_line().unwrap_or("")))));
         palette.table_scroll = table_scroll_handles(palette.commands.iter().map(Command::markdown_kind));
         palette.markdown_preview = true;
         palette.wrap_preview = true;
@@ -1093,6 +1102,7 @@ impl CommandPalette {
             input, heading, empty_message, buffer_rename: None, feedback: None, preview_link: None, code_scroll: Default::default(), directory_input: false, terminal_search_input: false, ssh_input: false, shortcuts_only: false, hex_preview: false, markdown_preview: false, wrap_preview: false, folder_navigation: None, preview_navigation: None, preview_history: None, location: None,
             search: palette_match::RankedSearch::with_shortcuts(commands.iter().map(Command::search_text).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
+            headings: Default::default(),
             table_scroll: Default::default(),
             commands,
             selected: 0,
@@ -1209,10 +1219,27 @@ impl CommandPalette {
         self.preview_link = markdown_preview::link_index(self.preview_link, command, links.len(), delta).map(|index| (command, index));
         cx.notify();
     }
-    fn open_preview_link(&self, cx: &mut Context<Self>) {
+    fn jump_preview_heading(&mut self, fragment: &str, cx: &mut Context<Self>) {
+        if !self.markdown_preview || self.input.read(cx).is_composing() { return; }
+        let target = if fragment.is_empty() { self.commands.iter().position(|command| command.preview_line().is_some()) }
+            else { self.headings.get(fragment).copied() };
+        let Some(command) = target else {
+            self.feedback = Some("Heading not found in this preview");
+            cx.notify();
+            return;
+        };
+        let Some(mut state) = self.preview_state(cx) else { return; };
+        state.query.clear();
+        state.command = Some(command);
+        self.preview_link = None;
+        self.feedback = None;
+        self.restore_preview(state, cx);
+    }
+    fn open_preview_link(&mut self, cx: &mut Context<Self>) {
         if self.input.read(cx).is_composing() { return; }
         if let Some((_, _, url)) = self.preview_link_target() {
-            if let Some(action) = local_preview_link(&url, self.preview_navigation.as_ref().map(|(path, _)| path.as_path())) { cx.emit(PaletteEvent::Run(action)); }
+            if let Some(fragment) = markdown_preview::fragment(&url) { self.jump_preview_heading(&fragment, cx); }
+            else if let Some(action) = local_preview_link(&url, self.preview_navigation.as_ref().map(|(path, _)| path.as_path())) { cx.emit(PaletteEvent::Run(action)); }
             else if openable_uri(&url) { cx.open_url(&url); }
         }
     }
@@ -1540,6 +1567,7 @@ impl Render for CommandPalette {
             .key_context(if self.preview_navigation.is_some() { if self.hex_preview { "CommandPalette FilePreview" } else if self.markdown_preview { "CommandPalette FilePreview TextPreview MarkdownPreview" } else { "CommandPalette FilePreview TextPreview" } } else if self.preview_history.is_some() { "CommandPalette FilePreview" } else if self.folder_navigation.is_some() { "CommandPalette FileBrowser" } else { "CommandPalette" })
             .on_action(cx.listener(|this, _: &PreviewBack, _, cx| this.navigate_document(false, cx)))
             .on_action(cx.listener(|this, _: &PreviewForward, _, cx| this.navigate_document(true, cx)))
+            .on_action(cx.listener(|this, action: &JumpPreviewHeading, _, cx| this.jump_preview_heading(&action.fragment, cx)))
             .on_action(cx.listener(|this, _: &OpenPreviewLink, _, cx| this.open_preview_link(cx)))
             .on_action(cx.listener(|this, _: &NextPreviewLink, _, cx| this.cycle_preview_link(1, cx)))
             .on_action(cx.listener(|this, _: &PreviousPreviewLink, _, cx| this.cycle_preview_link(-1, cx)))

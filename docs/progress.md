@@ -10399,3 +10399,20 @@ from the active keymap. Updated the file and Settings guides.
 One combined desktop compilation passed. Native input/visual acceptance remains
 pending from the confirmed locked desktop; no additional app build, release,
 website deployment or changes to user sessions were made.
+
+
+### Same-document Markdown heading links — 2026-11-22
+
+Added an indexed heading target map to Markdown previews, preserving formatted
+heading text, duplicate-name suffixes and Unicode. Fragment-only links are now
+interactive through the existing inline click and Tab/Alt+Enter routes; valid
+UTF-8 percent escapes decode locally. Jumps clear filtering, select and reveal
+the target without file I/O or leaving the preview. Bare # returns to the first
+reading block; missing targets show feedback and preserve the current location.
+Malformed/control fragments remain inert. Cross-file fragments and explicit HTML
+IDs remain pending. The parser retains its document/link bounds.
+
+Desktop test compilation and all 16 focused Markdown checks passed, including
+Unicode/duplicate target resolution, malformed escapes and existing rendering
+bounds. Native click/keyboard acceptance and screenshots remain pending while
+the desktop is locked. No app sessions, releases or site deployments changed.
