@@ -168,16 +168,19 @@ fn resolve_open_workspace(create: &mut WorkspaceCreate, cx: &mut gpui::App) -> R
     let name = create.name.as_deref().expect("validated workspace.open name");
     let mut windows = Vec::new();
     let mut matches = Vec::new();
+    let mut legacy_matches = Vec::new();
     for handle in cx.windows() {
         let Some(handle) = handle.downcast::<super::window_view::WorkspaceWindow>() else { continue; };
         let any: gpui::AnyWindowHandle = handle.into();
-        let Ok(Some((id, workspaces))) = any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, cx| {
-            entity.read(cx).automation_open_workspaces(name, create.project_directory.as_deref()).map(|workspaces| (entity.entity_id(), workspaces))
+        let Ok(Some((id, workspaces, legacy))) = any.read::<super::window_view::WorkspaceWindow, _, _>(cx, |entity, cx| {
+            entity.read(cx).automation_open_workspaces(name, create.project_directory.as_deref()).map(|workspaces| (entity.entity_id(), workspaces, entity.read(cx).automation_legacy_project_workspaces(name, create.project_directory.as_deref(), cx)))
         }) else { continue; };
         if target.is_some_and(|target| target != id) { continue; }
         for workspace in workspaces { matches.push((id, handle, workspace)); }
+        for workspace in legacy { legacy_matches.push((id, handle, workspace)); }
         windows.push((id, handle));
     }
+    if matches.is_empty() { matches = legacy_matches; }
     if matches.len() > 1 { return Err(Failure { code: -32006, message: if create.project_directory.is_some() { "Multiple workspaces belong to this project; close the duplicate before opening it again" } else { "Workspace name is ambiguous; use --window or rename duplicates" } }); }
     if let Some((id, handle, workspace)) = matches.pop() {
         create.window_id = id.to_string();

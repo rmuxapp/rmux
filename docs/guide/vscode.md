@@ -35,8 +35,11 @@ a workspace or changing its shell directory does not change its project identity
 That identity travels with the workspace between windows and is saved in layouts
 and sessions. Symlink aliases resolve to the same project.
 
-v0.1.7 uses folder-name matching. Workspaces created before project identity was
-introduced are left intact; the first native open creates a project workspace.
+v0.1.7 uses folder-name matching. For an older workspace without a stored project identity, rmux can adopt it
+when its name and first terminal's original launch directory both match.
+An existing stored identity takes priority; ambiguous matches are reported
+instead of guessed. Otherwise, a new project workspace is created and the old
+workspace is left intact.
 Explicit [CLI name reuse](automation.md#open-or-reuse-a-named-workspace) continues
 to match workspace names, and reports ambiguity if multiple workspaces share one.
 

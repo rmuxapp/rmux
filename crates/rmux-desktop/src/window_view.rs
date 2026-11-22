@@ -552,10 +552,26 @@ impl WorkspaceWindow {
         (!self.benchmark).then(|| self.workspace_state.entries.iter().filter(|entry| open_project::matches_workspace(&entry.name, entry.project_directory.as_deref(), name, project))
             .map(|entry| entry.workspace.entity_id()).collect())
     }
+    pub(super) fn automation_legacy_project_workspaces(&self, name: &str, project: Option<&std::path::Path>, cx: &App) -> Vec<EntityId> {
+        let Some(project) = project else { return Vec::new(); };
+        if self.benchmark { return Vec::new(); }
+        self.workspace_state.entries.iter().filter(|entry| entry.project_directory.is_none() && entry.name == name)
+            .filter_map(|entry| {
+                let workspace = entry.workspace.read(cx);
+                let pane = workspace.panes.first()?.read(cx);
+                let terminal = pane.terminals.first()?.read(cx);
+                (terminal.session.remote_destination().is_none()
+                    && open_project::matches_legacy_workspace(&entry.name, terminal.session.initial_directory(), name, project))
+                    .then_some(entry.workspace.entity_id())
+            }).collect()
+    }
     pub(super) fn automation_reuse_workspace(&mut self, create: &automation::WorkspaceCreate, id: EntityId, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.automation_available(cx)?;
         let index = self.workspace_state.entries.iter().position(|entry| entry.workspace.entity_id() == id)
             .ok_or(automation::Failure { code: -32004, message: "Workspace no longer exists" })?;
+        if self.workspace_state.entries[index].project_directory.is_none() {
+            self.workspace_state.entries[index].project_directory = create.project_directory.clone();
+        }
         if create.focus || create.activate { self.select(index, window, cx); }
         if create.activate { activate_destination(window, cx); }
         let mut result = self.automation_snapshot(create.window_id.clone(), true, cx)["workspaces"].as_array().unwrap()
@@ -594,7 +610,8 @@ impl WorkspaceWindow {
     pub(super) fn automation_finish_workspace(&mut self, create: &automation::WorkspaceCreate, prepared: Result<PreparedTerminal>, window: &mut Window, cx: &mut Context<Self>) -> Result<serde_json::Value, automation::Failure> {
         self.command_launching = false;
         if create.reuse {
-            let matches = self.automation_open_workspaces(create.name.as_deref().unwrap(), create.project_directory.as_deref()).unwrap_or_default();
+            let mut matches = self.automation_open_workspaces(create.name.as_deref().unwrap(), create.project_directory.as_deref()).unwrap_or_default();
+            if matches.is_empty() { matches = self.automation_legacy_project_workspaces(create.name.as_deref().unwrap(), create.project_directory.as_deref(), cx); }
             if matches.len() > 1 { return Err(automation::Failure { code: -32006, message: "Workspace match became ambiguous during startup" }); }
             if let Some(id) = matches.first() { return self.automation_reuse_workspace(create, *id, window, cx); }
         }

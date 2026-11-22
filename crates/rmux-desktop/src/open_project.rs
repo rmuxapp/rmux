@@ -5,6 +5,10 @@ pub(super) fn matches_workspace(name: &str, stored_project: Option<&std::path::P
     match project { Some(path) => stored_project == Some(path), None => name == requested_name }
 }
 
+pub(super) fn matches_legacy_workspace(name: &str, launch_directory: Option<&std::path::Path>, requested_name: &str, project: &std::path::Path) -> bool {
+    name == requested_name && launch_directory == Some(project)
+}
+
 fn project(uri: &str) -> anyhow::Result<automation::WorkspaceCreate> {
     let path = terminal_link::local_file(uri, false)
         .ok_or_else(|| anyhow::anyhow!("Open a local folder in rmux"))?;
@@ -56,6 +60,16 @@ mod tests {
         assert!(!matches_workspace("api", None, "api", Some(first)));
         assert!(matches_workspace("api", Some(first), "api", None));
         assert!(!matches_workspace("Renamed project", Some(first), "api", None));
+    }
+    #[test]
+    fn legacy_adoption_requires_both_name_and_launch_directory() {
+        use super::matches_legacy_workspace;
+        let first = std::path::Path::new("/work/client-a/api");
+        let second = std::path::Path::new("/work/client-b/api");
+        assert!(matches_legacy_workspace("api", Some(first), "api", first));
+        assert!(!matches_legacy_workspace("api", Some(second), "api", first));
+        assert!(!matches_legacy_workspace("Other workspace", Some(first), "api", first));
+        assert!(!matches_legacy_workspace("api", None, "api", first));
     }
     #[cfg(unix)]
     #[test]
