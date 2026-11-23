@@ -3,34 +3,34 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.16</title>
-            <pubDate>Mon, 23 Nov 2026 18:03:09 +0000</pubDate>
+            <title>0.1.17</title>
+            <pubDate>Mon, 23 Nov 2026 23:28:39 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.16</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.16</sparkle:version>
-            <sparkle:shortVersionString>0.1.16</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.17</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.17</sparkle:version>
+            <sparkle:shortVersionString>0.1.17</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.16
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.17
 
-Customize the terminal cursor and simplify the workspace layout from Settings.
+Polish terminal shortcuts, shell exits, menus, and macOS installation.
 
-- Enable cursor blinking alongside the existing Application, Block, Bar, and Underline styles. Typing and focus restore a visible cursor.
-- Show tab, split, zoom, and workspace-add controls only on hover, with space reserved so tabs do not shift.
-- Hide the in-window top workspace bar. macOS window buttons retain a drag area when the sidebar is also closed.
-- Enable a compact sidebar with single-row workspace names, icons, pins, and unread badges, hiding descriptions and other detail rows.
+- Cmd+K now clears terminal scrollback on macOS, preserving the current screen and running shell.
+- Successful shell exits, including Ctrl+D at an empty prompt, close their tabs after buffered output drains. Empty panes, workspaces, and windows are cleaned up; failed sessions and directly launched command output remain available for inspection.
+- File, Edit, and View commands are grouped into submenus, with existing actions and shortcuts preserved.
+- The macOS installer places rmux on the left and Applications on the right.
 
-All new toggles default to off. Changes apply immediately and support Save and Revert.
+Addresses GitHub issues #5, #6, #8, and #9.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-The debug build and 40 preference tests passed. Native visual review remains pending; Windows runtime validation remains deferred.
+The desktop/CLI debug build, focused terminal tests, and native RPC smoke checks passed, including Ctrl+D closure and last-tab cleanup. Compressed DMG layout metadata was verified. Native visual review remains pending; Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.16/rmux-0.1.16-macos-arm64.zip" length="7423641" type="application/octet-stream" sparkle:edSignature="aYJdahMLxUs46k8DScjmP0gT9t64B5nDTiumXIR8UEGPX3ieawZ+OmrnyNfrV3EcpW9i1oe0OaeuRl64E9tkCA=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.17/rmux-0.1.17-macos-arm64.zip" length="7426889" type="application/octet-stream" sparkle:edSignature="U0wTwEBvkH3jUh8QdeCXLzYvVcrdNor5Z9ymtp/4455VS4YUGc5Iqbt7JdbU58WFuACjcn+55EY7tfCyNiaKDQ=="/>
         </item>
     </channel>
 </rss>
