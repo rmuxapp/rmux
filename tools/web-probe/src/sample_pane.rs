@@ -262,7 +262,7 @@ impl Render for SamplePane {
                         let container = cx.entity_id();
                         let title: SharedString = terminal.read(cx).custom_title.clone()
                             .unwrap_or_else(|| self.labels[&target].clone()).into();
-                        tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused,None)
+                        tab_presentation::tab(("sample-tab",terminal.entity_id()),index==self.terminals.active_index(),focused,None,self.terminals.len())
                             .when(self.rename.is_none(), |tab| tab
                                 .on_drag(crate::drag_item::DragItem { scope, container, item: target, label: title.clone() }, |item, _, _, cx| cx.new(|_| item.clone()))
                                 .can_drop(move |item, _, _| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| item.scope == scope && (item.container == container || accepts_incoming) && item.item != target))

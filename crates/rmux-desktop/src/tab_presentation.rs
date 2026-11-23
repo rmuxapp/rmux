@@ -24,9 +24,10 @@ pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(crate::icons::icon("close"))
 }
-pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool, color: Option<u32>) -> Stateful<Div> {
-    div().id(id).h_full().flex().items_center().flex_shrink_0().px_2().gap_2()
-        .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())
+pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool, color: Option<u32>, count: usize) -> Stateful<Div> {
+    div().id(id).h_full().w(relative(1. / count.clamp(1, 3) as f32)).max_w(px(220.)).min_w_0()
+        .flex().items_center().flex_shrink_0().px_2().gap_1()
+        .text_size(px(12.)).border_b_2().border_color(gpui::transparent_black())
         .cursor_pointer().text_color(crate::chrome_style::muted())
         .hover(move |style| style.bg(color.map(|color| crate::chrome_style::custom_fill(color, active, true)).unwrap_or_else(crate::chrome_style::hover)))
         .when(active, |tab| tab.bg(if focused {crate::chrome_style::hover()} else {crate::chrome_style::elevated()})
@@ -68,7 +69,7 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &Ap
 }
 
 pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {
-    div().id(id).min_w(px(48.)).max_w(px(220.)).truncate()
+    div().id(id).flex_1().min_w_0().max_w(px(220.)).truncate()
 }
 pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {
     title_frame(id)

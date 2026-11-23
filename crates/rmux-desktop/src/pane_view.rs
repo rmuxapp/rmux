@@ -1310,7 +1310,7 @@ impl Render for PaneView {
                                         let label: SharedString = self.tab_title(index, cx).into();
                                         let hint_pane = cx.entity().downgrade();
                                         let display_title = label.clone();
-                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused, terminal.read(cx).tab_color)
+                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused, terminal.read(cx).tab_color, self.terminals.len())
                                             .on_drag(drag_item::DragItem { scope, container, item: target, label }, |item, _, _, cx| cx.new(|_| item.clone()))
                                             .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope && item.item != target))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, _| {
