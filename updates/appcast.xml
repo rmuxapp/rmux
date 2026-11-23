@@ -3,31 +3,34 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.15</title>
-            <pubDate>Mon, 23 Nov 2026 02:20:31 +0000</pubDate>
+            <title>0.1.16</title>
+            <pubDate>Mon, 23 Nov 2026 18:03:09 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.15</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.15</sparkle:version>
-            <sparkle:shortVersionString>0.1.15</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.16</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.16</sparkle:version>
+            <sparkle:shortVersionString>0.1.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.15
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.16
 
-Workspace and terminal tab colors now fill the row or tab, making projects easier to tell apart.
+Customize the terminal cursor and simplify the workspace layout from Settings.
 
-- Set individual terminal colors from the tab menu using a preset or custom hex color. Colors survive session restore and tab moves.
-- Workspace and group colors fill the sidebar row, with readable text in light and dark themes.
-- Tabs share the available width, with a simpler underline for the active tab and cleaner spacing in narrow panes.
+- Enable cursor blinking alongside the existing Application, Block, Bar, and Underline styles. Typing and focus restore a visible cursor.
+- Show tab, split, zoom, and workspace-add controls only on hover, with space reserved so tabs do not shift.
+- Hide the in-window top workspace bar. macOS window buttons retain a drag area when the sidebar is also closed.
+- Enable a compact sidebar with single-row workspace names, icons, pins, and unread badges, hiding descriptions and other detail rows.
+
+All new toggles default to off. Changes apply immediately and support Save and Revert.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Native visual review, focused color persistence tests and shared WASM compilation passed. Windows runtime validation remains deferred.
+The debug build and 40 preference tests passed. Native visual review remains pending; Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.15/rmux-0.1.15-macos-arm64.zip" length="7411296" type="application/octet-stream" sparkle:edSignature="Z9oeWhfIyW50VEnoiy9KSKyvv0kEuxyY/R5ubDhB9Re9DSUqod2nYFHC9KQe9Rbz7kFiiILSGCJXBkANdK7ICQ=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.16/rmux-0.1.16-macos-arm64.zip" length="7423641" type="application/octet-stream" sparkle:edSignature="aYJdahMLxUs46k8DScjmP0gT9t64B5nDTiumXIR8UEGPX3ieawZ+OmrnyNfrV3EcpW9i1oe0OaeuRl64E9tkCA=="/>
         </item>
     </channel>
 </rss>
