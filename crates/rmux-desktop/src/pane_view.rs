@@ -1292,7 +1292,7 @@ impl Render for PaneView {
             .map(|root| crate::tab_actions::bind(root, cx))
             .when(!self.benchmark, |root| {
                 root.child(
-                    crate::tab_presentation::strip()
+                    crate::tab_presentation::strip().group("pane-controls")
                         .child(
                             div()
                                 .id("tabs")
@@ -1392,6 +1392,7 @@ impl Render for PaneView {
                                             })
                                             .child(
                                                 crate::tab_presentation::close_button(("close-tab", terminal.entity_id()))
+                                                    .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                                     .on_click(cx.listener(
                                                         move |this, event: &ClickEvent, window, cx| {
                                                             cx.stop_propagation();
@@ -1417,6 +1418,7 @@ impl Render for PaneView {
                         )
                         .when(self.terminals.len() > 1, |header| header.child(
                             action_control("tab-picker", "Choose Terminal Tab", ShowTabPicker, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                 .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
@@ -1427,12 +1429,14 @@ impl Render for PaneView {
                             div().flex().items_center().gap_1().px_2().text_xs().text_color(crate::chrome_style::muted())
                                 .child(if self.tab_launch_canceled.as_ref().is_some_and(|cancel| cancel.load(Ordering::Relaxed)) { "Canceling…" } else { "Starting…" })
                                 .child(action_control("cancel-new-tab", "Cancel New Terminal Tab", CancelNewTab, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                     .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
                                         if event.standard_click() { this.cancel_tab_launch(cx); }
                                     })).child(icons::icon("close")))
                         ))
                         .child(
                             action_control("new-tab", if self.spawning_tab.is_some() { "Starting terminal…" } else if self.terminals.active().is_some_and(|terminal| terminal.read(cx).session.remote_destination().is_some()) { "New SSH Tab" } else { "New Terminal Tab" }, NewTab, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if event.standard_click() { this.add(window, cx); }
                                 }))
@@ -1440,6 +1444,7 @@ impl Render for PaneView {
                         )
                         .child(
                             action_control("split-right", "Split Right", Split, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
                                     this.focus(window, cx);
@@ -1449,6 +1454,7 @@ impl Render for PaneView {
                         )
                         .child(
                             action_control("split-down", "Split Down", SplitBelow, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
                                     this.focus(window, cx);
@@ -1458,6 +1464,7 @@ impl Render for PaneView {
                         )
                         .child(
                             action_control("pane-zoom", "Toggle Pane Zoom", TogglePaneZoom, control_focus.clone())
+                                .when(cx.global::<Preferences>().controls_on_hover, |button| button.invisible().group_hover("pane-controls", |style| style.visible()))
                                 .on_click(cx.listener(|this, event: &ClickEvent, window, cx| {
                                     if !event.standard_click() { return; }
                                     this.focus(window, cx);

@@ -257,6 +257,10 @@ pub struct Preferences {
     pub macos_option_as_alt: bool,
     pub unfocused_cursor: UnfocusedCursor,
     pub focused_cursor: FocusedCursor,
+    pub cursor_blink: bool,
+    pub controls_on_hover: bool,
+    pub hide_top_bar: bool,
+    pub compact_sidebar: bool,
     pub cursor_opacity: u8,
     pub foreground_color: Option<HexColor>,
     pub background_color: Option<HexColor>,
@@ -302,6 +306,10 @@ impl Default for Preferences {
             macos_option_as_alt: true,
             unfocused_cursor: UnfocusedCursor::default(),
             focused_cursor: FocusedCursor::default(),
+            cursor_blink: false,
+            controls_on_hover: false,
+            hide_top_bar: false,
+            compact_sidebar: false,
             cursor_opacity: 100,
             foreground_color: None,
             background_color: None,
@@ -587,6 +595,10 @@ impl Preferences {
             && self.theme_file == other.theme_file
             && self.unfocused_cursor == other.unfocused_cursor
             && self.focused_cursor == other.focused_cursor
+            && self.cursor_blink == other.cursor_blink
+            && self.controls_on_hover == other.controls_on_hover
+            && self.hide_top_bar == other.hide_top_bar
+            && self.compact_sidebar == other.compact_sidebar
             && self.cursor_opacity == other.cursor_opacity
             && self.selection_opacity == other.selection_opacity
             && self.macos_option_as_alt == other.macos_option_as_alt
@@ -611,6 +623,10 @@ impl Preferences {
         self.theme_file = baseline.theme_file.clone();
         self.unfocused_cursor = baseline.unfocused_cursor;
         self.focused_cursor = baseline.focused_cursor;
+        self.cursor_blink = baseline.cursor_blink;
+        self.controls_on_hover = baseline.controls_on_hover;
+        self.hide_top_bar = baseline.hide_top_bar;
+        self.compact_sidebar = baseline.compact_sidebar;
         self.cursor_opacity = baseline.cursor_opacity;
         self.selection_opacity = baseline.selection_opacity;
         self.macos_option_as_alt = baseline.macos_option_as_alt;
@@ -1425,6 +1441,32 @@ mod tests {
         }
         Ok(())
     }
+    #[test]
+    fn minimal_chrome_preferences_save_reload_and_revert() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("settings.json");
+        std::fs::write(&path, br#"{"font_size":17,"commands":[{"name":"Keep","argv":["echo","keep"]}]}"#)?;
+        let mut settings = Preferences::read(&path, false)?;
+        settings.source = Some(path.clone());
+        let baseline = settings.clone();
+        for key in ["cursor_blink", "controls_on_hover", "hide_top_bar", "compact_sidebar"] {
+            crate::settings_view::adjust(&mut settings, key, 1);
+        }
+        assert!(!settings.same_saved_appearance(&baseline));
+        settings.save_appearance()?;
+        let saved = Preferences::read(&path, false)?;
+        assert!(saved.cursor_blink && saved.controls_on_hover && saved.hide_top_bar && saved.compact_sidebar);
+        assert!(saved.same_saved_appearance(&settings));
+        assert_eq!(saved.commands[0].name, "Keep");
+        settings.restore_appearance(&baseline);
+        assert!(!settings.cursor_blink && !settings.controls_on_hover && !settings.hide_top_bar && !settings.compact_sidebar);
+        assert!(settings.same_saved_appearance(&baseline));
+        for key in ["cursor_blink", "controls_on_hover", "hide_top_bar", "compact_sidebar"] {
+            assert!(Preferences::decode(format!("{{\"{key}\":\"yes\"}}").as_bytes()).is_err());
+        }
+        Ok(())
+    }
+
     #[test]
     fn cursor_preferences_preserve_application_and_composition_shapes() -> Result<()> {
         use rmux_terminal::CursorShape;

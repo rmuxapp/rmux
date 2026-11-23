@@ -4270,6 +4270,9 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
 
 impl Render for WorkspaceWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let compact = cx.global::<Preferences>().compact_sidebar;
+        let hover_controls = cx.global::<Preferences>().controls_on_hover;
+        let hide_top_bar = cx.global::<Preferences>().hide_top_bar;
         let background = cx.global::<Preferences>().window_background();
         if self.rendered_background != Some(background) {
             window.set_background_appearance(background);
@@ -4574,12 +4577,13 @@ impl Render for WorkspaceWindow {
                 div.child(
                     crate::sidebar_presentation::sidebar(sidebar_width)
                         .child(
-                            crate::sidebar_presentation::header()
+                            crate::sidebar_presentation::header().group("sidebar-controls")
                                 .when(cfg!(target_os = "macos"), |header| header.pl(px(80.)))
                                  .child(gpui::div().id("sidebar-title-drag").flex_1().min_w_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                     .on_mouse_down(MouseButton::Left, |event, window, _| { if cfg!(target_os = "macos") { if event.click_count == 2 { window.zoom_window(); } else { window_geometry::drag_titlebar(window); } } })
                                     .child(if self.workspace_state.sidebar_selection.len() > 1 { format!("{} selected", self.workspace_state.sidebar_selection.len()) } else { "Workspaces".into() }))
                                 .child(pane_view::action_control("sidebar-new-workspace", "New Workspace", NewWorkspace, None)
+                                    .when(hover_controls, |button| button.invisible().group_hover("sidebar-controls", |style| style.visible()))
                                     .on_click(cx.listener(|this, event: &ClickEvent, window, cx| { if event.standard_click() { this.start_workspace(None, window, cx); } })).child(icons::icon("plus")))
                                 .tooltip(|window, cx| {
                                     let selection = if cfg!(target_os = "macos") { "⌘-click to select · Shift-click for range" }
@@ -4627,6 +4631,8 @@ impl Render for WorkspaceWindow {
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
                                     crate::sidebar_presentation::row(("workspace", entry.workspace.entity_id()), selected, header.map(|group| group.color).unwrap_or(entry.color))
+                                        .group("workspace-controls")
+                                        .when(compact, |row| row.py(px(1.)).px_2())
                                         .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                                         .when(self.rename.is_none(), |row| row
                                             .on_drag(drag_item::DragItem { scope: container, container, item: target, label: entry.name.clone().into() }, |item, _, _, cx| cx.new(|_| item.clone()))
@@ -4726,6 +4732,7 @@ impl Render for WorkspaceWindow {
                                                                 sidebar_presentation::pin(("workspace-pin", target), selected, header.is_some()))))
                                                     .when_some(header, |row, _| row.child(
                                                         sidebar_presentation::group_add(("group-add", target))
+                                                            .when(hover_controls, |button| button.invisible().group_hover("workspace-controls", |style| style.visible()))
                                                             .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
                                                                 if !event.standard_click() || this.automation_available(cx).is_err() { return; }
                                                                 cx.stop_propagation();
@@ -4735,7 +4742,7 @@ impl Render for WorkspaceWindow {
                                                                 }
                                                             }))
                                                     ))
-                                                    .when(position < 8 || position + 1 == self.workspace_state.entries.len(), |row| {
+                                                    .when(!compact && (position < 8 || position + 1 == self.workspace_state.entries.len()), |row| {
                                                         let number = if position < 8 { position + 1 } else { 9 };
                                                         row.when_some(sidebar_shortcuts[number - 1].clone(), |row, hint| row.child(
                                                             gpui::div().id(("workspace-shortcut", target)).flex_shrink_0().max_w(px(64.)).truncate().text_xs()
@@ -4743,6 +4750,7 @@ impl Render for WorkspaceWindow {
                                                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
                                                                 .child(hint)))
                                                     }))
+                                                        .when(!compact, |column| column
                                                         .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else if unread_count > 0 { crate::chrome_style::foreground() } else { crate::chrome_style::muted() }).truncate().child(summary)))
                                                         .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() }).truncate().child(entry.description.clone())))
                                                         .when_some(preview, |column, message| {
@@ -4773,7 +4781,7 @@ impl Render for WorkspaceWindow {
                                                                             if event.standard_click() { cx.open_url(&url); }
                                                                         }))
                                                                     .child(detail)
-                                                            }))
+                                                            })))
                                                     .into_any_element()
                                             },
                                         )
@@ -4788,7 +4796,13 @@ impl Render for WorkspaceWindow {
                     .h_full()
                     .flex().flex_col()
                     .when_some(self.workspace_state.entries.get(self.workspace_state.active), |div, entry| {
-                        div.child(
+                        div.when(hide_top_bar && !self.sidebar && cfg!(target_os = "macos"), |div| div.child(
+                            gpui::div().id("minimal-titlebar").h(px(36.)).flex_shrink_0()
+                                .on_mouse_down(MouseButton::Left, |event, window, _| {
+                                    if event.click_count == 2 { window.zoom_window(); }
+                                    else { window_geometry::drag_titlebar(window); }
+                                })
+                        )).when(!hide_top_bar, |div| div.child(
                             crate::workspace_presentation::toolbar()
                                 .when(cfg!(target_os = "macos") && !self.sidebar, |header| header.pl(px(80.)))
                                 .child(crate::workspace_presentation::sidebar_toggle(cfg!(target_os = "macos")))
@@ -4797,7 +4811,7 @@ impl Render for WorkspaceWindow {
                                 .child(pane_view::pane_control("toolbar-notifications", "Toggle Notifications")
                                     .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleNotifications), cx); } })
                                     .child(icons::icon("bell")))
-                        ).child(gpui::div().flex_1().min_h_0().child(entry.workspace.clone()))
+                        )).child(gpui::div().flex_1().min_h_0().child(entry.workspace.clone()))
                     })
                     .when_some(self.memory_rows.as_ref(), |div, rows| div.child(memory_view::panel(rows, self.memory_application, self.memory_sampled_at, self.memory_sort, self.memory_loading, self.memory_scroll.clone(), self.memory_focus.as_ref(), self.memory_selected, cx)))
                     .when_some(self.notice.clone(), |div, notice| div.child(gpui::div().flex().items_start().flex_shrink_0().min_w_0()

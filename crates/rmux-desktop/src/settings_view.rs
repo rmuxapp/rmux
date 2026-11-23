@@ -9,7 +9,7 @@ pub struct State {
 }
 pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
-    "selection_opacity", "import_theme", "file_editor", "editor_example", "editor_fallback", "shell_history",
+    "selection_opacity", "import_theme", "file_editor", "editor_example", "editor_fallback", "shell_history", "cursor_blink", "controls_on_hover", "hide_top_bar", "compact_sidebar",
 ];
 pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings", "undo_settings_save"];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
@@ -69,6 +69,11 @@ pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
 
 pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
     match key {
+        "cursor_blink" => settings.cursor_blink = !settings.cursor_blink,
+        "controls_on_hover" => settings.controls_on_hover = !settings.controls_on_hover,
+        "hide_top_bar" => settings.hide_top_bar = !settings.hide_top_bar,
+        "compact_sidebar" => settings.compact_sidebar = !settings.compact_sidebar,
+
         "opacity" => settings.background_opacity = (settings.background_opacity as i32 + 5 * delta.signum()).clamp(0, 100) as u8,
         "selection_opacity" => {
             settings.selection_opacity = if delta == 0 { None } else {
@@ -275,6 +280,10 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                         .tooltip({ let path = path.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(path.clone())).into() })
                         .child(path))
                 }))
+            .child(row("Blink cursor", "cursor_blink", if settings.cursor_blink { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("cursor_blink"), false))
+            .child(row("Show controls only on hover", "controls_on_hover", if settings.controls_on_hover { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("controls_on_hover"), false))
+            .child(row("Hide top workspace bar", "hide_top_bar", if settings.hide_top_bar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("hide_top_bar"), false))
+            .child(row("Compact sidebar", "compact_sidebar", if settings.compact_sidebar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("compact_sidebar"), false))
             .child(div().py_3().text_xs().text_color(crate::chrome_style::muted()).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
         .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(crate::chrome_style::border()).flex().flex_col().gap_2()
             .child(div().text_xs().text_color(if unsaved { crate::chrome_style::warning() } else { crate::chrome_style::muted() })

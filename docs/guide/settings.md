@@ -7,6 +7,7 @@
 - [Background opacity and blur](#background-opacity-and-blur)
 - [Choose a terminal font](#choose-a-terminal-font)
 - [Use the Settings panel](#use-the-settings-panel)
+- [Cursor and compact layout](#cursor-and-compact-layout)
 - [New workspace placement](#new-workspace-placement)
 - [Custom commands](#custom-commands)
 - [Custom keyboard shortcuts](#custom-keyboard-shortcuts)
@@ -102,6 +103,27 @@ Open Settings panels follow shared changes across windows. While a save, reload,
 or settings-file open is running, Save shows “Working with settings…” and file
 actions are temporarily unavailable. Controls remain editable; saving an older
 snapshot reports when newer session changes still need saving.
+
+## Cursor and compact layout
+
+In Settings, **Focused cursor** selects Application, Block, Bar, or Underline.
+**Blink cursor** enables a 500 ms blink; typing and focus restore a visible cursor.
+Unfocused cursors keep their Hollow/Hidden setting, and composition stays visible.
+
+- **Show controls only on hover** reveals new-tab, close-tab, split, zoom, and tab-picker
+  controls over the tab strip, and workspace add buttons over their header or group row.
+  Space stays reserved to avoid shifting tabs; keyboard commands remain available.
+- **Hide top workspace bar** removes the in-window workspace title and toolbar.
+  Settings remains available with Cmd+, (Ctrl+, elsewhere) or the command palette.
+  The native OS menu is unchanged. With the sidebar closed on macOS, a small drag area
+  remains for the native window buttons.
+- **Compact sidebar** reduces workspaces to single rows with names, icons, pins, and unread
+  badges. Descriptions, notification previews, directories, branches, and status details
+  are hidden; group expand/collapse and add controls remain available.
+
+These options apply immediately. Use **Save** to retain them, or **Revert** to undo
+unsaved changes. JSON keys `cursor_blink`, `controls_on_hover`, `hide_top_bar`, and
+`compact_sidebar` are booleans, all defaulting to `false`.
 
 ## New workspace placement
 

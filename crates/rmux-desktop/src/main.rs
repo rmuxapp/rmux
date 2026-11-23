@@ -657,6 +657,8 @@ struct TerminalView {
     error: Option<String>,
     process_exit: Option<String>,
     _updates: Task<()>,
+    cursor_blink_timer: Option<Task<()>>,
+    cursor_blink_hidden: bool,
     render_hold_timer: Option<Task<()>>,
     compression_task: Option<Task<()>>,
     compression_activity: std::time::Instant,
@@ -1137,6 +1139,8 @@ impl TerminalView {
             error: color_error,
             process_exit: None,
             _updates: task,
+            cursor_blink_timer: None,
+            cursor_blink_hidden: false,
             render_hold_timer: None,
             compression_task: None,
             compression_activity: std::time::Instant::now(),
@@ -1251,6 +1255,8 @@ impl TerminalView {
         if self.input_focused == focused {
             return;
         }
+        self.cursor_blink_timer = None;
+        self.cursor_blink_hidden = false;
         self.input_focused = focused;
         events::publish("surface.focus_changed", cx.entity_id(), None, cx);
         self.refresh_input_mode(cx);
@@ -1321,6 +1327,9 @@ impl TerminalView {
         cx.notify();
     }
     fn input(&mut self, bytes: &[u8], cx: &mut Context<Self>) {
+        self.cursor_blink_timer = None;
+        self.cursor_blink_hidden = false;
+        cx.notify();
         self.cancel_image_preparation(cx);
         self.refresh_input_mode(cx);
         if let Err(error) = self.session.input(bytes) {
@@ -2026,6 +2035,23 @@ impl Focusable for TerminalView {
 }
 impl Render for TerminalView {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let blinking = cx.global::<Preferences>().cursor_blink
+            && window.is_window_active() && self.focus.is_focused(window)
+            && self.composition.text.is_empty();
+        if !blinking {
+            self.cursor_blink_timer = None;
+            self.cursor_blink_hidden = false;
+        } else if self.cursor_blink_timer.is_none() {
+            let timer = cx.background_executor().timer(std::time::Duration::from_millis(500));
+            self.cursor_blink_timer = Some(cx.spawn(async move |entity, cx| {
+                timer.await;
+                let _ = entity.update(cx, |view, cx| {
+                    view.cursor_blink_timer = None;
+                    view.cursor_blink_hidden = !view.cursor_blink_hidden;
+                    cx.notify();
+                });
+            }));
+        }
         let ended_ssh = self.session.remote_destination().is_some();
         let entity = cx.weak_entity();
         self.rendered_paste_pending = self.session.paste_pending();
@@ -2510,6 +2536,7 @@ impl Element for TerminalElement {
         let cursor = frame
             .cursor
             .zip(cursor_shape)
+            .filter(|_| !focused || !marked.is_empty() || !cx.global::<Preferences>().cursor_blink || !self.view.read(cx).cursor_blink_hidden)
             .filter(|_| cx.global::<Preferences>().cursor_opacity != 0)
             .map(|((x, y), shape)| {
                 let mut origin =
