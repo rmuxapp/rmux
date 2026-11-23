@@ -236,7 +236,7 @@ an error instead of accepting a partial paste.
 
 ## Prompt navigation and search
 
-View → Previous Prompt / Next Prompt navigate shell-reported prompt boundaries.
+View → Scroll → Previous Prompt / Next Prompt navigate shell-reported prompt boundaries.
 Use Cmd+Up/Down on macOS or Ctrl+Shift+Up/Down on Linux/Windows, or the command
 palette. This requires semantic shell markers such as OSC 133; unmarked output
 does not move the viewport. New zsh sessions supply these markers automatically.
@@ -256,7 +256,7 @@ bounded background steps. History restores transparently when accessed. Focusing
 a terminal or opening Find cancels scheduling; completed passes stop until later
 activity. Savings depend on content and platform support.
 
-Edit → Clear Scrollback (also in the palette) removes retained history while
+Cmd+K on macOS, or Edit → Clear Scrollback (also in the palette) removes retained history while
 preserving the current screen and running shell. It clears selection and closes
 Find; new output continues to accumulate within the normal history limit.
 
@@ -337,7 +337,7 @@ Active IME composition is preserved rather than selecting over marked text.
 
 ## Search across terminals
 
-**Edit → Search Terminal Output…** or the command palette searches across terminals
+**Edit → Find → Search Terminal Output…** or the command palette searches across terminals
 in all rmux windows. The default shortcut is **Cmd+Shift+F** on macOS and
 **Ctrl+Alt+Shift+F** on Linux/Windows; terminal Find retains **Ctrl+Shift+F** there.
 Customize it with `search_terminal_output` in key bindings. Enter a literal
@@ -395,7 +395,12 @@ macOS. They do not change terminal input bindings or run during IME composition.
 
 ## Exited terminals and restarting
 
-When a terminal process exits, its output stays available and a status strip shows
+A shell that exits successfully (including Ctrl+D at an empty prompt) closes its
+terminal tab after buffered output is drained. Other tabs keep running. Failed
+sessions and explicitly launched commands remain open so their output can be
+inspected. Ctrl+D still reaches the running terminal application normally.
+
+For a retained terminal, its output stays available and a status strip shows
 the exit message. **New shell** opens a fresh tab through the normal new-tab path,
 using its directory/font inheritance; it does not replay the exited command.
 The adjacent close button closes the finished terminal through the normal close

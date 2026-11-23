@@ -42,8 +42,7 @@ command/workspace startup can be pending in a window. Directory and placement ar
 captured at the request; completion inserts relative to the original workspace and
 preserves focus if you moved elsewhere. Closing/moving the origin or changing its
 group during startup discards the new terminal with a notice. Settings changes are
-applied before insertion. Use the notice's Cancel control, **File → Cancel New
-Workspace**, the palette command, or custom `cancel_new_workspace` binding to
+applied before insertion. Use the notice's Cancel control, **File → Workspaces → Cancel New Workspace**, the palette command, or custom `cancel_new_workspace` binding to
 cancel. The launch slot stays occupied until the worker returns; cancellation
 cannot interrupt an OS spawn already in progress. Its result is discarded and an
 unattached child is cleaned up. Closing the window also signals cancellation.

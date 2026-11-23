@@ -10,7 +10,7 @@
 
 ## Connect with SSH
 
-**File → Connect via SSH…** (also in the command palette, custom action
+**File → SSH → Connect via SSH…** (also in the command palette, custom action
 `connect_ssh`) opens a destination editor. Enter an SSH config alias, hostname,
 or `user@host`, then press Enter or Connect to launch a new terminal workspace.
 For an explicit port, use `ssh://user@host:2222` or
@@ -22,7 +22,7 @@ interpret the input. Use your SSH configuration for identities, proxies and
 default ports. The SSH client handles configuration, host-key
 verification, agent/key use and password prompts inside the terminal.
 
-**File → SSH Hosts…** (palette/custom action `ssh_hosts`) reads concrete aliases
+**File → SSH → SSH Hosts…** (palette/custom action `ssh_hosts`) reads concrete aliases
 from `~/.ssh/config` on demand and opens a searchable picker. It also lists SSH
 session targets and restored saved targets from the first 256 terminals in this
 window, ahead of config aliases. Saved targets are labelled **Not connected**;
@@ -115,7 +115,7 @@ Interactive splits and new tabs inherit the active tab's explicit SSH destinatio
 starting a separate SSH client with its own authentication and an SSH-labelled tab.
 They do not reuse remote working directories as local paths or resume remote processes.
 A restored **Local / Not connected** tab starts local siblings until explicitly
-reconnected. Use **File → New Local Tab** (also in the palette, custom action `new_local_tab`)
+reconnected. Use **File → Tabs → New Local Tab** (also in the palette, custom action `new_local_tab`)
 to start a local shell in the same pane, or New Workspace for a separate workspace.
 New Local Tab uses the local cached directory when available, otherwise the app's
 initial directory; it never inherits a remote path or saved SSH destination.

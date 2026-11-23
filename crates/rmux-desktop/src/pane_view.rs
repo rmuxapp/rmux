@@ -1216,7 +1216,7 @@ impl PaneView {
         .detach();
     }
 
-    fn close_confirmed(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
+    pub(super) fn close_confirmed(&mut self, index: usize, window: &mut Window, cx: &mut Context<Self>) {
         if index >= self.terminals.len() {
             return;
         }

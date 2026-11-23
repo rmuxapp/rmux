@@ -354,7 +354,7 @@ def check_fresh_recovery():
         config = root / "config.json"
         config.write_text(json.dumps({"session_file": str(session), "confirm_close": "never"}))
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false")
         request = b'{"jsonrpc":"2.0","id":1,"method":"workspace.list"}\n{"jsonrpc":"2.0","method":"system.quit"}\n'
         def launch():
             result = subprocess.run([str(binary), "--rpc-stdio-live"], env=env,
@@ -387,7 +387,7 @@ def check_corrupt_fallback():
         config = root / "config.json"
         config.write_text(json.dumps({"session_file": str(session), "confirm_close": "never"}))
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false")
         for original in [b'{"version":', b'{"version":99,"windows":[],"active_window":null}']:
             session.write_bytes(original)
             result = subprocess.run([str(binary), "--rpc-stdio-live"], env=env,

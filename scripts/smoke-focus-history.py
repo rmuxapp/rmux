@@ -27,7 +27,7 @@ with tempfile.TemporaryDirectory(prefix='rmux-focus-history-') as directory:
     endpoint = root / 'rpc/rpc.sock'
     env = {k: v for k, v in os.environ.items() if not k.startswith('RMUX_')}
     env.update(RMUX_CONFIG=str(config), RMUX_SOCKET_DIR=str(endpoint.parent),
-               RMUX_SHELL='/usr/bin/true', MTL_HUD_ENABLED='0')
+               RMUX_SHELL='/usr/bin/false', MTL_HUD_ENABLED='0')
     with (root / 'app.log').open('w') as log:
         app = subprocess.Popen([str(binary), '--layout', str(layout)], env=env,
                                stdin=subprocess.DEVNULL, stdout=log, stderr=log)
