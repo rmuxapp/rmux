@@ -3,33 +3,31 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.14</title>
-            <pubDate>Sun, 22 Nov 2026 19:19:26 +0000</pubDate>
+            <title>0.1.15</title>
+            <pubDate>Mon, 23 Nov 2026 02:20:31 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.14</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.14</sparkle:version>
-            <sparkle:shortVersionString>0.1.14</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.15</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.15</sparkle:version>
+            <sparkle:shortVersionString>0.1.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.14
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.15
 
-Themes now apply to the entire rmux window, including the sidebar, tabs, command palette, menus and Settings.
+Workspace and terminal tab colors now fill the row or tab, making projects easier to tell apart.
 
-- All seven built-in themes are supported, including Solarized Dark and Solarized Light. Imported themes and explicit color overrides also style the surrounding interface.
-- Theme changes apply live across windows, with matching selection, border and accent colors and readable text in light and dark themes.
-- Settings, Notifications and Memory replace one another consistently and preserve the terminal return-focus target.
-- An invalid external-editor setting no longer prevents startup. rmux disables that optional editor and displays repair guidance without changing the configuration file.
-- Browser-demo palette search uses the same field-aware matching as the native app.
+- Set individual terminal colors from the tab menu using a preset or custom hex color. Colors survive session restore and tab moves.
+- Workspace and group colors fill the sidebar row, with readable text in light and dark themes.
+- Tabs share the available width, with a simpler underline for the active tab and cleaner spacing in narrow panes.
 
 ## Downloads
 
-GitHub builds the signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle.
+Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Focused theme/contrast and editor-recovery tests passed. Native review covered Catppuccin Latte, light palette input, and live switching to Nord. Shared WASM compilation passed. Windows runtime validation remains deferred.
+Native visual review, focused color persistence tests and shared WASM compilation passed. Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.14/rmux-0.1.14-macos-arm64.zip" length="7407389" type="application/octet-stream" sparkle:edSignature="horPVnnUxxTAEGaDZakgMnXiH20gbXcr/v2+HDDEir2310iAAq/3rPdP7L43P5f4eEcR/tBVVVOoOfFuhik5BQ=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.15/rmux-0.1.15-macos-arm64.zip" length="7411296" type="application/octet-stream" sparkle:edSignature="Z9oeWhfIyW50VEnoiy9KSKyvv0kEuxyY/R5ubDhB9Re9DSUqod2nYFHC9KQe9Rbz7kFiiILSGCJXBkANdK7ICQ=="/>
         </item>
     </channel>
 </rss>
