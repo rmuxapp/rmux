@@ -1,7 +1,7 @@
 //! Application-wide chrome palette, derived from the effective terminal theme.
 //! GPUI builds and paints UI on its main thread. Cache only resolved color values
 //! here so shared presentation helpers (also used by WASM) need no host settings.
-use std::cell::Cell;
+use std::cell::{Cell, RefCell};
 use gpui::Rgba;
 
 #[derive(Clone, Copy, Debug)]
@@ -57,7 +57,11 @@ impl Default for Palette {
     fn default() -> Self { Self::new(0x12141a, 0xdcdfe6, 0xa99be8, 0xf0b85b, 0xf18a8a, 0x9fceb0) }
 }
 thread_local! { static CURRENT: Cell<Palette> = Cell::new(Palette::default()); }
-pub(crate) fn set_palette(palette: Palette) { CURRENT.with(|current| current.set(palette)); }
+thread_local! { static CUSTOM: RefCell<Vec<(u32, [Rgba; 4])>> = const { RefCell::new(Vec::new()) }; }
+pub(crate) fn set_palette(palette: Palette) {
+    CURRENT.with(|current| current.set(palette));
+    CUSTOM.with(|cache| cache.borrow_mut().clear());
+}
 macro_rules! colors {
     ($($name:ident),+ $(,)?) => { $(pub(crate) fn $name() -> Rgba { CURRENT.with(|current| gpui::rgb(current.get().$name)) })+ };
 }
@@ -100,3 +104,34 @@ mod tests {
         }
     }
 }
+
+/// Theme-aware full-row color, preserving text contrast in both light and dark UI.
+fn derive_custom_fill(color: u32, selected: bool, hovered: bool) -> Rgba {
+    CURRENT.with(|current| {
+        let palette = current.get();
+        let mut weight = if hovered { 0.40 } else if selected { 0.32 } else { 0.22 };
+        for _ in 0..12 {
+            let fill = mix(palette.background, color, weight);
+            if contrast(palette.foreground, fill) >= 4.5 && contrast(palette.muted, fill) >= 4.5 { return gpui::rgb(fill); }
+            weight *= 0.8;
+        }
+        gpui::rgb(palette.background)
+    })
+}
+fn custom_paints(color: u32) -> [Rgba; 4] {
+    CUSTOM.with(|cache| {
+        let mut cache = cache.borrow_mut();
+        if let Some((_, colors)) = cache.iter().find(|(key, _)| *key == color) { return *colors; }
+        let colors = [derive_custom_fill(color, false, false), derive_custom_fill(color, true, false),
+            derive_custom_fill(color, true, true), CURRENT.with(|current| gpui::rgb(readable(color, current.get().background, 3.)))];
+        // Bound user-controlled custom colors; recompute only after a theme change
+        // or cache eviction, never do contrast math on every animation frame.
+        if cache.len() >= 128 { cache.clear(); }
+        cache.push((color, colors));
+        colors
+    })
+}
+pub(crate) fn custom_fill(color: u32, selected: bool, hovered: bool) -> Rgba {
+    custom_paints(color)[if hovered { 2 } else { usize::from(selected) }]
+}
+pub(crate) fn custom_border(color: u32) -> Rgba { custom_paints(color)[3] }

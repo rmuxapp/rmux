@@ -313,7 +313,9 @@ branches equal space. Resizing and closing panes preserve surviving sessions.
 
 ## Workspace colors, descriptions and pinning
 
-View → Workspace Color offers six accent colors and None to clear the marker.
+View → Workspace Color offers six colors and None to reset the row.
+The selected color fills the entire workspace or group row, with theme-aware
+contrast and a visible selection border.
 The same named choices appear in the command palette. Colors persist in saved
 layouts and do not change the terminal's ANSI colors or unread indicator.
 
@@ -384,8 +386,13 @@ Cmd+T creates a tab in the focused pane; Cmd+Shift+[ / ] switches tabs.
 Starting with the next release, Cmd+[ / ] cycles split panes on macOS.
 Ctrl+Tab / Ctrl+Shift+Tab also cycles panes. Pane and tab navigation appear
 in the application menu, and their actions can be rebound in settings.
+Terminal tabs can have their own colors: right-click → **Set Tab Color…**,
+choose a preset or enter `#RRGGBB`, and press Enter or Save. None (or an empty
+value) resets the color; Escape cancels. Tab colors persist in saved layouts and
+remain attached to the terminal when it is moved.
+
 Right-click a tab to select it and open a menu with Rename, Copy/Reveal Working
-Directory, Move Tab Left/Right,
+Directory, Move Tab Left/Right, Set Tab Color,
 Close, Close Other Tabs and Close Tabs to the Right. Arrow keys navigate, Enter/Space activates,
 and Escape returns to the terminal. Clicking outside or moving focus dismisses
 the menu. Shift+F10 or Show Tab Actions in the palette opens the menu without

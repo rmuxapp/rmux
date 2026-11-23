@@ -4626,7 +4626,7 @@ impl Render for WorkspaceWindow {
                                     let selected = self.workspace_state.sidebar_selection.contains(&target) || index == self.workspace_state.active || header.is_some_and(|group| group.collapsed && self.workspace_state.entries.get(self.workspace_state.active).is_some_and(|entry| group.members.contains(&entry.workspace.entity_id())));
                                     let drop_owner = cx.weak_entity();
                                     let hover_owner = drop_owner.clone();
-                                    crate::sidebar_presentation::row(("workspace", entry.workspace.entity_id()), selected)
+                                    crate::sidebar_presentation::row(("workspace", entry.workspace.entity_id()), selected, header.map(|group| group.color).unwrap_or(entry.color))
                                         .when(group.is_some() && header.is_none(), |row| row.ml(px(20.)))
                                         .when(self.rename.is_none(), |row| row
                                             .on_drag(drag_item::DragItem { scope: container, container, item: target, label: entry.name.clone().into() }, |item, _, _, cx| cx.new(|_| item.clone()))
@@ -4705,7 +4705,6 @@ impl Render for WorkspaceWindow {
                                                             .child(unread_count.to_string())
                                                     ))
                                                         .child(gpui::div().flex_1().min_w_0().flex().items_center().gap_1()
-                                                            .when_some(header.map(|group| group.color).unwrap_or(entry.color), |row, color| row.child(gpui::div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                                             .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| entry.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
                                                             .child(sidebar_presentation::title_frame(("workspace-name", target))
                                                                 .tooltip({

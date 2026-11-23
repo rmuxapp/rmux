@@ -153,7 +153,7 @@ struct TabMenu {
     scroll: ScrollHandle,
     typeahead: menu_navigation::Typeahead,
 }
-const TAB_MENU_LABELS: &[&str] = &["New Tab", "Rename Tab", "Copy Working Directory", "Reveal Working Directory", "Move Tab Left", "Move Tab Right", "Close Tab", "Close Other Tabs…", "Close Tabs to the Right…", "Close Finished Tabs…"];
+const TAB_MENU_LABELS: &[&str] = &["New Tab", "Rename Tab", "Copy Working Directory", "Reveal Working Directory", "Move Tab Left", "Move Tab Right", "Close Tab", "Close Other Tabs…", "Close Tabs to the Right…", "Close Finished Tabs…", "Set Tab Color…"];
 
 pub(super) struct PaneView {
     // Metadata repaints preserve this offset; selection and structural edits
@@ -175,6 +175,7 @@ pub(super) struct PaneView {
     benchmark: bool,
     error: Option<String>,
     rename: Option<Entity<text_field::TextField>>,
+    editing_tab_color: bool,
     close_prompt: Option<EntityId>,
 }
 impl Drop for PaneView {
@@ -229,12 +230,12 @@ impl PaneView {
     fn finished_tab_count(&self, keep: EntityId, cx: &App) -> usize {
         self.terminals.iter().filter(|terminal| terminal.entity_id() != keep && terminal.read(cx).process_exit.is_some()).count()
     }
-    fn tab_menu_enabled(&self, target: EntityId, cx: &App) -> [bool; 10] {
-        let Some(index) = self.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return [false; 10]; };
+    fn tab_menu_enabled(&self, target: EntityId, cx: &App) -> [bool; 11] {
+        let Some(index) = self.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return [false; 11]; };
         let batch_available = self.spawning_tab.is_none();
         let terminal = self.terminals[index].read(cx);
         let local = terminal.session.remote_destination().is_none();
-        [batch_available && !cx.global::<Shutdowns>().quitting, true, local || terminal.remote_directory_label.is_some(), local, index > 0, index + 1 < self.terminals.len(), true, batch_available && self.terminals.len() > 1, batch_available && index + 1 < self.terminals.len(), batch_available && self.finished_tab_count(target, cx) > 0]
+        [batch_available && !cx.global::<Shutdowns>().quitting, true, local || terminal.remote_directory_label.is_some(), local, index > 0, index + 1 < self.terminals.len(), true, batch_available && self.terminals.len() > 1, batch_available && index + 1 < self.terminals.len(), batch_available && self.finished_tab_count(target, cx) > 0, true]
     }
 
     fn show_active_tab_menu(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -260,6 +261,7 @@ impl PaneView {
             7 => self.close_tabs(TabCloseScope::Others, window, cx),
             8 => self.close_tabs(TabCloseScope::Right, window, cx),
             9 => self.close_tabs(TabCloseScope::Finished, window, cx),
+            10 => self.edit_tab(true, window, cx),
             _ => {},
         }
     }
@@ -311,7 +313,7 @@ impl PaneView {
                         else if index == 9 { format!("Close Finished Tabs ({})…", self.finished_tab_count(menu.target, cx)) }
                         else { (*label).to_owned() };
                     tab_presentation::menu_row(index, matches!(index, 1 | 4 | 6))
-                        .when(enabled[index] && index >= 6, |row| row.text_color(crate::chrome_style::danger()))
+                        .when(enabled[index] && (6..10).contains(&index), |row| row.text_color(crate::chrome_style::danger()))
                         .when(enabled[index], |row| row.cursor_pointer()
                             .when(index == menu.selected, |row| row.bg(crate::chrome_style::selected()))
                             .on_mouse_move(cx.listener(move |this, _, _, cx| {
@@ -328,7 +330,7 @@ impl PaneView {
                             cx.stop_propagation();
                         }))
                         .child(div().flex_1().min_w_0().truncate().child(label))
-                        .when_some(hints[index].clone(), |row, hint| row.child(
+                        .when_some(hints.get(index).cloned().flatten(), |row, hint| row.child(
                             div().id(("tab-menu-shortcut", index)).max_w(px(120.)).flex_shrink_0().truncate().text_xs().text_color(crate::chrome_style::muted())
                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| ControlHint(hint.clone().into())).into() })
                                 .child(hint)
@@ -567,6 +569,9 @@ impl PaneView {
         }
     }
     fn rename_tab(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.edit_tab(false, window, cx);
+    }
+    fn edit_tab(&mut self, color: bool, window: &mut Window, cx: &mut Context<Self>) {
         if let Some(input) = &self.rename {
             input.read(cx).focus.focus(window);
             return;
@@ -575,7 +580,9 @@ impl PaneView {
             return;
         };
         let id = terminal.entity_id();
-        let name = terminal.read(cx).custom_title.clone().unwrap_or_default();
+        let name = if color { terminal.read(cx).tab_color.map(|value| format!("#{value:06X}")).unwrap_or_default() }
+            else { terminal.read(cx).custom_title.clone().unwrap_or_default() };
+        self.editing_tab_color = color;
         let input = cx.new(|cx| text_field::TextField::new(&name, cx));
         cx.subscribe_in(
             &input,
@@ -583,7 +590,13 @@ impl PaneView {
             move |this, _, event: &text_field::EditEvent, window, cx| {
                 match event {
                     text_field::EditEvent::Submitted { text, .. } => {
-                        if rmux_core::tabs::custom_title_length(text) > rmux_core::tabs::CUSTOM_TITLE_LIMIT { return; }
+                        let tab_color = if color {
+                            match rmux_core::workspace_lifecycle::parse_workspace_color(text) {
+                                Ok(value) => value,
+                                Err(_) => { this.error = Some("Use #RRGGBB, a preset, or leave empty to reset the tab color".into()); cx.notify(); return; }
+                            }
+                        } else { None };
+                        if !color && rmux_core::tabs::custom_title_length(text) > rmux_core::tabs::CUSTOM_TITLE_LIMIT { return; }
 
                         if let Some(terminal) = this
                             .terminals
@@ -592,9 +605,14 @@ impl PaneView {
                         {
                             let title = rmux_core::tabs::custom_title(text);
                             terminal.update(cx, |terminal, cx| {
-                                if terminal.custom_title == title { return; }
-                                terminal.custom_title = title;
-                                events::publish("surface.title_changed", cx.entity_id(), None, cx);
+                                if color {
+                                    if terminal.tab_color == tab_color { return; }
+                                    terminal.tab_color = tab_color;
+                                } else {
+                                    if terminal.custom_title == title { return; }
+                                    terminal.custom_title = title;
+                                    events::publish("surface.title_changed", cx.entity_id(), None, cx);
+                                }
                                 cx.emit(TabMetadataChanged);
                                 cx.notify();
                             });
@@ -604,6 +622,7 @@ impl PaneView {
                     text_field::EditEvent::Changed(_) => { cx.notify(); return; },
                 }
                 this.rename = None;
+                this.error = None;
                 this.focus(window, cx);
                 cx.notify();
             },
@@ -788,6 +807,7 @@ impl PaneView {
             benchmark: false,
             error: None,
             rename: None,
+            editing_tab_color: false,
             close_prompt: None,
         }
     }
@@ -804,6 +824,7 @@ impl PaneView {
                     ssh_destination: terminal.read(cx).session.remote_destination().map(str::to_owned)
                         .or_else(|| terminal.read(cx).saved_ssh_destination.clone()),
                     custom_title: terminal.read(cx).custom_title.clone(),
+                    color: terminal.read(cx).tab_color,
                     font_size: terminal.read(cx).cells.font_size,
                     font_family: Some(terminal.read(cx).font_family.to_string()),
                     directory: terminal.read(cx).snapshot_directory.clone(),
@@ -844,6 +865,7 @@ impl PaneView {
             benchmark,
             error: None,
             rename: None,
+            editing_tab_color: false,
             close_prompt: None,
         }
     }
@@ -1288,7 +1310,7 @@ impl Render for PaneView {
                                         let label: SharedString = self.tab_title(index, cx).into();
                                         let hint_pane = cx.entity().downgrade();
                                         let display_title = label.clone();
-                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused)
+                                        crate::tab_presentation::tab(("tab", terminal.entity_id()), index == self.terminals.active_index(), focused, terminal.read(cx).tab_color)
                                             .on_drag(drag_item::DragItem { scope, container, item: target, label }, |item, _, _, cx| cx.new(|_| item.clone()))
                                             .can_drop(move |item, _, _| item.downcast_ref::<drag_item::DragItem>().is_some_and(|item| item.scope == scope && item.item != target))
                                             .drag_over(move |style, item: &drag_item::DragItem, _, _| {
@@ -1455,7 +1477,10 @@ impl Render for PaneView {
                     }),
             )
             .when_some(self.rename.as_ref(), |root, input| {
-                root.child(crate::tab_presentation::rename_editor(input.clone(), cx))
+                if self.editing_tab_color {
+                    root.child(div().px_3().py_2().bg(crate::chrome_style::surface())
+                        .child(crate::metadata_presets::editor(input, "Tab color · #RRGGBB or empty for default", Some(false), cx)))
+                } else { root.child(crate::tab_presentation::rename_editor(input.clone(), cx)) }
             })
             .when_some(self.error.clone(), |root, error| {
                 root.child(div_error(error, cx.listener(|this, event: &ClickEvent, _, cx| {

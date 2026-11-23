@@ -24,14 +24,16 @@ pub(crate) fn close_button(id: impl Into<ElementId>) -> Stateful<Div> {
         .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
         .child(crate::icons::icon("close"))
 }
-pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool) -> Stateful<Div> {
+pub(crate) fn tab(id: impl Into<ElementId>, active: bool, focused: bool, color: Option<u32>) -> Stateful<Div> {
     div().id(id).h_full().flex().items_center().flex_shrink_0().px_2().gap_2()
         .text_size(px(12.)).border_t_1().border_l_2().border_color(gpui::transparent_black())
         .cursor_pointer().text_color(crate::chrome_style::muted())
-        .hover(move |style| style.bg(if active { crate::chrome_style::hover() } else { crate::chrome_style::hover() }))
+        .hover(move |style| style.bg(color.map(|color| crate::chrome_style::custom_fill(color, active, true)).unwrap_or_else(crate::chrome_style::hover)))
         .when(active, |tab| tab.bg(if focused {crate::chrome_style::hover()} else {crate::chrome_style::elevated()})
             .text_color(if focused {crate::chrome_style::foreground()} else {crate::chrome_style::muted()})
             .border_color(if focused {crate::chrome_style::accent()} else {crate::chrome_style::border()}))
+        .when_some(color, |tab, color| tab.bg(crate::chrome_style::custom_fill(color, active, false))
+            .when(active, |tab| tab.border_color(crate::chrome_style::custom_border(color))))
 }
 
 pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &App) -> Div {

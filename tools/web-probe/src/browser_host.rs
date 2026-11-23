@@ -382,7 +382,7 @@ impl Render for BrowserHost {
                         let container = cx.entity_id();
                         let menu_group = header.map(|group| group.id);
                         let drop_owner = cx.weak_entity();
-                        sidebar_presentation::row(("workspace",target),selected)
+                        sidebar_presentation::row(("workspace",target),selected,header.map_or(metadata.color, |group| group.color))
                             .when(self.rename.is_none(), |row| row
                                 .on_drag(crate::drag_item::DragItem { scope: container, container, item: target, label: header.map_or_else(|| name.clone(), |group| group.name.clone()).into() }, |item, _, _, cx| cx.new(|_| item.clone()))
                                 .can_drop(move |item, _, cx| item.downcast_ref::<crate::drag_item::DragItem>().is_some_and(|item| drop_owner.upgrade().is_some_and(|owner| {
@@ -413,7 +413,6 @@ impl Render for BrowserHost {
                                             cx.notify();
                                         })))
                                 })
-                                .when_some(header.map_or(metadata.color, |group| group.color), |row, color| row.child(div().w(px(8.)).h(px(8.)).flex_shrink_0().rounded_sm().bg(rgb(color))))
                                 .when_some(sidebar_presentation::workspace_icon(header.map(|group| group.icon.clone()).unwrap_or_else(|| metadata.icon.clone()), header.is_some(), selected), |row, icon| row.child(icon))
                                 .child(sidebar_presentation::title(("workspace-name", target), header.map(|group| group.name.clone()).unwrap_or_else(|| name.clone()).into()))
                                 .when(header.map_or(*pinned, |group| group.pinned), |row| row.child(

@@ -215,6 +215,7 @@ impl Workspace {
                     terminals.push(cx.new(|cx| {
                         let mut view = TerminalView::new(session, window, cx);
                         view.custom_title = tab.custom_title;
+                        view.tab_color = tab.color;
                         view.saved_ssh_destination = tab.ssh_destination;
                         if let Some(family) = tab.font_family {
                             view.font_family = family.into();
@@ -340,7 +341,7 @@ mod tests {
             tabs: vec![snapshot::TabSnapshot {
                 shell_history_id: None,
                 ssh_destination: None,
-                custom_title: None,
+                custom_title: None, color: None,
                 font_family: None,
                 label: String::new(),
                 directory: path,

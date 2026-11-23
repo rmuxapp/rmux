@@ -11,6 +11,7 @@ parser = argparse.ArgumentParser()
 parser.add_argument("--binary", default="target/debug/rmux")
 parser.add_argument("--scene", choices=["workspace", "overflow", "compact"], default="workspace")
 parser.add_argument("--check", action="store_true")
+parser.add_argument("--colors", action="store_true", help="Show saved workspace and tab color examples")
 parser.add_argument("--theme", default="dark", choices=["dark", "light", "solarized_dark", "solarized_light", "nord", "catppuccin_mocha", "catppuccin_latte"])
 args = parser.parse_args()
 binary = Path(args.binary).resolve()
@@ -64,6 +65,13 @@ done
                              workspace("Documentation", "A quieter workspace", pane(docs, ["Notes"]))],
               "groups": [{"id": 1, "name": "Product", "members": [0, 1], "collapsed": False,
                           "pinned": True, "generated_anchor": False}]}
+    if args.colors:
+        layout["groups"][0]["color"] = 0x7aa2f7
+        layout["workspaces"][1]["color"] = 0x9ece6a
+        layout["workspaces"][2]["color"] = 0xe0af68
+        tabs = main["tabs"] if main["kind"] == "pane" else main["children"][0]["tabs"]
+        for tab, color in zip(tabs, [0x7aa2f7, 0xf7768e, 0x9ece6a]):
+            tab["color"] = color
     saved = root / "layout.json"
     saved.write_text(json.dumps(layout))
     env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}

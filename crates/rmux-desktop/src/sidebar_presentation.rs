@@ -21,11 +21,14 @@ pub(crate) fn header() -> Stateful<Div> {
     div().h(px(36.)).flex_shrink_0().px_3().flex().items_center().border_b_1()
         .border_color(crate::chrome_style::border()).text_sm().id("workspace-list-header")
 }
-pub(crate) fn row(id: impl Into<ElementId>, selected: bool) -> Stateful<Div> {
+pub(crate) fn row(id: impl Into<ElementId>, selected: bool, color: Option<u32>) -> Stateful<Div> {
     div().id(id).mx_1().mb(px(2.)).px_3().py_2().rounded(px(5.)).text_size(px(13.)).cursor_pointer()
         .border_1().border_color(gpui::transparent_black())
         .when(selected, |row| row.bg(crate::chrome_style::selected()).border_color(crate::chrome_style::selected_border()).text_color(crate::chrome_style::selected_text()))
-        .hover(move |style| style.bg(if selected {crate::chrome_style::selected_hover()} else {crate::chrome_style::hover()}))
+        .when_some(color, |row, color| row.bg(crate::chrome_style::custom_fill(color, selected, false))
+            .when(selected, |row| row.border_color(crate::chrome_style::custom_border(color))))
+        .hover(move |style| style.bg(color.map(|color| crate::chrome_style::custom_fill(color, selected, true))
+            .unwrap_or_else(|| if selected {crate::chrome_style::selected_hover()} else {crate::chrome_style::hover()})))
 }
 
 pub(crate) fn group_toggle(id: impl Into<ElementId>, collapsed: bool) -> Stateful<Div> {

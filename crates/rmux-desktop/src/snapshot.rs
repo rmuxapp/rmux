@@ -122,6 +122,8 @@ pub struct TabSnapshot {
     pub ssh_destination: Option<String>,
     #[serde(default)]
     pub custom_title: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color: Option<u32>,
     #[serde(default)]
     pub font_family: Option<String>,
     pub directory: Option<PathBuf>,
@@ -251,6 +253,7 @@ impl Node {
                         tab.label.len() <= 1024 && !tab.label.chars().any(char::is_control),
                         "invalid tab label"
                     );
+                    ensure!(tab.color.is_none_or(|color| color <= 0xffffff), "invalid tab color");
                     if let Some(title) = &tab.custom_title {
                         ensure!(
                             !title.trim().is_empty()
@@ -324,7 +327,7 @@ mod tests {
             tabs: vec![TabSnapshot {
                 shell_history_id: None,
                 ssh_destination: None,
-                custom_title: None,
+                custom_title: None, color: None,
                 font_family: None,
                 label: "日本".into(),
                 directory: None,
@@ -387,7 +390,7 @@ mod tests {
         let leaf = || Node::Pane { active_tab: 0, tabs: vec![TabSnapshot {
                 shell_history_id: None,
                 ssh_destination: None,
-            label: "Shell".into(), custom_title: None, font_family: None,
+            label: "Shell".into(), custom_title: None, color: None, font_family: None,
             directory: None, font_size: 14.,
         }] };
         let mut tree = leaf();
@@ -521,6 +524,24 @@ mod tests {
         assert!(fixture().encode().is_ok());
         Ok(())
     }
+    #[test]
+    fn tab_colors_are_optional_validated_and_round_trip() -> Result<()> {
+        let mut json = serde_json::to_value(fixture())?;
+        let path = "/workspaces/0/layout/children/0/tabs/0";
+        assert!(WindowSnapshot::decode(&serde_json::to_vec(&json)?).is_ok());
+        for color in [0, 0xffffff, 0x7aa2f7] {
+            json.pointer_mut(path).unwrap()["color"] = color.into();
+            let restored = WindowSnapshot::decode(&serde_json::to_vec(&json)?)?;
+            assert_eq!(serde_json::to_value(&restored)?.pointer(&format!("{path}/color")), Some(&color.into()));
+            assert_eq!(WindowSnapshot::decode(&restored.encode()?)?, restored);
+        }
+        json.pointer_mut(path).unwrap()["color"] = 0x1000000.into();
+        assert!(WindowSnapshot::decode(&serde_json::to_vec(&json)?).is_err());
+        json.pointer_mut(path).unwrap()["color"] = serde_json::Value::Null;
+        assert!(WindowSnapshot::decode(&serde_json::to_vec(&json)?).is_ok());
+        Ok(())
+    }
+
     #[test]
     fn custom_tab_titles_are_optional_bounded_and_round_trip() -> Result<()> {
         let mut json = serde_json::to_value(fixture())?;
