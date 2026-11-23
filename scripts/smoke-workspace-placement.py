@@ -20,7 +20,7 @@ for mode in (["end"] if args.live_shell else ["end", "top", "after_current"]):
         config.write_text(json.dumps({"new_workspace_placement": mode, "confirm_close": "never"}))
         endpoint = root / "rpc"
         env = {k: v for k, v in os.environ.items() if not k.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true", RMUX_SOCKET_DIR=str(endpoint))
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false", RMUX_SOCKET_DIR=str(endpoint))
         if args.live_shell:
             fixture = root / "fixture-shell"
             fixture.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nprintf "alive-%s" "$$" > "$RMUX_TEST_PROCESS_DIR/$$.ready"\ntoken=initial\nwhile IFS= read -r line; do\n  case "$line" in\n    set:*) token=${line#set:} ;;\n    probe) printf "%s" "$token" > "$RMUX_TEST_PROCESS_DIR/$$.state" ;;\n  esac\ndone\n')

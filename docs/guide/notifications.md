@@ -75,7 +75,7 @@ priority, followed by errors, completed work, running work and idle state; `+N`
 indicates additional records. Up to 64 records are kept per terminal. Shell prompt,
 exit, reset and focus events clean up records according to their state.
 
-View → Toggle Program Status (also in the palette) shows all records for the
+View → Status and Notifications → Toggle Program Status (also in the palette) shows all records for the
 focused terminal, including hierarchical IDs, inherited app names and messages.
 If terminal output is busy, the panel opens with a Loading state and fills in
 automatically; closing it cancels the pending load.
@@ -87,7 +87,7 @@ or Page Up/Down to move by the visible panel height, accounting for long message
 Use C or the Copy shortcut to copy its complete details. Escape closes the panel
 and returns to the terminal. Clicking a task also selects it; selection follows
 its task ID as reports update.
-View → Toggle Notifications (also in the palette) opens a panel with up to 32 recent
+View → Status and Notifications → Toggle Notifications (also in the palette) opens a panel with up to 32 recent
 messages per live terminal, with separate read state for each message. All and Unread
 filters show live counts; press U while the panel is focused to switch filters.
 Arrow keys or Tab navigate the visible messages, Enter opens the selected terminal,
@@ -117,7 +117,7 @@ anchor, so its individual metadata remains accessible.
 View → Workspace Icon offers Terminal, Code, Build, Cloud, Notes and None.
 The same choices are available in the palette. Icons persist in saved layouts
 and follow a workspace when it moves into a new window.
-File → Edit Workspace Icon accepts a single symbol or emoji. Edit Workspace Color
+File → Workspaces → Edit Workspace Icon accepts a single symbol or emoji. Edit Workspace Color
 accepts an exact six-digit hex color, with or without `#`. Both are also in the
 palette; an empty value clears the setting. Invalid input stays open for correction.
 
@@ -132,7 +132,7 @@ terminal in the active window clears the marker. System notifications and sounds
 are not implemented yet.
 
 Cmd+Shift+U jumps to an unread terminal (Ctrl+Alt+U on Linux/Windows), also under
-View → Next Unread Terminal. It searches the current workspace first, then wraps
+View → Status and Notifications → Next Unread Terminal. It searches the current workspace first, then wraps
 through this window's other workspaces in sidebar order. If a workspace is zoomed,
 the target pane becomes the zoomed pane. With no unread terminals it does nothing.
 

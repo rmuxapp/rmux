@@ -31,6 +31,27 @@ pub(super) fn focus_native_notification(terminal: &WeakEntity<TerminalView>, rev
     }
 }
 
+/// Resolve ownership after output drains; a tab may have moved since exit.
+pub(super) fn close_exited_terminal(terminal: EntityId, cx: &mut App) {
+    for handle in cx.windows() {
+        let Some(handle) = handle.downcast::<WorkspaceWindow>() else { continue; };
+        let closed = handle.update(cx, |root, window, cx| {
+            let pane = root.workspace_state.entries.iter().flat_map(|entry| {
+                entry.workspace.read(cx).panes.clone()
+            }).find(|pane| pane.read(cx).terminals.iter().any(|tab| tab.entity_id() == terminal));
+            let Some(pane) = pane else { return false; };
+            pane.update(cx, |pane, cx| {
+                if let Some(index) = pane.terminals.iter().position(|tab| tab.entity_id() == terminal
+                    && tab.read(cx).session.should_close_on_exit()) {
+                    pane.close_confirmed(index, window, cx);
+                }
+            });
+            true
+        }).unwrap_or(false);
+        if closed { break; }
+    }
+}
+
 /// Notification visibility is structural, not a scan of terminal/parser state.
 /// An inactive OS window, inactive workspace/tab or a zoom-hidden pane is invisible.
 pub(super) fn terminal_is_visible(terminal: EntityId, cx: &mut App) -> bool {

@@ -12,11 +12,11 @@
 
 ## Save and open sessions
 
-File → Save Session… (also in the command palette) captures all normal rmux
+File → Layouts and Sessions → Save Session… (also in the command palette) captures all normal rmux
 windows into one file. Capture refuses while a window is restoring, editing or
 waiting for a close decision. The selected path is written atomically on a
 background executor. This saves the state when the action was invoked.
-File → Open Session in New Windows… imports that file into the running app,
+File → Layouts and Sessions → Open Session in New Windows… imports that file into the running app,
 leaving existing windows and sessions intact. It prepares fresh shells off the UI
 thread, then opens the saved windows and activates the saved selection. No running
 process or command history is resumed. All saved working directories must exist;
@@ -51,7 +51,7 @@ presets to your settings. Replace these example paths with your saved files:
 
 After Reload Settings, choose **Open Preset: Development** in the palette or use
 its shortcut. You can also launch `rmux --preset "Development"` from a shell.
-File → Open Layout Preset… opens a dedicated searchable picker. It shows the
+File → Layouts and Sessions → Open Layout Preset… opens a dedicated searchable picker. It shows the
 layout/session type, optional project directory and source file, and includes
 configured shortcut hints. Search matches those details as well as the name.
 The `layout_preset_picker` shortcut action opens the same picker. If none are
@@ -135,8 +135,8 @@ mode. It restores layout metadata, not running processes or scrollback.
 
 ## Save a layout
 
-File → Save Layout… exports the current window's workspaces, splits, tabs, focus
-and reported directories to a JSON file. File → Open Layout in New Window… reads
+File → Layouts and Sessions → Save Layout… exports the current window's workspaces, splits, tabs, focus
+and reported directories to a JSON file. File → Layouts and Sessions → Open Layout in New Window… reads
 that file and starts fresh shells in the saved directories, restoring names,
 tabs, split proportions, focus and sidebar width. Preparation happens in the
 background with a Cancel control; errors leave existing windows intact. Closing

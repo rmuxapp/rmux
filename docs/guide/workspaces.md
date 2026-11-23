@@ -201,14 +201,14 @@ destination becomes active after dropping. Cross-window tab drops are not suppor
 
 ## Detach, transfer and equalize
 
-View → Move Workspace to New Window (also in the command palette) moves the whole
+View → Move Workspace → Move Workspace to New Window (also in the command palette) moves the whole
 workspace with its existing splits, tabs, live sessions, labels, color and pin
 state. The source window closes if it has no remaining workspaces.
 
-View → Equalize Pane Sizes (also in the palette) gives siblings equal space at
+View → Split Panes → Equalize Pane Sizes (also in the palette) gives siblings equal space at
 every split, exits pane zoom and preserves the split tree, tabs and running shells.
 
-View → Detach Tab to New Window (also in the command palette) moves the active
+View → Move Panes and Tabs → Detach Tab to New Window (also in the command palette) moves the active
 tab into its own window, retaining its running shell, output and font size.
 An emptied source pane/workspace closes.
 
@@ -277,17 +277,17 @@ The destination's remembered pane receives the existing terminal and custom tab
 label, becomes selected, and follows zoom if enabled. The destination window is
 activated. Closed or busy destinations report an error before removing the source
 tab. Native cross-window tab interaction acceptance is still pending.
-View → Move Tab to Next Workspace (also in the command palette) appends the active
+View → Move Panes and Tabs → Move Tab to Next Workspace (also in the command palette) appends the active
 terminal to the next workspace's remembered pane, wrapping at the end. Its session
 stays alive and the destination becomes active. Empty source panes/workspaces
 collapse; with only one workspace, the action does nothing.
 
-View → Join Pane into Next (also in the command palette) appends the focused
+View → Move Panes and Tabs → Join Pane into Next (also in the command palette) appends the focused
 pane's tabs to the next pane in layout order, preserves their order and active
 terminal, then collapses the empty split. The last pane wraps to the first;
 a single pane is unchanged. Like directional joins, it requires an unzoomed,
 idle layout; finish pending tab creation/editing in both panes and retry.
-View → Move Tab to Split Left / Right / Above / Below (also in the command palette) moves the
+View → Move Panes and Tabs → Move Tab to Split Left / Right / Above / Below (also in the command palette) moves the
 active tab into a new adjacent pane without starting a new shell. It requires at
 least two tabs in the source pane and focuses the moved tab. A single-tab pane
 is unchanged.
@@ -296,7 +296,7 @@ Tab-to-split moves, tab drags between panes and transfers between workspaces in
 the same window require pending splits/resizes and tab creation to finish.
 Close editors or overlays in the participating panes before retrying a refused
 move. Refusal leaves the tab and its process in place.
-View → Swap Pane with Next (also in the command palette) exchanges the focused
+View → Move Panes and Tabs → Swap Pane with Next (also in the command palette) exchanges the focused
 pane with the next pane in layout order, wrapping at the end. Tabs and sessions
 stay attached to their pane, focus follows the moved pane, and split proportions
 stay attached to their positions. Swapping exits zoom to reveal the new layout.
@@ -319,14 +319,14 @@ contrast and a visible selection border.
 The same named choices appear in the command palette. Colors persist in saved
 layouts and do not change the terminal's ANSI colors or unread indicator.
 
-File → Edit Workspace Description (also in the palette) edits a secondary sidebar
+File → Workspaces → Edit Workspace Description (also in the palette) edits a secondary sidebar
 label. Enter saves, Escape cancels, and an empty value clears it. Descriptions
 are retained in saved layouts; older layouts default to no description.
 
 View → Pin / Unpin Workspace (also in the palette) keeps pinned workspaces at the
 top. Reordering stays within pinned/unpinned groups. Save/Open Layout preserves
 pins; older layouts open unpinned.
-View → Last Workspace (also in the palette) toggles between the current and most
+View → Focus → Last Workspace (also in the palette) toggles between the current and most
 recently visited workspace. Reordering preserves the target; closing it clears
 the remembered destination. This history is per window and is not saved.
 Cmd+= / Cmd+- change the focused terminal's font size; Cmd+0 resets it to the

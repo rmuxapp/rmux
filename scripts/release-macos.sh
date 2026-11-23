@@ -37,6 +37,8 @@ staging="$(mktemp -d)"
 trap 'rm -rf "$staging"' EXIT HUP INT TERM
 ditto "$app" "$staging/rmux.app"
 ln -s /Applications "$staging/Applications"
+# Persist icon view and left-to-right installation order on every fresh mount.
+cp assets/macos/dmg-layout.dsstore "$staging/.DS_Store"
 dmg="$output/rmux-$version-macos-arm64.dmg"
 hdiutil create -volname rmux -srcfolder "$staging" -format UDZO -fs HFS+ "$dmg"
 codesign --force --timestamp --sign "$RMUX_SIGN_IDENTITY" "$dmg"

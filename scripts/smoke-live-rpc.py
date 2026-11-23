@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Short Unix native live-RPC smoke check; requires a usable GUI session.
 
-Run through mise after building rmux. Opens one test window with /usr/bin/true
+Run through mise after building rmux. Opens one test window with /usr/bin/false
 as its shell; terminates only the process it starts. Never attaches to other apps.
 """
 import json
@@ -33,10 +33,10 @@ def run(binary, live_shell=False):
             ],
         }))
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false")
         if live_shell:
             fixture = Path(directory) / "fixture-shell"
-            fixture.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nprintf "alive-%s" "$$" > "$RMUX_TEST_PROCESS_DIR/$$.ready"\ntoken=initial\nwhile IFS= read -r line; do\n  case "$line" in\n    set:*) token=${line#set:} ;;\n    probe) printf "%s" "$token" > "$RMUX_TEST_PROCESS_DIR/$$.state"; printf "reported-state:%s\\n" "$token" ;;\n  esac\ndone\n')
+            fixture.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nprintf "alive-%s" "$$" > "$RMUX_TEST_PROCESS_DIR/$$.ready"\ntoken=initial\nwhile IFS= read -r line; do\n  case "$line" in\n    fail) exit 7 ;;\n    set:*) token=${line#set:} ;;\n    probe) printf "%s" "$token" > "$RMUX_TEST_PROCESS_DIR/$$.state"; printf "reported-state:%s\\n" "$token" ;;\n  esac\ndone\n')
             fixture.chmod(0o700)
             env.update(RMUX_SHELL=str(fixture), RMUX_TEST_PROCESS_DIR=directory)
         child_pids = set()
@@ -382,6 +382,40 @@ def run(binary, live_shell=False):
                         wait_file(state, expected_states[pid])
                     checks.append("seven shell PIDs and Unicode variables survive same/cross-window merges and source-window closure")
                 checks.append("cross-window merge preserves layouts, tab positions/selections and hidden-tab unread messages, and removes the emptied source window")
+                if live_shell:
+                    closing_window = send("window.create", {"activate": False})["result"]
+                    sole_tab = next(item for item in send("surface.list")["result"]["surfaces"] if item["window_id"] == closing_window["id"])
+                    child_pids.add(sole_tab["process_id"])
+                    wait_file(Path(directory) / f'{sole_tab["process_id"]}.ready', f'alive-{sole_tab["process_id"]}')
+                    assert "result" in send("surface.send_text", {"surface_id": sole_tab["id"], "text": "\x04"})
+                    deadline = time.monotonic() + 5
+                    while any(item["id"] == closing_window["id"] for item in send("window.list")["result"]["windows"]):
+                        assert time.monotonic() < deadline, "last shell exit left an empty window"
+                        time.sleep(0.02)
+                    checks.append("Ctrl+D in the sole tab removes its empty pane, workspace and window")
+                    before_exit = send("surface.list")["result"]["surfaces"]
+                    failed = before_exit[0]
+                    assert "result" in send("surface.send_text", {"surface_id": failed["id"], "text": "fail\n"})
+                    deadline = time.monotonic() + 5
+                    while True:
+                        current = send("surface.list")["result"]["surfaces"]
+                        retained = next(item for item in current if item["id"] == failed["id"])
+                        if retained["process_exited"]:
+                            break
+                        assert time.monotonic() < deadline, "failed shell did not exit"
+                        time.sleep(0.02)
+                    # Canonical PTY input turns Ctrl+D on an empty line into EOF.
+                    exited = before_exit[1]
+                    assert "result" in send("surface.send_text", {"surface_id": exited["id"], "text": "\x04"})
+                    deadline = time.monotonic() + 5
+                    while True:
+                        current = send("surface.list")["result"]["surfaces"]
+                        if all(item["id"] != exited["id"] for item in current):
+                            break
+                        assert time.monotonic() < deadline, "Ctrl+D left a finished tab open"
+                        time.sleep(0.02)
+                    assert {item["id"] for item in current} == {item["id"] for item in before_exit} - {exited["id"]}
+                    checks.append("Ctrl+D closes only its successfully exited tab; failed shell remains inspectable")
                 process.stdin.close()
                 time.sleep(0.1)
                 assert process.poll() is None, "EOF unexpectedly closed the GUI"
@@ -418,8 +452,8 @@ def run(binary, live_shell=False):
 
 
 if __name__ == "__main__":
-    if os.name != "posix" or not Path("/usr/bin/true").exists():
-        raise SystemExit("This smoke harness requires Unix and /usr/bin/true")
+    if os.name != "posix" or not Path("/usr/bin/false").exists():
+        raise SystemExit("This smoke harness requires Unix and /usr/bin/false")
     parser = argparse.ArgumentParser()
     parser.add_argument("binary", nargs="?", default="target/debug/rmux")
     parser.add_argument("--live-shell", action="store_true")

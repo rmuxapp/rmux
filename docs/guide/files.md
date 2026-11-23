@@ -40,11 +40,11 @@ hex mode, and Preview as Text switches back. Hex previews are read-only, capped 
 1,024 rows, and share the regular-file/symlink checks, worker limit and cancellation
 used by text previews.
 
-**File → Open Folder…**, the command palette, or the `open_folder` custom action
+**File → Files → Open Folder…**, the command palette, or the `open_folder` custom action
 opens the native folder chooser. This works without a terminal working directory
 and loads the selected folder asynchronously. Open Folder is also available in
 the directory browser and its error view. Canceling leaves the workspace unchanged.
-You can also use **File → Open Text Preview…** or the palette (custom action
+You can also use **File → Files → Open Text Preview…** or the palette (custom action
 `open_text_preview`) to choose a single file with the system file picker.
 Canceling the picker makes no change; selected files use the same bounded,
 read-only preview loader.

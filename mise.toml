@@ -221,3 +221,7 @@ run = ["cargo build -p rmux-desktop --example native-quit-probe", "python script
 [tasks.test-fish-startup]
 description = "Check automatic fish integration through a real macOS PTY"
 run = "mise exec aqua:fish-shell/fish-shell@4.9.3 -- cargo test -p rmux-terminal automatic_fish_reports -- --ignored"
+
+[tasks.generate-dmg-layout]
+description = "Regenerate and verify the checked-in macOS installer icon layout"
+run = "mise exec uv@0.9.11 -- uv run --with ds-store==1.3.1 python scripts/generate-dmg-layout.py"

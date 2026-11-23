@@ -61,7 +61,7 @@ def main():
         config.write_text(json.dumps({"confirm_close": "never", "session_file": str(root / "session.json")}))
         endpoint = root / "rpc/rpc.sock"
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(PATH=str(root), RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true",
+        env.update(PATH=str(root), RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false",
                    RMUX_SOCKET_DIR=str(endpoint.parent), RMUX_TEST_SSH_CONFIG=str(client_config), SSH_ASKPASS_REQUIRE="never", LC_ALL="C")
 
         def call(method, **params):

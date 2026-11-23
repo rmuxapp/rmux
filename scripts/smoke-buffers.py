@@ -35,7 +35,7 @@ def main():
         config = Path(directory) / "config.json"
         config.write_text(json.dumps({"confirm_close": "never"}))
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false")
         result = subprocess.run([str(binary), "--rpc-stdio-live"], env=env, timeout=10,
                                 input="".join(json.dumps(request, ensure_ascii=False) + "\n" for request in requests).encode(),
                                 capture_output=True)

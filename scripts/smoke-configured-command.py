@@ -19,7 +19,7 @@ def run(binary):
         fixture.write_text("import json, os, pathlib, sys\npathlib.Path(sys.argv[1]).write_text(json.dumps({'argv': sys.argv[2:], 'cwd': os.getcwd(), 'value': os.environ['RMUX_COMMAND_TEST'], 'empty': os.environ['RMUX_COMMAND_EMPTY']}))\n")
         config = root / "config.json"
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/true", RMUX_COMMAND_TEST="inherited")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false", RMUX_COMMAND_TEST="inherited")
         for cwd in [str(project), None]:
             output.unlink(missing_ok=True)
             config.write_text(json.dumps({"commands": [{"name": "Probe 世界", "argv": [sys.executable, str(fixture), str(output), "", "two words", "$(literal)", "世界"], "cwd": cwd, "env": {"RMUX_COMMAND_TEST": "configured 世界", "RMUX_COMMAND_EMPTY": ""}}]}))

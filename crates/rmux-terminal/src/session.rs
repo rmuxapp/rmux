@@ -66,6 +66,7 @@ pub struct Session {
     remote_destination: Option<String>,
     child_pid: Option<u32>,
     direct_command: bool,
+    exit_success: Arc<AtomicBool>,
     _shell_integration: Option<tempfile::TempDir>,
     terminal: Arc<Mutex<Terminal>>,
     master: Box<dyn MasterPty + Send>,
@@ -402,6 +403,8 @@ impl Session {
         let (notify, updates) = async_channel::bounded(1);
         let exit = Arc::new(Mutex::new(None));
         let child_exit = exit.clone();
+        let exit_success = Arc::new(AtomicBool::new(false));
+        let child_success = exit_success.clone();
         let exit_terminal = terminal.clone();
         let exit_notify = notify.clone();
         let read_terminal = terminal.clone();
@@ -419,6 +422,7 @@ impl Session {
             remote_destination: None,
             child_pid,
             direct_command: false,
+            exit_success,
             _shell_integration: None,
             shell_history_id: None,
             terminal,
@@ -461,9 +465,12 @@ impl Session {
                     }
                 }
                 let message = match child.wait() {
-                    Ok(status) => match status.signal() {
-                        Some(signal) => format!("Process exited: {signal}"),
-                        None => format!("Process exited with status {}", status.exit_code()),
+                    Ok(status) => {
+                        child_success.store(status.success(), Ordering::Release);
+                        match status.signal() {
+                            Some(signal) => format!("Process exited: {signal}"),
+                            None => format!("Process exited with status {}", status.exit_code()),
+                        }
                     },
                     Err(error) => format!("Unable to wait for process: {error}"),
                 };
@@ -1252,6 +1259,11 @@ impl Session {
             .lock()
             .unwrap_or_else(|e| e.into_inner())
             .render_delay()
+    }
+    /// Successful interactive shell exits close their tabs. Failed sessions and
+    /// explicitly launched commands retain their output for inspection.
+    pub fn should_close_on_exit(&self) -> bool {
+        !self.direct_command && self.exit_status().is_some() && self.exit_success.load(Ordering::Acquire)
     }
     pub fn exit_status(&self) -> Option<String> {
         self.exit.lock().unwrap_or_else(|e| e.into_inner()).clone()
@@ -2279,6 +2291,20 @@ trap - EXIT HUP TERM
         #[cfg(windows)]
         command.args(["/d", "/c", script]);
         command
+    }
+    #[test]
+    fn automatic_close_requires_successful_shell_exit() -> Result<()> {
+        for (code, direct, expected) in [(0, false, true), (7, false, false), (0, true, false)] {
+            let mut session = Session::spawn(shell_command(&format!("exit {code}")), 40, 4)?;
+            session.direct_command = direct;
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+            while session.exit_status().is_none() {
+                anyhow::ensure!(std::time::Instant::now() < deadline, "shell exit deadline exceeded");
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+            assert_eq!(session.should_close_on_exit(), expected, "exit {code}, direct={direct}");
+        }
+        Ok(())
     }
     #[test]
     fn reports_exit_and_rejects_further_input() -> Result<()> {
