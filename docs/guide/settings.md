@@ -196,7 +196,7 @@ remain pending; shortcut overrides are described below.
 
 Set `"mode": "background"` to run a command without opening a terminal or
 workspace. Use the same named `command` binding as other configured commands.
-For example, on macOS this shortcut opens or focuses VS Code:
+For example, on macOS this shortcut opens the workspace's project folder in VS Code:
 
 ```json
 {
@@ -204,7 +204,7 @@ For example, on macOS this shortcut opens or focuses VS Code:
     {
       "name": "Focus VS Code",
       "mode": "background",
-      "argv": ["/usr/bin/open", "-a", "Visual Studio Code"]
+      "argv": ["/usr/bin/open", "-a", "Visual Studio Code", "{project_dir}"]
     }
   ],
   "keybindings": [
@@ -215,8 +215,11 @@ For example, on macOS this shortcut opens or focuses VS Code:
 
 Merge these entries into your existing arrays, then **Reload Settings**.
 The palette also offers **Run Focus VS Code**. This is a general command launcher;
-other apps and platforms can use their own executable and arguments. It focuses
-VS Code as an application, not a particular project window.
+other apps and platforms can use their own executable and arguments.
+`{project_dir}` requires rmux 0.1.13+ and a stored project identity, established
+by opening the rmux workspace from VS Code. It keeps targeting the original
+project after terminal directory changes. Remove this argument to focus only
+the app.
 
 Background commands use literal `argv`, optional absolute `cwd`, and child-only
 `env` overrides. Without `cwd`, a shortcut uses the focused terminal's reported
@@ -227,10 +230,11 @@ area. At most eight background commands run concurrently. Long-running commands
 retain a slot until they exit; closing a workspace does not terminate them.
 They are independent processes and are not restored with sessions.
 
-`rmux --command "Focus VS Code"` also supports background mode: it starts no GUI,
+`rmux --command NAME` also supports background mode: it starts no GUI,
 waits for the launcher command to exit, and returns success or failure. It cannot
 be combined with `--rpc-stdio-live`. Existing definitions without `mode` retain
-their terminal behavior.
+their terminal behavior. Standalone `--command` has no project identity, so
+commands using `{project_dir}` must be invoked inside rmux instead.
 
 ## Custom keyboard shortcuts
 

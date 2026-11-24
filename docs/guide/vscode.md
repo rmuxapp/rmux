@@ -62,7 +62,7 @@ No restart is needed. Keep your other commands, bindings, and layout presets:
   "commands": [{
     "name": "Focus VS Code",
     "mode": "background",
-    "argv": ["/usr/bin/open", "-a", "Visual Studio Code"]
+    "argv": ["/usr/bin/open", "-a", "Visual Studio Code", "{project_dir}"]
   }],
   "keybindings": [{
     "key": "cmd-shift-c",
@@ -72,8 +72,10 @@ No restart is needed. Keep your other commands, bindings, and layout presets:
 }
 ```
 
-This focuses VS Code as an application, not a specific editor window. macOS
-controls switching between Spaces; cross-Space behavior has not yet been
+Requires **rmux 0.1.13+**. This opens the workspace's original project folder in
+VS Code, even after changing terminal directories. Open the rmux workspace from
+VS Code first to establish its project identity. Remove `"{project_dir}"` if you
+only want to focus the app. macOS controls switching between Spaces; cross-Space behavior has not yet been
 verified. See [background commands](settings.md#background-commands-and-app-shortcuts)
 for other app-switching shortcuts.
 
@@ -107,7 +109,9 @@ use the workspace's stored project directory as a complete argument:
 
 ```json
 "argv": [
-  "/Applications/Visual Studio Code.app/Contents/Resources/app/bin/code",
+  "/usr/bin/open",
+  "-a",
+  "Visual Studio Code",
   "{project_dir}"
 ]
 ```

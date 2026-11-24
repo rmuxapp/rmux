@@ -73,7 +73,8 @@ In rmux Settings JSON, merge these entries into your existing arrays, then choos
       "argv": [
         "/usr/bin/open",
         "-a",
-        "Visual Studio Code"
+        "Visual Studio Code",
+        "{project_dir}"
       ]
     }
   ],
@@ -88,8 +89,10 @@ In rmux Settings JSON, merge these entries into your existing arrays, then choos
 ```
 
 From VS Code, the shortcut opens or reuses the project's running terminals.
-From rmux, it focuses VS Code. The return command focuses the app, not a specific
-project window; macOS controls switching between Spaces.
+From rmux, it opens the workspace's original project folder in VS Code. This
+return command requires **v0.1.13+** and a project identity established by opening
+the rmux workspace from VS Code. Changing terminal directories does not change
+the target; macOS controls switching between Spaces.
 
 Open a workspace for each project, split terminals for related tasks, and use the
 command palette to find actions without memorizing every shortcut. **⌘,** opens
