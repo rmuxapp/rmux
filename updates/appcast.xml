@@ -3,34 +3,35 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.22</title>
-            <pubDate>Tue, 24 Nov 2026 21:03:24 +0000</pubDate>
+            <title>0.1.23</title>
+            <pubDate>Tue, 24 Nov 2026 21:13:14 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.22</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.22</sparkle:version>
-            <sparkle:shortVersionString>0.1.22</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.23</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.23</sparkle:version>
+            <sparkle:shortVersionString>0.1.23</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.22
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.23
 
-Update the macOS app icon to Apple's Icon Composer format.
+Show terminal task status in the workspace sidebar consistently.
 
-- Let macOS control the icon's outer shape and sizing instead of baking rounded corners and padding into the artwork.
-- Preserve rmux's violet panes and terminal prompt, with default, dark, clear, and tinted appearances.
-- Include Apple's generated fallback icon assets for older macOS versions alongside the layered catalog.
-- Verify icon source and generated asset hashes during packaging, and install the compiler-generated icon lookup keys before signing.
+- Include program status reports from all applications, including reports without an application name, instead of requiring the exact name `Claude`.
+- Summarize status across all live tabs and panes, including inactive tabs. Show terminal progress when no program status is available.
+- Keep workspace status visible in compact-sidebar mode. Prioritize blocked and error states, then ongoing work; include percentages and a count of additional reports.
+- Exclude exited terminals and remove badges when reports clear.
+- Includes the Apple Icon Composer macOS icon update from 0.1.22.
 
-Addresses [#16](https://github.com/rmuxapp/rmux/issues/16).
+Addresses [#17](https://github.com/rmuxapp/rmux/issues/17).
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: Apple's compiler accepted the icon source; rendered appearance variants and small sizes were inspected. Generated catalog sizes and appearance records, the debug bundle's icon resources and lookup keys, and its code signature passed validation. Older-macOS runtime and live Dock/Finder appearance checks remain unverified. Native Windows runtime validation remains deferred.
+Validation: four focused workspace-status regression tests, the desktop debug build, and live RPC smoke checks passed. Tests cover unnamed and differently named applications, status priority, multiple reports, progress, and removal of exited or cleared status. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.22/rmux-0.1.22-macos-arm64.zip" length="8910901" type="application/octet-stream" sparkle:edSignature="qq2jINUcmfOHHdVRGTFEnmRQE2f52mE83cl1WQucP0HMh99yoO8DbITg79QWzQVyImnmVfYOlvDAisQoEFUdAg=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.23/rmux-0.1.23-macos-arm64.zip" length="8912903" type="application/octet-stream" sparkle:edSignature="LCbtBGAk0fbxbaFqaJQA/Z4QJHtkxM2EuU+IYO9rv3esDeV8hAwisECj4gE/dqsopRIw3M4Xaf8fi10vqayNAA=="/>
         </item>
     </channel>
 </rss>
