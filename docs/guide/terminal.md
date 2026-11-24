@@ -400,10 +400,13 @@ macOS. They do not change terminal input bindings or run during IME composition.
 
 ## Exited terminals and restarting
 
-A shell that exits successfully (including Ctrl+D at an empty prompt) closes its
-terminal tab after buffered output is drained. Other tabs keep running. Failed
-sessions and explicitly launched commands remain open so their output can be
-inspected. Ctrl+D still reaches the running terminal application normally.
+A shell that has run for at least two seconds closes its terminal tab when it
+exits, regardless of its final exit status. This includes Ctrl+D at an empty
+prompt after a failed command. Successful exits close immediately even during
+startup. Closing waits for buffered output to drain; other tabs keep running.
+Failures within the first two seconds and explicitly launched commands remain
+open so their output can be inspected. Ctrl+D still reaches the running terminal
+application normally; it does not forcibly close a running shell or application.
 
 For a retained terminal, its output stays available and a status strip shows
 the exit message. **New shell** opens a fresh tab through the normal new-tab path,

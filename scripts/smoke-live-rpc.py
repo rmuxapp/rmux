@@ -395,14 +395,15 @@ def run(binary, live_shell=False):
                     checks.append("Ctrl+D in the sole tab removes its empty pane, workspace and window")
                     before_exit = send("surface.list")["result"]["surfaces"]
                     failed = before_exit[0]
+                    # Ensure even the newest fixture is past the two-second startup guard.
+                    time.sleep(2.1)
                     assert "result" in send("surface.send_text", {"surface_id": failed["id"], "text": "fail\n"})
                     deadline = time.monotonic() + 5
                     while True:
                         current = send("surface.list")["result"]["surfaces"]
-                        retained = next(item for item in current if item["id"] == failed["id"])
-                        if retained["process_exited"]:
+                        if all(item["id"] != failed["id"] for item in current):
                             break
-                        assert time.monotonic() < deadline, "failed shell did not exit"
+                        assert time.monotonic() < deadline, "established shell with nonzero status did not close"
                         time.sleep(0.02)
                     # Canonical PTY input turns Ctrl+D on an empty line into EOF.
                     exited = before_exit[1]
@@ -414,8 +415,8 @@ def run(binary, live_shell=False):
                             break
                         assert time.monotonic() < deadline, "Ctrl+D left a finished tab open"
                         time.sleep(0.02)
-                    assert {item["id"] for item in current} == {item["id"] for item in before_exit} - {exited["id"]}
-                    checks.append("Ctrl+D closes only its successfully exited tab; failed shell remains inspectable")
+                    assert {item["id"] for item in current} == {item["id"] for item in before_exit} - {exited["id"], failed["id"]}
+                    checks.append("established failed shells and Ctrl+D close their tabs; unrelated tabs survive")
                 process.stdin.close()
                 time.sleep(0.1)
                 assert process.poll() is None, "EOF unexpectedly closed the GUI"

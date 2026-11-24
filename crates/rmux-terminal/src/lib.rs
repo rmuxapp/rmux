@@ -646,6 +646,7 @@ impl Terminal {
                     }
                 }
                 self.osc_capture = None;
+                self.osc_discard = false;
             }
             if stop.reached & GHOSTTY_TERMINAL_BOUNDARY_OSC_START as u32 != 0 {
                 self.osc_capture = Some(Vec::new());
@@ -758,7 +759,7 @@ impl Terminal {
     fn apply_clear_to_start(&mut self) -> Result<()> {
         // Never inject controls into an unfinished OSC, CSI or UTF-8 sequence.
         // Retry after the next application write has completed its parser state.
-        if self.osc_capture.is_some() || self.osc_discard { return Ok(()); }
+        if self.osc_capture.is_some() { return Ok(()); }
         // SAFETY: all engine access is exclusive; query output types match the API.
         unsafe {
             let mut remaining = 0;
@@ -1344,6 +1345,44 @@ mod tests {
         assert!(terminal.frame()?.text().contains("alternate"));
         terminal.write(b"\x1b[?1049l");
         assert!(terminal.frame()?.text().contains("primary"));
+        Ok(())
+    }
+    #[test]
+    fn clear_to_start_survives_ignored_osc_messages_at_every_chunk_boundary() -> Result<()> {
+        // A cwd/title containing '9' takes the OSC interception path even
+        // though only private history and notification messages are captured.
+        for message in [b"\x1b]7;file://localhost/tmp/project9\x07".as_slice(),
+                        b"\x1b]0;build 9\x1b\\".as_slice()] {
+            for split in 0..=message.len() {
+                let mut terminal = Terminal::new(40, 5)?;
+                terminal.write(b"old output\r\n$ typed input");
+                terminal.write(&message[..split]);
+                terminal.write(&message[split..]);
+                terminal.clear_to_start()?;
+                assert!(terminal.frame()?.text().starts_with("$ typed input"), "split={split}");
+                assert!(!terminal.clear_to_start_pending, "completed OSC must not block clear");
+                terminal.write(b"\r\nmore output\r\n$ next input");
+                terminal.clear_to_start()?;
+                assert!(terminal.frame()?.text().starts_with("$ next input"));
+            }
+        }
+        Ok(())
+    }
+    #[test]
+    fn clear_to_start_waits_for_discarded_osc_to_end_or_cancel() -> Result<()> {
+        for ending in [b"\x07".as_slice(), b"\x1b\\".as_slice(), b"\x18".as_slice()] {
+            let mut terminal = Terminal::new(40, 5)?;
+            terminal.write(b"old output\r\n$ typed input");
+            terminal.write(b"\x1b]99;");
+            terminal.write(&vec![b'x'; 9000]);
+            assert!(terminal.osc_discard);
+            terminal.clear_to_start()?;
+            assert!(terminal.frame()?.text().contains("old output"));
+            terminal.write(ending);
+            assert!(terminal.frame()?.text().starts_with("$ typed input"));
+            assert!(!terminal.clear_to_start_pending);
+            assert!(!terminal.osc_discard);
+        }
         Ok(())
     }
     #[test]

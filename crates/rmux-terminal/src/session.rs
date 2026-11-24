@@ -12,6 +12,14 @@ use std::{
     thread,
 };
 
+// Keep immediate failures visible, but a shell's final status often belongs
+// to its last command rather than to a failure of the shell itself.
+const SHELL_STARTUP_GRACE: std::time::Duration = std::time::Duration::from_secs(2);
+
+fn close_after_process_exit(success: bool, runtime: std::time::Duration) -> bool {
+    success || runtime >= SHELL_STARTUP_GRACE
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 enum Interaction {
     Scroll(crate::Scroll),
@@ -68,7 +76,7 @@ pub struct Session {
     remote_destination: Option<String>,
     child_pid: Option<u32>,
     direct_command: bool,
-    exit_success: Arc<AtomicBool>,
+    exit_closes: Arc<AtomicBool>,
     _shell_integration: Option<tempfile::TempDir>,
     terminal: Arc<Mutex<Terminal>>,
     master: Box<dyn MasterPty + Send>,
@@ -386,6 +394,7 @@ impl Session {
         let mut reader = pair.master.try_clone_reader()?;
         let pty_writer = pair.master.take_writer()?;
         let child = pair.slave.spawn_command(command).context("start process")?;
+        let started = std::time::Instant::now();
         let child_pid = child.process_id();
         let mut unstarted = UnstartedChild(Some(child));
         #[cfg(not(any(target_os = "macos", target_os = "linux")))]
@@ -405,8 +414,8 @@ impl Session {
         let (notify, updates) = async_channel::bounded(1);
         let exit = Arc::new(Mutex::new(None));
         let child_exit = exit.clone();
-        let exit_success = Arc::new(AtomicBool::new(false));
-        let child_success = exit_success.clone();
+        let exit_closes = Arc::new(AtomicBool::new(false));
+        let child_closes = exit_closes.clone();
         let exit_terminal = terminal.clone();
         let exit_notify = notify.clone();
         let read_terminal = terminal.clone();
@@ -424,7 +433,7 @@ impl Session {
             remote_destination: None,
             child_pid,
             direct_command: false,
-            exit_success,
+            exit_closes,
             _shell_integration: None,
             shell_history_id: None,
             terminal,
@@ -468,7 +477,7 @@ impl Session {
                 }
                 let message = match child.wait() {
                     Ok(status) => {
-                        child_success.store(status.success(), Ordering::Release);
+                        child_closes.store(close_after_process_exit(status.success(), started.elapsed()), Ordering::Release);
                         match status.signal() {
                             Some(signal) => format!("Process exited: {signal}"),
                             None => format!("Process exited with status {}", status.exit_code()),
@@ -1265,10 +1274,10 @@ impl Session {
             .unwrap_or_else(|e| e.into_inner())
             .render_delay()
     }
-    /// Successful interactive shell exits close their tabs. Failed sessions and
-    /// explicitly launched commands retain their output for inspection.
+    /// Established shells close regardless of their final command status.
+    /// Early failures and explicitly launched commands remain inspectable.
     pub fn should_close_on_exit(&self) -> bool {
-        !self.direct_command && self.exit_status().is_some() && self.exit_success.load(Ordering::Acquire)
+        !self.direct_command && self.exit_status().is_some() && self.exit_closes.load(Ordering::Acquire)
     }
     pub fn exit_status(&self) -> Option<String> {
         self.exit.lock().unwrap_or_else(|e| e.into_inner()).clone()
@@ -2298,7 +2307,46 @@ trap - EXIT HUP TERM
         command
     }
     #[test]
-    fn automatic_close_requires_successful_shell_exit() -> Result<()> {
+    fn shell_exit_policy_retains_only_early_failures() {
+        use std::time::Duration;
+        assert!(super::close_after_process_exit(true, Duration::ZERO));
+        assert!(!super::close_after_process_exit(false, super::SHELL_STARTUP_GRACE - Duration::from_nanos(1)));
+        assert!(super::close_after_process_exit(false, super::SHELL_STARTUP_GRACE));
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn eof_closes_established_failed_shell_but_not_a_running_application() -> Result<()> {
+        let script = "stty -echo; printf 'READY\\n'; read first; printf 'STILL_RUNNING\\n'; read second; exit 7";
+        let mut session = Session::spawn(shell_command(script), 80, 8)?;
+        let wait_text = |session: &Session, expected: &str| -> Result<()> {
+            let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+            while !session.frame()?.text().contains(expected) {
+                anyhow::ensure!(std::time::Instant::now() < deadline, "missing {expected}");
+                thread::sleep(std::time::Duration::from_millis(10));
+            }
+            Ok(())
+        };
+        wait_text(&session, "READY")?;
+        session.input(b"\x04")?;
+        wait_text(&session, "STILL_RUNNING")?;
+        assert!(session.exit_status().is_none(), "EOF in an application must not kill the shell");
+        assert!(!session.should_close_on_exit());
+        thread::sleep(super::SHELL_STARTUP_GRACE);
+        session.input(b"\x04")?;
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
+        while session.exit_status().is_none() || !session.shutdown_handle().is_output_drained() {
+            anyhow::ensure!(std::time::Instant::now() < deadline, "EOF did not finish the shell");
+            thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(session.exit_status().as_deref(), Some("Process exited with status 7"));
+        assert!(session.should_close_on_exit());
+        session.direct_command = true;
+        assert!(!session.should_close_on_exit(), "explicit commands retain their output regardless of runtime");
+        Ok(())
+    }
+    #[test]
+    fn automatic_close_retains_startup_failures_and_direct_commands() -> Result<()> {
         for (code, direct, expected) in [(0, false, true), (7, false, false), (0, true, false)] {
             let mut session = Session::spawn(shell_command(&format!("exit {code}")), 40, 4)?;
             session.direct_command = direct;
