@@ -17,7 +17,6 @@ mkdir -p "$bundle/Contents/Resources/shell-integration/zsh"
 mkdir -p "$bundle/Contents/Resources/shell-integration/bash"
 mkdir -p "$bundle/Contents/Resources/shell-integration/fish"
 mkdir -p "$bundle/Contents/Resources/shell-integration/powershell"
-cp docs/brand/rmux.icns "$bundle/Contents/Resources/rmux.icns"
 cp LICENSE "$bundle/Contents/Resources/LICENSE"
 cp shell-integration/powershell/rmux.ps1 "$bundle/Contents/Resources/shell-integration/powershell/rmux.ps1"
 cp shell-integration/fish/rmux.fish "$bundle/Contents/Resources/shell-integration/fish/rmux.fish"
@@ -33,7 +32,6 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 <key>CFBundleIdentifier</key><string>dev.rmux.prototype</string>
 <key>CFBundleName</key><string>rmux</string>
 <key>CFBundleDisplayName</key><string>rmux</string>
-<key>CFBundleIconFile</key><string>rmux.icns</string>
 <key>CFBundlePackageType</key><string>APPL</string>
 <key>CFBundleVersion</key><string>0.1.0</string>
 <key>NSHighResolutionCapable</key><true/>
@@ -45,6 +43,7 @@ cat > "$bundle/Contents/Info.plist" <<'PLIST'
 </dict></array>
 </dict></plist>
 PLIST
+python3 scripts/install-macos-icon.py "$bundle"
 if [ "${RMUX_DISTRIBUTION:-0}" = 1 ]; then
     sparkle="$(mise where github:sparkle-project/Sparkle@2.10.0)"
     mkdir -p "$bundle/Contents/Frameworks"

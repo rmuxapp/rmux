@@ -1,0 +1,11 @@
+{
+  "compiler": "Xcode 27.2\nBuild version 27B52",
+  "minimum_system_version": "12.0",
+  "sha256": {
+    "docs/brand/rmux.icon/Assets/panes.svg": "2c4772c26108a734bdf02ba68713e125001e7b525e8c0e029f11ce67eb4704c8",
+    "docs/brand/rmux.icon/icon.json": "bdea6f4699529b9b3185aa7a56ff834d4f43d9675697d6f2432c4683d4333408",
+    "docs/brand/macos/Assets.car": "27311dd3efb15c88e6e81f9bf4868051d1c71d93f35e258d2506320ff9f8e76d",
+    "docs/brand/macos/icon-info.plist": "2378f99306e61b2645b7d3f85027b7919a9af839b556d829100723c1f6c891e9",
+    "docs/brand/rmux.icns": "ec496756ee1502463f65017a3fbd70edae6455d49300bbecaf140e11d103e66a"
+  }
+}

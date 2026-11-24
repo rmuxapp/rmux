@@ -1,5 +1,6 @@
-// Native rendering of docs/brand/rmux.svg; uses the macOS SDK already required
-// to build rmux. Keep this geometry and the SVG master in sync.
+// Flat brand/Windows rendering of docs/brand/rmux.svg using the existing SDK.
+// macOS app bundles use rmux.icon via make-macos-icon.py instead.
+// Keep this geometry and the SVG master in sync.
 import AppKit
 
 guard CommandLine.arguments.count == 2 else {
