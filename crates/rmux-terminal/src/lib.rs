@@ -235,6 +235,7 @@ impl From<GhosttyColorRgb> for Color {
 }
 
 pub struct Terminal {
+    clear_to_start_pending: bool,
     osc_capture: Option<Vec<u8>>,
     osc_discard: bool,
     selection: selection::Gesture,
@@ -435,6 +436,7 @@ impl Terminal {
             "terminal dimensions must be nonzero"
         );
         let mut this = Self {
+            clear_to_start_pending: false,
             osc_capture: None,
             osc_discard: false,
             selection: selection::Gesture::new()?,
@@ -532,6 +534,9 @@ impl Terminal {
                 GHOSTTY_TERMINAL_OPT_RESET,
                 metadata_reset as *const c_void,
             ))?;
+            // One byte is enough to distinguish ground from unfinished input.
+            let continuation_limit: usize = 1;
+            check(ghostty_terminal_set(this.terminal, GHOSTTY_TERMINAL_OPT_CONTINUATION_MAX_BYTES, input(&continuation_limit)))?;
             let limit = rmux_core::scroll::DEFAULT_SCROLLBACK_BYTES;
             check(ghostty_terminal_set(
                 this.terminal,
@@ -575,6 +580,9 @@ impl Terminal {
             unsafe { ghostty_terminal_vt_write(self.terminal, bytes.as_ptr(), bytes.len()); }
         } else {
             self.write_with_osc_boundaries(bytes);
+        }
+        if self.clear_to_start_pending {
+            let _ = self.apply_clear_to_start();
         }
     }
 
@@ -741,6 +749,46 @@ impl Terminal {
                 .saturating_add(usage.alternate_image_bytes),
             compression_supported: usage.compression_supported,
         })
+    }
+    /// Clear output above the current input line without sending shell input.
+    pub fn clear_to_start(&mut self) -> Result<()> {
+        self.clear_to_start_pending = true;
+        self.apply_clear_to_start()
+    }
+    fn apply_clear_to_start(&mut self) -> Result<()> {
+        // Never inject controls into an unfinished OSC, CSI or UTF-8 sequence.
+        // Retry after the next application write has completed its parser state.
+        if self.osc_capture.is_some() || self.osc_discard { return Ok(()); }
+        // SAFETY: all engine access is exclusive; query output types match the API.
+        unsafe {
+            let mut remaining = 0;
+            if ghostty_terminal_continuation_buf(self.terminal, ptr::null_mut(), 0, &mut remaining) != GHOSTTY_SUCCESS || remaining != 0 {
+                return Ok(());
+            }
+            let mut screen: GhosttyTerminalScreen = GHOSTTY_TERMINAL_SCREEN_PRIMARY;
+            check(ghostty_terminal_get(self.terminal, GHOSTTY_TERMINAL_DATA_ACTIVE_SCREEN, out(&mut screen)))?;
+            self.clear_to_start_pending = false;
+            if screen != GHOSTTY_TERMINAL_SCREEN_PRIMARY { return Ok(()); }
+            let mut pending_wrap = false;
+            check(ghostty_terminal_get(self.terminal, GHOSTTY_TERMINAL_DATA_CURSOR_PENDING_WRAP, out(&mut pending_wrap)))?;
+            let mut row: u16 = 0;
+            check(ghostty_terminal_get(self.terminal, GHOSTTY_TERMINAL_DATA_CURSOR_Y, out(&mut row)))?;
+            self.scroll(Scroll::Bottom)?;
+            while row > 0 && self.row_flag(u32::from(row), GHOSTTY_ROW_DATA_WRAP_CONTINUATION)? {
+                row -= 1;
+            }
+            if row > 0 {
+                // Scroll the current line to the top, retaining its text/styles
+                // and column. Do not send Ctrl+L to the foreground application.
+                // Cursor movement cancels delayed wrap. Materialize it so
+                // subsequent output cannot overwrite the final input cell.
+                let wrap = if pending_wrap { "\r\n" } else { "" };
+                let controls = format!("\x1b[{row}S\x1b[{row}A{wrap}");
+                ghostty_terminal_vt_write(self.terminal, controls.as_ptr(), controls.len());
+            }
+        }
+        self.clear_scrollback()?;
+        self.scroll(Scroll::Bottom)
     }
     pub fn clear_scrollback(&mut self) -> Result<()> {
         self.revision = self.revision.wrapping_add(1);
@@ -1294,6 +1342,43 @@ mod tests {
                 >= alternate.primary_resident_bytes + alternate.alternate_resident_bytes
         );
         assert!(terminal.frame()?.text().contains("alternate"));
+        terminal.write(b"\x1b[?1049l");
+        assert!(terminal.frame()?.text().contains("primary"));
+        Ok(())
+    }
+    #[test]
+    fn clear_to_start_preserves_input_and_defers_partial_sequences() -> Result<()> {
+        let mut terminal = Terminal::new(30, 4)?;
+        terminal.write(b"old output\r\nmore output\r\n$ typed command");
+        terminal.write(b"\x1b[3");
+        terminal.clear_to_start()?;
+        assert!(terminal.frame()?.text().contains("old output"));
+        terminal.write(b"1m");
+        let frame = terminal.frame()?;
+        assert!(frame.text().starts_with("$ typed command"));
+        assert!(!frame.text().contains("output"));
+        assert_eq!(frame.scrollback_lines, 0);
+        terminal.write(b"!\r\nnext\r\nmore\r\nlast\r\n");
+        assert!(terminal.frame()?.scrollback_lines > 0);
+        Ok(())
+    }
+    #[test]
+    fn clear_to_start_preserves_wrapped_input() -> Result<()> {
+        let mut terminal = Terminal::new(10, 5)?;
+        terminal.write(b"old\r\n$ long command input");
+        terminal.clear_to_start()?;
+        let frame = terminal.frame()?;
+        assert!(frame.text().starts_with("$ long com\nmand input"));
+        assert_eq!(frame.cursor, Some((0, 2)));
+        Ok(())
+    }
+    #[test]
+    fn clear_to_start_leaves_alternate_screen_untouched() -> Result<()> {
+        let mut terminal = Terminal::new(30, 4)?;
+        terminal.write(b"primary\x1b[?1049happ\r\nsecond row");
+        let before = terminal.frame()?.text();
+        terminal.clear_to_start()?;
+        assert_eq!(terminal.frame()?.text(), before);
         terminal.write(b"\x1b[?1049l");
         assert!(terminal.frame()?.text().contains("primary"));
         Ok(())

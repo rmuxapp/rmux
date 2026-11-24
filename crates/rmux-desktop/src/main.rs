@@ -563,6 +563,7 @@ actions!(
         CopyWorkingDirectory,
         RevealWorkingDirectory,
         ClearScrollback,
+        ClearToStart,
         PreviousPrompt,
         NextPrompt,
         LastPrompt,
@@ -1933,12 +1934,25 @@ impl TerminalView {
         }
         cx.notify();
     }
+    fn clear_to_start(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        self.prepare_terminal_clear(window, cx);
+        if let Err(error) = self.session.queue_clear_to_start() {
+            self.error = Some(error.to_string());
+        }
+    }
     fn clear_scrollback(
         &mut self,
         _: &ClearScrollback,
         window: &mut Window,
         cx: &mut Context<Self>,
     ) {
+        self.prepare_terminal_clear(window, cx);
+        if let Err(error) = self.session.queue_clear_scrollback() {
+            self.error = Some(error.to_string());
+        }
+        cx.notify();
+    }
+    fn prepare_terminal_clear(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         self.clipboard_task = None;
         self.selecting = false;
         self.selection_scroll = None;
@@ -1946,9 +1960,6 @@ impl TerminalView {
         self.scroll_remainder = 0.;
         if self.dismiss_find(cx) {
             self.focus.focus(window);
-        }
-        if let Err(error) = self.session.queue_clear_scrollback() {
-            self.error = Some(error.to_string());
         }
         cx.notify();
     }
@@ -2064,6 +2075,7 @@ impl Render for TerminalView {
         let entity = cx.weak_entity();
         self.rendered_paste_pending = self.session.paste_pending();
         terminal_actions::bind(div(), cx).id("terminal-interaction")
+            .on_action(cx.listener(|this, _: &ClearToStart, window, cx| this.clear_to_start(window, cx)))
             .relative()
             .size_full()
             .flex()
@@ -3758,7 +3770,7 @@ fn main() {
                 KeyBinding::new("cmd-v", Paste, Some("Terminal")),
                 KeyBinding::new("cmd-c", CopySelection, Some("Terminal")),
                 KeyBinding::new("cmd-a", EditorSelectAll, Some("Terminal")),
-                KeyBinding::new("cmd-k", ClearScrollback, Some("Terminal")),
+                KeyBinding::new("cmd-k", ClearToStart, Some("Terminal")),
                 KeyBinding::new("cmd-left", MoveToLineStart, Some("Terminal")),
                 KeyBinding::new("cmd-right", MoveToLineEnd, Some("Terminal")),
                 KeyBinding::new("cmd-backspace", DeleteToLineStart, Some("Terminal")),
@@ -3987,6 +3999,7 @@ fn main() {
                     MenuItem::action("Undo", EditorUndo),
                     MenuItem::action("Redo", EditorRedo),
                     MenuItem::action("Select All", EditorSelectAll),
+                    MenuItem::action("Clear to Start", ClearToStart),
                     MenuItem::action("Clear Scrollback", ClearScrollback),
                     MenuItem::action("Paste", Paste),
                     MenuItem::submenu(Menu {

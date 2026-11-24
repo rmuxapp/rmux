@@ -59,7 +59,7 @@ impl Terminal {
         self.row_flag(row, GHOSTTY_ROW_DATA_WRAP)
     }
 
-    fn row_flag(&self, row: u32, flag: GhosttyRowData) -> Result<bool> {
+    pub(super) fn row_flag(&self, row: u32, flag: GhosttyRowData) -> Result<bool> {
         let point = GhosttyPoint {
             tag: GHOSTTY_POINT_TAG_VIEWPORT,
             value: GhosttyPointValue {

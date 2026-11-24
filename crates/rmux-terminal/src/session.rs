@@ -18,6 +18,7 @@ enum Interaction {
     Selection(crate::selection::Event),
     SelectAll,
     ClearScrollback,
+    ClearToStart,
 }
 #[derive(Default)]
 struct Interactions {
@@ -53,6 +54,7 @@ impl Interactions {
                 Interaction::Scroll(scroll) => terminal.scroll(scroll)?,
                 Interaction::Selection(event) => self.autoscroll = terminal.selection_event(event)?,
                 Interaction::SelectAll => { terminal.select_all()?; self.autoscroll = false; },
+                Interaction::ClearToStart => { terminal.clear_to_start()?; self.autoscroll = false; },
                 Interaction::ClearScrollback => { terminal.clear_scrollback()?; self.autoscroll = false; },
             }
         }
@@ -1061,6 +1063,9 @@ impl Session {
         terminal.clear_scrollback()
     }
     /// Viewport/selection ordering is shared with gestures, Select All and Copy.
+    pub fn queue_clear_to_start(&self) -> Result<()> {
+        self.queue_interaction(Interaction::ClearToStart).map(|_| ())
+    }
     pub fn queue_clear_scrollback(&self) -> Result<()> {
         self.queue_interaction(Interaction::ClearScrollback).map(|_| ())
     }

@@ -256,7 +256,12 @@ bounded background steps. History restores transparently when accessed. Focusing
 a terminal or opening Find cancels scheduling; completed passes stop until later
 activity. Savings depend on content and platform support.
 
-Cmd+K on macOS, or Edit → Clear Scrollback (also in the palette) removes retained history while
+Cmd+K on macOS (Edit → Clear to Start) clears output above the current input
+line and scrollback, preserving the input line and running shell. It leaves
+alternate-screen applications alone. Linux/Windows keep Ctrl+K available to the
+shell; Clear to Start is available from Edit.
+
+Edit → Clear Scrollback (also in the palette) removes retained history while
 preserving the current screen and running shell. It clears selection and closes
 Find; new output continues to accumulate within the normal history limit.
 
