@@ -89,6 +89,7 @@ mod snapshot;
 mod startup;
 mod ssh;
 mod status_view;
+mod workspace_status;
 #[cfg(all(target_os = "macos", feature = "browser"))]
 mod browser_window;
 mod text_field;

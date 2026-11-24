@@ -283,3 +283,9 @@ Set `RMUX_CLAUDE_INTEGRATION=0` to disable this integration. Shell integration
 must be enabled for the automatic `claude` function; `command claude` bypasses it.
 Automatic setup applies to local sessions. Shell wrappers are not installed on
 SSH hosts.
+
+Workspace status badges also include generic program status and terminal progress
+reports, even when an application supplies no name. They summarize all live tabs
+and panes, remain visible in compact-sidebar mode, and prioritize blocked or
+error states before ongoing work. A `+N` suffix indicates additional reports.
+Exited terminals and cleared reports do not leave stale workspace badges.

@@ -4329,7 +4329,7 @@ impl Render for WorkspaceWindow {
         });
         let mut navigation_positions = Vec::new();
         let mut unread_workspaces = std::collections::HashSet::new();
-        let mut claude_statuses = std::collections::HashMap::new();
+        let mut workspace_statuses = std::collections::HashMap::new();
         let mut notification_previews = std::collections::HashMap::new();
         if self.sidebar {
             navigation_positions.resize(self.workspace_state.entries.len(), 0);
@@ -4343,16 +4343,9 @@ impl Render for WorkspaceWindow {
                     for terminal in &pane.read(cx).terminals {
                         let terminal = terminal.read(cx);
                         unread |= terminal.attention.any();
-                        if terminal.process_exit.is_none()
-                            && let Some(status) = &terminal.program_status
-                            && status.record.app == "Claude"
-                        {
-                            use rmux_terminal::program_status::State;
-                            let priority = match status.record.state { State::Blocked => 5, State::Error => 4, State::Working => 3, State::Done => 2, State::Idle => 1 };
-                            let candidate = (priority, pane_view::task_badge(&status.record));
-                            let current = claude_statuses.entry(entry.workspace.entity_id()).or_insert(candidate);
-                            if priority > current.0 { *current = candidate; }
-                        }
+                        workspace_statuses.entry(entry.workspace.entity_id())
+                            .or_insert_with(crate::workspace_status::WorkspaceStatus::default)
+                            .include(terminal.program_status.as_ref(), terminal.progress, terminal.process_exit.is_some());
                         if let Some(candidate) = terminal.notifications.unread_preview()
                             && preview.as_ref().is_none_or(|(arrival, _)| candidate.0 > *arrival) {
                             preview = Some(candidate);
@@ -4799,12 +4792,14 @@ impl Render for WorkspaceWindow {
                                                                 .tooltip({ let hint = hint.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone().into())).into() })
                                                                 .child(hint)))
                                                     }))
+                                                        .when_some(workspace_statuses.get(&target).and_then(|status| status.badge()), |column, (text, tint)| {
+                                                            column.child(gpui::div().id(("workspace-status", target)).text_xs().text_color(rgb(tint)).truncate()
+                                                                .tooltip({ let text = text.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(text.clone().into())).into() })
+                                                                .child(text))
+                                                        })
                                                         .when(!compact, |column| column
                                                         .when_some(group_summary, |column, summary| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else if unread_count > 0 { crate::chrome_style::foreground() } else { crate::chrome_style::muted() }).truncate().child(summary)))
                                                         .when(!entry.description.is_empty(), |column| column.child(gpui::div().text_xs().text_color(if selected { crate::chrome_style::selected_detail() } else { crate::chrome_style::muted() }).truncate().child(entry.description.clone())))
-                                                        .when_some(claude_statuses.get(&target), |column, (_, (label, tint))| {
-                                                            column.child(gpui::div().text_xs().text_color(rgb(*tint)).truncate().child(format!("Claude · {label}")))
-                                                        })
                                                         .when_some(preview, |column, message| {
                                                             let text: SharedString = if message.title.is_empty() { message.body.clone() } else if message.body.is_empty() { message.title.clone() } else { format!("{} — {}", message.title, message.body) }.into();
                                                             let hint = text.clone();
