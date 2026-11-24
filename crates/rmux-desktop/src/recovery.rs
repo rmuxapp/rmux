@@ -1,4 +1,4 @@
-//! Opt-in, event-driven checkpoints. No periodic idle polling or per-frame hook.
+//! Event-driven session checkpoints. No periodic idle polling or per-frame hook.
 use super::*;
 use std::{path::PathBuf, sync::Mutex, time::Duration};
 
@@ -50,6 +50,7 @@ impl Writer {
     }
 }
 struct Recovery {
+    closing_window: Option<snapshot::SessionSnapshot>,
     lease: Option<Arc<Lease>>,
     generation: u64,
     writer: Arc<Mutex<Writer>>,
@@ -62,6 +63,16 @@ pub(super) fn changed(cx: &App) {
     if state.lease.is_some() && !cx.global::<Shutdowns>().quitting { let _ = state.wake.try_send(()); }
 }
 
+pub(super) fn enabled(cx: &App) -> bool {
+    cx.global::<Recovery>().lease.is_some()
+}
+
+/// Preserve the final window before native teardown; the normal quit path
+/// awaits this snapshot's write after the window itself has disappeared.
+pub(super) fn retain_closing_window(snapshot: snapshot::SessionSnapshot, cx: &mut App) {
+    cx.global_mut::<Recovery>().closing_window = Some(snapshot);
+}
+
 pub(super) fn checkpoint(cx: &mut App) -> Option<Task<anyhow::Result<()>>> {
     let lease = cx.global::<Recovery>().lease.clone()?;
     let snapshot = match super::capture_session(cx) {
@@ -71,6 +82,12 @@ pub(super) fn checkpoint(cx: &mut App) -> Option<Task<anyhow::Result<()>>> {
         Err(error) => { eprintln!("rmux: session checkpoint skipped: {error:#}"); return None; }
     };
     let state = cx.global_mut::<Recovery>();
+    let snapshot = if snapshot.windows.is_empty() {
+        state.closing_window.take().unwrap_or(snapshot)
+    } else {
+        state.closing_window = None;
+        snapshot
+    };
     state.generation += 1;
     let generation = state.generation;
     let writer = state.writer.clone();
@@ -91,7 +108,7 @@ fn observe<T: 'static>(cx: &App) {
 pub(super) fn install(lease: Option<Arc<Lease>>, cx: &mut App) {
     let enabled = lease.is_some();
     let (wake, receiver) = async_channel::bounded(1);
-    cx.set_global(Recovery { lease, generation: 0, writer: Arc::new(Mutex::new(Writer::default())), wake });
+    cx.set_global(Recovery { closing_window: None, lease, generation: 0, writer: Arc::new(Mutex::new(Writer::default())), wake });
     if !enabled { return; }
     observe::<window_view::WorkspaceWindow>(cx);
     cx.observe_new::<window_view::WorkspaceWindow>(|_, window, cx| {

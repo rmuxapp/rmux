@@ -1640,8 +1640,24 @@ impl WorkspaceWindow {
         for entry in &self.workspace_state.entries { entry.workspace.read(cx).request_process_close(cx); }
     }
 
+    fn retain_last_window(&mut self, window: &Window, cx: &mut Context<Self>) -> bool {
+        if cx.global::<Shutdowns>().quitting || !recovery::enabled(cx)
+            || cx.windows().into_iter().filter(|handle| handle.downcast::<Self>().is_some()).count() != 1 {
+            return true;
+        }
+        match self.session_snapshot(window, cx) {
+            Ok(snapshot) => { recovery::retain_closing_window(snapshot, cx); true }
+            Err(error) => {
+                self.notice = Some(format!("Could not retain this window for reopening: {error}. Finish any pending operation and try closing again."));
+                cx.notify();
+                false
+            }
+        }
+    }
+
     fn request_close_window(&mut self, window: &mut Window, cx: &mut Context<Self>) {
         if !self.should_confirm_close(cx) || cx.global::<Shutdowns>().quitting {
+            if !self.retain_last_window(window, cx) { return; }
             self.request_process_close(cx);
             window.remove_window();
             return;
@@ -1664,7 +1680,7 @@ impl WorkspaceWindow {
             let _ = cx.update(|window, cx| {
                 entity.update(cx, |this, cx| {
                     this.window_close_prompt = false;
-                    if confirmed {
+                    if confirmed && this.retain_last_window(window, cx) {
                         this.request_process_close(cx);
                         window.remove_window();
                     }
@@ -4361,6 +4377,7 @@ impl Render for WorkspaceWindow {
                 entity
                     .update(cx, |this, cx| {
                         if cx.global::<Shutdowns>().quitting || !this.should_confirm_close(cx) {
+                            if !this.retain_last_window(window, cx) { return false; }
                             this.request_process_close(cx);
                             true
                         } else {

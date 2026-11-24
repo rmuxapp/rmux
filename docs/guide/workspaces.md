@@ -362,8 +362,10 @@ sidebar and native window title; Save Layout preserves them for manual restorati
 
 Cmd+Shift+N opens a separate native window; Cmd+Shift+W closes the current window.
 Linux/Windows use Ctrl+Alt+N and Ctrl+Alt+W. Each window owns its workspace list.
-Closing a window drops its terminal sessions; quitting the app cleans up sessions
-across all windows. Native menus expose the main window, workspace, tab, edit and
+Closing a window stops its terminal processes; quitting stops processes across
+all windows. Normal launches automatically restore workspace layouts and working
+directories with fresh shells. Quit preserves all open windows; closing the last
+window preserves that window. See [session recovery](sessions.md#startup-restoration-and-crash-recovery). Native menus expose the main window, workspace, tab, edit and
 split commands where the platform provides an application menu.
 On macOS, normal system-originated app quits now route through rmux's confirmation
 and three-second cleanup path. The initial AppKit request is canceled, then

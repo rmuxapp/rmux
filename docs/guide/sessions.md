@@ -92,8 +92,19 @@ to an available display. Moving/resizing a window schedules a checkpoint when
 automatic recovery is enabled. Fullscreen/maximized and multi-monitor visual
 acceptance remain pending.
 
-To opt into recovery, set `"session_file": "/absolute/path/to/rmux-session.json"`
-in settings. Missing parent directories are created automatically (private to
+Normal launches automatically save and restore your workspaces. Quit rmux and
+reopen it to recover window layouts, workspace names and groups, splits, tabs,
+selection, and working directories with fresh shells. Closing the final window
+also retains that window for the next launch. Explicitly closing a workspace or
+terminal still removes it; running processes and scrollback are not resumed.
+
+The default recovery file is `config.session.json` beside your settings file
+(`~/.config/rmux/config.session.json` by default on macOS/Linux, or
+`%APPDATA%\rmux\config.session.json` on Windows). An `RMUX_CONFIG` override uses
+its own sibling `<config-stem>.session.json`, so separate profiles stay isolated.
+Set `"restore_session": false` to disable automatic saving and restoration, or
+set `"session_file": "/absolute/path/to/rmux-session.json"` to choose a custom
+location. Disabling restoration leaves the existing saved file untouched. Missing parent directories are created automatically (private to
 your user on macOS/Linux); existing files and directory permissions are preserved.
 Recovery requires an
 exclusive OS lock on a sibling `.lock` file. Another
@@ -102,8 +113,8 @@ so it cannot overwrite the owner's checkpoint. The lock file remains on disk;
 ownership is released by the OS when the process exits, including forced stops.
 Normal launches restore
 that file if present; normal Quit captures the current windows and awaits an
-atomic background save within the shared three-second cleanup deadline. Closing
-all windows records an empty session. Corrupt/unrestorable files log an error and
+atomic background save within the shared three-second cleanup deadline. Closing the final window captures it before teardown. Closing the last workspace
+or terminal explicitly records an empty session. Corrupt/unrestorable files log an error and
 open a fresh window with a recovery notice. Automatic saving is disabled for that
 launch so the original file remains available for repair; Save Session can write
 the new session separately. Lock failures also produce a recovery notice. Explicit

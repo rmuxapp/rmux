@@ -695,3 +695,12 @@ Automatic
 cleanup of old history files is not implemented yet. Explicit empty-history
 resets are supported; individual history-entry deletion is not synchronized yet.
 Save failures appear in the app and retry on the next command or at quit.
+
+## Restore workspaces on launch
+
+Workspace restoration is enabled by default. Normal Quit and closing the final
+window retain your workspace layout for reopening with fresh shells. Set
+`"restore_session": false` in Settings JSON to disable it, or use `session_file`
+to choose a custom recovery file. These settings take effect on the next launch.
+See [session recovery](sessions.md#startup-restoration-and-crash-recovery) for
+what is retained and how explicit layout/command launches stay isolated.

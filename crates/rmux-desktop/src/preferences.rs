@@ -244,6 +244,7 @@ pub struct Preferences {
     pub keybindings: Vec<crate::shortcuts::Binding>,
     pub new_workspace_placement: crate::workspace_groups::Placement,
     pub group_new_workspace_placement: crate::workspace_groups::Placement,
+    pub restore_session: bool,
     pub session_file: Option<std::path::PathBuf>,
     pub shell_history_directory: Option<std::path::PathBuf>,
     pub socket_directory: Option<std::path::PathBuf>,
@@ -291,6 +292,7 @@ impl Default for Preferences {
             commands: Vec::new(),
             layout_presets: Vec::new(),
             keybindings: Vec::new(),
+            restore_session: true,
             session_file: None,
             shell_history_directory: None,
             socket_directory: None,
@@ -775,6 +777,12 @@ impl Preferences {
     fn read(path: &Path, required: bool) -> Result<Self> {
         let value = Self::read_config(path, required)?;
         if let Some(path) = value.theme_file.clone() { value.import_theme(path) } else { Ok(value) }
+    }
+    /// Keep recovery beside the selected config, isolating alternate profiles
+    /// and test launches from the user's normal saved workspace.
+    pub fn recovery_path(&self) -> Option<std::path::PathBuf> {
+        if !self.restore_session { return None; }
+        self.session_file.clone().or_else(|| self.source.as_ref().map(|path| path.with_extension("session.json")))
     }
     pub fn load() -> Result<(Self, Option<String>)> {
         let explicit = std::env::var_os("RMUX_CONFIG");
@@ -1285,7 +1293,22 @@ mod tests {
         Ok(())
     }
     #[test]
-    fn recovery_path_is_opt_in_and_requires_an_absolute_path() -> Result<()> {
+    fn recovery_defaults_to_config_profile_and_can_be_disabled() -> Result<()> {
+        let directory = tempfile::tempdir()?;
+        let config = directory.path().join("config.json");
+        let mut preferences = Preferences::decode(b"{}")?;
+        preferences.source = Some(config.clone());
+        assert_eq!(preferences.recovery_path(), Some(config.with_extension("session.json")));
+        let custom = directory.path().join("custom.json");
+        preferences.session_file = Some(custom.clone());
+        assert_eq!(preferences.recovery_path(), Some(custom));
+        preferences.restore_session = false;
+        assert_eq!(preferences.recovery_path(), None);
+        assert!(!Preferences::decode(br#"{"restore_session":false}"#)?.restore_session);
+        Ok(())
+    }
+    #[test]
+    fn recovery_path_override_requires_an_absolute_path() -> Result<()> {
         assert!(Preferences::decode(b"{}")?.session_file.is_none());
         assert!(Preferences::decode(br#"{"session_file":"relative.json"}"#).is_err());
         assert!(Preferences::decode(br#"{"session_file":""}"#).is_err());

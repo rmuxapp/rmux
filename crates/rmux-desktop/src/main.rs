@@ -3523,7 +3523,7 @@ fn main() {
     // benchmarks neither restore nor overwrite the normal recovery file.
     let recovery_path = if matches!(&command, startup::Command::Launch { directory: None, argv, .. } if argv.is_empty())
         && std::env::var_os("RMUX_BENCH_PANES").is_none() {
-        preferences.session_file.clone()
+        preferences.recovery_path()
     } else { None };
     let mut recovery_notice = None;
     let mut recovery_lease = recovery_path.and_then(|path| match recovery::Lease::acquire(path.clone()) {
