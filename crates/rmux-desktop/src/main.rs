@@ -645,7 +645,7 @@ struct TerminalView {
     ports: ports_view::State,
     copy_mode: Option<Entity<copy_mode::CopyMode>>,
     hidden_line_input: bool,
-    link_hover: Option<(u64, String)>,
+    link_hover: Option<(u64, rmux_terminal::HoverLink)>,
     link_hover_cell: Option<(u64, u16, u32)>,
     attention: attention::Attention,
     session: Session,
@@ -1535,7 +1535,7 @@ impl TerminalView {
         let cell = (self.frame.revision, (f32::from(point.x) / self.cells.width) as u16, (f32::from(point.y) / self.cells.height) as u32);
         if self.link_hover_cell == Some(cell) { return; }
         // A busy parser leaves the cell uncached so the next motion can retry.
-        let uri = match self.session.hyperlink_at(cell.1, cell.2, cell.0) {
+        let uri = match self.session.hover_link_at(cell.1, cell.2, cell.0) {
             Ok(uri) => { self.link_hover_cell = Some(cell); uri },
             Err(_) => { self.clear_link_hover(cx); return; },
         };
@@ -2168,7 +2168,7 @@ impl Render for TerminalView {
                 if *hovered { this.update_link_hover(window.mouse_position(), window.modifiers(), cx); }
                 else { this.clear_link_hover(cx); }
             }))
-            .when_some(self.link_hover.as_ref().filter(|(revision, _)| *revision == self.frame.revision).map(|(_, uri)| uri.clone()), |root, uri| {
+            .when_some(self.link_hover.as_ref().filter(|(revision, _)| *revision == self.frame.revision).map(|(_, link)| link.uri.clone()), |root, uri| {
                 let file = self.local_link_file(&uri);
                 let allowed = openable_uri(&uri) || file.is_ok();
                 let caption: SharedString = if file.is_ok() {
@@ -2180,7 +2180,10 @@ impl Render for TerminalView {
                 else { "Ctrl-click to open link".into() };
                 let target: SharedString = file.map(|file| file.label()).unwrap_or(uri).into();
                 root.when(allowed, |root| root.cursor_pointer())
-                    .tooltip(move |_, cx| cx.new(|_| LinkHint { target: target.clone(), caption: caption.clone() }).into())
+                    .child(div().absolute().bottom_0().left_0().max_w_full().px_2().py_1()
+                        .bg(crate::chrome_style::border()).text_color(crate::chrome_style::foreground()).text_xs()
+                        .child(div().truncate().child(target))
+                        .child(div().truncate().text_color(crate::chrome_style::muted()).child(caption)))
             })
             .child(
                 canvas(
@@ -2647,6 +2650,16 @@ impl Element for TerminalElement {
                     cx,
                 );
             }
+            let view = self.view.read(cx);
+            if let Some((revision, link)) = &view.link_hover
+                && *revision == view.frame.revision
+                && (openable_uri(&link.uri) || view.local_link_file(&link.uri).is_ok())
+            {
+                for &(x, y) in &link.cells {
+                    let origin = state.content_bounds.origin + point(px(x as f32 * cells.width), px((y + 1) as f32 * cells.height - 2.));
+                    window.paint_quad(fill(Bounds::new(origin, size(px(cells.width), px(1.))), crate::chrome_style::foreground()));
+                }
+            }
             if let Some(preedit) = &mut state.preedit { preedit.paint(window, cx); }
             for cursor in state.cursor.drain(..) {
                 window.paint_quad(cursor);
@@ -2665,16 +2678,6 @@ impl Element for TerminalElement {
                 }
             });
         }
-    }
-}
-struct LinkHint { target: SharedString, caption: SharedString }
-impl Render for LinkHint {
-    fn render(&mut self, window: &mut Window, _: &mut Context<Self>) -> impl IntoElement {
-        div().w(px(520.).min((window.viewport_size().width - px(24.)).max(px(1.))))
-            .px_2().py_1().rounded_md().bg(crate::chrome_style::border()).text_color(crate::chrome_style::foreground())
-            .child(div().text_xs().text_color(crate::chrome_style::muted()).truncate().child(
-                self.caption.clone()))
-            .child(div().text_sm().truncate().child(self.target.clone()))
     }
 }
 

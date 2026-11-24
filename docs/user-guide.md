@@ -36,7 +36,7 @@ pin it, or close it. **Show Workspace Actions** opens the active workspace menu
 from the command palette. Use arrow keys to move, type to find an action,
 **Enter** to run it, or **Esc** to return to the terminal.
 
-Right-click a tab to rename, move, or close tabs. **Shift+F10** opens the active
+Double-click a tab to zoom its pane within the window; double-click again to restore the split layout. Right-click a tab to rename, move, or close tabs. **Shift+F10** opens the active
 tab's menu. Right-click terminal output for copy, paste, selection, find, and
 scrollback actions. These menus are also available through **Show Tab Actions**
 and **Terminal Actions** in the command palette.
@@ -262,3 +262,24 @@ contents; review anything you choose to attach for private information.
 
 For development status, see the [roadmap](roadmap.md) and [progress log](progress.md).
 Report problems in [GitHub Issues](https://github.com/rmuxapp/rmux/issues).
+
+## Claude Code status and notifications
+
+In a new local shell, launch `claude` normally. rmux's shell integration adds
+session-local Claude hooks that show **Claude · Working**, **Approval**, **Done**,
+or **Error** in the tab and workspace sidebar. Completion and approval requests
+also appear in rmux's notification history. Idle sessions remain labeled Claude.
+Existing aliases and functions are preserved; use `rmuxctl claude` explicitly if
+one of those overrides the automatic integration.
+
+Claude must already be installed and available on PATH. rmux does not modify
+Claude's settings files, prompts, or permissions, and does not need the automation
+socket for these hooks. The hooks use Claude's documented [lifecycle events](https://code.claude.com/docs/en/hooks).
+Session-local settings merge with existing hooks. If you pass `--settings`
+yourself, rmux leaves the invocation unchanged. Print mode (`-p` / `--print`) and
+redirected output also pass through without terminal status escapes.
+
+Set `RMUX_CLAUDE_INTEGRATION=0` to disable this integration. Shell integration
+must be enabled for the automatic `claude` function; `command claude` bypasses it.
+Automatic setup applies to local sessions. Shell wrappers are not installed on
+SSH hosts.

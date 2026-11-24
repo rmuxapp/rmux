@@ -1,12 +1,39 @@
 //! On-demand URI lookup; no URI allocation in the normal rendering path.
 use super::*;
+/// Viewport cells belonging to one hovered link, including wrapped labels.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct HoverLink {
+    pub uri: String,
+    pub cells: Vec<(u16, u32)>,
+}
 impl Terminal {
     pub fn link_at(&mut self, column: u16, row: u32) -> Result<Option<String>> {
+        Ok(self.hover_link_at(column, row)?.map(|link| link.uri))
+    }
+
+    pub fn hover_link_at(&mut self, column: u16, row: u32) -> Result<Option<HoverLink>> {
         if self.frame.revision != self.revision {
             return Ok(None);
         }
         if let Some(uri) = self.hyperlink_at(column, row)? {
-            return Ok(Some(uri));
+            let mut cells = vec![(column, row)];
+            // Follow adjacent cells only, crossing soft wraps but never hard newlines.
+            for forward in [false, true] {
+                let (mut x, mut y) = (column, row);
+                for _ in 0..8192 {
+                    if forward {
+                        if x + 1 < self.frame.columns { x += 1; }
+                        else if y + 1 < self.frame.rows.len() as u32 && self.row_wraps(y)? { x = 0; y += 1; }
+                        else { break; }
+                    } else if x > 0 { x -= 1; }
+                    else if y > 0 && self.row_wraps(y - 1)? { y -= 1; x = self.frame.columns - 1; }
+                    else { break; }
+                    if self.hyperlink_at(x, y)?.as_deref() != Some(&uri) { break; }
+                    cells.push((x, y));
+                }
+            }
+            cells.sort_unstable_by_key(|&(x, y)| (y, x));
+            return Ok(Some(HoverLink { uri, cells }));
         }
         if column >= self.frame.columns || row as usize >= self.frame.rows.len() {
             return Ok(None);
@@ -21,6 +48,7 @@ impl Terminal {
         }
         let mut text = String::new();
         let mut clicked = None;
+        let mut positions = Vec::new();
         let mut current = first;
         loop {
             for cell in self.frame.rows[current as usize]
@@ -33,6 +61,7 @@ impl Terminal {
                 {
                     clicked = Some(text.len());
                 }
+                positions.push((text.len(), cell.column, current, cell.width));
                 if cell.hidden || cell.text.is_empty() {
                     text.push(' ');
                 } else {
@@ -52,7 +81,13 @@ impl Terminal {
         }
         Ok(clicked
             .and_then(|offset| plain_url_at(&text, offset).or_else(|| plain_path_at(&text, offset)))
-            .map(str::to_owned))
+            .map(|uri| {
+                let start = uri.as_ptr() as usize - text.as_ptr() as usize;
+                let end = start + uri.len();
+                let cells = positions.into_iter().filter(|(offset, ..)| *offset >= start && *offset < end)
+                    .flat_map(|(_, x, y, width)| (x..x + u16::from(width)).map(move |x| (x, y))).collect();
+                HoverLink { uri: uri.to_owned(), cells }
+            }))
     }
 
     fn row_wraps(&self, row: u32) -> Result<bool> {
@@ -227,6 +262,28 @@ fn path_shaped(candidate: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    #[test]
+    fn hover_ranges_follow_labels_wraps_and_duplicate_targets() -> Result<()> {
+        let mut terminal = Terminal::new(20, 5)?;
+        terminal.write("界 (https://example.com/a_(b)). next".as_bytes());
+        terminal.frame()?;
+        let link = terminal.hover_link_at(6, 0)?.unwrap();
+        assert_eq!(link.uri, "https://example.com/a_(b)");
+        assert_eq!(link.cells, (4..20).map(|x| (x, 0)).chain((0..9).map(|x| (x, 1))).collect::<Vec<_>>());
+        let mut terminal = Terminal::new(40, 5)?;
+        terminal.write(b"https://x.test https://x.test");
+        terminal.frame()?;
+        assert_eq!(terminal.hover_link_at(16, 0)?.unwrap().cells, (15..29).map(|x| (x, 0)).collect::<Vec<_>>());
+        let mut terminal = Terminal::new(5, 5)?;
+        terminal.write("\x1b]8;;https://target.test\x07界label\x1b]8;;\x07".as_bytes());
+        terminal.frame()?;
+        let link = terminal.hover_link_at(1, 0)?.unwrap();
+        assert_eq!(link.uri, "https://target.test");
+        assert_eq!(link.cells, (0..5).map(|x| (x, 0)).chain((0..2).map(|x| (x, 1))).collect::<Vec<_>>());
+        terminal.write(b"!");
+        assert!(terminal.hover_link_at(1, 0)?.is_none());
+        Ok(())
+    }
     #[test]
     fn compiler_parenthesized_coordinates_are_part_of_the_link() {
         for target in ["src/main.ts(12,3)", "main.cs(42)", "\"src/my file.ts\"(12,3)"] {

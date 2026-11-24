@@ -190,6 +190,7 @@ pub mod compression;
 mod directory;
 mod kitty_notification;
 mod hyperlink;
+pub use hyperlink::HoverLink;
 pub mod keyboard;
 pub mod mouse;
 #[cfg(any(target_os = "macos", target_os = "linux"))]

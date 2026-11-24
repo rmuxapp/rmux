@@ -317,6 +317,10 @@ above 16 MiB instead of copying a partial result. Drag above/below the terminal 
 selection through scrollback; scrolling stops on release or at the history edge.
 
 
+Hold Cmd on macOS (Ctrl on Linux/Windows) while hovering a link to underline its
+visible text and show its destination along the bottom of the terminal pane.
+Wrapped links and OSC 8 labels are highlighted across their visible cells.
+
 Cmd-click an OSC 8 hyperlink or plain-text HTTP(S) URL to open it in the default
 browser (Ctrl-click on Linux/Windows). The lookup follows the displayed scrollback
 viewport and runs only on modifier-click or modifier-hover; ordinary rendering does not copy link

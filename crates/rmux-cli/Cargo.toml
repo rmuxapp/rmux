@@ -14,5 +14,7 @@ path = "src/main.rs"
 rmux-protocol = { path = "../rmux-protocol" }
 serde_json = "1.0.154"
 
-[dev-dependencies]
 tempfile = "3"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"

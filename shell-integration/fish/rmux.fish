@@ -6,6 +6,12 @@ test "$RMUX_SHELL_INTEGRATION" != 0; or return
 set -q _rmux_fish_loaded; and return
 set -g _rmux_fish_loaded 1
 
+if test -n "$RMUX_CLI"; and test "$RMUX_CLAUDE_INTEGRATION" != 0; and not functions -q claude
+    function claude --wraps claude
+        "$RMUX_CLI" claude $argv
+    end
+end
+
 # Modern fish owns OSC 7 and OSC 133 itself, including prompt-end markers.
 # Do not duplicate them or override an explicit no-mark-prompt preference.
 # Unknown feature (status 2) means an older fish needs the fallback hooks below.

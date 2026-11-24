@@ -599,6 +599,10 @@ impl Session {
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
         command.env("TERM_PROGRAM", "rmux");
+        if let Ok(executable) = std::env::current_exe() {
+            let client = executable.with_file_name(if cfg!(windows) { "rmuxctl.exe" } else { "rmuxctl" });
+            if client.is_file() { command.env("RMUX_CLI", client); }
+        }
         let powershell = is_powershell(&shell);
         let integration = if powershell
             && std::env::var_os("RMUX_SHELL_INTEGRATION").as_deref()
@@ -690,6 +694,10 @@ impl Session {
         command.env("TERM", "xterm-256color");
         command.env("COLORTERM", "truecolor");
         command.env("TERM_PROGRAM", "rmux");
+        if let Ok(executable) = std::env::current_exe() {
+            let client = executable.with_file_name(if cfg!(windows) { "rmuxctl.exe" } else { "rmuxctl" });
+            if client.is_file() { command.env("RMUX_CLI", client); }
+        }
         for (name, value) in environment { command.env(name, value); }
         let mut session = Self::spawn_with_scrollback(command, columns, rows, scrollback_bytes)?;
         session.direct_command = true;
@@ -1135,6 +1143,15 @@ impl Session {
             return Ok(None);
         }
         terminal.link_at(column, row)
+    }
+    pub fn hover_link_at(&self, column: u16, row: u32, displayed_revision: u64) -> Result<Option<crate::HoverLink>> {
+        let mut terminal = match self.terminal.try_lock() {
+            Ok(terminal) => terminal,
+            Err(std::sync::TryLockError::Poisoned(error)) => error.into_inner(),
+            Err(std::sync::TryLockError::WouldBlock) => anyhow::bail!("Terminal is busy"),
+        };
+        if terminal.revision != displayed_revision { return Ok(None); }
+        terminal.hover_link_at(column, row)
     }
     pub fn program_status_records(&self) -> Vec<crate::program_status::Record> {
         let terminal = self.terminal.lock().unwrap_or_else(|e| e.into_inner());

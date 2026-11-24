@@ -108,3 +108,8 @@ if [[ $(declare -p PROMPT_COMMAND 2>/dev/null) =~ ^declare[[:space:]]+-[^[:space
 else
     PROMPT_COMMAND=$'_rmux_bash_capture_status\n'"${PROMPT_COMMAND-}"$'\n_rmux_bash_precmd'
 fi
+
+# Preserve existing user aliases/functions and allow an explicit opt-out.
+if [[ -n ${RMUX_CLI-} && ${RMUX_CLAUDE_INTEGRATION-1} != 0 ]] && ! alias claude >/dev/null 2>&1 && ! typeset -f claude >/dev/null 2>&1; then
+    function claude { "$RMUX_CLI" claude "$@"; }
+fi

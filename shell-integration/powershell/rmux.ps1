@@ -40,3 +40,11 @@ if ($function:PSConsoleHostReadLine) {
         return $line
     }
 }
+
+# Preserve user aliases/functions. The installed CLI path is passed as data.
+if ($env:RMUX_CLI -and $env:RMUX_CLAUDE_INTEGRATION -ne '0' -and
+    -not (Get-Command claude -CommandType Alias,Function -ErrorAction SilentlyContinue)) {
+    function global:claude {
+        & $env:RMUX_CLI claude @args
+    }
+}

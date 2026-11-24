@@ -38,6 +38,7 @@ const COMMANDS: &[(&str, &[&str])] = &[
     ("split-pane", &["--pane", "--direction", "--ssh", "--cwd", "--focus", "--activate"]),
     ("set-pane-zoom", &["--pane", "--zoomed"]),
     ("completions", &[]),
+    ("claude", &[]),
 ];
 
 pub fn script(shell: &str) -> Result<&'static str, String> {

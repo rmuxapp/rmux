@@ -1,7 +1,7 @@
 use super::*;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-fn task_badge(record: &rmux_terminal::program_status::Record) -> (&'static str, u32) {
+pub(super) fn task_badge(record: &rmux_terminal::program_status::Record) -> (&'static str, u32) {
     use rmux_terminal::program_status::{Kind, State};
     match record.state {
         State::Idle => ("Idle", 0xa0a0a0),
@@ -1328,7 +1328,7 @@ impl Render for PaneView {
                                                 let Some(index) = this.terminals.iter().position(|terminal| terminal.entity_id() == target) else { return; };
                                                 this.select(index, window, cx);
                                                 if matches!(event, ClickEvent::Mouse(mouse) if mouse.down.click_count == 2) {
-                                                    this.rename_tab(window, cx);
+                                                    window.dispatch_action(Box::new(TogglePaneZoom), cx);
                                                 }
                                             }))
                                             .on_mouse_down(MouseButton::Middle, cx.listener(move |this, _, window, cx| {
@@ -1343,7 +1343,7 @@ impl Render for PaneView {
                                             .when_some(terminal.read(cx).program_status.as_ref().filter(|_| terminal.read(cx).process_exit.is_none()), |tab, status| {
                                                 let record = &status.record;
                                                 let (label, tint) = task_badge(record);
-                                                let mut text = label.to_owned();
+                                                let mut text = if record.app == "Claude" { format!("Claude · {label}") } else { label.to_owned() };
                                                 if let Some(percent) = record.progress { text.push_str(&format!(" {percent}%")); }
                                                 if status.count > 1 { text.push_str(&format!(" +{}", status.count - 1)); }
                                                 // A report can contain a 2 KiB message. Read and format it

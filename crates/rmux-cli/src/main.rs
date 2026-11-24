@@ -1,5 +1,6 @@
 //! Small external client: no GPUI, Ghostty, shell or terminal dependencies.
 mod commands;
+mod claude;
 mod completions;
 mod pipe;
 mod follow;
@@ -137,6 +138,12 @@ fn local_help(args: &[OsString]) -> Result<Option<String>, String> {
 
 fn run() -> Result<i32, String> {
     let args: Vec<_> = std::env::args_os().skip(1).collect();
+    if args.first().is_some_and(|arg| arg == "claude-hook") { return claude::hook(); }
+    if args.first().is_some_and(|arg| arg == "claude") { return claude::launch(&args[1..]); }
+    if args.len() == 2 && args[0] == "help" && args[1] == "claude" {
+        println!("Usage: rmuxctl claude [CLAUDE_ARGS...]\nLaunch Claude with session-local workspace status and notification hooks.\nRequires Claude on PATH. Set RMUX_CLAUDE_INTEGRATION=0 to disable.\nPrint mode, redirected output, and explicit --settings pass through unchanged.");
+        return Ok(0);
+    }
     if let Some(help) = local_help(&args)? {
         print!("{help}");
         return Ok(0);
@@ -155,7 +162,7 @@ fn run() -> Result<i32, String> {
         std::env::var_os("RMUX_SOCKET_DIR"),
     )?
     else {
-        print!("{HELP}\n{}\nOffline shell setup: rmuxctl completions bash|zsh|fish\n", commands::HELP);
+        print!("{HELP}\n{}\nClaude integration: rmuxctl claude [ARGS...]\nOffline shell setup: rmuxctl completions bash|zsh|fish\n", commands::HELP);
         return Ok(0);
     };
     let pipe_command = request.pipe_command.take();
