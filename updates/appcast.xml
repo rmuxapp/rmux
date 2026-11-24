@@ -3,34 +3,32 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.17</title>
-            <pubDate>Mon, 23 Nov 2026 23:28:39 +0000</pubDate>
+            <title>0.1.18</title>
+            <pubDate>Tue, 24 Nov 2026 03:28:48 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.17</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.17</sparkle:version>
-            <sparkle:shortVersionString>0.1.17</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.18</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.18</sparkle:version>
+            <sparkle:shortVersionString>0.1.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.17
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.18
 
-Polish terminal shortcuts, shell exits, menus, and macOS installation.
+Make macOS Cmd+K clear output above the current input line as well as scrollback.
 
-- Cmd+K now clears terminal scrollback on macOS, preserving the current screen and running shell.
-- Successful shell exits, including Ctrl+D at an empty prompt, close their tabs after buffered output drains. Empty panes, workspaces, and windows are cleaned up; failed sessions and directly launched command output remain available for inspection.
-- File, Edit, and View commands are grouped into submenus, with existing actions and shortcuts preserved.
-- The macOS installer places rmux on the left and Applications on the right.
-
-Addresses GitHub issues #5, #6, #8, and #9.
+- Cmd+K now performs Clear to Start, preserving the current input and running shell, including wrapped input lines.
+- Clearing waits for incomplete terminal escape sequences to finish and leaves alternate-screen applications alone.
+- Edit → Clear to Start exposes the action in the menu. Clear Scrollback remains available separately; Linux and Windows Ctrl+K remains available to the shell.
+- Ctrl+D retains the v0.1.17 behavior: successful shell exits close their tabs; failed sessions and explicitly launched commands remain available for inspection.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-The desktop/CLI debug build, focused terminal tests, and native RPC smoke checks passed, including Ctrl+D closure and last-tab cleanup. Compressed DMG layout metadata was verified. Native visual review remains pending; Windows runtime validation remains deferred.
+Validation: desktop debug build, terminal tests, focused clear tests, and the original successful-shell-exit regression passed. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.17/rmux-0.1.17-macos-arm64.zip" length="7426889" type="application/octet-stream" sparkle:edSignature="U0wTwEBvkH3jUh8QdeCXLzYvVcrdNor5Z9ymtp/4455VS4YUGc5Iqbt7JdbU58WFuACjcn+55EY7tfCyNiaKDQ=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.18/rmux-0.1.18-macos-arm64.zip" length="7430309" type="application/octet-stream" sparkle:edSignature="90Y7VvDeV/jt0vmEpVQ7hEnyTsEZJZXt2pxa01goIh+nai2mK51wHZ6Jycweas11cwchafZtvXkcrMgQRspxAw=="/>
         </item>
     </channel>
 </rss>
