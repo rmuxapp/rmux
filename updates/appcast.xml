@@ -3,33 +3,34 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.19</title>
-            <pubDate>Tue, 24 Nov 2026 04:04:06 +0000</pubDate>
+            <title>0.1.20</title>
+            <pubDate>Tue, 24 Nov 2026 16:49:46 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.19</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.19</sparkle:version>
-            <sparkle:shortVersionString>0.1.19</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.20</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.20</sparkle:version>
+            <sparkle:shortVersionString>0.1.20</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.19
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.20
 
-Restore your workspaces automatically when reopening rmux.
+Fix Cmd+K stopping unexpectedly and make shell exits close consistently after startup.
 
-- Normal launches now save and restore windows, workspace names and groups, splits, tabs, selection, and working directories by default.
-- Quitting retains all open windows. Closing the final window retains that window for reopening, including through the native macOS close button and confirmation dialog.
-- Restored terminals start fresh shells; running processes and scrollback are not resumed. Explicitly closed workspaces and terminals remain closed.
-- Recovery defaults to a config.session.json file beside your settings. Alternate config profiles stay isolated. Set restore_session to false to disable automatic recovery, or use session_file to choose a custom file.
-- Existing recovery locks, atomic saves, and protection for corrupt or unrestorable files remain in place. Explicit layout, session, directory, and command launches stay isolated from automatic recovery.
+- Cmd+K no longer gets stuck after ignored terminal title, working-directory, or oversized control messages. Clearing still waits safely for incomplete messages to finish or cancel.
+- Interactive shells that have run for at least two seconds now close on exit regardless of their final status, including Ctrl+D after a failed command. Successful exits close immediately.
+- Failures within the first two seconds and explicitly launched commands stay open for inspection. Ctrl+D inside a running application continues to reach that application normally.
+- Tab closure waits for buffered output, cleans up empty panes and windows, and leaves unrelated sessions running.
+
+Addresses the reproducible Cmd+K failure reported in [#12](https://github.com/rmuxapp/rmux/issues/12).
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: desktop debug build, seven recovery-related tests, multi-window session restore and crash-recovery smoke tests, default recovery and opt-out checks, and native macOS close/reopen checks passed. Native Windows runtime validation remains deferred.
+Validation: all 148 active terminal tests, the desktop debug build, and live RPC smoke checks passed. Regression coverage includes split control messages, message cancellation, startup failure retention, Ctrl+D forwarding, nonzero shell exits, and empty-window cleanup. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.19/rmux-0.1.19-macos-arm64.zip" length="7431709" type="application/octet-stream" sparkle:edSignature="ycm0WC1FO8OY9Cayl+paJFalmfPXGW1XpO3xe8boa0sKMV/VEqNbGFIqWZsdW+4lhzZUB+ZjjMadYmyb0GaICw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.20/rmux-0.1.20-macos-arm64.zip" length="7433192" type="application/octet-stream" sparkle:edSignature="jfDjGr6hdDhGCmGMSLG4n73U7ajx4v85hrXY2K+99xT6Fl5wzWNVoC7LPPyPbqikzYRs62qkB2BFjzmiph7RBw=="/>
         </item>
     </channel>
 </rss>
