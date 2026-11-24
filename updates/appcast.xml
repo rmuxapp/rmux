@@ -3,32 +3,33 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.18</title>
-            <pubDate>Tue, 24 Nov 2026 03:28:48 +0000</pubDate>
+            <title>0.1.19</title>
+            <pubDate>Tue, 24 Nov 2026 04:04:06 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.18</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.18</sparkle:version>
-            <sparkle:shortVersionString>0.1.18</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.19</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.19</sparkle:version>
+            <sparkle:shortVersionString>0.1.19</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.18
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.19
 
-Make macOS Cmd+K clear output above the current input line as well as scrollback.
+Restore your workspaces automatically when reopening rmux.
 
-- Cmd+K now performs Clear to Start, preserving the current input and running shell, including wrapped input lines.
-- Clearing waits for incomplete terminal escape sequences to finish and leaves alternate-screen applications alone.
-- Edit → Clear to Start exposes the action in the menu. Clear Scrollback remains available separately; Linux and Windows Ctrl+K remains available to the shell.
-- Ctrl+D retains the v0.1.17 behavior: successful shell exits close their tabs; failed sessions and explicitly launched commands remain available for inspection.
+- Normal launches now save and restore windows, workspace names and groups, splits, tabs, selection, and working directories by default.
+- Quitting retains all open windows. Closing the final window retains that window for reopening, including through the native macOS close button and confirmation dialog.
+- Restored terminals start fresh shells; running processes and scrollback are not resumed. Explicitly closed workspaces and terminals remain closed.
+- Recovery defaults to a config.session.json file beside your settings. Alternate config profiles stay isolated. Set restore_session to false to disable automatic recovery, or use session_file to choose a custom file.
+- Existing recovery locks, atomic saves, and protection for corrupt or unrestorable files remain in place. Explicit layout, session, directory, and command launches stay isolated from automatic recovery.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: desktop debug build, terminal tests, focused clear tests, and the original successful-shell-exit regression passed. Native Windows runtime validation remains deferred.
+Validation: desktop debug build, seven recovery-related tests, multi-window session restore and crash-recovery smoke tests, default recovery and opt-out checks, and native macOS close/reopen checks passed. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.18/rmux-0.1.18-macos-arm64.zip" length="7430309" type="application/octet-stream" sparkle:edSignature="90Y7VvDeV/jt0vmEpVQ7hEnyTsEZJZXt2pxa01goIh+nai2mK51wHZ6Jycweas11cwchafZtvXkcrMgQRspxAw=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.19/rmux-0.1.19-macos-arm64.zip" length="7431709" type="application/octet-stream" sparkle:edSignature="ycm0WC1FO8OY9Cayl+paJFalmfPXGW1XpO3xe8boa0sKMV/VEqNbGFIqWZsdW+4lhzZUB+ZjjMadYmyb0GaICw=="/>
         </item>
     </channel>
 </rss>
