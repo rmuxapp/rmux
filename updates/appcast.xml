@@ -3,35 +3,34 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.21</title>
-            <pubDate>Tue, 24 Nov 2026 17:25:18 +0000</pubDate>
+            <title>0.1.22</title>
+            <pubDate>Tue, 24 Nov 2026 21:03:24 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.21</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.21</sparkle:version>
-            <sparkle:shortVersionString>0.1.21</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.22</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.22</sparkle:version>
+            <sparkle:shortVersionString>0.1.22</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.21
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.22
 
-Improve link hover feedback, tab zoom, and Claude Code workspace status.
+Update the macOS app icon to Apple's Icon Composer format.
 
-- Hold Cmd on macOS or Ctrl on Linux/Windows while hovering a link to underline its visible text, including wrapped URLs and OSC 8 labels. The destination appears at the bottom of the terminal pane instead of in a popup.
-- Double-click a terminal tab to toggle pane zoom within the window. Rename remains available from the tab context menu.
-- Local shell integration launches Claude Code with session-local hooks for working, approval, completion, and error states in tabs and the workspace sidebar, plus completion and approval notifications. Existing Claude settings files and user shell aliases/functions are preserved.
-- Use `rmuxctl claude` explicitly when needed, or set `RMUX_CLAUDE_INTEGRATION=0` to opt out. Print mode, redirected output, and explicit `--settings` arguments pass through unchanged.
-- Includes the Cmd+K fix shipped in 0.1.20, with its regression checks reverified.
+- Let macOS control the icon's outer shape and sizing instead of baking rounded corners and padding into the artwork.
+- Preserve rmux's violet panes and terminal prompt, with default, dark, clear, and tinted appearances.
+- Include Apple's generated fallback icon assets for older macOS versions alongside the layered catalog.
+- Verify icon source and generated asset hashes during packaging, and install the compiler-generated icon lookup keys before signing.
 
-Addresses [#13](https://github.com/rmuxapp/rmux/issues/13), [#14](https://github.com/rmuxapp/rmux/issues/14), and [#15](https://github.com/rmuxapp/rmux/issues/15).
+Addresses [#16](https://github.com/rmuxapp/rmux/issues/16).
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: 149 active terminal tests and 37 CLI tests passed, along with the desktop debug build, live RPC smoke checks, shell integration checks, and Claude lifecycle fixtures covering Ctrl+C, cleanup, exit status, aliases, and passthrough. The CLI cross-check for Windows passed. Native visual verification was blocked by the locked Mac; native Windows runtime validation remains deferred.
+Validation: Apple's compiler accepted the icon source; rendered appearance variants and small sizes were inspected. Generated catalog sizes and appearance records, the debug bundle's icon resources and lookup keys, and its code signature passed validation. Older-macOS runtime and live Dock/Finder appearance checks remain unverified. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.21/rmux-0.1.21-macos-arm64.zip" length="7480373" type="application/octet-stream" sparkle:edSignature="qyliGj7RQHGU9jnfGBm82K31A6vMVbtDHWPKET+0ZIEXoWEJdsK7X1VvNuzEiDa2iNe9o48fPPoDNG015xBACg=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.22/rmux-0.1.22-macos-arm64.zip" length="8910901" type="application/octet-stream" sparkle:edSignature="qq2jINUcmfOHHdVRGTFEnmRQE2f52mE83cl1WQucP0HMh99yoO8DbITg79QWzQVyImnmVfYOlvDAisQoEFUdAg=="/>
         </item>
     </channel>
 </rss>
