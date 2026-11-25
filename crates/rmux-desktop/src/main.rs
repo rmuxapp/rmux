@@ -46,6 +46,7 @@ mod diagnostics;
 mod memory_view;
 mod settings_view;
 mod settings_search;
+mod settings_editor;
 mod shortcuts;
 mod shortcut_label;
 use rmux_core::focus_trail;
@@ -198,6 +199,25 @@ struct CheckForUpdates;
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct AdjustSetting { key: String, delta: i32 }
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct ResetSetting { key: String }
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct ApplySettingEditor;
+
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct CancelSettingEditor;
+
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct BrowseSettingPath;
+
+#[derive(Clone, Debug, Default, PartialEq, Action)]
+#[action(namespace = rmux, no_json)]
+struct SetSettingDraft { value: String }
+
 #[derive(Clone, Debug, Default, PartialEq, Action)]
 #[action(namespace = rmux, no_json)]
 struct SelectSetting { key: String }
@@ -420,6 +440,7 @@ actions!(
         ReportIssue,
         OpenWebsite,
         NewWindow,
+        MinimizeWindow,
         CloseWindow,
         CloseWorkspace,
         Split,
@@ -603,6 +624,7 @@ struct TerminalView {
     measured_font_size: Option<f32>,
     cells: CellMetrics,
     find: Option<Entity<find_bar::FindBar>>,
+    find_navigation_pending: bool,
     last_find_query: String,
     find_history: find_bar::QueryHistory,
     selecting: bool,
@@ -1083,6 +1105,7 @@ impl TerminalView {
             default_font_size: cx.global::<Preferences>().font_size,
             measured_font_size: None,
             find: None,
+            find_navigation_pending: false,
             last_find_query: String::new(),
             find_history: Default::default(),
             selecting: false,
@@ -1233,6 +1256,16 @@ impl TerminalView {
     }
     fn request_output_render_with_delay(&mut self, delay: Option<std::time::Duration>, cx: &mut Context<Self>) {
         self.schedule_compression(cx);
+        // Inactive tabs/workspaces and zoom-hidden panes release their snapshot.
+        // Their parents redraw on selection, and prepaint then takes a fresh
+        // frame (requesting another frame if the parser is busy). Pure output
+        // need not invalidate a view that cannot currently display it. Metadata,
+        // notifications, errors and process exits retain their independent updates.
+        if self.render_snapshot_released {
+            self.render_hold_timer = None;
+            if let Some(metrics) = &mut self.metrics { metrics.hidden_output_invalidations_skipped += 1; }
+            return;
+        }
         if let Some(delay) = delay {
             if self.render_hold_timer.is_none() {
                 let timer = cx.background_executor().timer(delay);
@@ -1966,6 +1999,7 @@ impl TerminalView {
         cx.notify();
     }
     fn dismiss_find(&mut self, cx: &App) -> bool {
+        self.find_navigation_pending = false;
         let Some(find) = self.find.take() else {
             return false;
         };
@@ -2522,6 +2556,14 @@ impl Element for TerminalElement {
                         if frame.revision != view.frame.revision { view.clear_link_hover(cx); }
                         view.frame = frame;
                         view.render_snapshot_released = false;
+                        // A search-result jump can reveal a hidden terminal with
+                        // different dimensions. Queue navigation only after its
+                        // first resize/refresh, which invalidates old matches.
+                        if std::mem::take(&mut view.find_navigation_pending) {
+                            if let Some(find) = &view.find {
+                                find.update(cx, |find, cx| find.navigate(rmux_terminal::search::Direction::Older, cx));
+                            }
+                        }
                     },
                     Ok(None) => {
                         // Keep the last coherent frame instead of waiting behind output
@@ -3501,6 +3543,10 @@ fn main() {
         eprintln!("rmux: {error}");
         std::process::exit(2);
     });
+    // Automation fixtures can open a window without taking keyboard focus
+    // away from the desktop the user is actively working in.
+    let activate_startup = std::env::var_os("RMUX_STARTUP_ACTIVATE").as_deref()
+        != Some(std::ffi::OsStr::new("0"));
     let live_rpc_stdio = match &command {
         startup::Command::Launch { live_rpc_stdio, .. } | startup::Command::Layout { live_rpc_stdio, .. } | startup::Command::Session { live_rpc_stdio, .. } | startup::Command::Preset { live_rpc_stdio, .. } | startup::Command::CustomCommand { live_rpc_stdio, .. } => *live_rpc_stdio,
         _ => false,
@@ -3535,7 +3581,7 @@ fn main() {
         Ok(lease) => Some(lease),
         Err(error) => {
             eprintln!("rmux: recovery disabled for {}: {error:#}", path.display());
-            recovery_notice = Some(format!("Session recovery is unavailable: {error}. This window will not overwrite the recovery file."));
+            recovery_notice = Some(format!("Session recovery is unavailable for {}: {error}. Close any other rmux instance using this session, or choose a different Session file in Settings and restart. Check that its parent directory is writable. This window will not overwrite the recovery file; use Save Session to save separately.", path.display()));
             None
         }
     });
@@ -3883,8 +3929,18 @@ fn main() {
         ]);
         #[cfg(all(target_os = "macos", feature = "browser"))]
         browser_window::initialize(cx);
+        #[cfg(target_os = "macos")]
+        cx.bind_keys([KeyBinding::new("cmd-m", MinimizeWindow, None)]);
         shortcuts::initialize(cx);
         cx.on_action(|_: &Quit, cx| request_quit(cx));
+        #[cfg(target_os = "macos")]
+        {
+            cx.on_action(|_: &MinimizeWindow, cx| {
+                if let Some(handle) = cx.active_window() {
+                    let _ = handle.update(cx, |_, window, _| window.minimize_window());
+                }
+            });
+        }
         cx.on_action(|_: &OpenUserGuide, cx| cx.open_url(rmux_core::commands::CommandId::OpenUserGuide.help_url().unwrap()));
         cx.on_action(|_: &ReportIssue, cx| cx.open_url(rmux_core::commands::CommandId::ReportIssue.help_url().unwrap()));
         cx.on_action(|_: &OpenWebsite, cx| cx.open_url(rmux_core::commands::CommandId::OpenWebsite.help_url().unwrap()));
@@ -4171,6 +4227,11 @@ fn main() {
                     }),
                 ],
             },
+            #[cfg(target_os = "macos")]
+            Menu {
+                name: "Window".into(),
+                items: vec![MenuItem::action("Minimize", MinimizeWindow)],
+            },
             Menu {
                 name: "Help".into(),
                 items: vec![
@@ -4212,7 +4273,7 @@ fn main() {
                     WindowOptions {
                         titlebar: workspace_titlebar(),
                     app_id: Some("rmux".into()),
-                        focus: index == active,
+                        focus: activate_startup && index == active,
                         window_bounds: Some(prepared.snapshot.geometry.map(|geometry| geometry.restore(cx)).unwrap_or_else(|| WindowBounds::centered(size(px(1000.), px(680.)), cx))),
                         ..Default::default()
                     },
@@ -4220,8 +4281,10 @@ fn main() {
                 ).expect("open restored session window");
                 if index == active { selected = Some(handle); }
             }
-            if let Some(handle) = selected { let _ = handle.update(cx, |_, window, _| window.activate_window()); }
-            cx.activate(true);
+            if activate_startup {
+                if let Some(handle) = selected { let _ = handle.update(cx, |_, window, _| window.activate_window()); }
+                cx.activate(true);
+            }
         } else if let Some(prepared) = initial_layout.take() {
             let bounds = prepared.snapshot.geometry.map(|geometry| geometry.restore(cx)).unwrap_or_else(|| WindowBounds::centered(size(px(1000.), px(680.)), cx));
             cx.open_window(
@@ -4229,6 +4292,7 @@ fn main() {
                         titlebar: workspace_titlebar(),
                     app_id: Some("rmux".into()),
                     window_bounds: Some(bounds),
+                    focus: activate_startup,
                     ..Default::default()
                 },
                 move |window, cx| {
@@ -4236,9 +4300,9 @@ fn main() {
                 },
             )
             .expect("open restored rmux window");
-            cx.activate(true);
+            if activate_startup { cx.activate(true); }
         } else {
-            let handle = open_window_with_activation(benchmark_panes, true, cx).expect("open rmux window");
+            let handle = open_window_with_activation(benchmark_panes, activate_startup, cx).expect("open rmux window");
             if let Some(notice) = recovery_notice.take() {
                 let _ = handle.update(cx, |view, _, cx| view.show_startup_notice(notice, cx));
             }

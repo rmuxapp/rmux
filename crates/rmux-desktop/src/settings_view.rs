@@ -2,6 +2,7 @@ use super::*;
 
 #[derive(Clone)]
 pub struct State {
+    pub editor: Option<settings_editor::Editor>,
     pub focus: FocusHandle,
     pub category: usize,
     pub origin_window: AnyWindowHandle,
@@ -10,6 +11,7 @@ pub struct State {
     pub search: Entity<text_field::TextField>,
     pub query: String,
     pub visible: Vec<usize>,
+    pub match_hints: std::collections::BTreeMap<usize, String>,
 }
 
 pub const CATEGORIES: &[(&str, &str, &[&str])] = &[
@@ -73,7 +75,7 @@ pub enum ControlInput {
 /// Arrow keys change values; they must never open a dialog or an editor.
 pub fn control_input(control: &str, key: &str) -> ControlInput {
     let action = matches!(control, "file_editor" | "editor_example" | "editor_fallback" | "import_theme" | "font_family" | "shell_history")
-        || FOOTER_KEYS.contains(&control) || super::settings_search::entry(control).json_only;
+        || FOOTER_KEYS.contains(&control) || super::settings_search::entry(control).json_only || settings_editor::field(control).is_some();
     match (action, key) {
         (true, "enter" | "space") => ControlInput::Activate,
         (false, "left") => ControlInput::Adjust(-1),
@@ -83,6 +85,7 @@ pub fn control_input(control: &str, key: &str) -> ControlInput {
 }
 pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
     match key {
+        "restore_session" => settings.restore_session = !settings.restore_session,
         "cursor_blink" => settings.cursor_blink = !settings.cursor_blink,
         "controls_on_hover" => settings.controls_on_hover = !settings.controls_on_hover,
         "hide_top_bar" => settings.hide_top_bar = !settings.hide_top_bar,
@@ -127,6 +130,53 @@ pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
         _ => {}
     }
 }
+/// Reset only the selected panel-controlled setting, preserving other drafts.
+pub fn reset(settings: &mut Preferences, key: &str) -> bool {
+    if let Some(field) = settings_editor::field(key).filter(|field| field.config != "font_family") {
+        if let Ok(next) = settings_editor::apply(settings, field, "") { *settings = next; return true; }
+        return false;
+    }
+    let defaults = Preferences::default();
+    match key {
+        "restore_session" => settings.restore_session = defaults.restore_session,
+        "font" => settings.font_size = defaults.font_size,
+        "font_family" => settings.font_family = defaults.font_family,
+        "padding" => settings.terminal_padding = defaults.terminal_padding,
+        "opacity" => settings.background_opacity = defaults.background_opacity,
+        "blur" => settings.background_blur = defaults.background_blur,
+        "selection_opacity" => settings.selection_opacity = defaults.selection_opacity,
+        "cursor_opacity" => settings.cursor_opacity = defaults.cursor_opacity,
+        "cursor" => settings.unfocused_cursor = defaults.unfocused_cursor,
+        "focused_cursor" => settings.focused_cursor = defaults.focused_cursor,
+        "cursor_blink" => settings.cursor_blink = defaults.cursor_blink,
+        "controls_on_hover" => settings.controls_on_hover = defaults.controls_on_hover,
+        "hide_top_bar" => settings.hide_top_bar = defaults.hide_top_bar,
+        "compact_sidebar" => settings.compact_sidebar = defaults.compact_sidebar,
+        "option_as_alt" => settings.macos_option_as_alt = defaults.macos_option_as_alt,
+        "scrollback" => settings.scrollback_mib = defaults.scrollback_mib,
+        "copy" => settings.copy_on_select = defaults.copy_on_select,
+        "native_notifications" => settings.native_notifications = defaults.native_notifications,
+        "notification_focus" => settings.notification_focus = defaults.notification_focus,
+        "workspace_placement" => settings.new_workspace_placement = defaults.new_workspace_placement,
+        "group_placement" => settings.group_new_workspace_placement = defaults.group_new_workspace_placement,
+        "theme" => settings.select_theme(defaults.terminal_theme),
+        "close" if !settings.close_policy_overridden() => settings.confirm_close = defaults.confirm_close,
+        _ => return false,
+    }
+    true
+}
+fn resettable(key: &str) -> bool {
+    settings_editor::field(key).is_some() || matches!(key, "restore_session" | "font" | "font_family" | "padding" | "opacity" | "blur" | "selection_opacity" | "cursor_opacity" | "cursor" | "focused_cursor" | "cursor_blink" | "controls_on_hover" | "hide_top_bar" | "compact_sidebar" | "option_as_alt" | "scrollback" | "copy" | "native_notifications" | "notification_focus" | "workspace_placement" | "group_placement" | "theme" | "close")
+}
+fn reset_button(key: &'static str) -> impl IntoElement {
+    div().id(SharedString::from(format!("{key}-reset"))).size(px(24.)).flex_shrink_0()
+        .flex().items_center().justify_center().rounded_sm().cursor_pointer()
+        .hover(|style| style.bg(chrome_style::hover_strong()))
+        .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Reset this setting to its default · Backspace".into())).into())
+        .on_click(move |event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ResetSetting { key: key.into() }), cx); } })
+        .child(icons::icon("refresh"))
+}
+
 fn button(id: String, label: String, hint: String, key: &'static str, delta: i32) -> impl IntoElement {
     let hint: SharedString = hint.into();
     div().id(SharedString::from(id)).min_w_0().max_w_full().px_2().py_1().rounded_sm().cursor_pointer()
@@ -138,7 +188,7 @@ fn button(id: String, label: String, hint: String, key: &'static str, delta: i32
 fn control_hint(key: &str) -> &'static str {
     match key {
         "editor_fallback" => if cfg!(target_os = "macos") { "Open Settings JSON in TextEdit to repair the editor configuration, then Reload Settings." } else { "Open Settings JSON with the system file association to repair the editor configuration, then Reload Settings." },
-        "shell_history" => "Recall commands when restoring a saved session. Supports zsh and non-login Bash. Set shell_history_directory in Settings JSON, then restart rmux.",
+        "shell_history" => "Recall commands when restoring a saved session. Supports zsh and non-login Bash. Choose a history directory, save the setting, then restart rmux.",
         "editor_example" => "Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.",
         "file_editor" => "Opens Settings JSON. Set file_editor.program and args, then Reload Settings.",
         "native_notifications" => "Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.",
@@ -168,7 +218,7 @@ fn row_with_detail(label: &'static str, key: &'static str, value: String, steppe
                     .px_2().py_1().text_size(px(12.)).text_color(crate::chrome_style::muted())
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Controlled by RMUX_CONFIRM_CLOSE. Remove the override and restart rmux to edit this policy here.".into())).into())
                     .child(value).into_any_element()
-            } else if matches!(key, "copy" | "native_notifications" | "blur" | "cursor_blink" | "controls_on_hover" | "hide_top_bar" | "compact_sidebar") {
+            } else if matches!(key, "restore_session" | "copy" | "native_notifications" | "blur" | "cursor_blink" | "controls_on_hover" | "hide_top_bar" | "compact_sidebar") {
                 let on = value == "On";
                 div().id(SharedString::from(format!("{key}-toggle"))).w(px(32.)).h(px(18.)).rounded_full().relative().cursor_pointer()
                     .bg(if on { chrome_style::accent() } else { chrome_style::hover_strong() })
@@ -179,13 +229,13 @@ fn row_with_detail(label: &'static str, key: &'static str, value: String, steppe
             } else if stepper {
                 div().min_w(px(44.)).text_center().text_size(px(12.)).child(value).into_any_element()
             } else {
-                button(format!("{key}-value"), value, if settings_search::entry(key).json_only {
+                button(format!("{key}-value"), value, if settings_search::entry(key).json_only && settings_editor::field(key).is_none() {
                     format!("Edit {} in Settings JSON, then choose Reload to apply the change.", settings_search::entry(key).config)
                 } else { format!("Change {label}") }, key, 1).into_any_element()
             })
             .when(stepper, |controls| controls
                 .child(button(format!("{key}-more"), "+".into(), format!("Increase {label}"), key, 1)))
-            .when(key == "selection_opacity", |controls| controls.child(button("selection-opacity-reset".into(), "Reset".into(), "Use the theme’s selection opacity".into(), "selection_opacity", 0))))
+            .when(!readonly && resettable(key), |controls| controls.child(reset_button(key))))
 }
 // Configuration-only preview: never creates a terminal or reads a running session.
 fn theme_preview(settings: &Preferences) -> impl IntoElement {
@@ -262,12 +312,12 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 .child(div().flex_1())
                 .child(div().px_3().py_2().text_xs().text_color(chrome_style::muted()).child("Search across all settings.\nEnter to browse results.")))
         .child(div().id("settings-scroll").flex_1().min_w_0().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_6().pb_4()
-            .child(div().pt_4().pb_3().child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child(if state.query.is_empty() { CATEGORIES[state.category].0.to_owned() } else { "Search results".into() })).child(div().mt_2().min_w_0().truncate().text_size(px(12.)).text_color(chrome_style::muted()).child(if state.query.is_empty() { CATEGORIES[state.category].1.to_owned() } else { format!("{} settings matching “{}”", state.visible.len(), state.query) })))
+            .child(div().pt_4().pb_3().child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child(if state.query.is_empty() { CATEGORIES[state.category].0.to_owned() } else { "Search results".into() })).child(div().mt_2().min_w_0().truncate().text_size(px(12.)).text_color(chrome_style::muted()).child(if state.query.is_empty() { CATEGORIES[state.category].1.to_owned() } else { format!("{} {} matching “{}”", state.visible.len(), if state.visible.len() == 1 { "setting" } else { "settings" }, state.query) })))
 
             .when(!state.query.is_empty() && state.visible.is_empty(), |panel| panel.child(div().py_6().text_size(px(13.)).text_color(chrome_style::muted()).child("No matching settings. Try a shorter phrase, like font, opacity, or notifications.")))
             .children(state.visible.iter().map(|index| {
                 let item = settings_search::entry(KEYS[*index]);
-                div().when(!state.query.is_empty(), |row| row.child(div().px_3().pt_3().text_size(px(11.)).text_color(chrome_style::muted()).child(CATEGORIES[item.category].0)))
+                div().when(!state.query.is_empty(), |row| row.child(div().px_3().pt_3().text_size(px(11.)).text_color(chrome_style::muted()).child(format!("{} · {}", CATEGORIES[item.category].0, state.match_hints.get(index).map(String::as_str).unwrap_or_default()))))
                     .child(setting_element(item.key, settings, &state, busy))
             }))))
 
@@ -276,7 +326,7 @@ pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::Worksp
                 .children([1, 2, 3].into_iter().map(|index| footer_button(index, &state, busy, unsaved, cx.global::<preferences::LastSettingsSave>().0.is_some(), &save_label)))
                 .child(div().flex_1())
                 .child(div().id("settings-keyboard-help").text_size(px(11.)).text_color(chrome_style::muted())
-                    .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Tab / ↑↓ select · ←→ change · Ctrl+Tab category · Cmd/Ctrl+F search · Esc clear search or close".into())).into())
+                    .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Tab / ↑↓ select · ←→ change · Backspace reset · Ctrl+Tab category · Cmd/Ctrl+F search · Esc clear search or close".into())).into())
                     .child("Keyboard help")))
             .child(div().flex().items_center().gap_2()
                 .child(div().flex_1().text_size(px(12.)).text_color(if unsaved { chrome_style::warning() } else { chrome_style::muted() })
@@ -308,7 +358,7 @@ fn setting_element(key: &str, settings: &Preferences, state: &State, busy: bool)
         "theme" => (div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(crate::chrome_style::border())
                 .on_mouse_down(MouseButton::Left, |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: "theme".into() }), cx))
                 .when(Some(state.selected) == control_index("theme"), |row| row.bg(crate::chrome_style::selected()))
-                .child(div().mb_2().text_size(px(13.)).child("App & terminal theme"))
+                .child(div().mb_2().flex().items_center().justify_between().text_size(px(13.)).child("App & terminal theme").child(reset_button("theme")))
                 .child(div().flex().flex_wrap().gap_2().children(
                     preferences::TerminalTheme::ALL.into_iter().enumerate().map(|(index, theme)| {
                         let selected = settings.theme_file.is_none() && settings.terminal_theme == theme;
@@ -323,6 +373,7 @@ fn setting_element(key: &str, settings: &Preferences, state: &State, busy: bool)
                     })
                 ))
                 .child(theme_preview(settings))).into_any_element(),
+        "restore_session" => row_with_detail("Restore session on launch", "restore_session", if settings.restore_session { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index(key), false, "Reopen your saved workspace. Save and restart to apply.".into(), "Changes startup behavior after saving and restarting rmux.".into()).into_any_element(),
         "import_theme" => (row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, Some(state.selected) == control_index("import_theme"), false)).into_any_element(),
         "font_family" => (row("Default font family", "font_family", settings.font_family.clone(), false, Some(state.selected) == control_index("font_family"), false)).into_any_element(),
         "font" => (row("Default text size", "font", format!("{} pt", settings.font_size), true, Some(state.selected) == control_index("font"), false)).into_any_element(),
@@ -378,7 +429,9 @@ fn setting_element(key: &str, settings: &Preferences, state: &State, busy: bool)
         }
         _ => {
             let item = settings_search::entry(key);
-            row(item.label, item.key, "Edit JSON…".into(), false, Some(state.selected) == control_index(key), false).into_any_element()
+            row_with_detail(item.label, item.key, settings_editor::field(key).map(|field| { let value = settings_editor::value(settings, field); if value.is_empty() { "Default…".into() } else { value } }).unwrap_or_else(|| "Edit JSON…".into()), false, Some(state.selected) == control_index(key), false,
+                if settings_editor::field(key).is_some_and(|field| field.restart) { format!("{} Save and restart to apply.", item.description) } else { item.description.into() },
+                item.description.into()).into_any_element()
         }
     }
 }
@@ -386,6 +439,27 @@ fn setting_element(key: &str, settings: &Preferences, state: &State, busy: bool)
 #[cfg(test)]
 mod tests {
     use super::{adjust, Preferences, close_policy, workspace_groups, KEYS, FOOTER_COUNT};
+    #[test]
+    fn reset_changes_only_the_requested_setting() {
+        let mut settings = Preferences::default();
+        settings.font_size = 32.;
+        settings.terminal_padding = 17;
+        settings.background_opacity = 65;
+        let mut expected = serde_json::to_value(&settings).unwrap();
+        expected["font_size"] = serde_json::json!(Preferences::default().font_size);
+        assert!(super::reset(&mut settings, "font"));
+        assert_eq!(serde_json::to_value(&settings).unwrap(), expected);
+        assert!(!super::reset(&mut settings, "commands"));
+        assert!(!super::reset(&mut settings, "unknown"));
+        assert_eq!(serde_json::to_value(&settings).unwrap(), expected);
+    }
+
+    #[test]
+    fn every_reset_control_handles_its_setting() {
+        for key in KEYS.iter().copied().filter(|key| super::resettable(key)) {
+            assert!(super::reset(&mut Preferences::default(), key), "{key}");
+        }
+    }
     #[test]
     fn categories_cover_every_control_once_and_navigation_stays_visible() {
         use super::{CATEGORIES, next_visible, visible_controls};

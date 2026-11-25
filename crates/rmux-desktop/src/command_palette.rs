@@ -504,7 +504,22 @@ fn table_rows_share_horizontal_position_without_linking_separate_tables() {
 }
 }
 
+// Headings are attached to actionable rows so keyboard navigation never lands
+// on a separator. Recompute after filtering to retain headings for partial groups.
+fn terminal_group_headings(matches: &[usize], groups: &std::collections::HashMap<usize, (EntityId, String)>) -> std::collections::HashMap<usize, String> {
+    let mut headings = std::collections::HashMap::new();
+    let mut previous = None;
+    for command in matches {
+        let Some((workspace, label)) = groups.get(command) else { previous = None; continue; };
+        if previous != Some(*workspace) { headings.insert(*command, label.clone()); }
+        previous = Some(*workspace);
+    }
+    headings
+}
+
 pub struct CommandPalette {
+    terminal_groups: std::collections::HashMap<usize, (EntityId, String)>,
+    terminal_headings: std::collections::HashMap<usize, String>,
     headings: std::collections::HashMap<String, usize>,
     location: Option<SharedString>,
     feedback: Option<&'static str>,
@@ -1080,13 +1095,26 @@ impl CommandPalette {
         palette
     }
     pub fn terminal_search_results(report: terminal_search::Report, query: String, extra: usize, window: &mut Window, cx: &mut Context<Self>) -> Self {
-        let summary = format!("{} matching terminals · {} scanned · {} unavailable · {} incomplete · {extra} beyond terminal limit", report.hits.len(), report.scanned, report.unavailable, report.limited);
+        let mut summary = format!("{} matching terminals · {} scanned", report.hits.len(), report.scanned);
+        if report.unavailable > 0 { summary.push_str(&format!(" · {} unavailable", report.unavailable)); }
+        if report.limited > 0 { summary.push_str(&format!(" · {} incomplete", report.limited)); }
+        if extra > 0 { summary.push_str(&format!(" · {extra} beyond terminal limit")); }
         let mut commands = vec![Command { title: "Search again".into(), subtitle: Some(query.clone()), shortcut: None,
             target: PaletteEvent::Run(Box::new(SearchTerminalOutput { query: query.clone() })) },
             Command { title: "New search…".into(), subtitle: None, shortcut: None, target: PaletteEvent::Run(Box::new(ShowTerminalSearch)) }];
-        commands.extend(report.hits.into_iter().map(|hit| Command { title: hit.name, subtitle: Some(hit.snippet), shortcut: None,
-            target: PaletteEvent::SearchTerminal { window: hit.window, workspace: hit.workspace, terminal: hit.terminal, query: query.clone(), preview: hit.preview } }));
+        let mut groups = std::collections::HashMap::new();
+        for hit in report.hits {
+            groups.insert(commands.len(), (hit.workspace, hit.group));
+            commands.push(Command { title: hit.name, subtitle: Some(hit.snippet), shortcut: None,
+                target: PaletteEvent::SearchTerminal { window: hit.window, workspace: hit.workspace, terminal: hit.terminal, query: query.clone(), preview: hit.preview } });
+        }
         let mut palette = Self::with_commands(commands, "Terminal output matches · Enter opens Find", "No matching results · Clear the filter to search again", window, cx);
+        palette.terminal_groups = groups;
+        palette.terminal_headings = terminal_group_headings(&palette.search.matches, &palette.terminal_groups);
+        palette.search = palette_match::RankedSearch::with_details(
+            palette.commands.iter().enumerate().map(|(index, command)| format!("{} {}", palette.terminal_groups.get(&index).map(|(_, label)| label.as_str()).unwrap_or(""), command.title).to_lowercase()).collect(),
+            palette.commands.iter().map(|command| command.subtitle.as_deref().unwrap_or_default().to_lowercase()).collect(),
+            palette.commands.iter().map(Command::shortcut_text).collect());
         palette.location = Some(summary.into());
         if palette.commands.len() > 2 { palette.selected = 2; }
         palette
@@ -1178,6 +1206,11 @@ impl CommandPalette {
                         let filter = crate::shortcut_label::ShortcutQuery::new(query);
                         this.search.update_filtered(query, |index| this.commands[index].shortcut.as_deref().is_some_and(|hint| filter.matches(hint)));
                     } else { this.search.update(query); }
+                    if !this.terminal_groups.is_empty() {
+                        // Filter within workspace order, keeping related terminals together.
+                        this.search.matches.sort_unstable();
+                        this.terminal_headings = terminal_group_headings(&this.search.matches, &this.terminal_groups);
+                    }
                     this.selected = 0;
                     this.scroll.reset(this.search.matches.len());
                     cx.notify();
@@ -1196,6 +1229,8 @@ impl CommandPalette {
             search: palette_match::RankedSearch::with_details(commands.iter().map(|command| command.title.to_lowercase()).collect(), commands.iter().map(|command| command.subtitle.as_deref().unwrap_or_default().to_lowercase()).collect(), commands.iter().map(Command::shortcut_text).collect()),
             scroll: ListState::new(commands.len(), ListAlignment::Top, px(96.)),
             headings: Default::default(),
+            terminal_groups: Default::default(),
+            terminal_headings: Default::default(),
             table_scroll: Default::default(),
             commands,
             selected: 0,
@@ -1252,6 +1287,9 @@ impl CommandPalette {
         }));
     }
     fn command_height(&self, command: usize) -> f32 {
+        self.command_content_height(command) + if self.terminal_headings.contains_key(&command) { 28. } else { 0. }
+    }
+    fn command_content_height(&self, command: usize) -> f32 {
         if self.wrap_preview && matches!(self.commands[command].markdown_kind(), Some(markdown_preview::Kind::Heading(_))) { 84. }
         else if self.wrap_preview && self.commands[command].preview_line().is_some() { 116. }
         else { result_row_height(self.commands[command].subtitle.is_some()) }
@@ -1442,7 +1480,7 @@ impl CommandPalette {
                 range, HighlightStyle { color: Some(crate::chrome_style::foreground().into()), background_color: Some(crate::chrome_style::selected().into()), ..Default::default() }
             )))
         });
-        palette_view::result(command, self.command_height(command), selected)
+        let result = palette_view::result(command, self.command_content_height(command), selected)
             .when(self.hex_preview && self.commands[command].preview_line().is_some(), |row| row.font_family(FONT_FAMILY))
             .when_some(heading, |row, level| row.font_weight(FontWeight::BOLD).text_size(px(match level { 1 => 20., 2 => 18., 3 => 16., _ => 14. })).line_height(px(24.)))
             .when(markdown == Some(markdown_preview::Kind::Code), |row| row.font_family(FONT_FAMILY))
@@ -1472,7 +1510,12 @@ impl CommandPalette {
                     palette_view::shortcut(shortcut.clone()).id(("command-shortcut", command))
                         .tooltip({ let hint: SharedString = shortcut.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into() }),
                 )
-            }).into_any_element()
+            }).into_any_element();
+        if let Some(label) = self.terminal_headings.get(&command) {
+            div().child(div().h(px(28.)).px_3().flex().items_center().text_xs().font_weight(FontWeight::SEMIBOLD)
+                .text_color(crate::chrome_style::muted()).child(div().min_w_0().truncate().child(label.clone())))
+                .child(result).into_any_element()
+        } else { result }
     }
     fn selected_search_excerpt(&self) -> Option<&str> {
         self.search.matches.get(self.selected)
@@ -1733,8 +1776,8 @@ impl Render for CommandPalette {
                     }))),
             ))
             .when_some(self.location.clone(), |palette, location| palette.child(
-                div().id("file-browser-location").flex_shrink_0().min_w_0().px_3().pt_2()
-                    .text_xs().text_color(crate::chrome_style::muted()).truncate()
+                div().id("file-browser-location").flex_shrink_0().w_full().min_w_0().px_3().pt_2()
+                    .text_xs().text_color(crate::chrome_style::muted())
                     .tooltip({ let location = location.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(location.clone())).into() })
                     .child(location)
             ))
@@ -1906,5 +1949,26 @@ fn preset_command(preset: &preferences::LayoutPreset) -> Command {
         subtitle: Some(format!("{}{} · {}", if preset.session { "Session" } else { "Layout" }, directory, preset.path.display())),
         target: PaletteEvent::Run(Box::new(OpenLayoutPreset { name: preset.name.clone() })),
         shortcut: None,
+    }
+}
+
+#[cfg(test)]
+mod terminal_group_tests {
+    use super::{terminal_group_headings, EntityId};
+    #[test]
+    fn terminal_search_grouping_survives_filtering_and_duplicate_names() {
+        let first = EntityId::from(0x100000001);
+        let second = EntityId::from(0x100000002);
+        let groups = [(2, (first, "Window 1 · Project".into())), (3, (first, "Window 1 · Project".into())),
+            (4, (second, "Window 2 · Project".into()))].into_iter().collect();
+        let all = terminal_group_headings(&[0, 1, 2, 3, 4], &groups);
+        assert_eq!(all.len(), 2);
+        assert!(all.contains_key(&2) && all.contains_key(&4));
+        let filtered = terminal_group_headings(&[3, 4], &groups);
+        assert_eq!(filtered.len(), 2);
+        assert_eq!(filtered[&3], "Window 1 · Project");
+        assert_eq!(filtered[&4], "Window 2 · Project");
+        assert!(terminal_group_headings(&[0, 1], &groups).is_empty());
+        assert!(terminal_group_headings(&[], &groups).is_empty());
     }
 }

@@ -33,10 +33,12 @@ def run(binary, live_shell=False):
             ],
         }))
         env = {key: value for key, value in os.environ.items() if not key.startswith("RMUX_")}
-        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false")
+        env.update(RMUX_CONFIG=str(config), RMUX_SHELL="/usr/bin/false", RMUX_STARTUP_ACTIVATE="0")
         if live_shell:
+            # Log only unrecognized commands: per-line filesystem writes can
+            # change timing and hide an input/exit race in this fixture.
             fixture = Path(directory) / "fixture-shell"
-            fixture.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nprintf "alive-%s" "$$" > "$RMUX_TEST_PROCESS_DIR/$$.ready"\ntoken=initial\nwhile IFS= read -r line; do\n  case "$line" in\n    fail) exit 7 ;;\n    set:*) token=${line#set:} ;;\n    probe) printf "%s" "$token" > "$RMUX_TEST_PROCESS_DIR/$$.state"; printf "reported-state:%s\\n" "$token" ;;\n  esac\ndone\n')
+            fixture.write_text('#!/bin/sh\ntrap "exit 0" HUP TERM\nprintf "alive-%s" "$$" > "$RMUX_TEST_PROCESS_DIR/$$.ready"\ntoken=initial\nwhile IFS= read -r line; do\n  case "$line" in\n    fail) exit 7 ;;\n    set:*) token=${line#set:} ;;\n    probe) printf "%s" "$token" > "$RMUX_TEST_PROCESS_DIR/$$.state"; printf "reported-state:%s\\n" "$token" ;;\n    *) printf "%s\\n" "$line" >> "$RMUX_TEST_PROCESS_DIR/$$.input" ;;\n  esac\ndone\n')
             fixture.chmod(0o700)
             env.update(RMUX_SHELL=str(fixture), RMUX_TEST_PROCESS_DIR=directory)
         child_pids = set()
@@ -422,6 +424,8 @@ def run(binary, live_shell=False):
                 assert process.poll() is None, "EOF unexpectedly closed the GUI"
                 checks.append("stdin EOF leaves GUI running")
             except Exception:
+                for input_log in sorted(Path(directory).glob("*.input")):
+                    print(f"unexpected fixture input {input_log.name}: {input_log.read_bytes()!r}", file=sys.stderr)
                 stderr.seek(0)
                 print(stderr.read(4096).decode(errors="replace"), file=sys.stderr)
                 raise

@@ -2026,8 +2026,13 @@ mod tests {
         assert_eq!(events["method"], "events.read");
         assert_eq!(events["cursor_scope"], "process");
         assert_eq!(events["push_subscriptions"], false);
-        let advertised = json!({"kinds":events["kinds"], "limit":events["max_page_records"], "wait_ms":events["max_wait_ms"]});
-        assert!(serde_json::from_value::<super::super::events::Read>(advertised).unwrap().valid());
+        // The catalog can grow beyond one request's advertised filter limit.
+        let max_kinds = events["max_filter_kinds"].as_u64().unwrap() as usize;
+        assert!(max_kinds > 0);
+        for kinds in events["kinds"].as_array().unwrap().chunks(max_kinds) {
+            let advertised = json!({"kinds":kinds, "limit":events["max_page_records"], "wait_ms":events["max_wait_ms"]});
+            assert!(serde_json::from_value::<super::super::events::Read>(advertised).unwrap().valid());
+        }
         let standalone = dispatch_inner(br#"{"jsonrpc":"2.0","id":1,"method":"system.capabilities"}"#, None).unwrap();
         assert!(standalone["result"]["events"].is_null());
         assert!(

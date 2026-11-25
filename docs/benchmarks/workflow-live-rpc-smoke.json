@@ -1,0 +1,33 @@
+{
+  "status": "passed",
+  "checks": [
+    "live discovery and cross-level identity",
+    "rename inactive workspace with normalized Unicode name without selecting it",
+    "switch inactive tab, sibling pane and other workspace without replacing identities",
+    "idempotent zoom, focus follows sibling, unzoom preserves layout and IDs",
+    "pane swap rejects zoom without mutation, preserves surface/pane/process identities and round-trips layout",
+    "selection and stale-ID errors",
+    "notification has no response; subsequent request remains aligned",
+    "create second window and route surface focus across windows",
+    "UTF-8 input reaches each PTY without changing workspace/tab selection",
+    "cross-window tab round trip retains identities/PIDs, selects destination and rejects stale IDs",
+    "move populated and last workspaces, retain layout/IDs and remove empty source window",
+    "background history reads unwrap Unicode output and enforce byte limits and valid scopes",
+    "background selection read returns empty text when no selection exists",
+    "on-demand background memory sample reports addressed Ghostty screen storage",
+    "viewport reads return live Unicode output with explicit bounded truncation",
+    "five running fixture-shell PIDs survive both workspace transfers",
+    "shell variable values survive transfer and remain reachable by targeted input",
+    "moving the sole tab closes its source window/workspace and preserves the shell and state",
+    "same-window merge preserves layouts, tab positions/selections and hidden-tab unread messages; stale source rejected without mutation",
+    "seven shell PIDs and Unicode variables survive same/cross-window merges and source-window closure",
+    "cross-window merge preserves layouts, tab positions/selections and hidden-tab unread messages, and removes the emptied source window",
+    "Ctrl+D in the sole tab removes its empty pane, workspace and window",
+    "established failed shells and Ctrl+D close their tabs; unrelated tabs survive",
+    "stdin EOF leaves GUI running",
+    "all tracked fixture children exited after app termination"
+  ],
+  "limitations": "no visual, OS activation or latency acceptance",
+  "binary_sha256": "07df55bc25a5289c2c822549c8b15a07258608ef00d9a452a109a670246b26fc",
+  "harness_sha256": "89df0ddd90df5ed3ef2161299a63b4dd25b980f5b618765dba205989f41ce84e"
+}

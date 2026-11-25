@@ -28,7 +28,17 @@ impl Endpoint {
         }
         // Exclusive creation prevents replacing a live endpoint or following a
         // user-provided final symlink. No stale directory is removed implicitly.
-        std::fs::DirBuilder::new().mode(0o700).create(directory)?;
+        std::fs::DirBuilder::new().mode(0o700).create(directory).map_err(|error| {
+            let detail = if error.kind() == io::ErrorKind::AlreadyExists {
+                format!(
+                    "Automation directory {} already exists. Another rmux instance may be using it. Quit that instance or choose a different, unused directory. Existing files have been preserved.",
+                    directory.display()
+                )
+            } else {
+                format!("Could not create automation directory {}: {error}", directory.display())
+            };
+            io::Error::new(error.kind(), detail)
+        })?;
         let result = (|| {
             let metadata = std::fs::symlink_metadata(directory)?;
             let path = directory.join("rpc.sock");
@@ -136,7 +146,10 @@ mod tests {
             std::fs::metadata(dir.join("rpc.sock")).unwrap().mode() & 0o777,
             0o600
         );
-        assert!(Endpoint::bind(&dir).is_err());
+        let error = Endpoint::bind(&dir).err().expect("existing endpoint must be refused");
+        assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+        assert!(error.to_string().contains(&dir.display().to_string()));
+        assert!(error.to_string().contains("Another rmux instance"));
         let connection = UnixStream::connect(dir.join("rpc.sock")).unwrap();
         let _ = listener.accept().unwrap();
         drop(connection);
@@ -151,5 +164,21 @@ mod tests {
         let (endpoint, _) = Endpoint::bind(&clean).unwrap();
         drop(endpoint);
         assert!(!clean.exists());
+    }
+
+    #[test]
+    fn existing_files_and_symlinks_are_preserved_on_startup_failure() {
+        let root = tempfile::tempdir().unwrap();
+        let file = root.path().join("file");
+        std::fs::write(&file, "keep").unwrap();
+        let link = root.path().join("link");
+        std::os::unix::fs::symlink(&file, &link).unwrap();
+        for path in [&file, &link] {
+            let error = Endpoint::bind(path).err().expect("existing paths must be refused");
+            assert_eq!(error.kind(), io::ErrorKind::AlreadyExists);
+            assert!(error.to_string().contains(&path.display().to_string()));
+        }
+        assert_eq!(std::fs::read_to_string(&file).unwrap(), "keep");
+        assert!(std::fs::symlink_metadata(&link).unwrap().file_type().is_symlink());
     }
 }

@@ -1,5 +1,44 @@
 # rmux performance acceptance plan
 
+## Current workflow baseline
+
+The post-0.1.24 workflow work now has CPU, app RSS and per-terminal render
+observations at 1/8/32 terminals for visible idle, visible busy, hidden busy and
+minimized busy scenarios. Additional minimized-idle and published hidden-idle
+samples are retained. These are bounded observations, not performance promises.
+
+| Scenario | App CPU, % of one core (1 / 8 / 32) | App RSS, MiB (1 / 8 / 32) | Render evidence |
+| --- | --- | --- | --- |
+| [Visible idle](benchmarks/rpc-visible-idle-native-debug.jsonl), 60 s | 1.37 / 1.22 / 1.23 | 115.3 / 133.9 / 166.6 | Every terminal painted before measurement; zero terminal paints during idle |
+| [Visible busy](benchmarks/rpc-visible-busy-native-debug.jsonl), 20 s | 17.69 / 101.98 / 102.06 | 132.2 / 170.5 / 295.4 | All terminals painted during measurement |
+| [Hidden busy, corrected fixture](benchmarks/rpc-hidden-busy-native-debug.jsonl), 20 s | 1.60 / 3.85 / 10.74 | 129.7 / 160.0 / 262.1 | Every measured terminal kept parsing, skipped invalidations and recorded zero paints |
+| [Minimized busy](benchmarks/rpc-minimized-busy-native-menu-debug.jsonl), 20 s | 0.65 / 3.20 / 12.24 | 139.3 / 175.8 / 295.6 | Continued parsing, zero paints; native Minimize command verified |
+| [Minimized idle](benchmarks/rpc-minimized-idle-native-menu-debug.jsonl), 60 s | 0.00 / 0.00 / 0.017 | 134.4 / 142.3 / 177.9 | Zero paints; native Cmd+M verified |
+| [Published hidden idle](benchmarks/rpc-idle-hidden-release-v0.1.24.jsonl), 60 s | 0.05 / 0.00 / 0.017 | 106.5 / 109.1 / 145.3 | Inactive workspace verified by RPC; published binary has no render counters |
+
+The native debug samples use a 1000×680 logical-pixel window, cursor blink off,
+and an enabled system Metal HUD. The HUD and debug build add overhead; do not
+compare these figures directly with release measurements. The busy producer
+attempts 32 ASCII/CJK lines at 20 Hz per terminal and is subject to backpressure.
+Raw records include binary/harness hashes, parsed bytes, render counters,
+process-tree memory/CPU and clean measured-child teardown. App CPU excludes child
+CPU; app RSS excludes graphics and child allocations. Zero CPU means no measurable
+increment at `ps` accounting resolution. Paint calls are not presentation FPS.
+
+Hidden scenarios keep a separate foreground terminal. The corrected busy fixture
+canonicalizes its temporary directory and waits for an explicit idle-ready marker;
+previous busy-hidden samples accidentally ran a producer there because of macOS
+path aliases. Those old CPU/RSS samples remain below as historical evidence, not
+accepted N-busy-plus-one-idle baselines. The accepted hidden samples avoided
+717 / 5,951 / 25,413 invalidations in 20 seconds. The separate
+[hide/show regression](benchmarks/render-visibility-smoke-debug.json) verifies
+retained Unicode output and fresh row painting on return. No reliable percentage
+CPU speedup is claimed from the earlier noisy before/after samples.
+
+The sections below retain earlier experiments, limitations and the longer-term
+performance roadmap. They are not additional scope for the completed workflow
+improvement batch.
+
 ## Post-scroll and mouse input comparison
 
 Three alternating 16-pane runs compared the retained style-only benchmark binary
@@ -408,6 +447,108 @@ desktop conditions prevent attributing the difference from the original run to
 a particular change. Output-pressure GUI latency and cross-platform gates remain
 open.
 
+## Published 0.1.24 idle observation
+
+On November 25, 2026, the published macOS arm64 archive was verified against
+`SHA256SUMS` and measured with `bench-rpc-splits.py`: one iteration each at
+1/8/32 panes, five seconds settling, and a 60-second idle CPU interval. The
+fixture used default settings and idle shell scripts; `MTL_HUD_ENABLED=0` was
+set for the subprocesses. No concurrent build or stress test ran during sampling.
+
+| Panes | App CPU, % of one core | App RSS before interval, MiB | App RSS after closing measured workspace, MiB |
+| --- | --- | --- | --- |
+| 1 | 0.017 | 114.6 | 109.6 |
+| 8 | 0.150 | 112.9 | 110.1 |
+| 32 | 0.017 | 143.9 | 126.1 |
+
+All original child processes were absent after workspace closure and after app
+quit. The post-close app retained one newly created survivor terminal. The
+non-monotonic CPU readings and single samples do not establish scaling or a
+speedup; `ps` CPU accounting is quantized. This is a normal-window idle baseline,
+not verified frame presentation, GPU memory, busy output, hidden/minimized
+behavior, or the separate blink-disabled acceptance gate. Other desktop apps
+remained open. Repeat runs and the rest of the workload matrix remain pending.
+
+[Raw samples and executable hash](benchmarks/rpc-idle-release-v0.1.24.jsonl).
+
+### Bounded output, visible versus hidden workspaces
+
+**Historical fixture limitation:** these early busy-hidden runs unintentionally
+included an extra busy foreground terminal. Its idle-directory comparison did
+not canonicalize macOS `/var` versus `/private/var` aliases. Their CPU/RSS figures
+are not accepted as the stated N-busy-plus-one-idle baseline. The later corrected
+native hidden-workspace records verify an explicit idle-ready marker. The idle
+workload runs do not use that busy-producer branch and are unaffected.
+
+The extended harness also ran one 20-second sample at each pane count with
+cursor blink disabled and a producer targeting 32 lines every 50 ms per terminal.
+Each line includes ASCII and CJK text. Hidden runs switch to a separate idle
+workspace; its one survivor process is included in total CPU/RSS but excluded
+from the measured-producer cleanup check. Visible means selected in rmux, not
+verified OS activation or absence of occlusion. The desktop remained in use.
+
+| Panes | Selected workspace app CPU, % of one core | Hidden workspace app CPU, % of one core | Selected / hidden initial app RSS, MiB |
+| --- | --- | --- | --- |
+| 1 | 0.35 | 0.65 | 111.2 / 122.4 |
+| 8 | 27.73 | 2.45 | 124.0 / 133.8 |
+| 32 | 12.79 | 9.05 | 194.1 / 191.5 |
+
+All measured producers were reaped after workspace closure. These are exploratory
+observations, not optimization proof: the selected-workspace results are notably
+non-monotonic, and render counters/OS visibility must be collected before
+attributing the difference to rendering. The Python producers add their own
+memory/CPU, separately available in the raw process trees; actual output rate
+can fall below the target under backpressure. The extended, uncommitted harness
+is not identified by the base Git revision alone. Later runs include a harness
+SHA256 for reproducibility. Selected-workspace runs also checked per-terminal
+output and selected workspace identity before sampling; hidden runs preceded
+those additional assertions.
+
+Raw data: [selected](benchmarks/rpc-busy-visible-release-v0.1.24.jsonl),
+[hidden](benchmarks/rpc-busy-hidden-release-v0.1.24.jsonl).
+
+Blink-disabled hidden idle samples, one 60-second interval per count, averaged
+0.050%, below the CPU counter's resolution, and 0.017% of one core at 1/8/32
+terminals respectively. Initial app RSS was 106.5/109.1/145.3 MiB. All measured
+children were absent after closure. These include one visible idle survivor and
+retain the single-sample and desktop-visibility limitations above.
+[Raw hidden idle samples](benchmarks/rpc-idle-hidden-release-v0.1.24.jsonl).
+
+The harness now supports `--render-metrics` with a debug binary containing the
+RPC counters. Keep these results distinct from the published release baseline.
+`--visibility minimized` requires `--control-directory`: after the harness writes
+`<workload>-minimized-<panes>-<iteration>.ready.json`, verify and minimize that
+specific process's window through native UI tools. Write a matching `.continue`
+JSON file containing the observed `pid`, `visibility: "minimized"`, and
+`fixture_name` to start sampling. The workspace/window title includes the PID,
+workload, visibility and terminal count; verify this exact title in the native
+window before acknowledging it. A bundle name alone is insufficient because a
+UI tool can launch another instance. The gate has a bounded wait, refuses reused marker files, and records
+the acknowledgement in the result. Use a fresh directory for each run.
+
+A five-second debug pilot with one hidden busy terminal parsed 219,584 additional
+bytes and received 170 output notifications while recording zero additional
+paint calls, prepaint calls, or rebuilt rows. The measured producer was reaped
+after closure. This verifies the counter path and demonstrates suppressed hidden
+render work in that fixture; it does not establish performance at 8/32 terminals
+or minimized-window behavior. [Raw counter snapshots](benchmarks/rpc-hidden-render-counters-debug.jsonl).
+
+A subsequent debug run recorded CPU of 0.50%/3.10%/10.04% of one core at
+1/8/32 busy terminals, zero paint/prepaint deltas, and approximately
+0.86/6.99/28.07 MB of parsed output. Producers were reaped after closure.
+**Minimized state is unverified:** its native acknowledgements identified the
+bundle but did not establish that the observed window belonged to the measured
+PID. A later attempt demonstrated that the native UI target could resolve to a
+different instance using normal configuration after the fixture exited. The
+original samples are retained for transparency, but must not be used as proof
+of minimized behavior. [Historical samples](benchmarks/rpc-minimized-busy-debug.jsonl).
+
+No idle minimized result is claimed. The latest attempt stopped at its gate
+when the fixture process exited; a different process was observed by the native
+tool. Both idle and busy minimized verification remain outstanding. The harness
+now gives each gated fixture a unique visible name and requires that name in
+the acknowledgement to make this mismatch detectable.
+
 ## Measurements
 
 | Metric | Definition | Initial gate |
@@ -715,3 +856,106 @@ for scroll coalescing. Queue saturation reports an error instead of waiting on
 the parser. Tests cover held-parser admission, visible-screen preservation,
 selection/clear ordering and immediate Copy without an intervening frame. Native
 drag/autoscroll behavior and click-to-redraw latency remain unmeasured.
+
+## Avoid invalidating released terminal views
+
+A five-second macOS sampling profile of 32 busy hidden terminals found UI
+invalidation work despite zero terminal paint/prepaint calls. Pure output now
+skips invalidation after the terminal's render snapshot has been released by
+hiding its tab, workspace, or pane. Metadata, notifications, errors, process
+exit, and history parsing retain their existing update paths. Selecting the
+terminal causes its parent to render it again; prepaint restores the snapshot
+and retries when the parser is busy. This does not suppress output for visible
+but unfocused terminals or rely on OS activation as a visibility proxy.
+
+Three 20-second debug samples before the change recorded app CPU of
+10.34%, 10.59%, and 45.67% of one core; after, 8.55%, 9.30%, and 11.19%.
+All samples had zero terminal paint/prepaint during the hidden interval and
+clean child shutdown. The first two after samples skipped 15,110 and 15,672
+invalidations. The third skipped none: the desktop had not rendered the
+workspace switch, so its snapshots had not been released. The optimization
+conservatively left those views alone. This uncontrolled, nonalternating sample
+has an unexplained baseline outlier and does **not** establish a reliable CPU
+percentage improvement. [All samples and hashes](benchmarks/rpc-hidden-invalidation-debug.jsonl).
+
+The historical busy-hidden comparison also used the non-canonical idle-survivor
+path described above. The recorded skipped invalidations on the 32 measured
+terminals remain direct evidence, but whole-app CPU includes an extra producer.
+Use the corrected hidden-workspace series for the workload baseline.
+
+`mise exec -- python scripts/smoke-render-visibility.py` verifies hidden output
+suppression, row rebuilding after selecting the workspace, retained Unicode
+output, and continued painting for new visible output using opt-in counters.
+It requires a drawable desktop window and fails explicitly if rendering is
+unavailable. This checks render execution, not visual correctness or latency.
+
+## Selected-workspace rendering audit
+
+A further debug busy sample selected the measured workspace at 1/8/32
+terminals, then recorded CPU and paint counters over 20 seconds.
+
+| Terminals | CPU (% of one core) | Terminals painted | Total paint calls |
+| --- | --- | --- | --- |
+| 1 | 3.2 | 1 | 62 |
+| 8 | 3.2 | 0 | 0 |
+| 32 | 12.34 | 0 | 0 |
+
+Selection alone does not establish OS visibility. Rows with no paint calls
+are not accepted as visible-rendering baselines. The desktop/UI tooling cannot
+currently maintain and verify the required window state reliably. All measured
+children exited after quit. [Raw observations](benchmarks/rpc-selected-busy-render-debug.jsonl).
+
+## Native-menu minimized baseline
+
+The follow-up added the missing macOS Window → Minimize command and Cmd+M
+binding. Each fixture displayed its PID, workload and terminal count in the
+native title. The one-terminal fixture was minimized through that menu; the
+eight- and 32-terminal fixtures used the registered shortcut. After a two-second
+settle, each sample recorded 20 seconds with cursor blinking disabled. All three
+continued parsing output and recorded zero paints and clean child teardown.
+
+| Busy terminals | App CPU (% of one core) | App RSS (MiB) | Parsed bytes during sample | Paints |
+| --- | --- | --- | --- | --- |
+| 1 | 0.65 | 139.3 | 868,992 | 0 |
+| 8 | 3.20 | 175.8 | 6,958,944 | 0 |
+| 32 | 12.24 | 295.6 | 27,884,832 | 0 |
+
+[Raw samples, binary/harness hashes, native verification and process trees](benchmarks/rpc-minimized-busy-native-menu-debug.jsonl).
+These are single debug-build observations, not release comparisons or a measured
+speedup. Earlier button/keyboard attempts without the registered command kept
+painting and are not accepted as minimized samples. Minimized idle and controlled
+visible-rendering coverage remain outstanding.
+
+The native minimized idle follow-up used the same binary and registered Cmd+M
+command, with 60-second samples at 1/8/32 terminals and cursor blink disabled.
+App CPU was 0.00/0.00/0.0167% of one core; app RSS was 134.4/142.3/177.9 MiB.
+All three recorded zero paints and clean measured-child teardown. CPU sampling
+uses `ps` time resolution, so zero means no measurable increment, not proof of
+zero CPU work. [Raw idle records](benchmarks/rpc-minimized-idle-native-menu-debug.jsonl).
+
+The subsequent visible fixture screenshot revealed an enabled system Metal HUD.
+These debug observations include diagnostic overhead; they should not be used
+as production CPU/RSS promises. The earlier minimized records use the same
+desktop environment, with no painting during their measurement intervals.
+
+## Native-activated visible busy baseline
+
+Each identified fixture was explicitly activated by clicking a terminal before
+acknowledging the measurement gate. At 1000×680 logical pixels (2000×1360 native
+screenshots), every measured terminal recorded paint calls during its 20-second
+interval. Cursor blinking was disabled; the Metal HUD remained enabled.
+
+| Busy terminals | App CPU (% of one core) | App RSS (MiB) | Terminals painted | Total terminal paint calls |
+| --- | --- | --- | --- | --- |
+| 1 | 17.69 | 132.2 | 1 | 376 |
+| 8 | 101.98 | 170.5 | 8 | 6,208 |
+| 32 | 102.06 | 295.4 | 32 | 2,528 |
+
+All measured children exited cleanly. [Raw accepted observations](benchmarks/rpc-visible-busy-native-debug.jsonl).
+An initial one-terminal attempt had zero paints after its screenshot and was
+rejected; the accepted repeat explicitly activated the terminal. The dense
+32-terminal layout contains very small panes, so this is a stress fixture, not
+a usability recommendation. Similar CPU at eight and 32 terminals does not mean
+similar responsiveness: the 32-terminal run painted each terminal less often.
+Paint-call counts are not presentation FPS or input-latency measurements. These
+single debug samples with HUD overhead establish coverage, not a release speedup.

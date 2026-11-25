@@ -357,6 +357,9 @@ Matching follows Find's ASCII
 case-insensitive rules. A 64 KiB prefix supplies previews; a capped prefix without
 a match falls back to incremental search of the terminal's retained history.
 
+Results are grouped by workspace, with window names in the group headings.
+Filtering the results also matches workspace names and keeps terminals in workspace
+order. Arrow keys select terminals and actions, skipping group headings.
 Results outside the preview identify the terminal without copying its full history.
 Preview excerpts start up to 32 characters before the literal match and show at
 most 1,024 characters, with ellipses marking omitted text. Literal matches in

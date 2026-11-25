@@ -33,15 +33,15 @@ pub static ENTRIES: &[Entry] = &[
     Entry { key: "commands", config: "commands", label: "Custom commands", description: "Define named commands, arguments, working directories, and environment variables.", aliases: "automation scripts argv cwd env", category: 4, json_only: true },
     Entry { key: "layout_presets", config: "layout_presets", label: "Layout presets", description: "Configure reusable workspace layouts and session presets.", aliases: "template arrangement saved splits", category: 2, json_only: true },
     Entry { key: "keybindings", config: "keybindings", label: "Keyboard shortcuts", description: "Customize key combinations and the actions they trigger.", aliases: "hotkeys bindings shortcuts remap keys", category: 4, json_only: true },
-    Entry { key: "restore_session", config: "restore_session", label: "Restore session on launch", description: "Restore your saved workspace when rmux starts.", aliases: "reopen startup remember windows tabs resume", category: 2, json_only: true },
-    Entry { key: "session_file", config: "session_file", label: "Session file", description: "Choose where the saved workspace session is stored.", aliases: "persistence restore path backup", category: 4, json_only: true },
-    Entry { key: "socket_directory", config: "socket_directory", label: "Automation socket directory", description: "Choose the directory for the local RPC socket.", aliases: "api ipc remote control integration automation", category: 4, json_only: true },
-    Entry { key: "foreground_color", config: "foreground_color", label: "Terminal text color", description: "Override the theme’s default terminal text color.", aliases: "foreground colour letters", category: 0, json_only: true },
-    Entry { key: "background_color", config: "background_color", label: "Terminal background color", description: "Override the theme’s default terminal background color.", aliases: "background colour", category: 0, json_only: true },
-    Entry { key: "cursor_color", config: "cursor_color", label: "Cursor color", description: "Override the terminal cursor color.", aliases: "caret colour", category: 1, json_only: true },
-    Entry { key: "cursor_text", config: "cursor_text", label: "Cursor text color", description: "Choose the text color inside a block cursor.", aliases: "caret foreground colour", category: 1, json_only: true },
-    Entry { key: "selection_background", config: "selection_background", label: "Selection background color", description: "Choose the background color for selected text.", aliases: "highlight colour", category: 0, json_only: true },
-    Entry { key: "selection_foreground", config: "selection_foreground", label: "Selection text color", description: "Choose the text color inside a selection.", aliases: "highlight foreground colour", category: 0, json_only: true },
+    Entry { key: "restore_session", config: "restore_session", label: "Restore session on launch", description: "Restore your saved workspace when rmux starts.", aliases: "reopen startup remember windows tabs resume", category: 2, json_only: false },
+    Entry { key: "session_file", config: "session_file", label: "Session file", description: "Choose where the saved workspace session is stored.", aliases: "persistence restore path backup", category: 4, json_only: false },
+    Entry { key: "socket_directory", config: "socket_directory", label: "Automation socket directory", description: "Choose the directory for the local RPC socket.", aliases: "api ipc remote control integration automation", category: 4, json_only: false },
+    Entry { key: "foreground_color", config: "foreground_color", label: "Terminal text color", description: "Override the theme’s default terminal text color.", aliases: "foreground colour letters", category: 0, json_only: false },
+    Entry { key: "background_color", config: "background_color", label: "Terminal background color", description: "Override the theme’s default terminal background color.", aliases: "background colour", category: 0, json_only: false },
+    Entry { key: "cursor_color", config: "cursor_color", label: "Cursor color", description: "Override the terminal cursor color.", aliases: "caret colour", category: 1, json_only: false },
+    Entry { key: "cursor_text", config: "cursor_text", label: "Cursor text color", description: "Choose the text color inside a block cursor.", aliases: "caret foreground colour", category: 1, json_only: false },
+    Entry { key: "selection_background", config: "selection_background", label: "Selection background color", description: "Choose the background color for selected text.", aliases: "highlight colour", category: 0, json_only: false },
+    Entry { key: "selection_foreground", config: "selection_foreground", label: "Selection text color", description: "Choose the text color inside a selection.", aliases: "highlight foreground colour", category: 0, json_only: false },
     Entry { key: "ansi_palette", config: "ansi_palette", label: "ANSI palette", description: "Override the terminal’s sixteen standard colors.", aliases: "ansi colour palette red green blue", category: 0, json_only: true },
 ];
 pub fn entry(key: &str) -> &'static Entry { ENTRIES.iter().find(|entry| entry.key == key).expect("registered setting") }
@@ -86,6 +86,29 @@ fn one_typo(a: &str, b: &str) -> bool {
     }
     edits + (a.len() - i) + (b.len() - j) <= 1
 }
+fn term_weight(term: &str, candidate: &str) -> Option<f32> {
+    if candidate == term { Some(1.) }
+    else if term.len() >= 2 && candidate.starts_with(term) { Some(0.75) }
+    else if one_typo(term, candidate) || term.strip_suffix('s').is_some_and(|term| one_typo(term, candidate)) { Some(0.65) }
+    else { None }
+}
+/// Explain the same normalized terms used by ranking, including aliases and typos.
+/// Computed when the query changes, not while rendering.
+pub fn match_hint(key: &str, query: &str) -> String {
+    let item = entry(key);
+    if item.config.eq_ignore_ascii_case(query.trim()) { return format!("Setting key: {}", item.config); }
+    let terms = tokens(query);
+    let document = &index().documents[ENTRIES.iter().position(|entry| entry.key == key).unwrap()];
+    let mut matches = Vec::new();
+    for term in terms {
+        let best = document.keys().filter_map(|candidate| term_weight(&term, candidate).map(|weight| (candidate, weight)))
+            .max_by(|(a, x), (b, y)| x.total_cmp(y).then_with(|| b.cmp(a)));
+        if let Some((candidate, _)) = best {
+            if !matches.contains(candidate) { matches.push(candidate.clone()); }
+        }
+    }
+    format!("Related terms: {}", matches.join(", "))
+}
 struct Index { documents: Vec<BTreeMap<String, f32>>, idf: BTreeMap<String, f32> }
 fn index() -> &'static Index {
     static INDEX: OnceLock<Index> = OnceLock::new();
@@ -117,8 +140,7 @@ pub fn search(query: &str) -> Vec<&'static str> {
     let index = index();
     let expanded: Vec<Vec<(&str, f32)>> = terms.iter().map(|term| {
         index.idf.keys().filter_map(|candidate| {
-            let weight = if candidate == term { 1. } else if term.len() >= 2 && candidate.starts_with(term) { 0.75 }
-                else if one_typo(term, candidate) || term.strip_suffix('s').is_some_and(|term| one_typo(term, candidate)) { 0.65 } else { return None; };
+            let weight = term_weight(term, candidate)?;
             Some((candidate.as_str(), weight))
         }).collect()
     }).collect();
@@ -154,6 +176,13 @@ mod tests {
         assert_eq!(search("socket_directory"), vec!["socket_directory"]);
         assert!(search("xyzzynothing").is_empty());
         assert!(search("  ").is_empty());
+    }
+    #[test]
+    fn explanations_follow_alias_and_typo_matches() {
+        assert_eq!(match_hint("socket_directory", "socket_directory"), "Setting key: socket_directory");
+        assert_eq!(match_hint("opacity", "transparent background"), "Related terms: opacity, background");
+        assert_eq!(match_hint("native_notifications", "notificaton"), "Related terms: notification");
+        assert_eq!(match_hint("scrollback", "ram"), "Related terms: memory");
     }
     #[test]
     fn catalog_covers_all_serialized_preferences_and_controls() {

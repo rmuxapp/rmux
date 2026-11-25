@@ -50,6 +50,27 @@ to keep the default across launches.
 
 ## Use the Settings panel
 
+Search results show their category and matching concepts, including related
+words and corrected typos. Searching an exact JSON key identifies that key in
+the result. Search runs locally without network requests or model downloads.
+
+Editable scalar settings include a reset icon. Click it, or press Backspace with
+the setting selected, to restore only that setting's default. Reset changes stay
+in the current draft until saved; Revert can restore the saved values. The close
+policy remains read-only when controlled by an environment override.
+
+Terminal foreground/background, cursor, and selection colors can be edited
+directly using swatches or `#RRGGBB` values. Cursor and selection colors also
+accept `cell-foreground` and `cell-background`. **Use default** removes an
+override; **Apply** updates the session draft, and **Save** persists it.
+
+Font names and session/socket/history paths have direct text editors with inline
+validation. Path editors offer **Browse…**, and also accept new absolute paths.
+For the automation socket, Browse chooses a parent and proposes a new
+`rmux-automation` child directory; that child must not already exist at startup.
+Session restoration and path changes show restart guidance. `RMUX_SOCKET_DIR`
+still takes precedence over the saved socket path.
+
 Open Settings with Cmd+, on macOS (Ctrl+, elsewhere), the app menu or palette.
 Settings opens in a separate, resizable window. Opening it again brings the same
 window forward without changing your terminal layout. Choose **Appearance**,
@@ -73,13 +94,13 @@ Hover **Keyboard help** for navigation hints.
 The fixed footer keeps **Save**, **Open settings file**, **Reload from file** and
 **Keyboard Shortcuts…** available while scrolling. Reload replaces session
 settings with the saved file; an invalid file leaves the current settings intact.
-The footer also shows **Unsaved session changes** when appearance controls differ
+The footer also shows **Unsaved session changes** when panel controls differ
 from the last loaded or successfully saved values. This status is shared across
 windows. Edits made while a save is running stay marked as unsaved; a failed save
 does not clear the status. It does not monitor external edits to the JSON file.
 **Revert unsaved changes** restores the panel controls to their last loaded or
-successfully saved values across all windows. It keeps commands, shortcuts,
-explicit color overrides and environment-controlled close policy, and does not
+successfully saved values across all windows, including color and path edits.
+It keeps commands, shortcuts, and environment-controlled close policy, and does not
 read or write the settings file. Imported theme colors are restored from the
 loaded snapshot, even if the theme file has changed or disappeared. It does not
 repair that file; restore the file or choose a bundled theme before the next
@@ -97,6 +118,9 @@ when you want to apply the restored file. Otherwise the restored settings apply
 immediately. The menu/palette action is **Undo Last Settings Save** and its custom
 shortcut action is `undo_settings_save`.
 
+Save merges only values changed in the draft, preserving unrelated JSON edits.
+If the same value changed differently on disk, Save reports a conflict and leaves
+the file intact; reload before editing that value again.
 Save and undo check for file changes again just before atomic replacement. This
 detects intervening edits but does not lock external editors; simultaneous writes
 from another process can still race the final check and replacement.

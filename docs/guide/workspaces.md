@@ -362,6 +362,8 @@ sidebar and native window title; Save Layout preserves them for manual restorati
 
 Cmd+Shift+N opens a separate native window; Cmd+Shift+W closes the current window.
 Linux/Windows use Ctrl+Alt+N and Ctrl+Alt+W. Each window owns its workspace list.
+On macOS, Cmd+M or Window → Minimize minimizes the active window without closing
+its terminals. Restore it from the Dock to return to the running sessions.
 Closing a window stops its terminal processes; quitting stops processes across
 all windows. Normal launches automatically restore workspace layouts and working
 directories with fresh shells. Quit preserves all open windows; closing the last

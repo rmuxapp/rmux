@@ -17,10 +17,11 @@ pub struct Job {
     pub workspace: EntityId,
     pub terminal: EntityId,
     pub name: String,
+    pub group: String,
     pub read: rmux_terminal::session::HistoryExport,
     pub probe: rmux_terminal::session::HistoryProbe,
 }
-pub struct Hit { pub window: Option<gpui::AnyWindowHandle>, pub workspace: EntityId, pub terminal: EntityId, pub name: String, pub snippet: String, pub preview: bool }
+pub struct Hit { pub window: Option<gpui::AnyWindowHandle>, pub workspace: EntityId, pub terminal: EntityId, pub name: String, pub group: String, pub snippet: String, pub preview: bool }
 #[derive(Default)]
 pub struct Report { pub hits: Vec<Hit>, pub scanned: usize, pub unavailable: usize, pub limited: usize }
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,8 +63,8 @@ pub fn scan_with_progress(jobs: Vec<Job>, query: &str, canceled: &AtomicBool, mu
     for (index, job) in jobs.into_iter().take(MAX_TERMINALS).enumerate() {
         if canceled.load(Ordering::Relaxed) { break; }
         if std::time::Instant::now() >= deadline { report.limited += 1; continue; }
-        let Job { window, workspace, terminal, name, read, probe } = job;
-        let mut hit = Hit { window, workspace, terminal, name, snippet: String::new(), preview: false };
+        let Job { window, workspace, terminal, name, group, read, probe } = job;
+        let mut hit = Hit { window, workspace, terminal, name, group, snippet: String::new(), preview: false };
         match read() {
             Ok(Some((text, limited))) => {
                 report.scanned += 1;
@@ -124,7 +125,7 @@ mod tests {
         let jobs = (0..3).map(|index| {
             let read_count = reads.clone();
             let probe_count = reads.clone();
-            super::Job { window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(),
+            super::Job { window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(), group: "Workspace".into(),
                 read: Box::new(move || {
                     read_count.fetch_add(1, Ordering::Relaxed);
                     Ok(Some((if index == 2 { "needle" } else { "prefix" }.into(), true)))
@@ -147,7 +148,7 @@ mod tests {
     #[test]
     fn truncated_misses_probe_history_and_report_unfinished_scans() {
         let jobs = (0..3).map(|index| super::Job {
-            window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(),
+            window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(), group: "Workspace".into(),
             read: Box::new(|| Ok(Some(("ordinary prefix".into(), true)))),
             probe: Box::new(move |query, _, _| {
                 assert_eq!(query, "needle");
@@ -165,7 +166,7 @@ mod tests {
         let calls = Arc::new(AtomicUsize::new(0));
         let jobs = |count| (0..count).map(|index| {
             let calls = calls.clone();
-            super::Job { window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(),
+            super::Job { window: None, workspace: gpui::EntityId::from(0x100000001), terminal: gpui::EntityId::from(0x100000002), name: index.to_string(), group: "Workspace".into(),
                 probe: Box::new(|_, _, _| Ok(None)),
                 read: Box::new(move || { calls.fetch_add(1, Ordering::Relaxed); match index {
                     0 => Ok(Some(("NEEDLE 世界".into(), true))), 1 => Ok(None), _ => anyhow::bail!("closed"),

@@ -416,7 +416,7 @@ pub struct AppearanceBaseline(pub Preferences);
 impl gpui::Global for AppearanceBaseline {}
 impl AppearanceBaseline {
     pub fn has_changes(&self, current: &Preferences) -> bool {
-        !self.0.same_saved_appearance(current)
+        !self.0.same_panel_values(current)
     }
 }
 impl Preferences {
@@ -586,6 +586,79 @@ impl Preferences {
     }
     /// Compare precisely the session values written by Save Settings. A close
     /// policy supplied by the environment is intentionally not persisted.
+    pub fn same_panel_values(&self, other: &Self) -> bool {
+        self.same_saved_appearance(other)
+            && self.foreground_color == other.foreground_color
+            && self.background_color == other.background_color
+            && self.cursor_color == other.cursor_color
+            && self.cursor_text == other.cursor_text
+            && self.selection_background == other.selection_background
+            && self.selection_foreground == other.selection_foreground
+            && self.session_file == other.session_file
+            && self.socket_directory == other.socket_directory
+            && self.shell_history_directory == other.shell_history_directory
+            && self.restore_session == other.restore_session
+    }
+    pub fn restore_panel(&mut self, baseline: &Self) {
+        self.restore_appearance(baseline);
+        self.foreground_color = baseline.foreground_color.clone();
+        self.background_color = baseline.background_color.clone();
+        self.cursor_color = baseline.cursor_color.clone();
+        self.cursor_text = baseline.cursor_text.clone();
+        self.selection_background = baseline.selection_background.clone();
+        self.selection_foreground = baseline.selection_foreground.clone();
+        self.session_file = baseline.session_file.clone();
+        self.socket_directory = baseline.socket_directory.clone();
+        self.shell_history_directory = baseline.shell_history_directory.clone();
+        self.restore_session = baseline.restore_session.clone();
+    }
+    pub fn edit_panel_value(&self, key: &str, value: serde_json::Value) -> Result<Self> {
+        ensure!(matches!(key, "foreground_color" | "background_color" | "cursor_color" | "cursor_text"
+            | "selection_background" | "selection_foreground" | "font_family" | "session_file"
+            | "socket_directory" | "shell_history_directory" | "restore_session"), "Setting is not editable here");
+        let mut object = serde_json::to_value(self)?;
+        object[key] = value;
+        let mut next = Self::decode(&serde_json::to_vec(&object)?)?;
+        next.source = self.source.clone();
+        next.required = self.required;
+        next.policy_override = self.policy_override;
+        next.imported_theme = self.imported_theme.clone();
+        Ok(next)
+    }
+    /// Merge only this draft's changes. Untouched settings edited on disk are
+    /// preserved; conflicting edits to the same setting are reported.
+    pub fn save_panel_with_receipt(&self, baseline: &Self) -> Result<SaveReceipt> {
+        let source = self.source.clone().context("No configuration path is available")?;
+        let path = match std::fs::symlink_metadata(&source) {
+            Ok(_) => source.canonicalize().context("Could not resolve configuration target")?,
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => source.clone(),
+            Err(error) => return Err(error.into()),
+        };
+        let before = config_bytes(&path)?;
+        let latest = before.as_deref().map(Self::decode).transpose()?.unwrap_or_default();
+        let old_values = serde_json::to_value(&latest)?;
+        let base_values = serde_json::to_value(baseline)?;
+        let mut staged = baseline.clone();
+        staged.restore_panel(self);
+        let draft_values = serde_json::to_value(&staged)?;
+        let mut merged: serde_json::Map<String, serde_json::Value> = before.as_deref()
+            .map(serde_json::from_slice).transpose()?.unwrap_or_default();
+        let mut changes = Vec::new();
+        for (key, value) in draft_values.as_object().context("Invalid settings object")? {
+            if base_values.get(key) == Some(value) { continue; }
+            ensure!(old_values.get(key) == base_values.get(key) || old_values.get(key) == Some(value),
+                "{key} changed in the settings file. Reload Settings before saving this value.");
+            if merged.get(key) != Some(value) {
+                let prior = merged.insert(key.clone(), value.clone());
+                changes.push((key.clone(), prior, value.clone()));
+            }
+        }
+        let bytes = serde_json::to_vec_pretty(&merged)?;
+        Self::decode(&bytes)?;
+        replace_config(&path, before.as_deref(), &bytes)?;
+        Ok(SaveReceipt { path: path.canonicalize()?, source, changes })
+    }
+
     pub fn same_saved_appearance(&self, other: &Self) -> bool {
         self.font_size == other.font_size
             && self.font_family == other.font_family
@@ -645,6 +718,7 @@ impl Preferences {
     pub fn save_appearance(&self) -> Result<std::path::PathBuf> {
         Ok(self.save_appearance_with_receipt()?.path)
     }
+    #[cfg(test)]
     pub fn save_appearance_with_receipt(&self) -> Result<SaveReceipt> {
         let path = self.source.clone().context("No configuration path is available")?;
         // Inspect the link itself: exists()/try_exists() follow it and mistake
@@ -827,6 +901,40 @@ impl Preferences {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn panel_save_merges_only_draft_changes_and_undo_preserves_external_edits() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("config.json");
+        std::fs::write(&path, br##"{"font_size":13,"foreground_color":"#ffffff"}"##)?;
+        let mut baseline = Preferences::read(&path, true)?;
+        baseline.source = Some(path.clone());
+        let draft = baseline.edit_panel_value("foreground_color", serde_json::json!("#aabbcc"))?;
+        std::fs::write(&path, br##"{"font_size":18,"foreground_color":"#ffffff"}"##)?;
+        let receipt = draft.save_panel_with_receipt(&baseline)?;
+        let saved = Preferences::read(&path, true)?;
+        assert_eq!(saved.font_size, 18.);
+        assert_eq!(saved.foreground_color, draft.foreground_color);
+        receipt.undo()?;
+        let restored = Preferences::read(&path, true)?;
+        assert_eq!(restored.font_size, 18.);
+        assert_eq!(restored.foreground_color, baseline.foreground_color);
+        Ok(())
+    }
+
+    #[test]
+    fn panel_save_rejects_same_field_conflicts_without_overwriting() -> Result<()> {
+        let root = tempfile::tempdir()?;
+        let path = root.path().join("config.json");
+        std::fs::write(&path, b"{}")?;
+        let mut baseline = Preferences::read(&path, true)?;
+        baseline.source = Some(path.clone());
+        let draft = baseline.edit_panel_value("font_family", serde_json::json!("Monaco"))?;
+        let external = br#"{"font_family":"Courier"}"#;
+        std::fs::write(&path, external)?;
+        assert!(draft.save_panel_with_receipt(&baseline).err().expect("same-field conflict").to_string().contains("font_family changed"));
+        assert_eq!(std::fs::read(&path)?, external);
+        Ok(())
+    }
     #[test]
     fn chrome_theme_follows_presets_and_explicit_background() -> Result<()> {
         for theme in TerminalTheme::ALL {
@@ -1190,7 +1298,7 @@ mod tests {
     }
 
     #[test]
-    fn appearance_restore_keeps_unrelated_config_and_policy_override() -> Result<()> {
+    fn panel_restore_keeps_unrelated_config_and_policy_override() -> Result<()> {
         let baseline = Preferences::default();
         let mut current = Preferences::decode(br##"{
             "font_size":20,"terminal_padding":16,"copy_on_select":true,
@@ -1202,12 +1310,12 @@ mod tests {
         current.policy_override = Some(ClosePolicy::Never);
         current.confirm_close = ClosePolicy::Never;
         assert!(AppearanceBaseline(baseline.clone()).has_changes(&current));
-        current.restore_appearance(&baseline);
+        current.restore_panel(&baseline);
         assert!(!AppearanceBaseline(current.clone()).has_changes(&baseline));
         assert!(current.same_saved_appearance(&baseline));
         assert_eq!(current.commands[0].name, "Example");
         assert_eq!(current.keybindings.len(), 1);
-        assert_eq!(current.foreground_color, Some(HexColor(0xabcdef)));
+        assert_eq!(current.foreground_color, baseline.foreground_color);
         assert_eq!(current.source, Some("/fixture/settings.json".into()));
         assert_eq!(current.confirm_close, ClosePolicy::Never);
         // Saving an environment override must still retain the on-disk policy.
@@ -1229,15 +1337,15 @@ mod tests {
         assert!(AppearanceBaseline(baseline.clone()).has_changes(&current));
         // A broken or moved file must not make an in-session revert depend on I/O.
         std::fs::write(&path, "background=invalid\n")?;
-        current.restore_appearance(&baseline);
+        current.restore_panel(&baseline);
         assert_eq!(current.terminal_colors()[1], Some(rmux_terminal::Color(0x12, 0x34, 0x56)));
         assert_eq!(current.terminal_palette(), baseline.terminal_palette());
         assert_eq!(current.selection_background(), baseline.selection_background());
-        assert_eq!(current.foreground_color, Some(HexColor(0xfedcba)));
+        assert_eq!(current.foreground_color, baseline.foreground_color);
         assert!(!AppearanceBaseline(baseline.clone()).has_changes(&current));
         std::fs::remove_file(&path)?;
         current.select_theme(TerminalTheme::Light);
-        current.restore_appearance(&baseline);
+        current.restore_panel(&baseline);
         assert_eq!(current.terminal_colors()[1], baseline.terminal_colors()[1]);
         assert_eq!(current.theme_file.as_ref(), Some(&path));
         Ok(())

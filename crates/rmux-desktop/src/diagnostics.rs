@@ -79,6 +79,7 @@ pub struct Metrics {
     id: u64,
     started: Instant,
     pub notifications: u64,
+    pub hidden_output_invalidations_skipped: u64,
     pub snapshot_busy: u64,
     pub metadata_busy: u64,
     pub resize_busy: u64,
@@ -94,11 +95,34 @@ pub struct Metrics {
     pub paint: Timing,
 }
 impl Metrics {
+    /// Bounded, read-only counters for automation sampling. No engine lock,
+    /// snapshot construction, or file IO is needed to observe render activity.
+    pub fn counters(&self, output_bytes: u64) -> serde_json::Value {
+        serde_json::json!({
+            "parsed_output_bytes": output_bytes,
+            "output_notifications": self.notifications,
+            "hidden_output_invalidations_skipped": self.hidden_output_invalidations_skipped,
+            "prepaint_calls": self.prepaint.count,
+            "prepaint_total_ns": self.prepaint.total_ns,
+            "paint_calls": self.paint.count,
+            "paint_total_ns": self.paint.total_ns,
+            "rows_reused": self.rows_reused,
+            "rows_rebuilt": self.rows_rebuilt,
+            "cache_releases": self.cache_releases,
+            "snapshot_busy": self.snapshot_busy,
+            "metadata_busy": self.metadata_busy,
+            "resize_busy": self.resize_busy,
+        })
+    }
     pub fn enabled() -> Option<Self> {
-        destination().map(|_| Self {
+        destination().map(|_| Self::new())
+    }
+    fn new() -> Self {
+        Self {
             id: NEXT_PANE.fetch_add(1, Ordering::Relaxed),
             started: Instant::now(),
             notifications: 0,
+            hidden_output_invalidations_skipped: 0,
             snapshot_busy: 0,
             metadata_busy: 0,
             resize_busy: 0,
@@ -112,7 +136,7 @@ impl Metrics {
             snapshot_recovery: SnapshotRecovery::default(),
             prepaint: Timing::default(),
             paint: Timing::default(),
-        })
+        }
     }
     pub fn snapshot(
         &self,
@@ -179,6 +203,22 @@ impl Metrics {
 #[cfg(test)]
 mod tests {
     use super::{SnapshotReleases, SnapshotRecovery};
+    #[test]
+    fn automation_sampling_preserves_cumulative_render_counters() {
+        let mut metrics = super::Metrics::new();
+        metrics.prepaint.record(std::time::Duration::from_micros(20));
+        metrics.paint.record(std::time::Duration::from_micros(10));
+        metrics.rows_rebuilt = 3;
+        let first = metrics.counters(1024);
+        assert_eq!(metrics.counters(1024), first);
+        metrics.paint.record(std::time::Duration::from_micros(5));
+        let second = metrics.counters(2048);
+        assert_eq!(second["paint_calls"], 2);
+        assert_eq!(second["paint_total_ns"], 15000);
+        assert_eq!(second["prepaint_calls"], 1);
+        assert_eq!(second["rows_rebuilt"], 3);
+        assert_eq!(second["parsed_output_bytes"], 2048);
+    }
     #[test]
     fn snapshot_recovery_excludes_hidden_time_and_counts_placeholder_frames() {
         use std::time::{Instant, Duration};

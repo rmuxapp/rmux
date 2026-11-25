@@ -189,6 +189,18 @@ other-platform acceptance remain pending. Reproduce with
 
 `mise run smoke-live-sessions` additionally checks running shell state through tab,
 workspace and workspace-merge transfers, including closure of emptied windows.
+The fixture sets `RMUX_STARTUP_ACTIVATE=0` so startup does not take keyboard
+focus from another application. This opt-in override also applies to layout and
+session launches; ordinary launches still activate their windows. Explicit
+automation requests with `activate: true` continue to activate a window.
+
+When `RMUX_RENDER_METRICS` is set at launch, `surface.list` additionally includes
+per-terminal `render_metrics`: cumulative paint/prepaint counts and timings,
+parsed output bytes, output notifications, row reuse/rebuild counts, cache
+releases, and busy counters. Reading them does not reset counters, write a file,
+take an engine lock, or activate the window. Compare two snapshots of the same
+surface to measure activity; these are internal render timings, not presentation
+or input-to-photon latency. The fields are absent when diagnostics are disabled.
 
 ## Unix socket automation
 
@@ -205,6 +217,13 @@ settings does not replace a live endpoint; changing this setting requires a
 restart. The CLI still needs `--socket PATH/rpc.sock` or its own `RMUX_SOCKET_DIR`.
 It does not read rmux's settings automatically. Do not create the endpoint directory
 in advance; rmux creates it privately and removes it on normal quit.
+
+If startup reports that the automation directory already exists, another running
+instance may own it. This commonly happens when launching `mise run run` while
+the installed app is open: both use the same saved settings. Quit the other
+instance first, or give development a separate unused directory, for example
+`RMUX_SOCKET_DIR="$HOME/.rmux-automation-dev" mise run run`. Existing paths are
+never automatically removed or replaced, including files and symlinks.
 
 Alternatively, for opt-in Unix socket automation, launch with
 `RMUX_SOCKET_DIR=/absolute/new-directory mise run run`. The parent must exist;

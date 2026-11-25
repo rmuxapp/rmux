@@ -484,7 +484,7 @@ impl PaneView {
     pub(super) fn automation_surfaces(&self, window_id: &str, workspace_id: &str, pane_id: &str, history: bool, cx: &App) -> Vec<serde_json::Value> {
         self.terminals.iter().enumerate().map(|(index, entity)| {
             let terminal = entity.read(cx);
-            serde_json::json!({
+            let mut result = serde_json::json!({
                 "id":entity.entity_id().to_string(), "window_id":window_id,
                 "workspace_id":workspace_id, "pane_id":pane_id,
                 "index":index, "type":"terminal", "title":self.tab_title(index, cx),
@@ -520,7 +520,11 @@ impl PaneView {
                 "ssh_destination":terminal.session.remote_destination(),
                 "saved_ssh_destination":terminal.saved_ssh_destination,
                 "process_exited":terminal.session.process_exited(),
-            })
+            });
+            if let Some(metrics) = &terminal.metrics {
+                result["render_metrics"] = metrics.counters(terminal.session.output_bytes());
+            }
+            result
         }).collect()
     }
     pub fn request_process_close(&self, cx: &App) {

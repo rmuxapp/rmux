@@ -1310,6 +1310,15 @@ impl WorkspaceWindow {
 
     fn settings_actions(root: Div, cx: &mut Context<Self>) -> Div {
         root
+            .on_action(cx.listener(|this, _: &ApplySettingEditor, window, cx| this.apply_setting_editor(window, cx)))
+            .on_action(cx.listener(|this, _: &CancelSettingEditor, window, cx| this.close_setting_editor(window, cx)))
+            .on_action(cx.listener(|this, _: &BrowseSettingPath, window, cx| this.browse_setting_path(window, cx)))
+            .on_action(cx.listener(|this, action: &SetSettingDraft, window, cx| {
+                if let Some(editor) = this.settings_state.as_ref().and_then(|state| state.editor.clone()) {
+                    editor.input.update(cx, |input, cx| input.replace_draft(&action.value, cx));
+                    editor.input.read(cx).focus.focus(window);
+                }
+            }))
             .on_action(cx.listener(|this, action: &SetTerminalTheme, window, cx| {
                 if let Some(state) = &mut this.settings_state {
                     state.selected = settings_view::KEYS.iter().position(|key| *key == "theme").unwrap_or(0);
@@ -1332,13 +1341,22 @@ impl WorkspaceWindow {
                     }
                 }
             }))
+            .on_action(cx.listener(|this, change: &ResetSetting, _, cx| {
+                let mut settings = cx.global::<Preferences>().clone();
+                if settings_view::reset(&mut settings, &change.key) {
+                    cx.set_global(settings.confirm_close);
+                    cx.set_global(settings);
+                    this.notice = None;
+                    cx.notify();
+                }
+            }))
             .on_action(cx.listener(|this, change: &AdjustSetting, window, cx| {
                 if let Some(state) = &mut this.settings_state {
                     if let Some(index) = settings_view::KEYS.iter().position(|key| *key == change.key) { state.selected = index; }
                     if state.origin_window != window.window_handle() { state.focus.focus(window); }
                 }
                 let mut settings = cx.global::<Preferences>().clone();
-                if this.editor_setting_action(&change.key, cx) {
+                if this.editor_setting_action(&change.key, window, cx) {
                     return;
                 }
                 if change.key == "import_theme" {
@@ -1350,7 +1368,7 @@ impl WorkspaceWindow {
                     return;
                 }
                 settings_view::adjust(&mut settings, &change.key, change.delta);
-                if !settings.same_saved_appearance(cx.global::<Preferences>()) {
+                if !settings.same_panel_values(cx.global::<Preferences>()) {
                     cx.set_global(settings.confirm_close);
                     cx.set_global(settings);
                 }
@@ -1383,7 +1401,21 @@ impl WorkspaceWindow {
         }));
     }
     fn notice_toast(&self, notice: String, settings: bool, cx: &mut Context<Self>) -> AnyElement {
-        let success = ["Settings saved to ", "Unsaved settings reverted.", "Saved session to ", "Saved layout to ", "Copied "]
+        // Keep the full diagnostic in the tooltip and Copy action. Long paths
+        // and OS errors should not bury the recovery action in a clipped toast.
+        let summary = if notice.starts_with("Settings saved to ") { "Settings saved" }
+            else if notice == "Settings reloaded. Fonts using previous defaults updated; per-terminal overrides retained." { "Settings reloaded" }
+            else if notice.starts_with("Undid ") && notice.ends_with("kept 0 values changed since the save.") { "Save undone" }
+            else if notice.starts_with("Saved session to ") { "Session saved" }
+            else if notice.starts_with("Saved layout to ") { "Layout saved" }
+            else if notice.starts_with("Session recovery is unavailable for ") {
+                "Session recovery unavailable. Check the Session file in Settings, then restart. Use Save Session to save separately. Copy this message for details."
+            } else if notice.starts_with("Could not restore the saved session:") {
+                "Session restore failed; the original file is preserved. Use Save Session to save this window separately. Copy this message for details."
+            } else if notice.starts_with("Automation could not start:") {
+                "Automation unavailable. Check the Automation socket directory in Settings, then restart. Copy this message for details."
+            } else { &notice }.to_owned();
+        let success = ["Settings saved to ", "Settings reloaded.", "Undid ", "Unsaved settings reverted.", "Saved session to ", "Saved layout to ", "Copied "]
             .iter().any(|prefix| notice.starts_with(prefix));
         gpui::div().id("window-notice-toast").absolute().right(px(16.)).bottom(px(if settings { 96. } else { 16. }))
             .max_w(relative(0.85)).occlude().shadow_lg().rounded_lg().flex().items_center().min_w_0()
@@ -1395,7 +1427,7 @@ impl WorkspaceWindow {
                         .child(gpui::div().id("window-notice-text").relative().top(px(-1.)).line_height(px(18.)).min_w_0().max_w(px(340.)).max_h(px(96.)).overflow_scroll().whitespace_normal()
                             .text_color(crate::chrome_style::foreground())
                             .tooltip({ let detail: SharedString = notice.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(detail.clone())).into() })
-                            .child(if notice.starts_with("Settings saved to ") { "Settings saved".to_owned() } else { notice.clone() }))
+                            .child(summary))
                         .child(pane_view::pane_control("copy-notice", "Copy message")
                             .on_click(move |event, _, cx| {
                                 if event.standard_click() { clipboard::write(ClipboardItem::new_string(notice.clone()), cx); }
@@ -1459,6 +1491,7 @@ impl WorkspaceWindow {
                     .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| { this.close_palette(window, cx); cx.stop_propagation(); }))
                     .child(palette.clone())
             ));
+        let root = root.when_some(self.settings_state.as_ref().and_then(|state| state.editor.clone()), |root, editor| root.child(settings_editor::panel(editor, f32::from(window.viewport_size().height))));
         Self::settings_actions(root, cx).into_any_element()
     }
     fn toggle_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
@@ -1477,7 +1510,7 @@ impl WorkspaceWindow {
                     field.placeholder = Some("Search settings…");
                     field
                 });
-                this.settings_state = Some(settings_view::State { focus: focus.clone(), origin_window, category: 0, selected: settings_view::control_index("theme").unwrap(), scroll: ScrollHandle::new(), search, query: String::new(), visible: settings_view::CATEGORIES[0].2.iter().filter_map(|key| settings_view::control_index(key)).collect() });
+                this.settings_state = Some(settings_view::State { match_hints: Default::default(), editor: None, focus: focus.clone(), origin_window, category: 0, selected: settings_view::control_index("theme").unwrap(), scroll: ScrollHandle::new(), search, query: String::new(), visible: settings_view::CATEGORIES[0].2.iter().filter_map(|key| settings_view::control_index(key)).collect() });
                 cx.notify();
             });
             let error_owner = owner.downgrade();
@@ -1536,6 +1569,9 @@ impl WorkspaceWindow {
             } else {
                 settings_search::search(&state.query).iter().filter_map(|key| settings_view::control_index(key)).collect()
             };
+            state.match_hints = if state.query.is_empty() { Default::default() } else {
+                state.visible.iter().map(|index| (*index, settings_search::match_hint(settings_view::KEYS[*index], &state.query))).collect()
+            };
             state.selected = state.visible.first().copied().unwrap_or(settings_view::KEYS.len());
             state.scroll = ScrollHandle::new();
             cx.notify();
@@ -1581,6 +1617,10 @@ impl WorkspaceWindow {
                 }
             }
             cx.notify();
+        } else if key == "backspace" {
+            if let Some(key) = settings_view::KEYS.get(state.selected) {
+                window.dispatch_action(Box::new(ResetSetting { key: (*key).into() }), cx);
+            }
         } else if key == "escape" {
             if !state.query.is_empty() {
                 state.search.update(cx, |field, cx| field.replace_draft("", cx));
@@ -1596,7 +1636,7 @@ impl WorkspaceWindow {
                 return;
             }
             if selected < settings_view::KEYS.len() {
-                if self.editor_setting_action(settings_view::KEYS[selected], cx) {
+                if self.editor_setting_action(settings_view::KEYS[selected], window, cx) {
                     cx.stop_propagation();
                     return;
                 }
@@ -1620,7 +1660,7 @@ impl WorkspaceWindow {
                 if let settings_view::ControlInput::Adjust(delta) = input {
                     settings_view::adjust(&mut settings, settings_view::KEYS[selected], delta);
                 }
-                if !settings.same_saved_appearance(cx.global::<Preferences>()) {
+                if !settings.same_panel_values(cx.global::<Preferences>()) {
                     cx.set_global(settings.confirm_close);
                     cx.set_global(settings);
                 }
@@ -1644,12 +1684,13 @@ impl WorkspaceWindow {
         if cx.global::<preferences::ReloadState>().0 { return; }
         cx.global_mut::<preferences::ReloadState>().0 = true;
         let settings = cx.global::<Preferences>().clone();
+        let baseline = cx.global::<preferences::AppearanceBaseline>().0.clone();
         let executor = cx.background_executor().clone();
-        self.notice = Some("Saving appearance settings…".into());
+        self.notice = Some("Saving settings…".into());
         cx.notify();
         cx.spawn(async move |entity, cx| {
             let snapshot = settings.clone();
-            let result = executor.spawn(async move { snapshot.save_appearance_with_receipt() }).await;
+            let result = executor.spawn(async move { snapshot.save_panel_with_receipt(&baseline) }).await;
             let _ = cx.update(|cx| {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
                 if let Ok(receipt) = &result {
@@ -1658,7 +1699,7 @@ impl WorkspaceWindow {
                 }
                 let _ = entity.update(cx, |this, cx| {
                     this.notice = Some(match result {
-                        Ok(receipt) if settings.same_saved_appearance(cx.global::<Preferences>()) => format!("Settings saved to {}", receipt.path.display()),
+                        Ok(receipt) if settings.same_panel_values(cx.global::<Preferences>()) => format!("Settings saved to {}", receipt.path.display()),
                         Ok(_) => "Earlier settings saved. Your newer changes are not saved yet; choose Save again to keep them.".into(),
                         Err(error) => format!("Settings not saved: {error:#}"),
                     });
@@ -1701,7 +1742,7 @@ impl WorkspaceWindow {
                 // A closed originating window must not apply a delayed import.
                 let _ = entity.update(cx, |this, cx| {
                     this.notice = Some(match result {
-                        Ok(_) if !current.same_saved_appearance(cx.global::<Preferences>()) =>
+                        Ok(_) if !current.same_panel_values(cx.global::<Preferences>()) =>
                             "Settings changed during import; your newer edits were kept.".into(),
                         Ok(next) => {
                             cx.set_global(next);
@@ -1719,7 +1760,7 @@ impl WorkspaceWindow {
         let mut settings = cx.global::<Preferences>().clone();
         let baseline = cx.global::<preferences::AppearanceBaseline>();
         if !baseline.has_changes(&settings) { return; }
-        settings.restore_appearance(&baseline.0);
+        settings.restore_panel(&baseline.0);
         cx.set_global(settings.confirm_close);
         cx.set_global(settings);
         self.notice = Some("Unsaved settings reverted. The settings file was not changed.".into());
@@ -1746,7 +1787,7 @@ impl WorkspaceWindow {
                     Ok(((restored, skipped), loaded)) => {
                         cx.set_global(preferences::LastSettingsSave::default());
                         let summary = format!("Undid {restored} saved settings; kept {skipped} values changed since the save.");
-                        if unsaved || !current.same_saved_appearance(cx.global::<Preferences>()) {
+                        if unsaved || !current.same_panel_values(cx.global::<Preferences>()) {
                             format!("{summary} Your session edits were kept. Reload Settings to apply the restored file.")
                         } else {
                             match loaded {
@@ -1784,7 +1825,7 @@ impl WorkspaceWindow {
             let _ = cx.update(|cx| {
                 cx.global_mut::<preferences::ReloadState>().0 = false;
                 let notice = match result {
-                    Ok(_) if !current.same_saved_appearance(cx.global::<Preferences>()) => {
+                    Ok(_) if !current.same_panel_values(cx.global::<Preferences>()) => {
                         "Settings changed while reloading. Your newer edits were kept; reload again to replace them with the file settings.".into()
                     }
                     Ok(next) => {
@@ -1806,7 +1847,76 @@ impl WorkspaceWindow {
             });
         }).detach();
     }
-    fn editor_setting_action(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
+    fn open_setting_editor(&mut self, field: settings_editor::Field, window: &mut Window, cx: &mut Context<Self>) {
+        if self.settings_state.is_none() { return; }
+        let value = settings_editor::value(cx.global::<Preferences>(), field);
+        let input = cx.new(|cx| {
+            let mut field = text_field::TextField::new(&value, cx);
+            field.select_all_text(cx);
+            field
+        });
+        cx.subscribe_in(&input, window, |this, _, event: &text_field::EditEvent, window, cx| {
+            match event {
+                text_field::EditEvent::Submitted { .. } => this.apply_setting_editor(window, cx),
+                text_field::EditEvent::Cancelled => this.close_setting_editor(window, cx),
+                text_field::EditEvent::Changed(_) => {
+                    if let Some(editor) = this.settings_state.as_mut().and_then(|s| s.editor.as_mut()) { editor.error = None; }
+                    cx.notify();
+                }
+            }
+        }).detach();
+        self.settings_state.as_mut().unwrap().editor = Some(settings_editor::Editor { field, input: input.clone(), error: None });
+        input.read(cx).focus.focus(window);
+        cx.notify();
+    }
+    fn close_setting_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(state) = self.settings_state.as_mut() { state.editor = None; state.focus.focus(window); }
+        cx.notify();
+    }
+    fn apply_setting_editor(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(editor) = self.settings_state.as_ref().and_then(|s| s.editor.clone()) else { return; };
+        match settings_editor::apply(cx.global::<Preferences>(), editor.field, editor.input.read(cx).value()) {
+            Ok(next) => { cx.set_global(next); self.close_setting_editor(window, cx); },
+            Err(error) => {
+                if let Some(editor) = self.settings_state.as_mut().and_then(|s| s.editor.as_mut()) { editor.error = Some(error.to_string()); }
+                cx.notify();
+            }
+        }
+    }
+    fn browse_setting_path(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        let Some(editor) = self.settings_state.as_ref().and_then(|s| s.editor.clone()) else { return; };
+        if !editor.field.path { return; }
+        let Some(permit) = cx.global::<PromptGate>().acquire() else { return; };
+        let picker = cx.prompt_for_paths(PathPromptOptions {
+            files: editor.field.config == "session_file", directories: editor.field.config != "session_file", multiple: false,
+            prompt: Some(if editor.field.config == "socket_directory" { "Choose Parent Folder" } else { "Choose Path" }.into()),
+        });
+        cx.spawn_in(window, async move |entity, cx| {
+            let result: anyhow::Result<Option<std::path::PathBuf>> = async { Ok(picker.await??.and_then(|paths| paths.into_iter().next())) }.await;
+            drop(permit);
+            let _ = cx.update(|window, cx| entity.update(cx, |this, cx| {
+                let Some(current) = this.settings_state.as_ref().and_then(|s| s.editor.clone()) else { return; };
+                if current.input.entity_id() != editor.input.entity_id() { return; }
+                match result {
+                    Ok(Some(path)) => {
+                        let path = if editor.field.config == "socket_directory" { path.join("rmux-automation") } else { path };
+                        current.input.update(cx, |input, cx| input.replace_draft(&path.to_string_lossy(), cx));
+                        current.input.read(cx).focus.focus(window);
+                    },
+                    Ok(None) => {},
+                    Err(error) => {
+                        if let Some(editor) = this.settings_state.as_mut().and_then(|s| s.editor.as_mut()) { editor.error = Some(format!("Could not choose path: {error}")); }
+                        cx.notify();
+                    }
+                }
+            }));
+        }).detach();
+    }
+    fn editor_setting_action(&mut self, key: &str, window: &mut Window, cx: &mut Context<Self>) -> bool {
+        if let Some(field) = settings_editor::field(key) {
+            self.open_setting_editor(field, window, cx);
+            return true;
+        }
         if settings_search::ENTRIES.iter().any(|entry| entry.key == key && entry.json_only) {
             self.open_settings_file(cx);
             return true;
@@ -3195,9 +3305,7 @@ impl WorkspaceWindow {
         target.update(cx, |view, cx| {
             view.dismiss_find(cx);
             view.install_find(worker, query.to_owned(), window, cx);
-            if let Some(find) = &view.find {
-                find.update(cx, |find, cx| find.navigate(rmux_terminal::search::Direction::Older, cx));
-            }
+            view.find_navigation_pending = true;
         });
         Ok(())
     }
@@ -3208,7 +3316,8 @@ impl WorkspaceWindow {
                 for (tab, terminal) in pane.read(cx).terminals.iter().enumerate() {
                     if jobs.len() == terminal_search::MAX_TERMINALS { *extra += 1; continue; }
                     jobs.push(terminal_search::Job { window: target, workspace: entry.workspace.entity_id(), terminal: terminal.entity_id(),
-                        name: format!("{label} · {} / {}", entry.name, pane.read(cx).tab_title(tab, cx)),
+                        name: pane.read(cx).tab_title(tab, cx).to_string(),
+                        group: format!("{label} · {}", entry.name),
                         probe: terminal.read(cx).session.history_probe(),
                         read: terminal.read(cx).session.history_export(terminal_search::MAX_BYTES) });
                 }
