@@ -3,34 +3,35 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.24</title>
-            <pubDate>Wed, 25 Nov 2026 03:08:04 +0000</pubDate>
+            <title>0.1.25</title>
+            <pubDate>Wed, 25 Nov 2026 14:53:09 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.24</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.24</sparkle:version>
-            <sparkle:shortVersionString>0.1.24</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.25</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.25</sparkle:version>
+            <sparkle:shortVersionString>0.1.25</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.24
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.25
 
-A dedicated, searchable Settings window with clearer controls and compact feedback.
+More complete Settings controls, clearer terminal search, and less rendering work for hidden terminals.
 
-- Open Settings in its own resizable window, with category icons, an organized sidebar, and setting descriptions.
-- Search across all settings using local sparse-vector ranking, related terms, prefixes, and typo matching. Search runs locally without a remote service or model download.
-- Discover JSON-only options alongside editable settings, with direct access to the configuration file.
-- Improve keyboard navigation, toggle controls, and the save/revert footer. Keep configuration details and status messages inside their associated rows or tooltips.
-- Show notifications as compact floating toasts without shifting the layout. Successful actions display a checkmark; save confirmations dismiss automatically, with the full message available to copy.
-- Clean up native build warnings from deprecated xattr types and browser-only helpers.
+- Edit terminal colors, font family, and session, socket, and history paths directly in Settings, with color swatches, native browsing, validation, and per-setting resets.
+- Preserve unrelated configuration edits when saving or undoing Settings changes, and report conflicts instead of overwriting them. Add clearer restart guidance and search-match explanations.
+- Group terminal search results by window and workspace, highlight matching excerpts, and reliably navigate to matches across windows.
+- Skip redundant hidden-terminal output invalidations after releasing snapshots, while retaining output and independent status/error updates. Add opt-in rendering counters and a documented CPU/memory baseline.
+- Make startup, socket, and session-recovery errors more actionable while preserving existing files and endpoints. Keep full diagnostics available from compact toasts.
+- Polish compact Settings layouts and success feedback, and add native macOS Window → Minimize / Command-M support.
+- Prevent live-shell smoke fixtures from stealing keyboard focus, improving repeatability of input and exit checks.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: 14 focused Settings tests, the desktop/CLI debug build, release metadata checks, and native Settings visual checks passed. The live-shell RPC smoke check passed once but showed intermittent input/exit failures on repeat runs; the installed prior release also reproduced the shell-exit failure. Native Windows runtime validation remains deferred.
+Validation: 320 desktop tests passed with six intentional ignores, the desktop/CLI debug build passed, and the final live-shell smoke passed all 25 checks. Native Settings and cross-window search checks passed. Render visibility checks verified retained Unicode output and fresh painting on return. Performance baselines cover 1, 8, and 32 terminals; debug measurements are not release speedup claims. Native Windows runtime validation remains deferred.
 
-[User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
+[Delivery evidence](../workflow-improvements.md) · [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.24/rmux-0.1.24-macos-arm64.zip" length="8977095" type="application/octet-stream" sparkle:edSignature="ORiDIQS0joWzPIxlvgeSYLVNrFt0n73ixtWNdqNpsdkFh1ku31F5CBQ8ubassho4DvI7ruoY+d/hFNiibfSHCg=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.25/rmux-0.1.25-macos-arm64.zip" length="9039605" type="application/octet-stream" sparkle:edSignature="q3Cu6hQHKnJcbSBtMeqcrcAV0g3kIzP0hnACVuqNjn5lVTHdF+JmwwRp57T8iveGeyb87Tlqe+VKkYAJWcouBg=="/>
         </item>
     </channel>
 </rss>
