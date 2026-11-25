@@ -3,35 +3,34 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.23</title>
-            <pubDate>Tue, 24 Nov 2026 21:13:14 +0000</pubDate>
+            <title>0.1.24</title>
+            <pubDate>Wed, 25 Nov 2026 03:08:04 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.23</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.23</sparkle:version>
-            <sparkle:shortVersionString>0.1.23</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.24</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.24</sparkle:version>
+            <sparkle:shortVersionString>0.1.24</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.23
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.24
 
-Show terminal task status in the workspace sidebar consistently.
+A dedicated, searchable Settings window with clearer controls and compact feedback.
 
-- Include program status reports from all applications, including reports without an application name, instead of requiring the exact name `Claude`.
-- Summarize status across all live tabs and panes, including inactive tabs. Show terminal progress when no program status is available.
-- Keep workspace status visible in compact-sidebar mode. Prioritize blocked and error states, then ongoing work; include percentages and a count of additional reports.
-- Exclude exited terminals and remove badges when reports clear.
-- Includes the Apple Icon Composer macOS icon update from 0.1.22.
-
-Addresses [#17](https://github.com/rmuxapp/rmux/issues/17).
+- Open Settings in its own resizable window, with category icons, an organized sidebar, and setting descriptions.
+- Search across all settings using local sparse-vector ranking, related terms, prefixes, and typo matching. Search runs locally without a remote service or model download.
+- Discover JSON-only options alongside editable settings, with direct access to the configuration file.
+- Improve keyboard navigation, toggle controls, and the save/revert footer. Keep configuration details and status messages inside their associated rows or tooltips.
+- Show notifications as compact floating toasts without shifting the layout. Successful actions display a checkmark; save confirmations dismiss automatically, with the full message available to copy.
+- Clean up native build warnings from deprecated xattr types and browser-only helpers.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: four focused workspace-status regression tests, the desktop debug build, and live RPC smoke checks passed. Tests cover unnamed and differently named applications, status priority, multiple reports, progress, and removal of exited or cleared status. Native Windows runtime validation remains deferred.
+Validation: 14 focused Settings tests, the desktop/CLI debug build, release metadata checks, and native Settings visual checks passed. The live-shell RPC smoke check passed once but showed intermittent input/exit failures on repeat runs; the installed prior release also reproduced the shell-exit failure. Native Windows runtime validation remains deferred.
 
 [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.23/rmux-0.1.23-macos-arm64.zip" length="8912903" type="application/octet-stream" sparkle:edSignature="LCbtBGAk0fbxbaFqaJQA/Z4QJHtkxM2EuU+IYO9rv3esDeV8hAwisECj4gE/dqsopRIw3M4Xaf8fi10vqayNAA=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.24/rmux-0.1.24-macos-arm64.zip" length="8977095" type="application/octet-stream" sparkle:edSignature="ORiDIQS0joWzPIxlvgeSYLVNrFt0n73ixtWNdqNpsdkFh1ku31F5CBQ8ubassho4DvI7ruoY+d/hFNiibfSHCg=="/>
         </item>
     </channel>
 </rss>
