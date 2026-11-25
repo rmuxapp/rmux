@@ -5393,7 +5393,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-cli"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "libc",
  "rmux-protocol",
@@ -5403,7 +5403,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-core"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "anyhow",
  "serde",
@@ -5414,7 +5414,7 @@ dependencies = [
 
 [[package]]
 name = "rmux-desktop"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",
@@ -5449,11 +5449,11 @@ dependencies = [
 
 [[package]]
 name = "rmux-protocol"
-version = "0.1.25"
+version = "0.1.26"
 
 [[package]]
 name = "rmux-terminal"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "anyhow",
  "async-channel 2.5.0",

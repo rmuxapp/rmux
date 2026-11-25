@@ -306,7 +306,7 @@ impl PaneView {
                 }))
                 .child(crate::workspace_menu_view::target_header(title.into(), "Terminal tab"))
                 .child(div().id("tab-menu-scroll")
-                    .max_h((window.viewport_size().height - px(74.)).max(px(1.)))
+                    .max_h((window.viewport_size().height - px(90.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(TAB_MENU_LABELS.iter().enumerate().map(|(index, label)| {
                     let label = if index == 0 && inherits_ssh { "New SSH Tab".to_owned() }

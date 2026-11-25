@@ -235,6 +235,7 @@ impl Render for TextField {
         let prepaint = cx.entity();
         let paint = cx.entity();
         div()
+            .cursor_text()
             .h(px(24.))
             .flex_shrink_0()
             .flex()

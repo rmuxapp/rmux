@@ -8,8 +8,8 @@ pub(crate) fn menu_frame(window: &Window) -> Stateful<Div> {
 }
 pub(crate) fn menu_row(index: usize, section: bool) -> Stateful<Div> {
     div().id(("tab-menu-item", index)).mx_1().px_3().py_2().rounded_sm()
-        .text_size(px(13.)).flex().items_center().gap_3()
-        .when(section, |row| row.mt_1().border_t_1().border_color(crate::chrome_style::border()))
+        .text_size(px(13.)).line_height(px(20.)).flex().items_center().gap_3()
+        .when(section, |row| row.mt_2().relative().child(crate::workspace_menu_view::separator()))
 }
 pub(crate) fn strip() -> Div {
     div().flex().w_full().min_w_0().max_w_full().overflow_hidden()

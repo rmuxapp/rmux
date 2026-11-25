@@ -2475,6 +2475,7 @@ struct PaintedText {
 }
 struct TerminalPaint {
     content_bounds: Bounds<Pixels>,
+    text_hitboxes: Vec<Hitbox>,
     selections: Arc<Vec<Option<(u16, u16)>>>,
     scrollbar: Option<PaintQuad>,
     rows: Arc<Vec<Arc<row_cache::ShapedRow>>>,
@@ -2634,8 +2635,30 @@ impl Element for TerminalElement {
                 cursor_view::quads(shape, origin, width, cells.height, cx.global::<Preferences>().cursor_paint(cursor_fill))
             })
             .unwrap_or_default();
+        // Register text runs, rather than the entire pane, so blank cells and
+        // padding retain the arrow. Wide glyphs include their continuation cell.
+        let mut text_hitboxes = Vec::new();
+        for (y, row) in frame.rows.iter().enumerate() {
+            let mut runs: Vec<(u16, u16)> = Vec::new();
+            for cell in row.iter().filter(|cell| !cell.hidden && cell.width > 0 && cell.text.chars().any(|ch| !ch.is_whitespace())) {
+                let end = cell.column.saturating_add(u16::from(cell.width));
+                if let Some(run) = runs.last_mut().filter(|run| run.1 >= cell.column) {
+                    run.1 = run.1.max(end);
+                } else {
+                    runs.push((cell.column, end));
+                }
+            }
+            for (start, end) in runs {
+                let text_bounds = Bounds::new(
+                    bounds.origin + point(px(f32::from(start) * cells.width), px(y as f32 * cells.height)),
+                    size(px(f32::from(end - start) * cells.width), px(cells.height)),
+                ).intersect(&bounds);
+                text_hitboxes.push(window.insert_hitbox(text_bounds, HitboxBehavior::Normal));
+            }
+        }
         let state = TerminalPaint {
             content_bounds: bounds,
+            text_hitboxes,
             selections: frame.selections.clone(),
             scrollbar: scrollbar_view::indicator(bounds, &frame),
             rows: shaped_rows,
@@ -2664,6 +2687,12 @@ impl Element for TerminalElement {
         cx: &mut App,
     ) {
         let cells = self.view.read(cx).cells;
+        let view = self.view.read(cx);
+        let actionable_link = view.link_hover.as_ref().is_some_and(|(revision, link)|
+            *revision == view.frame.revision && (openable_uri(&link.uri) || view.local_link_file(&link.uri).is_ok()));
+        for hitbox in &state.text_hitboxes {
+            window.set_cursor_style(if actionable_link { CursorStyle::PointingHand } else { CursorStyle::IBeam }, hitbox);
+        }
         let started = self
             .view
             .read(cx)

@@ -94,7 +94,7 @@ impl SamplePane {
                     cx.notify();
                 }))
                 .child(crate::workspace_menu_view::target_header(title.into(), "Terminal tab"))
-                .child(div().id("sample-tab-menu-scroll").max_h((window.viewport_size().height - px(74.)).max(px(1.)))
+                .child(div().id("sample-tab-menu-scroll").max_h((window.viewport_size().height - px(90.)).max(px(1.)))
                     .overflow_y_scroll().track_scroll(&menu.scroll)
                     .children(MENU_LABELS.iter().enumerate().map(|(index, label)| {
                         tab_presentation::menu_row(index, matches!(index, 1 | 2 | 4))
