@@ -51,8 +51,24 @@ to keep the default across launches.
 ## Use the Settings panel
 
 Open Settings with Cmd+, on macOS (Ctrl+, elsewhere), the app menu or palette.
-In narrow windows, Settings and Notifications overlay the right side instead of
-shrinking the terminal layout. Wider windows keep them alongside the terminals.
+Settings opens in a separate, resizable window. Opening it again brings the same
+window forward without changing your terminal layout. Choose **Appearance**,
+**Terminal**, **Workspaces**, **Notifications**, or **Advanced** on the left;
+controls for that category appear on the right. Use Ctrl+Tab / Ctrl+Shift+Tab to
+switch categories. Tab and arrow navigation stay within the selected category
+and the fixed footer.
+
+The sidebar search searches every settings category, including options configured
+only through JSON. Cmd+F (Ctrl+F elsewhere) focuses it; Enter or Down moves to the
+results. Results are ranked using a local weighted term-vector index, related-word
+aliases, prefix matching, and single-character typo tolerance. For example, try
+“transparent background”, “text size”, or “stop close warnings”. This is local
+lexical/concept search, not neural embeddings; no query leaves the app and no model
+is downloaded. JSON-only results offer **Edit JSON…**; edit the named option and
+reload settings afterward. Escape clears a search before closing Settings.
+
+The compact footer separates file/shortcut utilities from save, revert, and undo.
+Hover **Keyboard help** for navigation hints.
 
 The fixed footer keeps **Save**, **Open settings file**, **Reload from file** and
 **Keyboard Shortcuts…** available while scrolling. Reload replaces session
@@ -86,7 +102,7 @@ detects intervening edits but does not lock external editors; simultaneous write
 from another process can still race the final check and replacement.
 
 Use Tab or the arrow keys to select controls, then Enter to activate them.
-The side panel adjusts text-size defaults, terminal padding/theme, unfocused
+The settings window adjusts text-size defaults, terminal padding/theme, unfocused
 cursor, copy-on-select and close confirmation. Choose Active tasks, Always or Never
 for close confirmation. Active tasks also requests confirmation when terminal
 state is busy, so closing does not wait for output parsing. An `RMUX_CONFIRM_CLOSE`
@@ -96,8 +112,8 @@ fields while preserving other configuration options. Font defaults update matchi
 values. Reset Font Size returns the focused terminal to the size default. The editor link exposes the remaining settings. Tab/Shift-Tab or up/down navigate
 the panel; left/right adjust values, Enter/Space activate, and Escape closes it.
 Font/theme pickers and editor actions open only with Enter/Space, not arrow keys. Opening
-the panel moves keyboard focus out of the shell; closing restores its prior focus
-when the panel still owns focus.
+Settings moves keyboard focus into its own window. Escape, Cmd+W (Ctrl+W elsewhere),
+or the native close button closes it; unsaved session changes remain active until reverted or reloaded.
 
 Open Settings panels follow shared changes across windows. While a save, reload,
 or settings-file open is running, Save shows “Working with settings…” and file

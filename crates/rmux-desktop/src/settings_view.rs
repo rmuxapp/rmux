@@ -3,15 +3,47 @@ use super::*;
 #[derive(Clone)]
 pub struct State {
     pub focus: FocusHandle,
-    pub origin: Option<FocusHandle>,
+    pub category: usize,
+    pub origin_window: AnyWindowHandle,
     pub selected: usize,
     pub scroll: ScrollHandle,
+    pub search: Entity<text_field::TextField>,
+    pub query: String,
+    pub visible: Vec<usize>,
 }
+
+pub const CATEGORIES: &[(&str, &str, &[&str])] = &[
+    ("Appearance", "Make rmux feel at home.", &["theme", "import_theme", "font_family", "font", "padding", "opacity", "blur", "selection_opacity", "foreground_color", "background_color", "selection_background", "selection_foreground", "ansi_palette"]),
+    ("Terminal", "Text input, cursor behavior, and output history.", &["focused_cursor", "cursor", "cursor_blink", "cursor_opacity", "copy", #[cfg(target_os = "macos")] "option_as_alt", "scrollback", "cursor_color", "cursor_text"]),
+    ("Workspaces", "Arrange your workspace and keep navigation comfortable.", &["workspace_placement", "group_placement", "close", "controls_on_hover", "hide_top_bar", "compact_sidebar", "layout_presets", "restore_session"]),
+    ("Notifications", "Choose when rmux should get your attention.", &["native_notifications", "notification_focus"]),
+    ("Advanced", "External tools and experimental session features.", &["file_editor", "editor_example", "editor_fallback", "shell_history", "commands", "keybindings", "session_file", "socket_directory"]),
+];
+#[cfg(test)]
+pub fn visible_controls(category: usize) -> Vec<usize> {
+    CATEGORIES[category].2.iter().filter_map(|key| control_index(key))
+        .chain(FOOTER_ORDER.iter().map(|index| KEYS.len() + index)).collect()
+}
+pub fn next_visible(visible: &[usize], selected: usize, key: &str, shift: bool) -> Option<usize> {
+    let controls: Vec<_> = visible.iter().copied().chain(FOOTER_ORDER.iter().map(|index| KEYS.len() + index)).collect();
+    let position = controls.iter().position(|index| *index == selected).unwrap_or(0);
+    let index = match key {
+        "tab" if shift => (position + controls.len() - 1) % controls.len(),
+        "up" => (position + controls.len() - 1) % controls.len(),
+        "tab" | "down" => (position + 1) % controls.len(),
+        "home" | "pageup" => 0,
+        "end" | "pagedown" => controls.len() - 1,
+        _ => return None,
+    };
+    Some(controls[index])
+}
+
 pub const KEYS: &[&str] = &["font", "padding", "theme", "focused_cursor", "cursor_opacity", "cursor", "copy", "close", "group_placement", "scrollback", "native_notifications", "notification_focus", "font_family", "opacity", "blur", "workspace_placement",
     #[cfg(target_os = "macos")] "option_as_alt",
-    "selection_opacity", "import_theme", "file_editor", "editor_example", "editor_fallback", "shell_history", "cursor_blink", "controls_on_hover", "hide_top_bar", "compact_sidebar",
+    "selection_opacity", "import_theme", "file_editor", "editor_example", "editor_fallback", "shell_history", "cursor_blink", "controls_on_hover", "hide_top_bar", "compact_sidebar", "commands", "layout_presets", "keybindings", "restore_session", "session_file", "socket_directory", "foreground_color", "background_color", "cursor_color", "cursor_text", "selection_background", "selection_foreground", "ansi_palette",
 ];
 pub const FOOTER_KEYS: &[&str] = &["save_settings", "open_settings", "reload_settings", "keyboard_shortcuts", "revert_settings", "undo_settings_save"];
+pub const FOOTER_ORDER: &[usize] = &[1, 2, 3, 5, 4, 0];
 pub const FOOTER_COUNT: usize = FOOTER_KEYS.len();
 pub fn control_index(key: &str) -> Option<usize> {
     KEYS.iter().chain(FOOTER_KEYS).position(|candidate| *candidate == key)
@@ -41,7 +73,7 @@ pub enum ControlInput {
 /// Arrow keys change values; they must never open a dialog or an editor.
 pub fn control_input(control: &str, key: &str) -> ControlInput {
     let action = matches!(control, "file_editor" | "editor_example" | "editor_fallback" | "import_theme" | "font_family" | "shell_history")
-        || FOOTER_KEYS.contains(&control);
+        || FOOTER_KEYS.contains(&control) || super::settings_search::entry(control).json_only;
     match (action, key) {
         (true, "enter" | "space") => ControlInput::Activate,
         (false, "left") => ControlInput::Adjust(-1),
@@ -49,24 +81,6 @@ pub fn control_input(control: &str, key: &str) -> ControlInput {
         _ => ControlInput::None,
     }
 }
-// The heading precedes the settings. Save/editor controls live in a fixed footer.
-pub fn scroll_index(control: usize) -> usize {
-    control + 1
-}
-pub fn next_control(selected: usize, key: &str, shift: bool) -> Option<usize> {
-    if shift && key != "tab" { return None; }
-    let count = KEYS.len() + FOOTER_COUNT;
-    match key {
-        "up" => Some((selected + count - 1) % count),
-        "down" => Some((selected + 1) % count),
-        "tab" => Some((selected + if shift { count - 1 } else { 1 }) % count),
-        "home" => Some(0),
-        "end" => Some(count - 1),
-        _ => None,
-    }
-}
-
-
 pub fn adjust(settings: &mut Preferences, key: &str, delta: i32) {
     match key {
         "cursor_blink" => settings.cursor_blink = !settings.cursor_blink,
@@ -121,12 +135,31 @@ fn button(id: String, label: String, hint: String, key: &'static str, delta: i32
         .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into())
         .child(div().truncate().child(label))
 }
+fn control_hint(key: &str) -> &'static str {
+    match key {
+        "editor_fallback" => if cfg!(target_os = "macos") { "Open Settings JSON in TextEdit to repair the editor configuration, then Reload Settings." } else { "Open Settings JSON with the system file association to repair the editor configuration, then Reload Settings." },
+        "shell_history" => "Recall commands when restoring a saved session. Supports zsh and non-login Bash. Set shell_history_directory in Settings JSON, then restart rmux.",
+        "editor_example" => "Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.",
+        "file_editor" => "Opens Settings JSON. Set file_editor.program and args, then Reload Settings.",
+        "native_notifications" => "Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.",
+        "scrollback" => "Output history budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.",
+        "option_as_alt" => "Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding.",
+        "blur" => "Blur requires opacity below 100% and OS/compositor support. Text, colored cells, tabs and sidebar remain opaque.",
+        _ => settings_search::entry(key).description,
+    }
+}
+
 fn row(label: &'static str, key: &'static str, value: String, stepper: bool, selected: bool, readonly: bool) -> impl IntoElement {
-    div().id(SharedString::from(format!("setting-row-{key}"))).min_w_0().px_1().py_3()
+    row_with_detail(label, key, value, stepper, selected, readonly,
+        settings_search::entry(key).description.into(), control_hint(key).into())
+}
+fn row_with_detail(label: &'static str, key: &'static str, value: String, stepper: bool, selected: bool, readonly: bool, description: String, hint: SharedString) -> impl IntoElement {
+    div().id(SharedString::from(format!("setting-row-{key}"))).min_w_0().px_3().py_2()
         .on_mouse_down(MouseButton::Left, move |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: key.into() }), cx))
         .when(selected, |s| s.bg(crate::chrome_style::selected())).border_b_1().border_color(crate::chrome_style::border())
         .flex().flex_wrap().items_center().gap_2()
-        .child(div().flex_1().w(px(120.)).min_w_0().max_w_full().text_size(px(13.)).child(label))
+        .child(div().id(SharedString::from(format!("{key}-label"))).tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.clone())).into()).flex_1().w(px(120.)).min_w_0().max_w_full().text_size(px(13.)).child(label)
+            .child(div().mt_1().text_size(px(11.)).text_color(chrome_style::muted()).child(description)))
         .child(div().flex().flex_wrap().items_center().gap_2().min_w_0().max_w_full()
             .when(stepper, |controls| controls
                 .child(button(format!("{key}-less"), "−".into(), format!("Decrease {label}"), key, -1)))
@@ -135,13 +168,24 @@ fn row(label: &'static str, key: &'static str, value: String, stepper: bool, sel
                     .px_2().py_1().text_size(px(12.)).text_color(crate::chrome_style::muted())
                     .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Controlled by RMUX_CONFIRM_CLOSE. Remove the override and restart rmux to edit this policy here.".into())).into())
                     .child(value).into_any_element()
+            } else if matches!(key, "copy" | "native_notifications" | "blur" | "cursor_blink" | "controls_on_hover" | "hide_top_bar" | "compact_sidebar") {
+                let on = value == "On";
+                div().id(SharedString::from(format!("{key}-toggle"))).w(px(32.)).h(px(18.)).rounded_full().relative().cursor_pointer()
+                    .bg(if on { chrome_style::accent() } else { chrome_style::hover_strong() })
+                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(format!("{label}: {}", if on { "On" } else { "Off" }).into())).into())
+                    .on_click(move |event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(AdjustSetting { key: key.into(), delta: 1 }), cx); } })
+                    .child(div().absolute().top(px(2.)).left(px(if on { 16. } else { 2. })).size(px(14.)).rounded_full().bg(if on { chrome_style::on_accent() } else { chrome_style::foreground() }))
+                    .into_any_element()
             } else if stepper {
                 div().min_w(px(44.)).text_center().text_size(px(12.)).child(value).into_any_element()
             } else {
-                button(format!("{key}-value"), value, format!("Change {label}"), key, 1).into_any_element()
+                button(format!("{key}-value"), value, if settings_search::entry(key).json_only {
+                    format!("Edit {} in Settings JSON, then choose Reload to apply the change.", settings_search::entry(key).config)
+                } else { format!("Change {label}") }, key, 1).into_any_element()
             })
             .when(stepper, |controls| controls
-                .child(button(format!("{key}-more"), "+".into(), format!("Increase {label}"), key, 1))))
+                .child(button(format!("{key}-more"), "+".into(), format!("Increase {label}"), key, 1)))
+            .when(key == "selection_opacity", |controls| controls.child(button("selection-opacity-reset".into(), "Reset".into(), "Use the theme’s selection opacity".into(), "selection_opacity", 0))))
 }
 // Configuration-only preview: never creates a terminal or reads a running session.
 fn theme_preview(settings: &Preferences) -> impl IntoElement {
@@ -183,7 +227,7 @@ fn theme_preview(settings: &Preferences) -> impl IntoElement {
         } else { "Preview of configured colors. Apps may override them." }))
 }
 
-pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<window_view::WorkspaceWindow>) -> AnyElement {
+pub fn panel(state: State, window: &Window, cx: &mut Context<window_view::WorkspaceWindow>) -> AnyElement {
     let settings = cx.global::<Preferences>();
     let busy = cx.global::<preferences::ReloadState>().0;
     let unsaved = cx.global::<preferences::AppearanceBaseline>().has_changes(settings);
@@ -192,20 +236,78 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
             .map(|key| format!("Save · {key}"))
             .unwrap_or_else(|| "Save".into())
     };
-    chrome_style::inspector(overlay).track_focus(&state.focus).key_context("Settings")
+    div().w_full().flex_1().min_h_0().flex().flex_col().bg(chrome_style::surface()).track_focus(&state.focus).key_context("Settings")
         .on_mouse_down(MouseButton::Left, { let focus = state.focus.clone(); move |_, window, _| { focus.focus(window); } })
         .on_key_down(cx.listener(|this, event: &KeyDownEvent, window, cx| this.settings_key(event, window, cx)))
-        .child(div().h(px(44.)).px_3().flex().items_center().gap_2().flex_shrink_0()
-            .child(div().flex_1().text_size(px(13.)).font_weight(FontWeight::SEMIBOLD).child("Settings"))
-            .child(pane_view::pane_control("close-settings", "Close Settings")
-                .on_click(|event, window, cx| { if event.standard_click() { window.dispatch_action(Box::new(ToggleSettings), cx); } }).child(icons::icon("close"))))
-        .child(div().id("settings-scroll").flex_1().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_3()
-            .child(div().pt_3().text_xs().text_color(crate::chrome_style::muted()).child("Changes apply now. Save to keep them. Settings marked below require a restart."))
-            .child(row("Default text size", "font", format!("{} pt", settings.font_size), true, state.selected == 0, false))
-            .child(row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, state.selected == 1, false))
-            .child(div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(crate::chrome_style::border())
+        .child(div().flex().flex_1().min_h_0()
+            .child(div().w(px(210.)).flex_shrink_0().p_3().bg(chrome_style::elevated())
+                .border_r_1().border_color(chrome_style::border()).flex().flex_col().gap_1()
+                .child(div().px_3().py_4().text_size(px(16.)).font_weight(FontWeight::SEMIBOLD).child("Settings"))
+                .child(div().mb_3().px_2().py_1().rounded_md().border_1().border_color(chrome_style::border()).bg(chrome_style::background()).flex().items_center().gap_2()
+                    .child(icons::icon("search"))
+                    .child(div().flex_1().min_w_0().child(state.search.clone()))
+                    .when(!state.query.is_empty(), |row| row.child(pane_view::pane_control("clear-settings-search", "Clear search")
+                        .on_click({ let search = state.search.clone(); move |event, window, cx| { if event.standard_click() {
+                            search.update(cx, |field, cx| field.replace_draft("", cx));
+                            search.read(cx).focus.focus(window);
+                        } } }).child(icons::icon("close")))))
+                .children(CATEGORIES.iter().enumerate().map(|(index, (label, _, _))| {
+                    div().id(("settings-category", index)).px_3().py_2().rounded_md().cursor_pointer()
+                        .flex().items_center().gap_2().text_size(px(13.)).when(state.query.is_empty() && index == state.category, |row| row.bg(chrome_style::selected()).text_color(chrome_style::accent()).font_weight(FontWeight::SEMIBOLD))
+                        .hover(|row| row.bg(chrome_style::hover()))
+                        .on_click(cx.listener(move |this, event: &ClickEvent, window, cx| {
+                            if event.standard_click() { this.select_settings_category(index, window, cx); }
+                        })).child(icons::icon(["palette", "terminal", "sidebar", "bell", "sliders"][index]).size(px(16.)).text_color(if state.query.is_empty() && index == state.category { chrome_style::accent() } else { chrome_style::muted() })).child(*label)
+                }))
+                .child(div().flex_1())
+                .child(div().px_3().py_2().text_xs().text_color(chrome_style::muted()).child("Search across all settings.\nEnter to browse results.")))
+        .child(div().id("settings-scroll").flex_1().min_w_0().min_h_0().overflow_y_scroll().track_scroll(&state.scroll).px_6().pb_4()
+            .child(div().pt_4().pb_3().child(div().text_size(px(18.)).font_weight(FontWeight::SEMIBOLD).child(if state.query.is_empty() { CATEGORIES[state.category].0.to_owned() } else { "Search results".into() })).child(div().mt_2().min_w_0().truncate().text_size(px(12.)).text_color(chrome_style::muted()).child(if state.query.is_empty() { CATEGORIES[state.category].1.to_owned() } else { format!("{} settings matching “{}”", state.visible.len(), state.query) })))
+
+            .when(!state.query.is_empty() && state.visible.is_empty(), |panel| panel.child(div().py_6().text_size(px(13.)).text_color(chrome_style::muted()).child("No matching settings. Try a shorter phrase, like font, opacity, or notifications.")))
+            .children(state.visible.iter().map(|index| {
+                let item = settings_search::entry(KEYS[*index]);
+                div().when(!state.query.is_empty(), |row| row.child(div().px_3().pt_3().text_size(px(11.)).text_color(chrome_style::muted()).child(CATEGORIES[item.category].0)))
+                    .child(setting_element(item.key, settings, &state, busy))
+            }))))
+
+        .child(div().flex_shrink_0().px_4().py_2().border_t_1().border_color(chrome_style::border()).flex().flex_col().gap_2()
+            .child(div().flex().items_center().gap_1()
+                .children([1, 2, 3].into_iter().map(|index| footer_button(index, &state, busy, unsaved, cx.global::<preferences::LastSettingsSave>().0.is_some(), &save_label)))
+                .child(div().flex_1())
+                .child(div().id("settings-keyboard-help").text_size(px(11.)).text_color(chrome_style::muted())
+                    .tooltip(|_, cx| cx.new(|_| pane_view::ControlHint("Tab / ↑↓ select · ←→ change · Ctrl+Tab category · Cmd/Ctrl+F search · Esc clear search or close".into())).into())
+                    .child("Keyboard help")))
+            .child(div().flex().items_center().gap_2()
+                .child(div().flex_1().text_size(px(12.)).text_color(if unsaved { chrome_style::warning() } else { chrome_style::muted() })
+                    .child(if busy { "Working…" } else if unsaved { "Unsaved changes" } else { "No unsaved changes" }))
+                .children([5, 4, 0].into_iter().map(|index| footer_button(index, &state, busy, unsaved, cx.global::<preferences::LastSettingsSave>().0.is_some(), &save_label)))))
+
+        .into_any_element()
+}
+
+fn footer_button(index: usize, state: &State, busy: bool, unsaved: bool, can_undo: bool, save_label: &str) -> AnyElement {
+    let labels = [save_label, "Open JSON", "Reload", "Shortcuts…", "Revert", "Undo save"];
+    let hints = ["Save current settings", "Open settings in your configured editor", "Reload settings from the saved file", "Find keyboard shortcuts", "Revert unsaved changes", "Undo the last save while preserving later file edits"];
+    let enabled = footer_enabled(index, busy, unsaved, can_undo);
+    let selected = state.selected == KEYS.len() + index;
+    let hint = hints[index];
+    div().id(("settings-footer", index)).flex_shrink_0().h(px(28.)).px_3().rounded_md().flex().items_center().justify_center().text_size(px(12.))
+        .border_1().border_color(if selected { chrome_style::accent() } else { rgba(0x00000000) })
+        .bg(if index == 0 && enabled { chrome_style::accent() } else { rgba(0x00000000) })
+        .text_color(if !enabled { chrome_style::muted() } else if index == 0 { chrome_style::on_accent() } else { chrome_style::foreground() })
+        .when(enabled, |button| button.cursor_pointer().hover(move |style| style.bg(if index == 0 { chrome_style::accent() } else { chrome_style::hover() })))
+        .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
+        .on_mouse_down(MouseButton::Left, move |_, window, cx| { if enabled { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); } })
+        .on_click(move |event, window, cx| { if enabled && event.standard_click() { if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); } } })
+        .child(labels[index].to_owned()).into_any_element()
+}
+
+fn setting_element(key: &str, settings: &Preferences, state: &State, busy: bool) -> AnyElement {
+    match key {
+        "theme" => (div().id("setting-row-theme").px_1().py_3().border_b_1().border_color(crate::chrome_style::border())
                 .on_mouse_down(MouseButton::Left, |_, window, cx| window.dispatch_action(Box::new(SelectSetting { key: "theme".into() }), cx))
-                .when(state.selected == 2, |row| row.bg(crate::chrome_style::selected()))
+                .when(Some(state.selected) == control_index("theme"), |row| row.bg(crate::chrome_style::selected()))
                 .child(div().mb_2().text_size(px(13.)).child("App & terminal theme"))
                 .child(div().flex().flex_wrap().gap_2().children(
                     preferences::TerminalTheme::ALL.into_iter().enumerate().map(|(index, theme)| {
@@ -220,114 +322,93 @@ pub fn panel(state: State, overlay: bool, window: &Window, cx: &mut Context<wind
                             }).child(theme.label())
                     })
                 ))
-                .child(theme_preview(settings)))
-            .child(row("Focused cursor", "focused_cursor", settings.focused_cursor.label().into(), false, state.selected == 3, false))
-            .child(row("Cursor opacity", "cursor_opacity", format!("{}%", settings.cursor_opacity), true, state.selected == 4, false))
-            .child(row("Unfocused cursor", "cursor", match settings.unfocused_cursor { preferences::UnfocusedCursor::Hollow => "Hollow", preferences::UnfocusedCursor::Hidden => "Hidden" }.into(), false, state.selected == 5, false))
-            .child(row("Copy on select", "copy", if settings.copy_on_select { "On" } else { "Off" }.into(), false, state.selected == 6, false))
-            .child(row("Confirm before closing", "close", format!("{}{}", match settings.confirm_close {
+                .child(theme_preview(settings))).into_any_element(),
+        "import_theme" => (row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, Some(state.selected) == control_index("import_theme"), false)).into_any_element(),
+        "font_family" => (row("Default font family", "font_family", settings.font_family.clone(), false, Some(state.selected) == control_index("font_family"), false)).into_any_element(),
+        "font" => (row("Default text size", "font", format!("{} pt", settings.font_size), true, Some(state.selected) == control_index("font"), false)).into_any_element(),
+        "padding" => (row("Terminal padding", "padding", format!("{} px", settings.terminal_padding), true, Some(state.selected) == control_index("padding"), false)).into_any_element(),
+        "opacity" => (row("Terminal background opacity", "opacity", format!("{}%", settings.background_opacity), true, Some(state.selected) == control_index("opacity"), false)).into_any_element(),
+        "blur" => (div().child(row("Blur behind terminal", "blur", if settings.background_blur { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("blur"), false))
+                ).into_any_element(),
+        "selection_opacity" => row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, Some(state.selected) == control_index("selection_opacity"), false).into_any_element(),
+        "focused_cursor" => (row("Focused cursor", "focused_cursor", settings.focused_cursor.label().into(), false, Some(state.selected) == control_index("focused_cursor"), false)).into_any_element(),
+        "cursor" => (row("Unfocused cursor", "cursor", match settings.unfocused_cursor { preferences::UnfocusedCursor::Hollow => "Hollow", preferences::UnfocusedCursor::Hidden => "Hidden" }.into(), false, Some(state.selected) == control_index("cursor"), false)).into_any_element(),
+        "cursor_blink" => (row("Blink cursor", "cursor_blink", if settings.cursor_blink { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("cursor_blink"), false)).into_any_element(),
+        "cursor_opacity" => (row("Cursor opacity", "cursor_opacity", format!("{}%", settings.cursor_opacity), true, Some(state.selected) == control_index("cursor_opacity"), false)).into_any_element(),
+        "copy" => (row("Copy on select", "copy", if settings.copy_on_select { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("copy"), false)).into_any_element(),
+        "option_as_alt" => (div().when(cfg!(target_os = "macos"), |panel| panel.child(div()
+                .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, Some(state.selected) == control_index("option_as_alt"), false))
+                ))).into_any_element(),
+        "scrollback" => (div()
+                .child(row("New terminal scrollback", "scrollback", format!("{} MiB", settings.scrollback_mib), true, Some(state.selected) == control_index("scrollback"), false))
+                ).into_any_element(),
+        "workspace_placement" => (row("New workspace position", "workspace_placement", match settings.new_workspace_placement {
+                workspace_groups::Placement::AfterCurrent => "After current",
+                workspace_groups::Placement::Top => "First",
+                workspace_groups::Placement::End => "Last",
+            }.into(), false, Some(state.selected) == control_index("workspace_placement"), false)).into_any_element(),
+        "group_placement" => (row("New group workspace", "group_placement", match settings.group_new_workspace_placement {
+                workspace_groups::Placement::AfterCurrent => "After current",
+                workspace_groups::Placement::Top => "First",
+                workspace_groups::Placement::End => "Last",
+            }.into(), false, Some(state.selected) == control_index("group_placement"), false)).into_any_element(),
+        "close" => (row("Confirm before closing", "close", format!("{}{}", match settings.confirm_close {
                 close_policy::ClosePolicy::Active => "Active tasks", close_policy::ClosePolicy::Always => "Always", close_policy::ClosePolicy::Never => "Never",
-            }, if settings.close_policy_overridden() { " · Environment" } else { "" }), false, state.selected == 7, settings.close_policy_overridden()))
-            .child(row("New group workspace", "group_placement", match settings.group_new_workspace_placement {
-                workspace_groups::Placement::AfterCurrent => "After current",
-                workspace_groups::Placement::Top => "First",
-                workspace_groups::Placement::End => "Last",
-            }.into(), false, state.selected == 8, false))
-            .child(div()
-                .child(row("New terminal scrollback", "scrollback", format!("{} MiB", settings.scrollback_mib), true, state.selected == 9, false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Output history budget per new terminal. 0 disables scrollback. Existing terminals keep their current history; total app memory also includes other resources.")))
-            .child(div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, state.selected == 10, false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Optional OS banners for unfocused terminals. macOS asks for permission on first delivery. In-app history stays available when off.")))
-            .child(row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, state.selected == 11, false))
-            .child(row("Default font family", "font_family", settings.font_family.clone(), false, state.selected == 12, false))
-            .child(row("Terminal background opacity", "opacity", format!("{}%", settings.background_opacity), true, state.selected == 13, false))
-            .child(div().child(row("Blur behind terminal", "blur", if settings.background_blur { "On" } else { "Off" }.into(), false, state.selected == 14, false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Blur requires opacity below 100% and OS/compositor support. Text, colored cells, tabs and sidebar remain opaque.")))
-            .child(row("New workspace position", "workspace_placement", match settings.new_workspace_placement {
-                workspace_groups::Placement::AfterCurrent => "After current",
-                workspace_groups::Placement::Top => "First",
-                workspace_groups::Placement::End => "Last",
-            }.into(), false, state.selected == 15, false))
-            .when(cfg!(target_os = "macos"), |panel| panel.child(div()
-                .child(row("Option key behavior", "option_as_alt", if settings.macos_option_as_alt { "Terminal Alt" } else { "Native text" }.into(), false, state.selected == 16, false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Terminal Alt sends Option shortcuts to your shell. Native text allows Option characters and dead keys. Control+Option and navigation keys still use terminal encoding."))))
-            .child(div().child(row("Selection opacity", "selection_opacity", settings.selection_opacity.map_or_else(|| "Theme default".into(), |value| format!("{value}%")), true, Some(state.selected) == control_index("selection_opacity"), false))
-                .child(button("selection-opacity-reset".into(), "Use theme default".into(), "Reset selection opacity to the theme default".into(), "selection_opacity", 0)))
-            .child(row("Import terminal theme", "import_theme", if busy { "Working…" } else { "Choose file…" }.into(), false, Some(state.selected) == control_index("import_theme"), false))
-            .child(div()
-                .child(row("External editor", "file_editor", "Configure…".into(), false, Some(state.selected) == control_index("file_editor"), false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Opens Settings JSON. Set file_editor.program and args, then Reload Settings."))
-                .child(div().id("settings-editor-program").pt_1().text_xs().min_w_0().truncate().text_color(crate::chrome_style::muted())
-                    .tooltip({ let program: SharedString = settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "No external editor configured".into()).into();
-                        move |_, cx| cx.new(|_| pane_view::ControlHint(program.clone())).into() })
-                    .child(settings.file_editor.as_ref().map(|editor| editor.program.display().to_string()).unwrap_or_else(|| "Not configured".into()))))
-            .child(div()
-                .child(row("VS Code configuration", "editor_example", "Copy example".into(), false, Some(state.selected) == control_index("editor_example"), false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child("Merge file_editor into Settings JSON. Adjust the executable path for your installation, then Reload Settings.")))
-            .child(div()
-                .child(row("Edit settings without configured editor", "editor_fallback", "Open…".into(), false, Some(state.selected) == control_index("editor_fallback"), false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted()).child(if cfg!(target_os = "macos") { "Opens TextEdit if your editor configuration needs repair." } else { "Uses the system file association if your editor configuration needs repair." })))
-            .child(div()
-                .child(row("Saved command history", "shell_history", "Configure…".into(), false,
-                    Some(state.selected) == control_index("shell_history"), false))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted())
-                    .child(format!("{} · Experimental", shell_history::settings_status(&settings.shell_history_directory))))
-                .child(div().pt_2().text_xs().text_color(crate::chrome_style::muted())
-                    .child("Recall commands when restoring a saved session. Supports zsh and non-login Bash. Set shell_history_directory in Settings JSON, then restart rmux."))
-                .when_some(settings.shell_history_directory.as_ref(), |row, path| {
-                    let path: SharedString = path.display().to_string().into();
-                    row.child(div().id("settings-history-directory").pt_1().text_xs().min_w_0().truncate().text_color(crate::chrome_style::muted())
-                        .tooltip({ let path = path.clone(); move |_, cx| cx.new(|_| pane_view::ControlHint(path.clone())).into() })
-                        .child(path))
-                }))
-            .child(row("Blink cursor", "cursor_blink", if settings.cursor_blink { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("cursor_blink"), false))
-            .child(row("Show controls only on hover", "controls_on_hover", if settings.controls_on_hover { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("controls_on_hover"), false))
-            .child(row("Hide top workspace bar", "hide_top_bar", if settings.hide_top_bar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("hide_top_bar"), false))
-            .child(row("Compact sidebar", "compact_sidebar", if settings.compact_sidebar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("compact_sidebar"), false))
-            .child(div().py_3().text_xs().text_color(crate::chrome_style::muted()).child("Font changes apply to terminals using the default size. Per-terminal zoom stays unchanged. Custom colors in your config override the theme.")))
-        .child(div().flex_shrink_0().px_3().py_2().border_t_1().border_color(crate::chrome_style::border()).flex().flex_col().gap_2()
-            .child(div().text_xs().text_color(if unsaved { crate::chrome_style::warning() } else { crate::chrome_style::muted() })
-                .child(if unsaved { "Unsaved changes" } else { "No unsaved changes" }))
-            .child(div().text_xs().text_color(crate::chrome_style::muted()).child("↑↓ select · ←→ change · Enter apply · Esc close"))
-            .children([
-                [
-                    (0, "settings-save", save_label.as_str(), "Save current appearance settings to the settings file"),
-                    (1, "settings-json", "Open JSON", "Open settings file in your configured editor"),
-                    (2, "settings-reload", "Reload", "Replace this session's settings with the saved file; invalid files leave settings unchanged"),
-                ],
-                [
-                    (3, "settings-shortcuts", "Shortcuts…", "Search command shortcuts available in the current context"),
-                    (4, "settings-revert", "Revert", "Restore the last loaded or saved panel values without changing the settings file"),
-                    (5, "settings-undo-save", "Undo save", "Restore saved values only where the file still matches the last save; preserve later edits"),
-                ],
-            ].into_iter().map(|row| div().flex().gap_2().children(row.into_iter().map(|(index, id, label, hint)| {
-                let enabled = footer_enabled(index, busy, unsaved,
-                    cx.global::<preferences::LastSettingsSave>().0.is_some());
-                div().id(id).flex_1().min_w_0().h(px(30.)).flex().items_center().justify_center().px_2().rounded_sm().text_xs().border_1()
-                    .when(index == 0, |button| button.bg(if busy { crate::chrome_style::hover() } else { crate::chrome_style::selected() }))
-                    .border_color(if state.selected == KEYS.len() + index { crate::chrome_style::accent() } else { crate::chrome_style::hover() })
-                    .text_color(if enabled { crate::chrome_style::accent() } else { crate::chrome_style::muted() })
-                    .when(enabled, |link| link.cursor_pointer().hover(|style| style.bg(crate::chrome_style::selected_hover())))
-                    .tooltip(move |_, cx| cx.new(|_| pane_view::ControlHint(hint.into())).into())
-                    .on_mouse_down(MouseButton::Left, move |_, window, cx| {
-                        if enabled { window.dispatch_action(Box::new(SelectSetting { key: FOOTER_KEYS[index].into() }), cx); }
-                    })
-                    .on_click(move |event, window, cx| {
-                        if enabled && event.standard_click() {
-                            if let Some(action) = footer_action(index) { window.dispatch_action(action, cx); }
-                        }
-                    }).child(div().min_w_0().truncate().child(label.to_owned()))
-            })))))
-        .into_any_element()
+            }, if settings.close_policy_overridden() { " · Environment" } else { "" }), false, Some(state.selected) == control_index("close"), settings.close_policy_overridden())).into_any_element(),
+        "controls_on_hover" => (row("Show controls only on hover", "controls_on_hover", if settings.controls_on_hover { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("controls_on_hover"), false)).into_any_element(),
+        "hide_top_bar" => (row("Hide top workspace bar", "hide_top_bar", if settings.hide_top_bar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("hide_top_bar"), false)).into_any_element(),
+        "compact_sidebar" => (row("Compact sidebar", "compact_sidebar", if settings.compact_sidebar { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("compact_sidebar"), false)).into_any_element(),
+        "native_notifications" => (div().child(row("Desktop notifications", "native_notifications", if settings.native_notifications { "On" } else { "Off" }.into(), false, Some(state.selected) == control_index("native_notifications"), false))
+                ).into_any_element(),
+        "notification_focus" => (row("Show desktop banners", "notification_focus", settings.notification_focus.label().into(), false, Some(state.selected) == control_index("notification_focus"), false)).into_any_element(),
+        "file_editor" => {
+            let description = settings.file_editor.as_ref().map(|editor| format!("Open files with {}.", editor.program.file_name().unwrap_or_default().to_string_lossy()))
+                .unwrap_or_else(|| "No external editor selected. Choose a program to open files.".into());
+            let hint = settings.file_editor.as_ref().map(|editor| format!("{}\n{}", editor.program.display(), control_hint(key)))
+                .unwrap_or_else(|| control_hint(key).into());
+            row_with_detail("External editor", "file_editor", "Configure…".into(), false, Some(state.selected) == control_index(key), false, description, hint.into()).into_any_element()
+        }
+        "editor_example" => row("VS Code configuration", "editor_example", "Copy example".into(), false, Some(state.selected) == control_index(key), false).into_any_element(),
+        "editor_fallback" => row("Repair editor configuration", "editor_fallback", "Open…".into(), false, Some(state.selected) == control_index(key), false).into_any_element(),
+        "shell_history" => {
+            let description = format!("{} · Experimental. Recall commands after session restore; restart required.", shell_history::settings_status(&settings.shell_history_directory));
+            let hint = settings.shell_history_directory.as_ref().map(|path| format!("{}\n{}", path.display(), control_hint(key)))
+                .unwrap_or_else(|| control_hint(key).into());
+            row_with_detail("Saved command history", "shell_history", "Configure…".into(), false, Some(state.selected) == control_index(key), false, description, hint.into()).into_any_element()
+        }
+        _ => {
+            let item = settings_search::entry(key);
+            row(item.label, item.key, "Edit JSON…".into(), false, Some(state.selected) == control_index(key), false).into_any_element()
+        }
+    }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{adjust, next_control, Preferences, close_policy, workspace_groups, KEYS, FOOTER_COUNT};
+    use super::{adjust, Preferences, close_policy, workspace_groups, KEYS, FOOTER_COUNT};
+    #[test]
+    fn categories_cover_every_control_once_and_navigation_stays_visible() {
+        use super::{CATEGORIES, next_visible, visible_controls};
+        let mut categorized: Vec<_> = CATEGORIES.iter().flat_map(|(_, _, keys)| keys.iter().copied()).collect();
+        categorized.sort();
+        let mut expected = KEYS.to_vec();
+        expected.sort();
+        assert_eq!(categorized, expected);
+        for category in 0..CATEGORIES.len() {
+            let controls = visible_controls(category);
+            assert_eq!(next_visible(&controls[..controls.len() - FOOTER_COUNT], controls[0], "tab", true), controls.last().copied());
+            assert_eq!(next_visible(&controls[..controls.len() - FOOTER_COUNT], *controls.last().unwrap(), "down", false), Some(controls[0]));
+            for pair in controls.windows(2) {
+                assert_eq!(next_visible(&controls[..controls.len() - FOOTER_COUNT], pair[0], "tab", false), Some(pair[1]));
+            }
+            assert_eq!(next_visible(&controls[..controls.len() - FOOTER_COUNT], controls[0], "right", false), None);
+            assert_eq!(controls.len(), CATEGORIES[category].2.len() + FOOTER_COUNT);
+        }
+    }
     #[test]
     fn arrows_adjust_values_but_never_launch_actions() {
         use super::{control_input, ControlInput};
-        for control in ["file_editor", "editor_example", "editor_fallback", "import_theme", "font_family", "shell_history"].into_iter().chain(super::FOOTER_KEYS.iter().copied()) {
+        for control in ["file_editor", "editor_example", "editor_fallback", "import_theme", "font_family", "shell_history"].into_iter().chain(super::FOOTER_KEYS.iter().copied()).chain(crate::settings_search::ENTRIES.iter().filter(|entry| entry.json_only).map(|entry| entry.key)) {
             assert_eq!(control_input(control, "left"), ControlInput::None);
             assert_eq!(control_input(control, "right"), ControlInput::None);
             assert_eq!(control_input(control, "enter"), ControlInput::Activate);
@@ -339,10 +420,6 @@ mod tests {
     }
     #[test]
     fn keyboard_navigation_wraps_and_adjustments_stay_in_bounds() {
-        assert_eq!(next_control(0, "tab", true), Some(KEYS.len() + FOOTER_COUNT - 1));
-        assert_eq!(next_control(KEYS.len() + FOOTER_COUNT - 1, "down", false), Some(0));
-        assert_eq!(next_control(3, "end", false), Some(KEYS.len() + FOOTER_COUNT - 1));
-        assert_eq!(next_control(3, "a", false), None);
         let original = Preferences::default();
         let mut option = original.clone();
         adjust(&mut option, "option_as_alt", 1);

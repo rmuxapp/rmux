@@ -61,6 +61,8 @@ pub(crate) fn workspace_icon(custom: Option<String>, group: bool, selected: bool
 pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {
     div().id(id).flex_1().min_w_0().truncate().font_weight(FontWeight::SEMIBOLD)
 }
+// Browser preview uses plain titles; native rows compose their own title content.
+#[cfg(target_family = "wasm")]
 pub(crate) fn title(id: impl Into<ElementId>, text: SharedString) -> Stateful<Div> {
     let hint = text.clone();
     title_frame(id)

@@ -200,7 +200,7 @@ def run(binary, live_shell=False):
                         try:
                             wait_file(Path(directory) / f"{pid}.state", f"state-{pid}-世界")
                         except AssertionError as error:
-                            screen = send("surface.read_text", {"surface_id": surface_id, "scope": "screen", "max_bytes": 4096})
+                            screen = send("surface.read_text", {"surface_id": surface_id, "scope": "viewport", "max_bytes": 4096})
                             raise AssertionError(f"{error}; fixture screen: {screen}") from error
                     assert send("window.list")["result"] == before_input
                     assert [(item["id"], item["selected"]) for item in send("surface.list")["result"]["surfaces"]] == [(item["id"], item["selected"]) for item in all_surfaces]

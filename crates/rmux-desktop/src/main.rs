@@ -45,6 +45,7 @@ mod scrollbar_view;
 mod diagnostics;
 mod memory_view;
 mod settings_view;
+mod settings_search;
 mod shortcuts;
 mod shortcut_label;
 use rmux_core::focus_trail;
@@ -3839,6 +3840,7 @@ fn main() {
         cx.bind_keys(pane_shortcuts::pane_numbers(cfg!(target_os = "macos")));
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-," } else { "ctrl-," }, ToggleSettings, None)]);
         cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-s" } else { "ctrl-s" }, SaveAppearanceSettings, Some("Settings"))]);
+        cx.bind_keys([KeyBinding::new(if cfg!(target_os = "macos") { "cmd-w" } else { "ctrl-w" }, CloseWindow, Some("Settings"))]);
         cx.bind_keys(pane_shortcuts::tab_reordering());
         cx.bind_keys([
             KeyBinding::new("shift-f10", ShowTabMenu, Some("Terminal")),

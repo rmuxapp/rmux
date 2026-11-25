@@ -71,6 +71,8 @@ pub(crate) fn rename_editor(input: Entity<crate::text_field::TextField>, cx: &Ap
 pub(crate) fn title_frame(id: impl Into<ElementId>) -> Stateful<Div> {
     div().id(id).flex_1().min_w_0().max_w(px(220.)).truncate()
 }
+// Browser preview uses plain titles; native tabs compose their own title content.
+#[cfg(target_family = "wasm")]
 pub(crate) fn title(id: impl Into<ElementId>, title: SharedString, hint: SharedString) -> Stateful<Div> {
     title_frame(id)
         .tooltip(move |_, cx| cx.new(|_| crate::control_hint::ControlHint(hint.clone())).into())

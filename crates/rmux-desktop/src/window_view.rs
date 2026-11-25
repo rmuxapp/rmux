@@ -136,6 +136,7 @@ pub(super) struct WorkspaceWindow {
     workspace_menu: Option<WorkspaceMenu>,
     workspace_menu_blur: Option<Subscription>,
     palette: Option<(Entity<command_palette::CommandPalette>, Option<FocusHandle>)>,
+    palette_window: Option<AnyWindowHandle>,
     font_picker_job: Option<Task<()>>,
     file_browser_job: Option<Task<()>>,
     preview_restore: Option<command_palette::PreviewState>,
@@ -149,6 +150,8 @@ pub(super) struct WorkspaceWindow {
     restore_job: Option<restore::Job>,
     workspace_scroll: ScrollHandle,
     notice: Option<String>,
+    timed_notice: Option<String>,
+    notice_timer: Option<Task<()>>,
     memory_rows: Option<Vec<memory_view::Row>>,
     memory_scroll: ListState,
     memory_focus: Option<FocusHandle>,
@@ -1305,45 +1308,284 @@ impl WorkspaceWindow {
         }).detach();
     }
 
+    fn settings_actions(root: Div, cx: &mut Context<Self>) -> Div {
+        root
+            .on_action(cx.listener(|this, action: &SetTerminalTheme, window, cx| {
+                if let Some(state) = &mut this.settings_state {
+                    state.selected = settings_view::KEYS.iter().position(|key| *key == "theme").unwrap_or(0);
+                    if state.origin_window != window.window_handle() { state.focus.focus(window); }
+                }
+                if cx.global::<Preferences>().terminal_theme != action.theme || cx.global::<Preferences>().theme_file.is_some() {
+                    let mut settings = cx.global::<Preferences>().clone();
+                    settings.select_theme(action.theme);
+                    cx.set_global(settings);
+                }
+                this.notice = None;
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, selected: &SelectSetting, window, cx| {
+                if let Some(state) = &mut this.settings_state {
+                    if let Some(index) = settings_view::control_index(&selected.key) {
+                        state.selected = index;
+                        if state.origin_window != window.window_handle() { state.focus.focus(window); }
+                        cx.notify();
+                    }
+                }
+            }))
+            .on_action(cx.listener(|this, change: &AdjustSetting, window, cx| {
+                if let Some(state) = &mut this.settings_state {
+                    if let Some(index) = settings_view::KEYS.iter().position(|key| *key == change.key) { state.selected = index; }
+                    if state.origin_window != window.window_handle() { state.focus.focus(window); }
+                }
+                let mut settings = cx.global::<Preferences>().clone();
+                if this.editor_setting_action(&change.key, cx) {
+                    return;
+                }
+                if change.key == "import_theme" {
+                    this.choose_terminal_theme(window, cx);
+                    return;
+                }
+                if change.key == "font_family" {
+                    this.show_font_picker(true, window, cx);
+                    return;
+                }
+                settings_view::adjust(&mut settings, &change.key, change.delta);
+                if !settings.same_saved_appearance(cx.global::<Preferences>()) {
+                    cx.set_global(settings.confirm_close);
+                    cx.set_global(settings);
+                }
+                this.notice = None;
+                cx.notify();
+            }))
+            .on_action(cx.listener(|this, _: &SaveAppearanceSettings, _, cx| this.save_appearance_settings(cx)))
+            .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
+            .on_action(cx.listener(|this, _: &RevertAppearanceSettings, _, cx| this.revert_appearance_settings(cx)))
+            .on_action(cx.listener(|this, _: &UndoSettingsSave, _, cx| this.undo_settings_save(cx)))
+            .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
+            .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
+    }
+    fn update_notice_timer(&mut self, cx: &mut Context<Self>) {
+        if self.timed_notice == self.notice { return; }
+        self.notice_timer = None;
+        self.timed_notice = self.notice.clone();
+        let Some(message) = self.notice.clone().filter(|message|
+            message.starts_with("Settings saved to ") || message.starts_with("Unsaved settings reverted.")) else { return; };
+        let timer = cx.background_executor().timer(std::time::Duration::from_secs(6));
+        self.notice_timer = Some(cx.spawn(async move |entity, cx| {
+            timer.await;
+            let _ = entity.update(cx, |this, cx| {
+                if this.notice.as_ref() == Some(&message) {
+                    this.notice = None;
+                    this.timed_notice = None;
+                    cx.notify();
+                }
+            });
+        }));
+    }
+    fn notice_toast(&self, notice: String, settings: bool, cx: &mut Context<Self>) -> AnyElement {
+        let success = ["Settings saved to ", "Unsaved settings reverted.", "Saved session to ", "Saved layout to ", "Copied "]
+            .iter().any(|prefix| notice.starts_with(prefix));
+        gpui::div().id("window-notice-toast").absolute().right(px(16.)).bottom(px(if settings { 96. } else { 16. }))
+            .max_w(relative(0.85)).occlude().shadow_lg().rounded_lg().flex().items_center().min_w_0()
+            .on_mouse_down(MouseButton::Left, |_, _, cx| cx.stop_propagation())
+                        .gap_2().px_3().py_2().text_xs().bg(crate::chrome_style::elevated()).border_1().border_color(crate::chrome_style::border())
+                        .when(success, |toast| toast.child(icons::icon("check").size(px(16.)).text_color(chrome_style::success())))
+                        // Center the visible glyphs with the icons, compensating for
+                        // the font's extra space above its baseline within the line box.
+                        .child(gpui::div().id("window-notice-text").relative().top(px(-1.)).line_height(px(18.)).min_w_0().max_w(px(340.)).max_h(px(96.)).overflow_scroll().whitespace_normal()
+                            .text_color(crate::chrome_style::foreground())
+                            .tooltip({ let detail: SharedString = notice.clone().into(); move |_, cx| cx.new(|_| pane_view::ControlHint(detail.clone())).into() })
+                            .child(if notice.starts_with("Settings saved to ") { "Settings saved".to_owned() } else { notice.clone() }))
+                        .child(pane_view::pane_control("copy-notice", "Copy message")
+                            .on_click(move |event, _, cx| {
+                                if event.standard_click() { clipboard::write(ClipboardItem::new_string(notice.clone()), cx); }
+                            }).child(icons::icon("copy")))
+                        .when(self.restore_job.is_none() && self.file_browser_job.is_none() && self.terminal_search_job.is_none() && self.workspace_launch_cancel.is_none(), |row| row.child(pane_view::pane_control("dismiss-notice", "Dismiss message")
+                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                                if event.standard_click() { this.notice = None; cx.notify(); }
+                            })).child(icons::icon("close"))))
+                        .when(self.workspace_launch_cancel.is_some(), |row| row.child(pane_view::pane_control("cancel-workspace-startup", "Cancel New Workspace")
+                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                                if event.standard_click() { this.cancel_workspace_launch(cx); }
+                            })).child(icons::icon("close"))))
+                        .when(self.terminal_search_job.is_some(), |row| row.child(pane_view::pane_control("cancel-terminal-search", "Cancel terminal search")
+                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                                if !event.standard_click() { return; }
+                                this.terminal_search_cancel = None;
+                                this.terminal_search_job = None;
+                                if this.notice.as_deref().is_some_and(|notice| notice.starts_with("Searching terminal output…")) { this.notice = None; }
+                                cx.notify();
+                            })).child(icons::icon("close"))))
+                        .when(self.file_browser_job.is_some(), |row| row.child(pane_view::pane_control("cancel-file-load", "Cancel file loading")
+                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                                if !event.standard_click() { return; }
+                                this.cancel_file_loading(cx);
+                            })).child(icons::icon("close"))))
+                        .when(self.restore_job.is_some(), |row| row.child(gpui::div().id("cancel-restore").flex_shrink_0().px_2().py_1().rounded_sm().cursor_pointer()
+                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
+                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
+                                if !event.standard_click() { return; }
+                                this.cancel_restore(cx);
+                            })).child("Cancel"))).into_any_element()
+    }
+    fn render_settings_window(&mut self, window: &mut Window, cx: &mut Context<Self>) -> AnyElement {
+        self.update_notice_timer(cx);
+        let root = div().size_full().relative().flex().flex_col()
+            .text_color(chrome_style::foreground()).bg(chrome_style::surface())
+            .on_action(cx.listener(|_, _: &CloseWindow, window, _| window.remove_window()))
+            .on_action(cx.listener(|_, _: &ToggleSettings, window, _| window.activate_window()))
+            .on_action(cx.listener(|this, _: &ShowKeyboardShortcuts, _, cx| {
+                if let Some(state) = &this.settings_state {
+                    let origin = state.origin_window;
+                    cx.defer(move |cx| { let _ = origin.update(cx, |_, window, cx| {
+                        window.activate_window();
+                        window.dispatch_action(Box::new(ShowKeyboardShortcuts), cx);
+                    }); });
+                }
+            }))
+            .on_action(cx.listener(|_, action: &SetDefaultFont, _, cx| {
+                if !action.family.trim().is_empty() && action.family.len() <= 128 && !action.family.chars().any(char::is_control) {
+                    let mut settings = cx.global::<Preferences>().clone();
+                    if settings.font_family != action.family {
+                        settings.font_family = action.family.clone();
+                        cx.set_global(settings);
+                    }
+                }
+            }))
+            .when_some(self.settings_state.clone(), |root, state| root.child(settings_view::panel(state, window, cx)))
+            .when_some(self.notice.clone(), |root, notice| root.child(self.notice_toast(notice, true, cx)))
+            .when_some(self.palette.as_ref().filter(|_| self.palette_window == Some(window.window_handle())), |root, (palette, _)| root.child(
+                div().absolute().inset_0().occlude().flex().justify_center().items_start().pt(px(48.)).bg(rgba(0x00000066))
+                    .on_mouse_down(MouseButton::Left, cx.listener(|this, _, window, cx| { this.close_palette(window, cx); cx.stop_propagation(); }))
+                    .child(palette.clone())
+            ));
+        Self::settings_actions(root, cx).into_any_element()
+    }
     fn toggle_settings(&mut self, window: &mut Window, cx: &mut Context<Self>) {
-        if let Some(state) = self.settings_state.take() {
-            if state.focus.is_focused(window) {
-                if let Some(origin) = state.origin { origin.focus(window); } else { self.select(self.workspace_state.active, window, cx); }
+        let owner = cx.entity();
+        let origin_window = window.window_handle();
+        // Opening a native window draws it immediately. Release the workspace
+        // entity borrow before its settings view renders through that controller.
+        cx.defer(move |cx| {
+            if let Some(handle) = cx.try_global::<SettingsWindowHandle>().and_then(|state| state.0) {
+                if handle.update(cx, |_, window, _| window.activate_window()).is_ok() { return; }
             }
-        } else {
-            self.close_inspectors(window, cx);
-            self.remember_focus(window, cx);
-            let state = settings_view::State { focus: cx.focus_handle(), origin: window.focused(cx), selected: 0, scroll: ScrollHandle::new() };
-            state.focus.focus(window);
-            self.settings_state = Some(state);
+            let focus = cx.focus_handle();
+            owner.update(cx, |this, cx| {
+                let search = cx.new(|cx| {
+                    let mut field = text_field::TextField::new("", cx);
+                    field.placeholder = Some("Search settings…");
+                    field
+                });
+                this.settings_state = Some(settings_view::State { focus: focus.clone(), origin_window, category: 0, selected: settings_view::control_index("theme").unwrap(), scroll: ScrollHandle::new(), search, query: String::new(), visible: settings_view::CATEGORIES[0].2.iter().filter_map(|key| settings_view::control_index(key)).collect() });
+                cx.notify();
+            });
+            let error_owner = owner.downgrade();
+            let bounds = Bounds::centered(None, size(px(880.), px(720.)), cx);
+            match cx.open_window(WindowOptions {
+                window_bounds: Some(WindowBounds::Windowed(bounds)),
+                window_min_size: Some(size(px(720.), px(520.))),
+                titlebar: Some(TitlebarOptions::default()),
+                app_id: Some("rmux".into()),
+                ..Default::default()
+            }, move |window, cx| {
+                window.set_window_title("rmux Settings");
+                focus.focus(window);
+                owner.update(cx, |this, cx| {
+                    let search = this.settings_state.as_ref().unwrap().search.clone();
+                    cx.subscribe_in(&search, window, |this, field, event: &text_field::EditEvent, window, cx| {
+                        match event {
+                            text_field::EditEvent::Changed(query) => this.update_settings_query(query, cx),
+                            text_field::EditEvent::Submitted { .. } => {
+                                if let Some(state) = &this.settings_state { state.focus.focus(window); }
+                            }
+                            text_field::EditEvent::Cancelled => {
+                                if field.read(cx).value().is_empty() { window.remove_window(); }
+                                else { field.update(cx, |field, cx| field.replace_draft("", cx)); }
+                            }
+                        }
+                    }).detach();
+                });
+                cx.new(|cx: &mut Context<SettingsWindow>| {
+                    cx.observe(&owner, |_, _, cx| cx.notify()).detach();
+                    cx.observe_release_in(&owner, window, |_, _, window, _| window.remove_window()).detach();
+                    let handle = window.window_handle();
+                    cx.on_release(move |this, cx| {
+                        let owner = this.owner.clone();
+                        cx.defer(move |cx| {
+                            let _ = owner.update(cx, |owner, cx| {
+                                owner.settings_state = None;
+                                if owner.palette_window == Some(handle) { owner.palette = None; owner.palette_window = None; }
+                                cx.notify();
+                            });
+                        });
+                    }).detach();
+                    SettingsWindow { owner: owner.downgrade() }
+                })
+            }) {
+                Ok(handle) => cx.set_global(SettingsWindowHandle(Some(handle))),
+                Err(error) => { let _ = error_owner.update(cx, |this, cx| { this.settings_state = None; this.notice = Some(format!("Could not open Settings: {error:#}")); cx.notify(); }); }
+            }
+        });
+    }
+    fn update_settings_query(&mut self, query: &str, cx: &mut Context<Self>) {
+        if let Some(state) = &mut self.settings_state {
+            state.query = query.trim().to_owned();
+            state.visible = if state.query.is_empty() {
+                settings_view::CATEGORIES[state.category].2.iter().filter_map(|key| settings_view::control_index(key)).collect()
+            } else {
+                settings_search::search(&state.query).iter().filter_map(|key| settings_view::control_index(key)).collect()
+            };
+            state.selected = state.visible.first().copied().unwrap_or(settings_view::KEYS.len());
+            state.scroll = ScrollHandle::new();
+            cx.notify();
         }
-        cx.notify();
+    }
+    pub(super) fn select_settings_category(&mut self, category: usize, window: &mut Window, cx: &mut Context<Self>) {
+        if let Some(state) = &mut self.settings_state {
+            state.category = category;
+            state.search.update(cx, |field, cx| field.replace_draft("", cx));
+            state.focus.focus(window);
+        }
+        self.update_settings_query("", cx);
     }
     pub(super) fn settings_key(&mut self, event: &KeyDownEvent, window: &mut Window, cx: &mut Context<Self>) {
         let Some(state) = &mut self.settings_state else { return; };
         let key = event.keystroke.key.as_str();
+        if key == "f" && (if cfg!(target_os = "macos") { event.keystroke.modifiers.platform } else { event.keystroke.modifiers.control }) {
+            state.search.read(cx).focus.focus(window);
+            state.search.update(cx, |field, cx| field.select_all_text(cx));
+            cx.stop_propagation();
+            return;
+        }
+        if event.keystroke.modifiers.control && key == "tab" {
+            let count = settings_view::CATEGORIES.len();
+            let category = (state.category + if event.keystroke.modifiers.shift { count - 1 } else { 1 }) % count;
+            self.select_settings_category(category, window, cx);
+            cx.stop_propagation();
+            return;
+        }
         if event.keystroke.modifiers.platform || event.keystroke.modifiers.control || event.keystroke.modifiers.alt
             || (event.keystroke.modifiers.shift && key != "tab") { return; }
-        let next = if matches!(key, "pageup" | "pagedown") {
-            command_palette::paged_result(state.selected, settings_view::KEYS.len() + settings_view::FOOTER_COUNT,
-                key == "pageup", f32::from(state.scroll.bounds().size.height), |index| {
-                    let item = settings_view::scroll_index(index);
-                    let Some(bounds) = state.scroll.bounds_for_item(item) else { return 1.; };
-                    let next = state.scroll.bounds_for_item(settings_view::scroll_index(index + 1));
-                    f32::from(next.map(|next| next.top() - bounds.top()).unwrap_or(bounds.size.height)).max(1.)
-                })
-        } else {
-            settings_view::next_control(state.selected, key, event.keystroke.modifiers.shift)
-        };
+        if state.search.read(cx).focus.is_focused(window) {
+            if matches!(key, "tab" | "down") { state.focus.focus(window); cx.stop_propagation(); cx.notify(); }
+            return;
+        }
+        let next = settings_view::next_visible(&state.visible, state.selected, key, event.keystroke.modifiers.shift);
         if let Some(index) = next {
             state.selected = index;
             // Footer actions stay visible without moving the settings list.
             if index < settings_view::KEYS.len() {
-                state.scroll.scroll_to_item(settings_view::scroll_index(index));
+                if let Some(position) = state.visible.iter().position(|item| *item == index) {
+                    state.scroll.scroll_to_item(position + 1);
+                }
             }
             cx.notify();
         } else if key == "escape" {
-            self.toggle_settings(window, cx);
+            if !state.query.is_empty() {
+                state.search.update(cx, |field, cx| field.replace_draft("", cx));
+                state.search.read(cx).focus.focus(window);
+            } else { window.remove_window(); }
         } else if matches!(key, "left" | "right" | "enter" | "space") {
             let selected = state.selected;
             let control = settings_view::KEYS.iter().chain(settings_view::FOOTER_KEYS).nth(selected).copied();
@@ -1565,6 +1807,10 @@ impl WorkspaceWindow {
         }).detach();
     }
     fn editor_setting_action(&mut self, key: &str, cx: &mut Context<Self>) -> bool {
+        if settings_search::ENTRIES.iter().any(|entry| entry.key == key && entry.json_only) {
+            self.open_settings_file(cx);
+            return true;
+        }
         match key {
             "file_editor" | "shell_history" => self.open_settings_file(cx),
             "editor_fallback" => self.open_settings_file_with(true, cx),
@@ -2626,7 +2872,6 @@ impl WorkspaceWindow {
         // an older inspector as its origin; close it first to restore that chain.
         // The toggle close branches take their state and never call this helper.
         if self.memory_rows.is_some() { self.close_memory(window, cx); }
-        if self.settings_state.is_some() { self.toggle_settings(window, cx); }
         if self.notification_navigation.is_some() { self.toggle_notifications(window, cx); }
     }
 
@@ -3183,6 +3428,8 @@ impl WorkspaceWindow {
         cx.notify();
     }
     fn install_palette(&mut self, palette: Entity<command_palette::CommandPalette>, focus: Option<FocusHandle>, window: &mut Window, cx: &mut Context<Self>) {
+        if self.palette_window != Some(window.window_handle()) { self.palette = None; }
+        self.palette_window = Some(window.window_handle());
         // A clicked document link can replace a palette without closing it
         // first. Escape must return to the original terminal, not the search
         // field of the palette that is about to be dropped.
@@ -3495,6 +3742,7 @@ impl WorkspaceWindow {
         let (snapshot, mut sessions) = prepared.into_parts();
         let mut this = Self {
             palette: None,
+            palette_window: None,
             font_picker_job: None,
             file_browser_job: None,
             preview_restore: None,
@@ -3508,6 +3756,8 @@ impl WorkspaceWindow {
             restore_job: None,
             workspace_scroll: ScrollHandle::new(),
             notice: None,
+            timed_notice: None,
+            notice_timer: None,
             memory_rows: None,
             memory_scroll: ListState::new(0, ListAlignment::Top, px(80.)),
             memory_focus: None,
@@ -3709,6 +3959,7 @@ impl WorkspaceWindow {
         Self::observe_settings(cx);
         Self {
             palette: None,
+            palette_window: None,
             font_picker_job: None,
             file_browser_job: None,
             preview_restore: None,
@@ -3722,6 +3973,8 @@ impl WorkspaceWindow {
             restore_job: None,
             workspace_scroll: ScrollHandle::new(),
             notice: None,
+            timed_notice: None,
+            notice_timer: None,
             memory_rows: None,
             memory_scroll: ListState::new(0, ListAlignment::Top, px(80.)),
             memory_focus: None,
@@ -4307,6 +4560,7 @@ impl crate::workspace_actions::WorkspaceCommandHost for WorkspaceWindow {
 
 impl Render for WorkspaceWindow {
     fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        self.update_notice_timer(cx);
         let compact = cx.global::<Preferences>().compact_sidebar;
         let hover_controls = cx.global::<Preferences>().controls_on_hover;
         let hide_top_bar = cx.global::<Preferences>().hide_top_bar;
@@ -4535,59 +4789,7 @@ impl Render for WorkspaceWindow {
             .on_action(cx.listener(|this, _: &ShowLayoutPresetPicker, window, cx| this.show_layout_preset_picker(window, cx)))
             .on_action(cx.listener(|this, command: &RunCustomCommand, window, cx| this.run_custom_command(&command.name, window, cx)))
             .on_action(cx.listener(|this, _: &ToggleSettings, window, cx| this.toggle_settings(window, cx)))
-            .on_action(cx.listener(|this, action: &SetTerminalTheme, window, cx| {
-                if let Some(state) = &mut this.settings_state {
-                    state.selected = settings_view::KEYS.iter().position(|key| *key == "theme").unwrap_or(0);
-                    state.focus.focus(window);
-                }
-                if cx.global::<Preferences>().terminal_theme != action.theme || cx.global::<Preferences>().theme_file.is_some() {
-                    let mut settings = cx.global::<Preferences>().clone();
-                    settings.select_theme(action.theme);
-                    cx.set_global(settings);
-                }
-                this.notice = None;
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, selected: &SelectSetting, window, cx| {
-                if let Some(state) = &mut this.settings_state {
-                    if let Some(index) = settings_view::control_index(&selected.key) {
-                        state.selected = index;
-                        state.focus.focus(window);
-                        cx.notify();
-                    }
-                }
-            }))
-            .on_action(cx.listener(|this, change: &AdjustSetting, window, cx| {
-                if let Some(state) = &mut this.settings_state {
-                    if let Some(index) = settings_view::KEYS.iter().position(|key| *key == change.key) { state.selected = index; }
-                    state.focus.focus(window);
-                }
-                let mut settings = cx.global::<Preferences>().clone();
-                if this.editor_setting_action(&change.key, cx) {
-                    return;
-                }
-                if change.key == "import_theme" {
-                    this.choose_terminal_theme(window, cx);
-                    return;
-                }
-                if change.key == "font_family" {
-                    this.show_font_picker(true, window, cx);
-                    return;
-                }
-                settings_view::adjust(&mut settings, &change.key, change.delta);
-                if !settings.same_saved_appearance(cx.global::<Preferences>()) {
-                    cx.set_global(settings.confirm_close);
-                    cx.set_global(settings);
-                }
-                this.notice = None;
-                cx.notify();
-            }))
-            .on_action(cx.listener(|this, _: &SaveAppearanceSettings, _, cx| this.save_appearance_settings(cx)))
-            .on_action(cx.listener(|this, _: &ReloadSettings, _, cx| this.reload_settings(cx)))
-            .on_action(cx.listener(|this, _: &RevertAppearanceSettings, _, cx| this.revert_appearance_settings(cx)))
-            .on_action(cx.listener(|this, _: &UndoSettingsSave, _, cx| this.undo_settings_save(cx)))
-            .on_action(cx.listener(|this, _: &OpenSettingsFile, _, cx| this.open_settings_file(cx)))
-            .on_action(cx.listener(|this, _: &ImportTerminalTheme, window, cx| this.choose_terminal_theme(window, cx)))
+            .when(true, |root| Self::settings_actions(root, cx))
             .on_action(cx.listener(|this, _: &CancelNewWorkspace, _, cx| this.cancel_workspace_launch(cx)))
             .on_action(cx.listener(|this, _: &RefreshTerminalMemory, window, cx| this.refresh_memory(window, cx)))
             .on_action(cx.listener(|this, _: &CycleTerminalMemorySort, _, cx| this.sort_memory(cx)))
@@ -4841,7 +5043,7 @@ impl Render for WorkspaceWindow {
                     .flex_1()
                     .min_w_0()
                     .h_full()
-                    .flex().flex_col()
+                    .relative().flex().flex_col()
                     .when_some(self.workspace_state.entries.get(self.workspace_state.active), |div, entry| {
                         div.when(hide_top_bar && !self.sidebar && cfg!(target_os = "macos"), |div| div.child(
                             gpui::div().id("minimal-titlebar").h(px(36.)).flex_shrink_0()
@@ -4861,41 +5063,7 @@ impl Render for WorkspaceWindow {
                         )).child(gpui::div().flex_1().min_h_0().child(entry.workspace.clone()))
                     })
                     .when_some(self.memory_rows.as_ref(), |div, rows| div.child(memory_view::panel(rows, self.memory_application, self.memory_sampled_at, self.memory_sort, self.memory_loading, self.memory_scroll.clone(), self.memory_focus.as_ref(), self.memory_selected, cx)))
-                    .when_some(self.notice.clone(), |div, notice| div.child(gpui::div().flex().items_start().flex_shrink_0().min_w_0()
-                        .gap_2().px_3().py_2().text_xs().bg(crate::chrome_style::elevated()).border_t_1().border_color(crate::chrome_style::border())
-                        .child(gpui::div().id("window-notice-text").flex_1().min_w_0().max_h(px(96.)).overflow_scroll().whitespace_normal()
-                            .text_color(crate::chrome_style::foreground()).child(notice.clone()))
-                        .child(pane_view::pane_control("copy-notice", "Copy message")
-                            .on_click(move |event, _, cx| {
-                                if event.standard_click() { clipboard::write(ClipboardItem::new_string(notice.clone()), cx); }
-                            }).child(icons::icon("copy")))
-                        .when(self.restore_job.is_none() && self.file_browser_job.is_none() && self.terminal_search_job.is_none() && self.workspace_launch_cancel.is_none(), |row| row.child(pane_view::pane_control("dismiss-notice", "Dismiss message")
-                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                                if event.standard_click() { this.notice = None; cx.notify(); }
-                            })).child(icons::icon("close"))))
-                        .when(self.workspace_launch_cancel.is_some(), |row| row.child(pane_view::pane_control("cancel-workspace-startup", "Cancel New Workspace")
-                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                                if event.standard_click() { this.cancel_workspace_launch(cx); }
-                            })).child(icons::icon("close"))))
-                        .when(self.terminal_search_job.is_some(), |row| row.child(pane_view::pane_control("cancel-terminal-search", "Cancel terminal search")
-                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                                if !event.standard_click() { return; }
-                                this.terminal_search_cancel = None;
-                                this.terminal_search_job = None;
-                                if this.notice.as_deref().is_some_and(|notice| notice.starts_with("Searching terminal output…")) { this.notice = None; }
-                                cx.notify();
-                            })).child(icons::icon("close"))))
-                        .when(self.file_browser_job.is_some(), |row| row.child(pane_view::pane_control("cancel-file-load", "Cancel file loading")
-                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                                if !event.standard_click() { return; }
-                                this.cancel_file_loading(cx);
-                            })).child(icons::icon("close"))))
-                        .when(self.restore_job.is_some(), |row| row.child(gpui::div().id("cancel-restore").flex_shrink_0().px_2().py_1().rounded_sm().cursor_pointer()
-                            .hover(|style| style.bg(crate::chrome_style::hover_strong()))
-                            .on_click(cx.listener(|this, event: &ClickEvent, _, cx| {
-                                if !event.standard_click() { return; }
-                                this.cancel_restore(cx);
-                            })).child("Cancel"))))),
+                    .when_some(self.notice.clone(), |div, notice| div.child(self.notice_toast(notice, false, cx))),
             )
             .when_some(window.pending_input_keystrokes().filter(|keys| !keys.is_empty()), |root, keys| root.child(
                 div().absolute().bottom(px(8.)).right(px(8.)).max_w(relative(0.8))
@@ -4904,9 +5072,8 @@ impl Render for WorkspaceWindow {
                     .child(format!("{}  ·  Waiting for next key…", keys.iter().map(shortcuts::key_label).collect::<Vec<_>>().join(" ")))
             ))
             .when_some(self.workspace_menu.clone(), |root, menu| root.child(self.workspace_menu_element(menu, window, cx)))
-            .when_some(self.settings_state.clone(), |root, state| root.child(settings_view::panel(state, overlay_inspector, window, cx)))
             .when(self.notification_navigation.is_some(), |root| root.child(self.notification_panel(overlay_inspector, cx)))
-            .when_some(self.palette.as_ref(), |root, (palette, _)| root.child(
+            .when_some(self.palette.as_ref().filter(|_| self.palette_window == Some(window.window_handle())), |root, (palette, _)| root.child(
                 div().id("command-palette-overlay").occlude().absolute().inset_0().flex().justify_center().items_start()
                     .pt(px(command_palette::top_inset(f32::from(window.viewport_size().height))))
                     .bg(rgba(0x00000066))
@@ -4922,5 +5089,22 @@ impl Render for WorkspaceWindow {
 impl crate::sidebar_interaction::SidebarHost for WorkspaceWindow {
     fn sidebar_state(&mut self) -> (&mut f32, &mut Option<(Pixels, f32)>) {
         (&mut self.sidebar_width, &mut self.sidebar_drag)
+    }
+}
+
+
+struct SettingsWindowHandle(Option<WindowHandle<SettingsWindow>>);
+impl Global for SettingsWindowHandle {}
+struct SettingsWindow {
+    owner: WeakEntity<WorkspaceWindow>,
+}
+impl Render for SettingsWindow {
+    fn render(&mut self, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        if let Some(owner) = self.owner.upgrade() {
+            owner.update(cx, |owner, cx| owner.render_settings_window(window, cx))
+        } else {
+            window.remove_window();
+            div().into_any_element()
+        }
     }
 }
