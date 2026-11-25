@@ -3,35 +3,32 @@
     <channel>
         <title>rmux</title>
         <item>
-            <title>0.1.25</title>
-            <pubDate>Wed, 25 Nov 2026 14:53:09 +0000</pubDate>
+            <title>0.1.26</title>
+            <pubDate>Wed, 25 Nov 2026 17:04:42 +0000</pubDate>
             <link>https://github.com/rmuxapp/rmux</link>
-            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.25</sparkle:fullReleaseNotesLink>
-            <sparkle:version>0.1.25</sparkle:version>
-            <sparkle:shortVersionString>0.1.25</sparkle:shortVersionString>
+            <sparkle:fullReleaseNotesLink>https://github.com/rmuxapp/rmux/releases/tag/v0.1.26</sparkle:fullReleaseNotesLink>
+            <sparkle:version>0.1.26</sparkle:version>
+            <sparkle:shortVersionString>0.1.26</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.25
+            <description sparkle:format="markdown"><![CDATA[# rmux 0.1.26
 
-More complete Settings controls, clearer terminal search, and less rendering work for hidden terminals.
+Clearer text hover feedback and better-spaced context menus.
 
-- Edit terminal colors, font family, and session, socket, and history paths directly in Settings, with color swatches, native browsing, validation, and per-setting resets.
-- Preserve unrelated configuration edits when saving or undoing Settings changes, and report conflicts instead of overwriting them. Add clearer restart guidance and search-match explanations.
-- Group terminal search results by window and workspace, highlight matching excerpts, and reliably navigate to matches across windows.
-- Skip redundant hidden-terminal output invalidations after releasing snapshots, while retaining output and independent status/error updates. Add opt-in rendering counters and a documented CPU/memory baseline.
-- Make startup, socket, and session-recovery errors more actionable while preserving existing files and endpoints. Keep full diagnostics available from compact toasts.
-- Polish compact Settings layouts and success feedback, and add native macOS Window → Minimize / Command-M support.
-- Prevent live-shell smoke fixtures from stealing keyboard focus, improving repeatability of input and exit checks.
+- Show the I-beam cursor over visible terminal text, including wide characters, while blank cells and terminal padding retain the arrow. Actionable links keep the hand pointer; terminal selection gestures are unchanged.
+- Show the I-beam cursor in editable text fields.
+- Give workspace and terminal-tab context menus more room around their headings, consistent row line heights, and straight section dividers separated from rounded selection backgrounds.
+- Adjust menu scrolling limits to accommodate the taller headers in small windows. Shared browser-demo menus receive the same spacing improvements.
 
 ## Downloads
 
 Signed and notarized macOS Apple Silicon DMG and ZIP, Linux x86-64 tarball, and Windows x86-64 ZIP. macOS updates use Sparkle. All release builds run on GitHub.
 
-Validation: 320 desktop tests passed with six intentional ignores, the desktop/CLI debug build passed, and the final live-shell smoke passed all 25 checks. Native Settings and cross-window search checks passed. Render visibility checks verified retained Unicode output and fresh painting on return. Performance baselines cover 1, 8, and 32 terminals; debug measurements are not release speedup claims. Native Windows runtime validation remains deferred.
+Validation: desktop check and debug build passed; both context menus were visually checked in an isolated native preview. Native Windows runtime validation remains deferred.
 
-[Delivery evidence](../workflow-improvements.md) · [User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
+[User guide](https://github.com/rmuxapp/rmux/blob/main/docs/user-guide.md) · [Website](https://rmux.app)
 ]]></description>
-            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.25/rmux-0.1.25-macos-arm64.zip" length="9039605" type="application/octet-stream" sparkle:edSignature="q3Cu6hQHKnJcbSBtMeqcrcAV0g3kIzP0hnACVuqNjn5lVTHdF+JmwwRp57T8iveGeyb87Tlqe+VKkYAJWcouBg=="/>
+            <enclosure url="https://github.com/rmuxapp/rmux/releases/download/v0.1.26/rmux-0.1.26-macos-arm64.zip" length="9041851" type="application/octet-stream" sparkle:edSignature="CySsqq0xU17fUD+7op8n/PKz00z1Ff2Umd9uToHVzOJt1gpYizXsZczkmccVxsUmcaUqDT1v2z/RuojeElLfAg=="/>
         </item>
     </channel>
 </rss>
